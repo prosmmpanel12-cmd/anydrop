@@ -1,3 +1,4 @@
+
 <resources>
     <!-- Brand -->
     <color name="anydrop_primary">#E64A19</color>
@@ -37,6 +38,8 @@
     <color name="offer_fg">#B23C14</color>
 
     <!-- Soft tinted fill for the login/OTP input boxes -->
-    <color name="anydrop_input_fill">#FBF1EC</color>
+<color name="anydrop_input_fill">#FBF1EC</color>
+<color name="anydrop_input_stroke">#D9A78C</color>
     <color name="anydrop_launcher_bg">#0B0B0B</color>
 </resources>
+
