@@ -4,10 +4,10 @@ import android.content.Context
 import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.Gravity
+import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.View
 import com.anydrop.food.R
 
 /**
