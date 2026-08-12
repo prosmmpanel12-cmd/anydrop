@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  H5 — one coupon row inside CouponsListBottomSheetFragment. Dashed
+  "voucher" card (bg_coupon_card) with the discount headline, min-order
+  line, and a tap-to-apply / applied / locked trailing state. Ineligible
+  coupons (usage exhausted or cart still below min-order) render at 50%
+  alpha and aren't clickable — same "don't let it look tappable if it will
+  just fail" principle as btnPlaceOrder's disabled state on H4.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/couponRowRoot"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="12dp"
+    android:background="@drawable/bg_coupon_card"
+    android:orientation="horizontal"
+    android:padding="14dp"
+    android:gravity="center_vertical">
+
+    <ImageView
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:src="@drawable/ic_offer_tag"
+        app:tint="@color/offer_fg" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="12dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/couponCode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textStyle="bold"
+            android:textSize="15sp"
+            android:textColor="@color/text_primary"
+            tools:text="SAVE50" />
+
+        <TextView
+            android:id="@+id/couponDiscountLine"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textSize="13sp"
+            android:textColor="@color/offer_fg"
+            tools:text="50% OFF up to ₹100" />
+
+        <TextView
+            android:id="@+id/couponSubLine"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary"
+            tools:text="Min order ₹199" />
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/couponActionText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:textColor="@color/anydrop_primary"
+        tools:text="Tap to apply" />
+
+    <ImageView
+        android:id="@+id/couponAppliedIcon"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginStart="8dp"
+        android:src="@drawable/ic_check_circle"
+        app:tint="@color/success_fg"
+        android:visibility="gone" />
+
+</LinearLayout>

@@ -1,0 +1,41 @@
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/v1/auth/restaurant/login/?$ api/v1/auth/restaurant-login.php [L,QSA]
+RewriteRule ^api/v1/auth/customer/email/request-otp/?$ api/v1/auth/customer-request-otp.php [L,QSA]
+RewriteRule ^api/v1/auth/customer/email/verify-otp/?$ api/v1/auth/customer-verify-otp.php [L,QSA]
+RewriteRule ^api/v1/restaurants/?$ api/v1/restaurants/list.php [L,QSA]
+RewriteRule ^api/v1/restaurants/([0-9]+)/menu/?$ api/v1/restaurants/menu.php?id=$1 [L,QSA]
+RewriteRule ^api/v1/search/?$ api/v1/search/search.php [L,QSA]
+RewriteRule ^api/v1/system/app-version/?$ api/v1/system/app-version.php [L,QSA]
+RewriteRule ^api/v1/home/categories/?$ api/v1/home/categories.php [L,QSA]
+RewriteRule ^api/v1/home/category-items/?$ api/v1/home/category-items.php [L,QSA]
+
+# Phase 3 — Ordering
+RewriteRule ^api/v1/cart/validate/?$ api/v1/cart/validate.php [L,QSA]
+RewriteRule ^api/v1/orders/?$ api/v1/orders/create.php [L,QSA]
+RewriteRule ^api/v1/orders/([0-9]+)/?$ api/v1/orders/detail.php?id=$1 [L,QSA]
+RewriteRule ^api/v1/orders/([0-9]+)/track/?$ api/v1/orders/track.php?id=$1 [L,QSA]
+RewriteRule ^api/v1/orders/([0-9]+)/cancel/?$ api/v1/orders/cancel.php?id=$1 [L,QSA]
+
+RewriteRule ^api/v1/restaurant/orders/?$ api/v1/restaurant/orders-list.php [L,QSA]
+RewriteRule ^api/v1/restaurant/orders/([0-9]+)/?$ api/v1/restaurant/orders-detail.php?id=$1 [L,QSA]
+RewriteRule ^api/v1/restaurant/orders/([0-9]+)/accept/?$ api/v1/restaurant/orders-accept.php?id=$1 [L,QSA]
+RewriteRule ^api/v1/restaurant/orders/([0-9]+)/reject/?$ api/v1/restaurant/orders-reject.php?id=$1 [L,QSA]
+RewriteRule ^api/v1/restaurant/orders/([0-9]+)/status/?$ api/v1/restaurant/orders-status.php?id=$1 [L,QSA]
+RewriteRule ^api/v1/restaurant/dashboard/?$ api/v1/restaurant/dashboard.php [L,QSA]
+RewriteRule ^api/v1/customer/addresses/?$ api/v1/customer/addresses.php [L,QSA]
+RewriteRule ^api/v1/customer/addresses/([0-9]+)/?$ api/v1/customer/addresses.php?id=$1 [L,QSA]
+
+# Phase 3.6 — Bookmarks, promo carousel, popular dishes, profile screen
+RewriteRule ^api/v1/home/promo-banners/?$ api/v1/home/promo-banners.php [L,QSA]
+RewriteRule ^api/v1/home/popular-items/?$ api/v1/home/popular-items.php [L,QSA]
+RewriteRule ^api/v1/customer/favorites/?$ api/v1/customer/favorites.php [L,QSA]
+RewriteRule ^api/v1/customer/faqs/?$ api/v1/customer/faqs.php [L,QSA]
+RewriteRule ^api/v1/customer/feedback/?$ api/v1/customer/feedback.php [L,QSA]
+
+# Part 13 — Rating system
+RewriteRule ^api/v1/customer/reviews/?$ api/v1/customer/reviews.php [L,QSA]
+
+# H5 — Checkout "View all offers & coupons" page
+RewriteRule ^api/v1/coupons/?$ api/v1/coupons/list.php [L,QSA]

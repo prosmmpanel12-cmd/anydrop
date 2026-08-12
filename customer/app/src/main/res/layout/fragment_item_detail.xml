@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  §2.6 / 1.9 — dish customization bottom sheet. Opened from every dish-card
+  body tap across the app (Restaurant Detail's own menu, Home's Popular
+  row, Search results). Addon checkboxes only render meaningfully when the
+  MenuItem passed in actually carries `addons` (Restaurant Detail's own
+  menu items do; Popular/Search-sourced items don't, see
+  network/Models.kt's toMenuItem() converters) — noAddonsNote covers that
+  case instead of showing an empty heading with nothing under it.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/surface">
+
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/bg_chip_selected" />
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxHeight="520dp"
+        android:clipToPadding="false">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="12dp">
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="180dp"
+                android:layout_marginTop="12dp">
+
+                <ImageView
+                    android:id="@+id/itemDetailImage"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:background="@color/background" />
+
+                <ImageView
+                    android:id="@+id/itemDetailClose"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_gravity="top|end"
+                    android:layout_margin="12dp"
+                    android:padding="6dp"
+                    android:background="@drawable/bg_bookmark_circle"
+                    android:src="@drawable/ic_close"
+                    app:tint="@color/text_primary" />
+
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingHorizontal="18dp"
+                android:paddingTop="14dp">
+
+                <View
+                    android:id="@+id/itemDetailVegBadge"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/bg_badge_veg" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="10dp"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/itemDetailName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_primary" />
+
+                    <TextView
+                        android:id="@+id/itemDetailPrice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textSize="15sp"
+                        android:textColor="@color/text_primary" />
+
+                    <TextView
+                        android:id="@+id/itemDetailDescription"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textSize="13sp"
+                        android:textColor="@color/text_secondary" />
+
+                    <!-- §1.9 — restaurant this dish belongs to; tappable to
+                         open the full restaurant, so the sheet replacing
+                         "tap opens the restaurant" doesn't lose restaurant
+                         access entirely. -->
+                    <TextView
+                        android:id="@+id/itemDetailViewFullMenu"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/anydrop_primary" />
+
+                </LinearLayout>
+
+                <!-- features.md §2 — bookmark + share, 44dp circular outlined
+                     touch targets (screenshots 01/07/08), matching size with
+                     RestaurantDetailActivity's own header buttons. -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:id="@+id/itemDetailBookmark"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:padding="11dp"
+                        android:background="@drawable/bg_circle_outline"
+                        android:src="@drawable/ic_bookmark_outline"
+                        app:tint="@color/text_primary"
+                        android:contentDescription="@string/cd_save_item" />
+
+                    <ImageView
+                        android:id="@+id/itemDetailShare"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:layout_marginStart="10dp"
+                        android:padding="11dp"
+                        android:background="@drawable/bg_circle_outline"
+                        android:src="@drawable/ic_share"
+                        app:tint="@color/text_primary"
+                        android:contentDescription="@string/cd_share_item" />
+
+                </LinearLayout>
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="16dp"
+                android:layout_marginHorizontal="18dp"
+                android:background="@color/outline" />
+
+            <!-- Addon checkboxes — flat list (no groups/max-select cap, see
+                 CartManager.kt's kdoc for the accepted v1 simplification). -->
+            <TextView
+                android:id="@+id/addonsHeading"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="18dp"
+                android:layout_marginTop="16dp"
+                android:text="@string/item_addons_heading"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <LinearLayout
+                android:id="@+id/addonsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="14dp" />
+
+            <TextView
+                android:id="@+id/noAddonsNote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="18dp"
+                android:layout_marginEnd="18dp"
+                android:layout_marginTop="16dp"
+                android:text="@string/item_no_addons_note"
+                android:textSize="13sp"
+                android:textColor="@color/text_secondary"
+                android:visibility="gone" />
+
+            <!-- Cooking request — per-item note (distinct from the
+                 order-level delivery instructions field on Checkout). -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="18dp"
+                android:layout_marginTop="20dp"
+                android:text="@string/delivery_note_label"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/quickSelectChipsContainer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="18dp" />
+
+            </HorizontalScrollView>
+
+            <EditText
+                android:id="@+id/cookingRequestInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="18dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_search_pill"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="10dp"
+                android:hint="@string/item_cooking_request_hint"
+                android:textColorHint="@color/text_secondary"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:inputType="textCapSentences|textMultiLine"
+                android:maxLength="200"
+                android:minLines="1"
+                android:maxLines="3" />
+
+            <TextView
+                android:id="@+id/cookingRequestCounter"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginEnd="18dp"
+                android:gravity="end"
+                android:textSize="11sp"
+                android:textColor="@color/text_secondary" />
+
+            <!-- Quantity stepper -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:layout_marginHorizontal="18dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/lbl_item_total"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/bg_qty_stepper"
+                    android:paddingHorizontal="6dp">
+
+                    <ImageView
+                        android:id="@+id/itemDetailQtyDecrease"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:padding="6dp"
+                        android:src="@drawable/ic_remove"
+                        app:tint="@color/white" />
+
+                    <TextView
+                        android:id="@+id/itemDetailQty"
+                        android:layout_width="28dp"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="1"
+                        android:textColor="@color/white"
+                        android:textStyle="bold"
+                        android:textSize="14sp" />
+
+                    <ImageView
+                        android:id="@+id/itemDetailQtyIncrease"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:padding="6dp"
+                        android:src="@drawable/ic_add"
+                        app:tint="@color/white" />
+
+                </LinearLayout>
+            </LinearLayout>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- Sticky Add button — always visible below the scrollable content,
+         live total updates on every addon/qty change. -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnAddItem"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_margin="16dp"
+        android:backgroundTint="@color/anydrop_primary"
+        android:textColor="@color/white"
+        android:textStyle="bold"
+        android:text="@string/item_add_button_format"
+        app:cornerRadius="10dp" />
+
+</LinearLayout>

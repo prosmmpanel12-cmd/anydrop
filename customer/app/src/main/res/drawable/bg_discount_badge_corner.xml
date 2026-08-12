@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Discount badge pinned to the bottom-end corner of a dish/restaurant
+     image (features.md §4 — "right down side corner" per user request).
+     Rounded on the top-start corner only + matches the image's own
+     bottom-end corner radius, same mirrored-corner trick as
+     bg_carousel_overlay_pill.xml uses for its own (top-start) placement. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/anydrop_primary_dark" />
+    <corners
+        android:topLeftRadius="10dp"
+        android:bottomRightRadius="12dp" />
+</shape>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "Highly reordered" pill background, menu item / popular dish cards
+     (features.md §3). Reuses the existing success_bg color instead of
+     introducing a new one. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/success_bg" />
+    <corners android:radius="20dp" />
+</shape>

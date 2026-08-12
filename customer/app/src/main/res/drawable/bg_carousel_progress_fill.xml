@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Filled portion of a single Stories-style progress segment
+     (DishPhotoCarouselView's carouselProgressSegments) — solid white, same
+     color as the old dot_carousel_selected.xml it replaces. This view's
+     WIDTH is animated 0 -> full by DishPhotoCarouselView to show real
+     elapsed-time progress toward the next auto-advance, not a static fill
+     state. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/white" />
+    <corners android:radius="2dp" />
+</shape>

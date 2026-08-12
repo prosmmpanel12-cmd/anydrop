@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0B0B0B">
+
+    <!-- Bundled hero image (splash_hero.jpg) — centerCrop so the artwork
+         always fills the entire screen edge-to-edge (no black letterbox
+         bars top/bottom on taller/shorter screens). The logo + tagline
+         sit centered in the artwork with generous dark margin around
+         them, so cropping the outer food-photo edges never clips the
+         logo itself. -->
+    <ImageView
+        android:id="@+id/splashBannerImage"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:src="@drawable/splash_hero"
+        android:contentDescription="@null" />
+
+    <!-- Loading indicator, pinned to the very bottom of the screen. -->
+    <ProgressBar
+        android:id="@+id/splashProgress"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="36dp"
+        android:indeterminateTint="@color/anydrop_primary" />
+
+</FrameLayout>

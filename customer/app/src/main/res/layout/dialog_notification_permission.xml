@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bg_dialog_rounded_top"
+    android:paddingTop="28dp"
+    android:paddingBottom="28dp"
+    android:paddingHorizontal="28dp"
+    android:gravity="center_horizontal">
+
+    <com.airbnb.lottie.LottieAnimationView
+        android:id="@+id/bellAnimation"
+        android:layout_width="140dp"
+        android:layout_height="140dp"
+        app:lottie_rawRes="@raw/anim_bell_ring"
+        app:lottie_autoPlay="true"
+        app:lottie_loop="true"
+        app:lottie_repeatMode="restart" />
+
+    <TextView
+        android:id="@+id/notifTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:text="@string/notif_permission_title"
+        android:textSize="19sp"
+        android:textStyle="bold"
+        android:textColor="@color/text_primary" />
+
+    <Button
+        android:id="@+id/btnEnableNotifications"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:paddingVertical="13dp"
+        android:text="@string/notif_permission_positive"
+        android:textAllCaps="false"
+        android:textSize="16sp"
+        android:textColor="@color/white"
+        android:background="@drawable/bg_button_primary" />
+
+    <TextView
+        android:id="@+id/btnNotNow"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:padding="8dp"
+        android:text="@string/notif_permission_negative"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:textColor="@color/anydrop_primary_dark"
+        android:background="?attr/selectableItemBackground" />
+
+</LinearLayout>

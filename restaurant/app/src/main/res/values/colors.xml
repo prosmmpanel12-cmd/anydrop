@@ -1,0 +1,38 @@
+<resources>
+    <!-- Brand -->
+    <color name="anydrop_primary">#E64A19</color>
+    <color name="anydrop_primary_dark">#B23C14</color>
+    <color name="anydrop_primary_container">#FFE0D3</color>
+    <color name="anydrop_secondary">#2E7D32</color>
+
+    <!-- Surfaces -->
+    <color name="background">#FAFAFA</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="outline">#E0E0E0</color>
+
+    <!-- Text -->
+    <color name="text_primary">#1A1A1A</color>
+    <color name="text_secondary">#6E6E6E</color>
+    <color name="white">#FFFFFF</color>
+
+    <!-- Semantic -->
+    <color name="veg_green">#2E7D32</color>
+    <color name="nonveg_red">#C62828</color>
+    <color name="rating_gold">#F5A623</color>
+
+    <color name="success_bg">#E7F6E9</color>
+    <color name="success_fg">#1E7B34</color>
+    <color name="error_bg">#FDE9E7</color>
+    <color name="error_fg">#C62828</color>
+    <color name="info_bg">#E8EEFB</color>
+    <color name="info_fg">#2955A8</color>
+
+    <!-- Order status chips -->
+    <color name="status_pending_bg">#FFF3E0</color>
+    <color name="status_pending_fg">#E65100</color>
+    <color name="status_active_bg">#E8EEFB</color>
+    <color name="status_active_fg">#2955A8</color>
+    <color name="status_done_bg">#E7F6E9</color>
+    <color name="status_done_fg">#1E7B34</color>
+    <color name="anydrop_launcher_bg">#0B0B0B</color>
+</resources>

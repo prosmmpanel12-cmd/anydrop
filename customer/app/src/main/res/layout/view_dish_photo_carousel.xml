@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Merged into DishPhotoCarouselView (a FrameLayout) — see that class for
+     the auto-advance / dot-indicator / overlay-text logic. Kept as its own
+     layout file (rather than inline-inflated code) so the visual structure
+     can be tweaked without touching the Kotlin. -->
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <ImageView
+        android:id="@+id/carouselImage"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:background="@color/anydrop_primary_container"
+        tools:src="@drawable/ic_restaurant" />
+
+    <!-- Instagram/WhatsApp-Stories-style progress segments, top-edge over
+         the photo — one segment per gallery photo, only shown when there
+         are 2+ photos. Replaces the old dot indicators (§2.7's original
+         ask, deferred until part 19 — see DishPhotoCarouselView's kdoc).
+         Each segment is built at runtime in DishPhotoCarouselView as a
+         track (carousel_progress_track) + an animatable fill view
+         (carousel_progress_fill) layered inside via FrameLayout, matching
+         this container's height. The fill's width is what animates 0→100%
+         over INTERVAL_MS to show real elapsed-time progress, not a static
+         state. -->
+    <LinearLayout
+        android:id="@+id/carouselProgressSegments"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:layout_marginTop="8dp"
+        android:layout_marginHorizontal="8dp"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        tools:visibility="visible" />
+
+    <!-- "Dish Name · ₹price" tag, top-start over the photo — screenshot
+         reference: "Chilly Paneer Pizza · ₹149". Hidden entirely when the
+         current photo has no dish_name/price (plain gallery photo). Margin
+         increased slightly so it doesn't collide with the progress
+         segments row directly above it. -->
+    <TextView
+        android:id="@+id/carouselOverlayText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="10dp"
+        android:layout_marginTop="18dp"
+        android:layout_marginEnd="10dp"
+        android:background="@drawable/bg_carousel_overlay_pill"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="5dp"
+        android:textColor="@color/white"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        tools:visibility="visible"
+        tools:text="Chilly Paneer Pizza · ₹149" />
+
+</merge>

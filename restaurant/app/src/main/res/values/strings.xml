@@ -1,0 +1,32 @@
+<resources>
+    <string name="app_name">Anydrop Restaurant</string>
+
+    <!-- Login -->
+    <string name="login_title">Restaurant Login</string>
+    <string name="login_subtitle">Sign in with your registered email</string>
+    <string name="hint_email">Email address</string>
+    <string name="hint_password">Password</string>
+    <string name="btn_login">Log In</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">Orders</string>
+    <string name="tab_new">New</string>
+    <string name="tab_active">Active</string>
+    <string name="tab_history">History</string>
+    <string name="empty_orders">No orders here right now</string>
+    <string name="today_summary">Today: %1$d orders · ₹%2$s earned</string>
+    <string name="btn_logout">Log out</string>
+
+    <!-- Order detail -->
+    <string name="order_detail_title">Order Detail</string>
+    <string name="btn_accept">Accept</string>
+    <string name="btn_reject">Reject</string>
+    <string name="btn_mark_preparing">Mark Preparing</string>
+    <string name="btn_mark_ready">Mark Ready</string>
+    <string name="hint_reject_reason">Reason for rejecting</string>
+    <string name="btn_confirm_reject">Confirm Reject</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="items_label">Items</string>
+    <string name="customer_note_label">Delivery instructions</string>
+    <string name="bill_total_label">Item total</string>
+</resources>

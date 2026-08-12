@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingVertical="12dp"
+        android:gravity="center_vertical">
+
+    <View
+        android:id="@+id/cartLineVegBadge"
+        android:layout_width="14dp"
+        android:layout_height="14dp"
+        android:layout_marginEnd="10dp"
+        android:background="@drawable/bg_badge_veg" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingEnd="10dp">
+
+        <TextView
+            android:id="@+id/cartLineName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:textColor="@color/text_primary" />
+
+        <TextView
+            android:id="@+id/cartLinePrice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textSize="13sp"
+            android:textColor="@color/text_secondary" />
+
+        <!-- §2.6 — addon summary ("Extra Cheese, Extra Sauce") and/or the
+             cooking-request note, shown only when the line actually has one;
+             GONE by default so plain (non-customized) lines look unchanged. -->
+        <TextView
+            android:id="@+id/cartLineCustomization"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textSize="12sp"
+            android:textStyle="italic"
+            android:visibility="gone"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:textColor="@color/text_secondary" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="32dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_qty_stepper"
+        android:paddingHorizontal="4dp">
+
+        <ImageView
+            android:id="@+id/btnLineDecrease"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:padding="6dp"
+            android:src="@drawable/ic_remove"
+            app:tint="@color/white" />
+
+        <TextView
+            android:id="@+id/cartLineQty"
+            android:layout_width="22dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="@color/white"
+            android:textStyle="bold"
+            android:textSize="13sp" />
+
+        <ImageView
+            android:id="@+id/btnLineIncrease"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:padding="6dp"
+            android:src="@drawable/ic_add"
+            app:tint="@color/white" />
+
+    </LinearLayout>
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/outline" />
+
+</LinearLayout>

@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginBottom="10dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="1dp"
+    app:cardBackgroundColor="@color/surface">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:gravity="center_vertical"
+        android:clipChildren="false"
+        android:clipToPadding="false">
+
+        <FrameLayout
+            android:layout_width="70dp"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            android:clipChildren="false"
+            android:clipToPadding="false">
+
+            <ImageView
+                android:id="@+id/dishImage"
+                android:layout_width="70dp"
+                android:layout_height="70dp"
+                android:scaleType="centerCrop"
+                android:background="@color/anydrop_primary_container" />
+
+            <ImageView
+                android:id="@+id/dishBookmark"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="top|end"
+                android:padding="4dp"
+                android:background="@drawable/bg_bookmark_circle"
+                android:src="@drawable/ic_bookmark_outline"
+                app:tint="@color/text_primary" />
+
+            <LinearLayout
+                android:id="@+id/qtyStepper"
+                android:layout_width="wrap_content"
+                android:layout_height="30dp"
+                android:layout_gravity="bottom|center_horizontal"
+                android:layout_marginBottom="-14dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_qty_stepper"
+                android:paddingHorizontal="3dp"
+                android:elevation="3dp">
+
+                <ImageView
+                    android:id="@+id/btnDecrease"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:padding="4dp"
+                    android:src="@drawable/ic_remove"
+                    app:tint="@color/white" />
+
+                <TextView
+                    android:id="@+id/itemQuantity"
+                    android:layout_width="20dp"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="1"
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:textSize="11sp" />
+
+                <ImageView
+                    android:id="@+id/btnIncrease"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:padding="4dp"
+                    android:src="@drawable/ic_add"
+                    app:tint="@color/white" />
+
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAdd"
+                android:layout_width="wrap_content"
+                android:layout_height="30dp"
+                android:layout_gravity="bottom|center_horizontal"
+                android:layout_marginBottom="-14dp"
+                android:minWidth="0dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:paddingHorizontal="10dp"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:backgroundTint="@color/surface"
+                android:textColor="@color/anydrop_primary"
+                android:textSize="11sp"
+                android:text="@string/btn_add_to_cart"
+                android:elevation="3dp"
+                app:cornerRadius="8dp" />
+
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <View
+                    android:id="@+id/dishVegDot"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/dot_veg_fill" />
+
+                <TextView
+                    android:id="@+id/dishName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    tools:text="Cheese Burst Pizza" />
+
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/dishPrice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:textSize="13sp"
+                android:textColor="@color/text_primary"
+                tools:text="₹299" />
+
+            <!-- Restaurant tag — "from <Restaurant Name>", the key requirement:
+                 every item card always shows which restaurant it comes from,
+                 including items pulled in from other restaurants for the
+                 same dish search. -->
+            <TextView
+                android:id="@+id/dishRestaurantTag"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_chip_unselected"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp"
+                android:textSize="11sp"
+                android:textColor="@color/anydrop_primary"
+                android:maxLines="1"
+                android:ellipsize="end"
+                tools:text="from La Pino'z Pizza" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>

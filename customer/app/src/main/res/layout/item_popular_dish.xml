@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="150dp"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="12dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="1dp"
+    app:cardBackgroundColor="@color/surface">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="10dp"
+        android:clipChildren="false"
+        android:clipToPadding="false">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="110dp"
+            android:clipChildren="false"
+            android:clipToPadding="false">
+
+            <ImageView
+                android:id="@+id/dishImage"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:background="@color/anydrop_primary_container" />
+
+            <!-- Discount badge, bottom-end corner (features.md §4). Visible
+                 only when item.discountPercent > 0, bound in
+                 PopularItemsAdapter.VH.bind(). -->
+            <TextView
+                android:id="@+id/dishDiscountBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|end"
+                android:background="@drawable/bg_discount_badge_corner"
+                android:paddingHorizontal="7dp"
+                android:paddingVertical="3dp"
+                android:textColor="@color/white"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                tools:text="20% OFF"
+                tools:visibility="visible" />
+
+            <ImageView
+                android:id="@+id/dishBookmark"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_gravity="top|end"
+                android:layout_margin="6dp"
+                android:padding="5dp"
+                android:background="@drawable/bg_bookmark_circle"
+                android:src="@drawable/ic_bookmark_outline"
+                app:tint="@color/text_primary" />
+
+            <LinearLayout
+                android:id="@+id/qtyStepper"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_gravity="bottom|center_horizontal"
+                android:layout_marginBottom="-14dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_qty_stepper"
+                android:paddingHorizontal="4dp"
+                android:elevation="3dp">
+
+                <ImageView
+                    android:id="@+id/btnDecrease"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:padding="5dp"
+                    android:src="@drawable/ic_remove"
+                    app:tint="@color/white" />
+
+                <TextView
+                    android:id="@+id/itemQuantity"
+                    android:layout_width="22dp"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="1"
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:textSize="12sp" />
+
+                <ImageView
+                    android:id="@+id/btnIncrease"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:padding="5dp"
+                    android:src="@drawable/ic_add"
+                    app:tint="@color/white" />
+
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAdd"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_gravity="bottom|center_horizontal"
+                android:layout_marginBottom="-14dp"
+                android:minWidth="0dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:paddingHorizontal="14dp"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:backgroundTint="@color/surface"
+                android:textColor="@color/anydrop_primary"
+                android:textSize="11sp"
+                android:text="@string/btn_add_to_cart"
+                android:elevation="3dp"
+                app:cornerRadius="8dp" />
+
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="16dp"
+            android:paddingHorizontal="8dp"
+            android:gravity="center_vertical">
+
+            <View
+                android:id="@+id/dishVegDot"
+                android:layout_width="9dp"
+                android:layout_height="9dp"
+                android:layout_marginEnd="5dp"
+                android:background="@drawable/dot_veg_fill" />
+
+            <TextView
+                android:id="@+id/dishName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:maxLines="1"
+                android:ellipsize="end"
+                tools:text="Cheese Burst Pizza" />
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/dishPrice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:layout_marginStart="8dp"
+            android:textSize="13sp"
+            android:textColor="@color/text_primary"
+            tools:text="₹299" />
+
+        <!-- "Highly reordered" pill (features.md §3) — visible only when
+             item.isBestseller is true, bound in PopularItemsAdapter.VH.bind(). -->
+        <TextView
+            android:id="@+id/dishHighlyReordered"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_pill_highly_reordered"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="2dp"
+            android:text="@string/highly_reordered"
+            android:textColor="@color/success_fg"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+        <TextView
+            android:id="@+id/dishRestaurantTag"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_chip_unselected"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:textSize="10sp"
+            android:textColor="@color/anydrop_primary"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="from La Pino'z Pizza" />
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- On-photo carousel dot (current photo) — solid white so it reads on any
+     food-photo background, unlike dot_promo_selected.xml which uses
+     anydrop_primary and is meant for a plain white banner background. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@color/white" />
+    <size
+        android:width="6dp"
+        android:height="6dp" />
+</shape>

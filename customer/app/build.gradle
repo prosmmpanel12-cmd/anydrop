@@ -1,0 +1,85 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.anydrop.food'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.anydrop.food"
+        minSdk 24
+        targetSdk 34
+        // versionCode is the number the update-check compares against
+        // `min_app_version_customer` / `latest_app_version_customer` in app_settings.
+        // Bump this on every release build.
+        versionCode 1
+        versionName "0.1-phase2"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    buildFeatures {
+        viewBinding true
+        buildConfig true
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+    implementation 'androidx.recyclerview:recyclerview:1.3.2'
+    implementation 'androidx.cardview:cardview:1.0.0'
+    implementation 'androidx.coordinatorlayout:coordinatorlayout:1.2.0'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0'
+    implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.7.0'
+    implementation 'androidx.fragment:fragment-ktx:1.6.2'
+
+    // Networking — talks to the Phase 1 PHP/MySQL backend
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+
+    // Image loading for restaurant/menu photos (logo_url, image_url, etc.)
+    implementation 'io.coil-kt:coil:2.6.0'
+
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+
+    // Daily local meal-reminder notifications (survives app kill/reboot)
+    implementation 'androidx.work:work-runtime-ktx:2.9.0'
+
+    // Animated notification-permission popup bell (Home screen, once per app open)
+    implementation 'com.airbnb.android:lottie:6.4.0'
+
+    // Promo carousel (Phase 3.6 §2.2) — ViewPager2 + TabLayout dots
+    implementation 'androidx.viewpager2:viewpager2:1.1.0'
+
+    // H6 part 2 — map pin-drop screen (screenshot 13). Google Maps SDK for
+    // Android, replacing the earlier osmdroid approach (see
+    // docs/12_Handover_H6_Map_PinDrop_Photo.md, "Google Maps SDK migration
+    // plan" for the full reasoning). Requires com.google.android.geo.API_KEY
+    // meta-data in AndroidManifest.xml — see that same doc section, "API key
+    // security," before shipping a real key here. Version pinned to what
+    // was current stable on Maven Central as of this migration.
+    implementation 'com.google.android.gms:play-services-maps:19.1.0'
+}
