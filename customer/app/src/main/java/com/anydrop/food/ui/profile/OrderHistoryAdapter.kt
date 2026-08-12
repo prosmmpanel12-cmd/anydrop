@@ -5,13 +5,36 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import coil.load
 import com.anydrop.food.R
+import com.anydrop.food.data.CartManager
+import com.anydrop.food.data.CartSyncManager
 import com.anydrop.food.databinding.ItemOrderCardBinding
+import com.anydrop.food.network.ApiClient
 import com.anydrop.food.network.OrderHistoryEntry
+import com.anydrop.food.ui.cart.CartBottomSheetFragment
+import com.anydrop.food.ui.common.InAppNotifier
 import com.anydrop.food.ui.orders.RateOrderDialog
+import kotlinx.coroutines.launch
 
+/**
+ * I1 (Reorder button, docs/features.md Phase I). Tapping "Reorder" on a
+ * past order refills the cart with that order's items and opens the cart
+ * sheet — instead of re-browsing the restaurant menu from scratch.
+ *
+ * Re-fetches both the order's own line items (GET /orders/{id} — has
+ * menu_item_id + addon ids/prices at order time) AND the restaurant's
+ * *current* live menu (GET restaurants/menu.php), then matches by
+ * menu_item_id so price/availability is always today's, never a stale
+ * snapshot from whenever the order was placed. A menu item that's been
+ * deleted/86'd since, or an addon no longer offered on it, is silently
+ * dropped from that one line rather than failing the whole reorder —
+ * matches the pattern flagged in features.md's own I1 note ("decide
+ * whether to silently skip them or show a note"): skip + tell the user
+ * how many were skipped, don't block the rest of the order.
+ */
 class OrderHistoryAdapter(
     private val onClick: (OrderHistoryEntry) -> Unit,
     private val onRated: (OrderHistoryEntry) -> Unit = {}
@@ -98,6 +121,73 @@ class OrderHistoryAdapter(
             }
 
             binding.root.setOnClickListener { onClick(order) }
+
+            binding.btnReorder.setOnClickListener {
+                val activity = binding.root.context as? AppCompatActivity ?: return@setOnClickListener
+                reorder(activity, order)
+            }
+        }
+
+        private fun reorder(activity: AppCompatActivity, order: OrderHistoryEntry) {
+            val button = binding.btnReorder
+            button.isEnabled = false
+            val api = ApiClient.create(activity)
+            activity.lifecycleScope.launch {
+                try {
+                    val orderDetail = api.getOrder(order.id).body()?.data?.order
+                    val pastItems = orderDetail?.items.orEmpty()
+                    if (pastItems.isEmpty()) {
+                        InAppNotifier.show(activity, activity.getString(R.string.reorder_none_available), InAppNotifier.Type.ERROR)
+                        return@launch
+                    }
+
+                    val menu = api.getMenu(order.restaurantId).body()?.data
+                    val liveItemsById = menu?.categories.orEmpty()
+                        .flatMap { it.items }
+                        .associateBy { it.id }
+
+                    var addedCount = 0
+                    var skippedCount = 0
+                    for (line in pastItems) {
+                        val liveItem = line.menuItemId?.let { liveItemsById[it] }
+                        if (liveItem == null) {
+                            skippedCount++
+                            continue
+                        }
+                        val liveAddonIds = liveItem.addons.map { it.id }.toSet()
+                        val addonIds = line.addons.map { it.id }.filter { it in liveAddonIds }
+                        CartManager.setCustomized(
+                            restaurantId = order.restaurantId,
+                            item = liveItem,
+                            quantity = line.quantity,
+                            addonIds = addonIds,
+                            specialInstructions = null,
+                            restaurantName = order.restaurantName
+                        )
+                        addedCount++
+                    }
+
+                    if (addedCount == 0) {
+                        InAppNotifier.show(activity, activity.getString(R.string.reorder_none_available), InAppNotifier.Type.ERROR)
+                        return@launch
+                    }
+
+                    CartSyncManager.scheduleSync(activity)
+
+                    val message = if (skippedCount > 0) {
+                        activity.getString(R.string.reorder_some_items_unavailable, skippedCount)
+                    } else {
+                        activity.getString(R.string.reorder_added_to_cart)
+                    }
+                    InAppNotifier.show(activity, message, InAppNotifier.Type.SUCCESS)
+
+                    CartBottomSheetFragment().show(activity.supportFragmentManager, "cart")
+                } catch (e: Exception) {
+                    InAppNotifier.show(activity, activity.getString(R.string.reorder_failed), InAppNotifier.Type.ERROR)
+                } finally {
+                    button.isEnabled = true
+                }
+            }
         }
 
         /** created_at comes as "YYYY-MM-DD HH:MM:SS" from MySQL — reformat to

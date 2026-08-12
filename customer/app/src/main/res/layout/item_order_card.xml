@@ -97,6 +97,21 @@
                 android:visibility="gone"
                 app:drawableStartCompat="@drawable/ic_star" />
 
+            <TextView
+                android:id="@+id/btnReorder"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="5dp"
+                android:text="@string/btn_reorder"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="@android:color/white"
+                android:background="@drawable/bg_reorder_button"
+                android:clickable="true"
+                android:focusable="true" />
+
         </LinearLayout>
 
         <ImageView

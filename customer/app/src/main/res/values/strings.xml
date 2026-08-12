@@ -220,6 +220,11 @@
     <string name="rate_order_already_rated">You already rated this order</string>
     <string name="btn_rate_order">Rate Order</string>
     <string name="label_rated">Rated</string>
+    <string name="btn_reorder">Reorder</string>
+    <string name="reorder_added_to_cart">Added to cart</string>
+    <string name="reorder_some_items_unavailable">%1$d item(s) no longer available, rest added to cart</string>
+    <string name="reorder_none_available">None of these items are available anymore</string>
+    <string name="reorder_failed">Couldn\'t reorder — try again</string>
     <string name="account_basics_title">Account</string>
     <string name="logout_confirm_positive">Log out</string>
     <string name="btn_cancel">Cancel</string>

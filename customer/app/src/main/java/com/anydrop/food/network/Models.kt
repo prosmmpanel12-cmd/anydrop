@@ -384,12 +384,33 @@ data class CreateOrderBody(
     @SerializedName("delivery_instructions") val deliveryInstructions: String? = null
 )
 
+/** One addon snapshot as stored in order_items.addons_json at order time —
+ * {id, name, price} per lib/orders.php's price_cart(). [id] is the actual
+ * menu_item_addons.id, so Reorder (I1) can re-select the same addon on the
+ * restaurant's *current* menu without a name-matching heuristic. */
+data class OrderedAddonSnapshot(
+    val id: Int,
+    val name: String,
+    val price: Double
+)
+
 data class OrderItemLine(
     val id: Int,
+    // I1 (Reorder) needs this to re-match a past order's line against the
+    // restaurant's *current* menu — null for any order placed before this
+    // field existed, or if the menu item was later hard-deleted server-side
+    // (format_order() reads it straight off order_items, which always had
+    // this column; only ever null for pre-migration rows).
+    @SerializedName("menu_item_id") val menuItemId: Int? = null,
     val name: String,
     @SerializedName("variant_name") val variantName: String?,
     val quantity: Int,
     @SerializedName("unit_price") val unitPrice: Double,
+    // Addons the customer picked at order time (format_order() decodes
+    // addons_json server-side, which stores {id, name, price} per addon) —
+    // used by Reorder to re-select the same addons on the *current* menu
+    // item; any addon id no longer offered by that item is silently dropped.
+    val addons: List<OrderedAddonSnapshot> = emptyList(),
     val subtotal: Double
 )
 
