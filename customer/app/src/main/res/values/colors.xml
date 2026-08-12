@@ -40,5 +40,5 @@
     <color name="anydrop_input_fill">#FBF1EC</color>
     <!-- Stroke/hint color for the login/OTP input boxes -->
     <color name="anydrop_input_stroke">#D9A78C</color>
-    <color name="anydrop_launcher_bg">#0B0B0B</color>
+    <color name="anydrop_launcher_bg">#00000000</color>
 </resources>

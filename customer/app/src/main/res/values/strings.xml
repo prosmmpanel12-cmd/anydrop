@@ -261,6 +261,14 @@
     <string name="btn_cancel_order">Cancel Order</string>
     <string name="btn_back_to_home">Back to Home</string>
 
+    <!-- I2 — Order tracking status timeline (visual stepper), docs/features.md
+         Phase I. 5 stepper labels the 9 backend statuses collapse into. -->
+    <string name="step_placed">Placed</string>
+    <string name="step_accepted">Accepted</string>
+    <string name="step_preparing">Preparing</string>
+    <string name="step_out_for_delivery">Out for delivery</string>
+    <string name="step_delivered">Delivered</string>
+
     <!-- §2.3 — service-area "not available yet" state -->
     <string name="service_area_unavailable_title">We\'re not available in your area yet</string>
     <string name="service_area_unavailable_message">No restaurants deliver here right now — we\'re working on it. Coming soon!</string>

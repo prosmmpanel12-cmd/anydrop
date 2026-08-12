@@ -20,6 +20,10 @@ import kotlinx.coroutines.launch
  * while the order is active (simple polling, per docs/03_Live_Tracking.md —
  * the live map view itself is Phase 4 scope, this screen just shows status +
  * rider contact + delivery OTP once assigned).
+ *
+ * I2 (docs/features.md Phase I) adds the visual stepper — see
+ * [OrderStatusStepperView] for the 9-status-to-5-step mapping and how
+ * cancelled/rejected orders are handled.
  */
 class OrderStatusActivity : AppCompatActivity() {
 
@@ -104,6 +108,18 @@ class OrderStatusActivity : AppCompatActivity() {
         }
 
         binding.btnCancelOrder.visibility = if (track.status in CANCELLABLE_STATUSES) View.VISIBLE else View.GONE
+
+        // I2 — stepper only makes sense for the 5-step happy path;
+        // stepIndexFor() returns null for cancelled/rejected (see
+        // OrderStatusStepperView kdoc), so hide it for those instead of
+        // forcing a "cancelled" state onto the timeline.
+        val stepIndex = OrderStatusStepperView.stepIndexFor(track.status)
+        if (stepIndex != null) {
+            binding.statusStepper.visibility = View.VISIBLE
+            binding.statusStepper.setStatus(stepIndex)
+        } else {
+            binding.statusStepper.visibility = View.GONE
+        }
 
         if (track.status in TERMINAL_STATUSES) {
             polling = false
