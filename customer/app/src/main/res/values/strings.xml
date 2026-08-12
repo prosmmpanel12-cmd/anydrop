@@ -307,6 +307,27 @@
     <string name="filters_clear_all">Clear All</string>
     <string name="filters_apply_format">Apply (%1$d)</string>
 
+    <!-- I3 — Search filters (docs/features.md Phase I): cuisine, price,
+         rating, nearby. Reuses filters_clear_all / filters_apply_format
+         above for the sticky footer. -->
+    <string name="search_filters_pill_label">Filters</string>
+    <string name="search_filters_sheet_title">Filter Results</string>
+    <string name="search_filters_cuisine_heading">Cuisine</string>
+    <string name="search_filters_price_heading">Price</string>
+    <string name="search_filters_rating_heading">Rating</string>
+    <string name="search_filters_nearby_heading">Distance</string>
+    <string name="search_filters_price_under_200">Under ₹200</string>
+    <string name="search_filters_price_200_400">₹200 – ₹400</string>
+    <string name="search_filters_price_400_600">₹400 – ₹600</string>
+    <string name="search_filters_price_above_600">Above ₹600</string>
+    <string name="search_filters_rating_4_0">4.0+</string>
+    <string name="search_filters_rating_4_3">4.3+</string>
+    <string name="search_filters_rating_4_5">4.5+</string>
+    <string name="search_filters_nearby_2km">Within 2 km</string>
+    <string name="search_filters_nearby_5km">Within 5 km</string>
+    <string name="search_filters_nearby_10km">Within 10 km</string>
+    <string name="search_filters_nearby_unavailable">Turn on location to filter by distance</string>
+
     <!-- features.md §6 — Restaurant detail header parity pass -->
     <string name="detail_pure_veg_badge">Pure Veg</string>
     <string name="detail_distance_format">%1$s km · %2$s</string>

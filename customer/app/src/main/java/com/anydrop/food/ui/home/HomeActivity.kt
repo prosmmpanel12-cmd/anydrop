@@ -40,6 +40,8 @@ import com.anydrop.food.ui.common.NotificationPermissionDialog
 import com.anydrop.food.ui.login.LoginActivity
 import com.anydrop.food.ui.itemdetail.ItemDetailBottomSheetFragment
 import com.anydrop.food.ui.restaurant.RestaurantDetailActivity
+import com.anydrop.food.ui.search.SearchFilters
+import com.anydrop.food.ui.search.SearchFiltersBottomSheet
 import com.anydrop.food.ui.search.SearchResultsAdapter
 import com.anydrop.food.network.toMenuItem
 import kotlinx.coroutines.Job
@@ -86,6 +88,17 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
 
     private val searchHandler = Handler(Looper.getMainLooper())
     private var searchRunnable: Runnable? = null
+
+    // I3 (docs/features.md Phase I) — search filters state. Raw = the
+    // latest search response after vegOnly (kept separate so toggling
+    // filters re-applies against the full result set instead of an
+    // already-filtered one). Sticky across searches on purpose — a chosen
+    // "Under ₹200" filter carries over if the user tweaks their search
+    // text, same as VegModeManager's site-wide toggle; only "Clear All"
+    // inside the sheet resets it.
+    private var searchFilters = SearchFilters()
+    private var rawSearchRestaurants: List<Restaurant> = emptyList()
+    private var rawSearchItems: List<SearchItem> = emptyList()
     private var currentQuery: String = ""
 
     /**
@@ -240,6 +253,7 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
 
         setupSearch()
         setupVoiceSearch()
+        setupSearchFilters()
         setupVegToggle()
         setupFilterChips()
         loadCategories()
@@ -926,6 +940,12 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
         binding.searchInput.setText("")
         isProgrammaticSearchClear = false
         currentQuery = ""
+        // I3 — every caller of this function is leaving search mode for
+        // something else (category tap, offers tile, promo banner, etc.),
+        // and isProgrammaticSearchClear suppresses the watcher that would
+        // otherwise reach runSearchOrReload's own GONE branch — so hide the
+        // filters pill here once, rather than at each of those call sites.
+        binding.btnSearchFilters.visibility = android.view.View.GONE
     }
 
     private fun setupSearch() {
@@ -971,6 +991,7 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
             binding.sectionTitle.text = getString(R.string.restaurants_near_you)
             binding.filterScroll.visibility = android.view.View.VISIBLE
             binding.categoryList.visibility = android.view.View.VISIBLE
+            binding.btnSearchFilters.visibility = android.view.View.GONE
             binding.restaurantList.adapter = restaurantAdapter
             loadRestaurants()
             setPopularItemsVisible(!popularItemsAdapter.isEmpty())
@@ -989,18 +1010,30 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
                 // menu item whose name matches — each item tagged with its
                 // own restaurant_id/restaurant_name, including dishes from
                 // OTHER restaurants for the same query ("Also available at").
-                val response = api.search(query = query)
+                // I3 — lat/lng now passed so search.php's distance_km comes
+                // back populated (it was already accepting these params,
+                // just never sent from here), which is what the "nearby"
+                // filter option filters against.
+                val activeAddress = ActiveAddressManager.get(this@HomeActivity)
+                val response = api.search(
+                    query = query,
+                    lat = activeAddress?.latitude,
+                    lng = activeAddress?.longitude
+                )
                 binding.swipeRefresh.isRefreshing = false
                 val body = response.body()?.data
                 val restaurants = body?.restaurants ?: emptyList()
                 val items = body?.items ?: emptyList()
 
                 val vegOnly = VegModeManager.isVegOnly(this@HomeActivity)
-                val filteredRestaurants = if (vegOnly) restaurants.filter { it.isVegOnly } else restaurants
-                val filteredItems = if (vegOnly) items.filter { it.isVeg } else items
+                rawSearchRestaurants = if (vegOnly) restaurants.filter { it.isVegOnly } else restaurants
+                rawSearchItems = if (vegOnly) items.filter { it.isVeg } else items
 
-                searchAdapter.submit(filteredRestaurants, filteredItems)
-                setEmptyState(searchAdapter.isEmpty(), getString(R.string.empty_search_results))
+                binding.btnSearchFilters.visibility =
+                    if (rawSearchRestaurants.isEmpty() && rawSearchItems.isEmpty()) android.view.View.GONE
+                    else android.view.View.VISIBLE
+
+                applySearchFiltersAndSubmit()
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -1008,6 +1041,41 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
                 setEmptyState(true, getString(R.string.empty_search_results))
                 InAppNotifier.show(this@HomeActivity, "Search failed. Check your connection.", InAppNotifier.Type.ERROR)
             }
+        }
+    }
+
+    /** I3 — applies [searchFilters] against the latest raw search response
+     * and re-submits to [searchAdapter]. Called after a new search comes
+     * back, and again from [setupSearchFilters]'s onApply once the sheet
+     * closes, so toggling filters never needs a fresh network call. */
+    private fun applySearchFiltersAndSubmit() {
+        val cuisineTagsByRestaurantId = rawSearchRestaurants.associate { r ->
+            r.id to r.cuisineTags.orEmpty().split(",").map { it.trim() }.filter { it.isNotBlank() }
+        }
+        val filteredRestaurants = rawSearchRestaurants.filter { searchFilters.matches(it) }
+        val filteredItems = rawSearchItems.filter { item ->
+            searchFilters.matches(item, cuisineTagsByRestaurantId[item.restaurantId].orEmpty())
+        }
+        searchAdapter.submit(filteredRestaurants, filteredItems)
+        setEmptyState(searchAdapter.isEmpty(), getString(R.string.empty_search_results))
+    }
+
+    /** I3 — wires the "Filters" pill shown while browsing search results. */
+    private fun setupSearchFilters() {
+        binding.btnSearchFilters.setOnClickListener {
+            val activeAddress = ActiveAddressManager.get(this@HomeActivity)
+            val hasLocation = activeAddress?.latitude != null && activeAddress.longitude != null
+            val sheet = SearchFiltersBottomSheet.newInstance(
+                restaurants = rawSearchRestaurants,
+                items = rawSearchItems,
+                hasLocation = hasLocation,
+                current = searchFilters
+            )
+            sheet.onApply = { newFilters ->
+                searchFilters = newFilters
+                applySearchFiltersAndSubmit()
+            }
+            sheet.show(supportFragmentManager, "search_filters")
         }
     }
 
