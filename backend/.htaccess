@@ -24,6 +24,7 @@ RewriteRule ^api/v1/restaurant/orders/([0-9]+)/accept/?$ api/v1/restaurant/order
 RewriteRule ^api/v1/restaurant/orders/([0-9]+)/reject/?$ api/v1/restaurant/orders-reject.php?id=$1 [L,QSA]
 RewriteRule ^api/v1/restaurant/orders/([0-9]+)/status/?$ api/v1/restaurant/orders-status.php?id=$1 [L,QSA]
 RewriteRule ^api/v1/restaurant/dashboard/?$ api/v1/restaurant/dashboard.php [L,QSA]
+RewriteRule ^api/v1/restaurant/status-update/?$ api/v1/restaurant/status-update.php [L,QSA]
 RewriteRule ^api/v1/customer/addresses/?$ api/v1/customer/addresses.php [L,QSA]
 RewriteRule ^api/v1/customer/addresses/([0-9]+)/?$ api/v1/customer/addresses.php?id=$1 [L,QSA]
 

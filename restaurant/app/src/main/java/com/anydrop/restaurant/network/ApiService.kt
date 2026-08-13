@@ -31,4 +31,7 @@ interface ApiService {
 
     @GET("restaurant/dashboard.php")
     suspend fun getDashboard(): Response<ApiResponse<DashboardResult>>
+
+    @POST("restaurant/status-update.php")
+    suspend fun updateOperationalStatus(@Body body: OperationalStatusUpdateBody): Response<ApiResponse<OperationalStatusResult>>
 }

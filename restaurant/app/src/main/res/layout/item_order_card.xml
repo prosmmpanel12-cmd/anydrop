@@ -43,6 +43,22 @@
         android:maxLines="2"
         android:ellipsize="end" />
 
+    <!-- I4 follow-up (docs/16 Part A2) — badge so a scheduled order
+         doesn't look identical to an ASAP one sitting in the queue.
+         Hidden entirely for normal orders. -->
+    <TextView
+        android:id="@+id/scheduledBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_badge_scheduled"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="3dp"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:textColor="@color/info_fg"
+        android:visibility="gone" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

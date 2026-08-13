@@ -43,6 +43,18 @@
         android:textColor="@color/text_secondary"
         android:visibility="gone" />
 
+    <!-- I4 follow-up — shows "Scheduled for 8:30 PM" for a scheduled
+         order, hidden entirely for a normal ASAP order. -->
+    <TextView
+        android:id="@+id/scheduledForText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:gravity="center"
+        android:textStyle="bold"
+        android:textColor="@color/text_secondary"
+        android:visibility="gone" />
+
     <!-- I2 — order status stepper (docs/features.md Phase I). Hidden for
          cancelled/rejected orders; see OrderStatusStepperView kdoc. -->
     <com.anydrop.food.ui.orderstatus.OrderStatusStepperView

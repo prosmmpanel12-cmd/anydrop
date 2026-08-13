@@ -258,6 +258,8 @@
     <string name="order_status_delivered">Delivered — enjoy your meal!</string>
     <string name="order_status_cancelled">Order cancelled</string>
     <string name="order_status_rejected">Restaurant rejected this order</string>
+    <string name="order_scheduled_for_format">Scheduled for %1$s</string>
+    <string name="restaurant_temporarily_unavailable">Temporarily unavailable</string>
     <string name="btn_cancel_order">Cancel Order</string>
     <string name="btn_back_to_home">Back to Home</string>
 

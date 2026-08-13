@@ -16,9 +16,12 @@
     <string name="empty_orders">No orders here right now</string>
     <string name="today_summary">Today: %1$d orders · ₹%2$s earned</string>
     <string name="btn_logout">Log out</string>
+    <string name="accepting_orders_label">Accepting orders</string>
+    <string name="status_update_failed">Couldn\'t update — try again</string>
 
     <!-- Order detail -->
     <string name="order_detail_title">Order Detail</string>
+    <string name="order_scheduled_for_format">Scheduled for %1$s</string>
     <string name="btn_accept">Accept</string>
     <string name="btn_reject">Reject</string>
     <string name="btn_mark_preparing">Mark Preparing</string>

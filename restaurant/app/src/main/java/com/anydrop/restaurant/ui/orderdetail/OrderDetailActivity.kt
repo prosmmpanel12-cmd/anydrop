@@ -13,6 +13,7 @@ import com.anydrop.restaurant.network.Order
 import com.anydrop.restaurant.network.RejectBody
 import com.anydrop.restaurant.network.StatusUpdateBody
 import com.anydrop.restaurant.ui.common.InAppNotifier
+import com.anydrop.restaurant.util.ScheduledTimeFormatter
 import kotlinx.coroutines.launch
 
 /**
@@ -70,6 +71,14 @@ class OrderDetailActivity : AppCompatActivity() {
         binding.orderCodeText.text = order.orderCode
         binding.statusText.text = order.status.uppercase().replace("_", " ")
         binding.itemTotalText.text = "₹${"%.2f".format(order.itemTotal)}"
+
+        val scheduledTime = ScheduledTimeFormatter.formatTime(order.scheduledFor)
+        if (scheduledTime != null) {
+            binding.scheduledForText.visibility = View.VISIBLE
+            binding.scheduledForText.text = getString(R.string.order_scheduled_for_format, scheduledTime)
+        } else {
+            binding.scheduledForText.visibility = View.GONE
+        }
 
         binding.itemsContainer.removeAllViews()
         order.items.forEach { item ->

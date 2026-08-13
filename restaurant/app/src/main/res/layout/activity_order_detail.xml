@@ -58,6 +58,20 @@
                 android:textColor="@color/anydrop_primary"
                 android:textStyle="bold" />
 
+            <!-- I4 follow-up (docs/16 Part A2) -->
+            <TextView
+                android:id="@+id/scheduledForText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_badge_scheduled"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="@color/info_fg"
+                android:visibility="gone" />
+
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

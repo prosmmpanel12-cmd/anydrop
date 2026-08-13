@@ -32,6 +32,33 @@
             android:padding="4dp" />
     </LinearLayout>
 
+    <!-- Part B (docs/16) — on-demand pause, independent of the fixed
+         opening/closing-hours schedule. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/surface"
+        android:paddingHorizontal="16dp"
+        android:paddingBottom="12dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/accepting_orders_label"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchAcceptingOrders"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:thumbTint="@color/anydrop_primary"
+            app:trackTint="@color/anydrop_primary_container" />
+    </LinearLayout>
+
     <TextView
         android:id="@+id/summaryText"
         android:layout_width="match_parent"

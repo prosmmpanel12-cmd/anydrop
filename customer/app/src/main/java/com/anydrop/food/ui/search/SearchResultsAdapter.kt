@@ -156,9 +156,19 @@ class SearchResultsAdapter(
             // features.md §5 — cross-fading ETA/distance <-> "Near & Fast" meta
             // line (RotatingEtaView), shown regardless of open/closed status.
             binding.restaurantEta.bind(restaurant.etaMinutes, restaurant.distanceKm)
-            binding.restaurantStatus.text = if (restaurant.isOpenNow) "Open" else "Closed"
+            binding.restaurantStatus.text = when {
+                restaurant.isOpenNow -> "Open"
+                restaurant.isPaused -> binding.root.context.getString(R.string.restaurant_temporarily_unavailable)
+                else -> "Closed"
+            }
             binding.restaurantStatus.setTextColor(
-                binding.root.context.getColor(if (restaurant.isOpenNow) R.color.success_fg else R.color.error_fg)
+                binding.root.context.getColor(
+                    when {
+                        restaurant.isOpenNow -> R.color.success_fg
+                        restaurant.isPaused -> R.color.paused_fg
+                        else -> R.color.error_fg
+                    }
+                )
             )
             // Same closed-restaurant dimming as the Home restaurant list
             // (RestaurantAdapter) — keeps search results visually consistent.

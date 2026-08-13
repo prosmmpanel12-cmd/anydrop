@@ -27,8 +27,6 @@ import com.anydrop.food.ui.common.InAppNotifier
 import com.anydrop.food.ui.common.ScheduleTimeSlotBottomSheet
 import com.anydrop.food.ui.orderstatus.OrderStatusActivity
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Locale
 
 /**
  * Phase 3 — Checkout: pick/add a delivery address, choose payment method,
@@ -161,26 +159,18 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
     /**
      * I4 — "Deliver Now" while the cart has no scheduledFor, or
      * "Today, h:mm a" once it does. Mirrors
-     * RestaurantDetailActivity.renderEtaRowText()'s scheduled-state format
-     * exactly; worth factoring into one shared helper instead of this
-     * copy-paste per the handover note — hasn't been done yet.
+     * RestaurantDetailActivity.renderEtaRowText()'s scheduled-state format;
+     * both now share ScheduledTimeFormatter instead of duplicating the
+     * parse/format logic (see that file's kdoc for the handover note that
+     * triggered the factor-out).
      */
     private fun renderDeliveryTimeRow() {
         val scheduledFor = CartManager.getCart(restaurantId)?.scheduledFor
-        binding.deliveryTimeText.text = if (scheduledFor == null) {
-            getString(R.string.schedule_deliver_now)
+        val timeText = com.anydrop.food.util.ScheduledTimeFormatter.formatTime(scheduledFor)
+        binding.deliveryTimeText.text = if (timeText != null) {
+            getString(R.string.detail_eta_scheduled_format, timeText)
         } else {
-            val parsed = try {
-                SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(scheduledFor)
-            } catch (e: Exception) {
-                null
-            }
-            if (parsed != null) {
-                val timeText = SimpleDateFormat("h:mm a", Locale.getDefault()).format(parsed)
-                getString(R.string.detail_eta_scheduled_format, timeText)
-            } else {
-                getString(R.string.schedule_deliver_now)
-            }
+            getString(R.string.schedule_deliver_now)
         }
     }
 

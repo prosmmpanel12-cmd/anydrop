@@ -147,6 +147,10 @@ function compute_open_now(array $r, string $currentTime, int $currentDow): bool
 $restaurantResults = [];
 foreach ($mergedRestaurants as $r) {
     $isOpenNow = compute_open_now($r, $currentTime, $currentDow);
+    // Part B follow-up — same "paused vs outside hours" distinction as
+    // restaurants/list.php; kept in sync since both feed the same
+    // Restaurant model/card UI on the Android side.
+    $isPaused = in_array($r['operational_status'], ['busy', 'temp_closed'], true);
 
     $distanceKm = null;
     if ($lat !== null && $lng !== null && $r['latitude'] !== null && $r['longitude'] !== null) {
@@ -169,6 +173,7 @@ foreach ($mergedRestaurants as $r) {
         'distance_km' => $distanceKm,
         'estimated_delivery_minutes' => $distanceKm !== null ? (int) round(15 + $distanceKm * 4) : null,
         'is_open_now' => $isOpenNow,
+        'is_paused' => $isPaused,
         'offer_badge_text' => $r['offer_badge_text'] ?? null,
         'tags' => $tagsByRestaurant[$r['id']] ?? [],
         'gallery' => $galleryByRestaurant[$r['id']] ?? [],

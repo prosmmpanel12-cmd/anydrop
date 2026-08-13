@@ -3,6 +3,10 @@
  * GET /api/v1/restaurants?lat=&lng=&filter=&sort=&page=&per_page=
  * Auth: Customer token
  * Response: paginated list with distance_km, is_open_now computed server-side.
+ * Also includes is_paused — true when the restaurant is on-demand paused
+ * (operational_status busy/temp_closed) rather than simply outside its
+ * fixed hours; lets the app show "Temporarily unavailable" instead of a
+ * plain "Closed" for that case (Part B follow-up).
  */
 
 require_once __DIR__ . '/../../../config/database.php';
@@ -113,6 +117,15 @@ foreach ($all as $r) {
         $timeMatches = ($currentTime >= $r['opening_time'] && $currentTime <= $r['closing_time']);
         $isOpenNow = $dayMatches && $timeMatches;
     }
+    // Part B follow-up — distinguishes "closed because it's outside its
+    // fixed hours" from "on-demand paused right now" so the app can show
+    // "Temporarily unavailable" instead of a plain "Closed" for the
+    // latter, since the restaurant could resume any minute. Only
+    // meaningful when $isOpenNow is already false — a restaurant that's
+    // both within its hours and 'busy'/'temp_closed' is correctly
+    // !isOpenNow too (operational_status !== 'open' short-circuits the
+    // check above), and this flag is what tells the app why.
+    $isPaused = in_array($r['operational_status'], ['busy', 'temp_closed'], true);
 
     if ($filter === 'open_now' && !$isOpenNow) {
         continue;
@@ -159,6 +172,7 @@ foreach ($all as $r) {
         'distance_km' => $distanceKm,
         'estimated_delivery_minutes' => $distanceKm !== null ? (int) round(15 + $distanceKm * 4) : null,
         'is_open_now' => $isOpenNow,
+        'is_paused' => $isPaused,
         'offer_badge_text' => $r['offer_badge_text'] ?? null,
         'tags' => $tagsByRestaurant[$r['id']] ?? [],
         'gallery' => $galleryByRestaurant[$r['id']] ?? [],

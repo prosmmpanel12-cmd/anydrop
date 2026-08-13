@@ -102,7 +102,8 @@ Standard CRUD, restaurant-scoped (enforced server-side by token owner, never tru
 ### `GET /restaurant/riders` / `POST /restaurant/riders` (create) / `PUT /restaurant/riders/{id}` (edit/disable)
 **Request (create):** `{ "name", "username", "password", "mobile" }` — server hashes password, checks username uniqueness.
 
-### `GET /restaurant/dashboard` — today's orders/earnings summary, computed server-side (not client-aggregated, to avoid trusting client math)
+### `GET /restaurant/dashboard` — today's orders/earnings summary, computed server-side (not client-aggregated, to avoid trusting client math); also returns `operational_status` (initial state for the toggle below)
+### `POST /restaurant/status-update` — `{ "operational_status": "open"|"busy"|"temp_closed" }`; on-demand pause/resume of new orders, independent of opening/closing-hours schedule (I4 follow-up)
 
 ### `GET /restaurant/due-ledger` — paginated ledger entries + current balance
 

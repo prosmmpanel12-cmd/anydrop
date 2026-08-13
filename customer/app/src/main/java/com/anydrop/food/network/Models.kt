@@ -86,6 +86,12 @@ data class Restaurant(
     @SerializedName("distance_km") val distanceKm: Double?,
     @SerializedName("estimated_delivery_minutes") val etaMinutes: Int?,
     @SerializedName("is_open_now") val isOpenNow: Boolean,
+    // Part B follow-up — true when the restaurant is on-demand paused
+    // (kitchen busy) rather than simply outside its fixed hours. Lets a
+    // card show "Temporarily unavailable" instead of a plain "Closed".
+    // Defaults false so older/other endpoints that don't send this yet
+    // just fall back to the plain-Closed look, not a false positive.
+    @SerializedName("is_paused") val isPaused: Boolean = false,
     @SerializedName("match_type") val matchType: String? = null,
     @SerializedName("matched_dish") val matchedDish: String? = null,
     @SerializedName("offer_badge_text") val offerBadgeText: String? = null,

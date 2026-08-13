@@ -2,12 +2,14 @@ package com.anydrop.restaurant.ui.dashboard
 
 import android.content.Context
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.anydrop.restaurant.R
 import com.anydrop.restaurant.databinding.ItemOrderCardBinding
 import com.anydrop.restaurant.network.Order
+import com.anydrop.restaurant.util.ScheduledTimeFormatter
 
 class OrderAdapter(
     private val context: Context,
@@ -39,6 +41,14 @@ class OrderAdapter(
             binding.itemsSummaryText.text = order.items.joinToString(", ") { "${it.quantity}x ${it.name}" }
             binding.grandTotalText.text = "₹${"%.2f".format(order.grandTotal)}"
             binding.paymentMethodText.text = order.paymentMethod.uppercase()
+
+            val scheduledTime = ScheduledTimeFormatter.formatTime(order.scheduledFor)
+            if (scheduledTime != null) {
+                binding.scheduledBadge.visibility = View.VISIBLE
+                binding.scheduledBadge.text = context.getString(R.string.order_scheduled_for_format, scheduledTime)
+            } else {
+                binding.scheduledBadge.visibility = View.GONE
+            }
 
             val (bgColor, fgColor, label) = statusStyle(order.status)
             binding.statusChip.text = label

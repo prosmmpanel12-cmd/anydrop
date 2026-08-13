@@ -53,6 +53,7 @@ class OrderStatusActivity : AppCompatActivity() {
         binding.btnBackHome.setOnClickListener { goHome() }
         binding.btnCancelOrder.setOnClickListener { cancelOrder() }
 
+        loadScheduledFor()
         startPolling()
     }
 
@@ -64,6 +65,28 @@ class OrderStatusActivity : AppCompatActivity() {
     private fun goHome() {
         startActivity(Intent(this, HomeActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK))
         finish()
+    }
+
+    /** I4 follow-up — `scheduled_for` lives on the full Order (GET
+     * /orders/{id}), not on the lightweight OrderTrackResult the 5s poll
+     * uses, and it never changes once an order is placed. So this is a
+     * one-shot fetch on load rather than something render() needs to
+     * re-check every poll cycle. Silent failure — same reasoning as
+     * maybePromptRating(), this is a nice-to-have label, not core to the
+     * screen. */
+    private fun loadScheduledFor() {
+        lifecycleScope.launch {
+            try {
+                val scheduledFor = api.getOrder(orderId).body()?.data?.order?.scheduledFor
+                val timeText = com.anydrop.food.util.ScheduledTimeFormatter.formatTime(scheduledFor)
+                if (timeText != null) {
+                    binding.scheduledForText.visibility = View.VISIBLE
+                    binding.scheduledForText.text = getString(R.string.order_scheduled_for_format, timeText)
+                }
+            } catch (e: Exception) {
+                // Silent — see kdoc above.
+            }
+        }
     }
 
     private fun startPolling() {

@@ -4,6 +4,9 @@
  * Auth: Restaurant token
  * Response: today's order/earnings summary, computed server-side (never
  * client-aggregated, so the restaurant app can't be tricked by stale local math).
+ * Also returns operational_status — Part B's "Accepting orders" toggle
+ * (see status-update.php) reads its initial on/off state from here, since
+ * this is already the dashboard screen's first load call.
  */
 
 require_once __DIR__ . '/../../../config/database.php';
@@ -42,9 +45,14 @@ $todayStmt = $db->prepare(
 $todayStmt->execute(['rid' => $restaurantId]);
 $today = $todayStmt->fetch();
 
-$dueStmt = $db->prepare('SELECT current_due FROM restaurants WHERE id = :rid LIMIT 1');
+$dueStmt = $db->prepare('SELECT current_due, operational_status FROM restaurants WHERE id = :rid LIMIT 1');
 $dueStmt->execute(['rid' => $restaurantId]);
-$currentDue = (float) ($dueStmt->fetch()['current_due'] ?? 0);
+$restaurantRow = $dueStmt->fetch();
+$currentDue = (float) ($restaurantRow['current_due'] ?? 0);
+// Part B — dashboard is the natural first load for the Restaurant App
+// screen that also hosts the "Accepting orders" toggle, so it doubles as
+// the read side for initializing that switch's on/off state.
+$operationalStatus = $restaurantRow['operational_status'] ?? 'closed';
 
 respond_ok([
     'pending_orders' => $pendingCount,
@@ -55,4 +63,5 @@ respond_ok([
         'commission_owed' => (float) $today['commission'],
     ],
     'current_due' => $currentDue,
+    'operational_status' => $operationalStatus,
 ]);

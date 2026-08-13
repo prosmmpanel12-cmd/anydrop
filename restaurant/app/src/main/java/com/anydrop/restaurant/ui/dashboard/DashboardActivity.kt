@@ -11,6 +11,7 @@ import com.anydrop.restaurant.R
 import com.anydrop.restaurant.data.TokenManager
 import com.anydrop.restaurant.databinding.ActivityDashboardBinding
 import com.anydrop.restaurant.network.ApiClient
+import com.anydrop.restaurant.network.OperationalStatusUpdateBody
 import com.anydrop.restaurant.ui.common.InAppNotifier
 import com.anydrop.restaurant.ui.login.LoginActivity
 import com.anydrop.restaurant.ui.orderdetail.OrderDetailActivity
@@ -32,6 +33,10 @@ class DashboardActivity : AppCompatActivity() {
 
     private var currentTab = Tab.NEW
     private var polling = true
+    // Part B — guards the switch's listener while we're setting its state
+    // programmatically (initial load from dashboard, or reverting after a
+    // failed toggle), so that doesn't itself fire another API call.
+    private var suppressToggleListener = false
 
     private enum class Tab(val statusFilter: String) {
         NEW("pending"),
@@ -67,6 +72,9 @@ class DashboardActivity : AppCompatActivity() {
         binding.tabActive.setOnClickListener { selectTab(Tab.ACTIVE) }
         binding.tabHistory.setOnClickListener { selectTab(Tab.HISTORY) }
         binding.btnLogout.setOnClickListener { logout() }
+        binding.switchAcceptingOrders.setOnCheckedChangeListener { _, isChecked ->
+            if (!suppressToggleListener) toggleAcceptingOrders(isChecked)
+        }
 
         selectTab(Tab.NEW)
         loadDashboardSummary()
@@ -126,11 +134,48 @@ class DashboardActivity : AppCompatActivity() {
                         summary.today.ordersCount,
                         "%.0f".format(summary.today.earnings)
                     )
+                    // Part B — initialize the switch from the restaurant's
+                    // actual current state; suppressed so this doesn't
+                    // re-trigger a status-update call.
+                    suppressToggleListener = true
+                    binding.switchAcceptingOrders.isChecked = summary.operationalStatus == "open"
+                    suppressToggleListener = false
                 }
             } catch (e: Exception) {
                 // Non-critical — leave summary blank if it fails, orders list still works.
             }
         }
+    }
+
+    /** Part B (docs/16) — "open" while accepting orders, "busy" while
+     * paused, per the handover doc's recommended plain ON/OFF scope (no
+     * reason/ETA message yet — flagged there as an open question, not
+     * decided). On failure, reverts the switch to its pre-toggle state
+     * rather than leaving the UI showing something the backend didn't
+     * actually apply. */
+    private fun toggleAcceptingOrders(turningOn: Boolean) {
+        binding.switchAcceptingOrders.isEnabled = false
+        val newStatus = if (turningOn) "open" else "busy"
+        lifecycleScope.launch {
+            try {
+                val response = api.updateOperationalStatus(OperationalStatusUpdateBody(newStatus))
+                if (!response.isSuccessful || response.body()?.data == null) {
+                    revertToggle(turningOn)
+                    InAppNotifier.show(this@DashboardActivity, getString(R.string.status_update_failed), InAppNotifier.Type.ERROR)
+                }
+            } catch (e: Exception) {
+                revertToggle(turningOn)
+                InAppNotifier.show(this@DashboardActivity, getString(R.string.status_update_failed), InAppNotifier.Type.ERROR)
+            } finally {
+                binding.switchAcceptingOrders.isEnabled = true
+            }
+        }
+    }
+
+    private fun revertToggle(failedTurningOn: Boolean) {
+        suppressToggleListener = true
+        binding.switchAcceptingOrders.isChecked = !failedTurningOn
+        suppressToggleListener = false
     }
 
     private fun startPolling() {

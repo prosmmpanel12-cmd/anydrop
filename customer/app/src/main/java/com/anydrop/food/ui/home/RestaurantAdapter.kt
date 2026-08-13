@@ -88,6 +88,17 @@ class RestaurantAdapter(
                     binding.root.context.getColor(R.color.success_fg)
                 )
                 binding.root.alpha = 1.0f
+            } else if (restaurant.isPaused) {
+                // Part B follow-up — restaurant is on-demand paused, not
+                // simply outside its hours. Still dimmed (can't order
+                // right now either way) but a distinct amber label +
+                // color so it doesn't read as a flat "gone for the day"
+                // the way "Closed" does — it could resume any minute.
+                binding.restaurantStatus.text = binding.root.context.getString(R.string.restaurant_temporarily_unavailable)
+                binding.restaurantStatus.setTextColor(
+                    binding.root.context.getColor(R.color.paused_fg)
+                )
+                binding.root.alpha = 0.5f
             } else {
                 binding.restaurantStatus.text = "Closed"
                 binding.restaurantStatus.setTextColor(

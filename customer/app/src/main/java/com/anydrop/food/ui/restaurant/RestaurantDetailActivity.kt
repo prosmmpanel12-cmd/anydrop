@@ -629,20 +629,11 @@ class RestaurantDetailActivity : AppCompatActivity() {
      */
     private fun renderEtaRowText(etaMinutesFallback: Int) {
         val scheduledFor = CartManager.getScheduledFor(restaurantId)
-        if (scheduledFor == null) {
-            binding.detailEta.text = getString(R.string.detail_eta_format, etaMinutesFallback)
+        val timeText = com.anydrop.food.util.ScheduledTimeFormatter.formatTime(scheduledFor)
+        binding.detailEta.text = if (timeText != null) {
+            getString(R.string.detail_eta_scheduled_format, timeText)
         } else {
-            val parsed = try {
-                java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(scheduledFor)
-            } catch (e: Exception) {
-                null
-            }
-            binding.detailEta.text = if (parsed != null) {
-                val timeText = java.text.SimpleDateFormat("h:mm a", Locale.getDefault()).format(parsed)
-                getString(R.string.detail_eta_scheduled_format, timeText)
-            } else {
-                getString(R.string.detail_eta_format, etaMinutesFallback)
-            }
+            getString(R.string.detail_eta_format, etaMinutesFallback)
         }
     }
 

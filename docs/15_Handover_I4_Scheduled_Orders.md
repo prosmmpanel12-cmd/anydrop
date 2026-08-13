@@ -1,11 +1,8 @@
 # Handover — I4: Scheduled Orders ("Schedule for later"), same-day only
 
-**Status: 🟡 In progress, 2026-08-13.** Backend is complete and should be
-deployable as-is. Android is functionally done — `CheckoutActivity.kt` is now
-wired up (see below). **No Gradle build has been run against any of this
-work yet** — that's the actual next step.
-
-Say **"continue I4"** to pick this up.
+**Status: ✅ Done, 2026-08-13.** Backend deployed, Android built and
+confirmed working end-to-end by the app owner (schedule pick → checkout →
+order placed successfully). Closing this handover.
 
 **Scope, confirmed by the app owner:** same-day only. The picker never
 shows a date — just "Deliver Now" or a same-day time slot, bounded to the

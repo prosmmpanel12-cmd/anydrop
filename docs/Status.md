@@ -1,6 +1,59 @@
 # Anydrop — Project Status
 
-**Last Updated:** 2026-08-10 (H6 part 1, in progress)
+**Last Updated:** 2026-08-13 (I4 follow-ups + "pause taking orders" toggle — ✅ built, NOT tested/Gradle-built yet)
+
+## Session update (2026-08-13) — I4 follow-ups + "pause taking orders" toggle. **Built, NOT tested, NOT built with Gradle.**
+
+Both parts of `docs/16_Handover_I4_Followups_And_Order_Toggle.md` are now built:
+
+**Part A — I4 leftovers:**
+- Customer App's `OrderStatusActivity` now shows "Scheduled for h:mm a"
+  for a scheduled order (one-shot fetch via `GET /orders/{id}`, since the
+  5s tracking poll's `OrderTrackResult` doesn't carry `scheduled_for`).
+  Factored the duplicated date-format pattern out of
+  `RestaurantDetailActivity`/`CheckoutActivity` into a shared
+  `util/ScheduledTimeFormatter` while there.
+- Restaurant App's `Order` model now has `scheduledFor`; surfaced as a
+  "Scheduled for h:mm a" badge on both the order list card (`OrderAdapter`)
+  and order detail screen (`OrderDetailActivity`), with its own copy of
+  the same formatter util (separate Gradle module).
+
+**Part B — "Accepting orders" toggle:**
+- New `POST /restaurant/status-update.php` (restaurant auth) — restricted
+  to `open`/`busy`/`temp_closed` (excludes the admin-only/long-term enum
+  values).
+- `lib/orders.php`'s `price_cart()` now rejects with
+  `restaurant_not_accepting_orders` (422) whenever `operational_status !==
+  'open'` — shipped together with the endpoint per the handover doc's own
+  requirement, and covers `orders/create.php` + `cart/validate.php` both
+  since they share `price_cart()`.
+- `GET /restaurant/dashboard` now also returns `operational_status`, used
+  to initialize the new "Accepting orders" switch on `DashboardActivity`.
+- **Follow-up done this session too:** Customer App now shows a distinct
+  "Temporarily unavailable" (amber) badge instead of a plain "Closed" (red)
+  when a restaurant is on-demand paused rather than simply outside its
+  fixed hours — `restaurants/list.php` and `search.php` both now return
+  `is_paused`, consumed by `RestaurantAdapter` (Home) and
+  `SearchResultsAdapter` (Search). Still dims the card either way (can't
+  order regardless); only the label/color differ.
+
+**Still open, deliberately deferred (not decided, not oversights):**
+- Whether a paused restaurant should show customers a reason/ETA message
+  (e.g. "Kitchen too busy, back around 8 PM") — shipped as plain ON/OFF
+  with no message per the handover doc's own recommendation.
+
+**Not done this session:** no Gradle build or on-device test of any of
+the above — next actual step is a build+test pass before calling this done.
+
+## Older open thread, still unresolved — H6 Google Maps key decision
+(carried over from 2026-08-10, unrelated to the above) Location Picker /
+map pin-drop screen still needs a real Android-restricted Maps key —
+Google Cloud billing isn't set up. Two options still on the table: (a) get
+billing sorted and generate real keys, or (b) do a build-only sanity pass
+now (map renders blank/grey, expected). See
+`docs/12_Handover_H6_Map_PinDrop_Photo.md`.
+
+---
 
 ## Session update (2026-08-10, H6 part 1) — Location Picker screen (screenshot 12). **Built, NOT tested, NOT built with Gradle.**
 
@@ -3001,19 +3054,39 @@ sync/compile) to catch any migration mistakes before billing is sorted,
 since the map rendering blank is expected/fine for that kind of check.
 Say which.
 
-## I4 — Scheduled orders, backend + partial Android (2026-08-13, in progress)
+## I4 — Scheduled orders (2026-08-13) — ✅ DONE, confirmed working on-device
 
 Started I4 ("Schedule for later") per app owner's explicit scope call:
 **same-day only** — a time-slot picker bounded to today's remaining open
 hours, not a date+time picker.
 
-**Backend is done.** Android has models, cart storage, the slot-picker
-sheet, and the restaurant-detail entry point built and wired.
-`CheckoutActivity.kt` is the one remaining piece — layout row exists,
-click handler + API wiring doesn't yet.
+Backend, Android models/cart storage/slot-picker sheet, restaurant-detail
+entry point, and finally `CheckoutActivity.kt` (delivery-time row,
+sheet wiring, `scheduledFor` sent with the order, 422 error handling) are
+all done. **Confirmed working end-to-end by the app owner** — schedule
+pick → checkout → order placed successfully.
 
-Full detail — file-by-file list of what's done, exactly what
-`CheckoutActivity.kt` still needs, and the design decisions made along the
-way (lead time, slot interval, same-day-only scope, etc.) — in
-`docs/15_Handover_I4_Scheduled_Orders.md`. Say **"continue I4"** to pick
-this up.
+Full detail in `docs/15_Handover_I4_Scheduled_Orders.md`.
+
+**Still open, lower priority (not blockers):**
+- `OrderStatusActivity`/order-history doesn't show `scheduled_for` yet,
+  even though the API already returns it.
+- Restaurant App's order list/detail doesn't surface `scheduled_for` —
+  restaurant staff currently can't tell a scheduled order apart from an
+  ASAP one.
+- No Gradle build log was captured this session (app owner tested the
+  installed APK directly) — worth a clean build pass at some point as a
+  sanity check, not urgent since it's confirmed working live.
+
+## Next up — I4 follow-ups + new "pause taking orders" toggle (2026-08-13, planned only)
+
+Two small I4 leftovers (above) plus a **new feature request**: restaurant
+should be able to mark itself as not accepting orders right now, and
+resume whenever ready, independent of its fixed opening/closing hours.
+Turns out the DB already has an unused `operational_status` column and
+`is_open_now` already reads it — the read side is done, just no
+restaurant-facing endpoint/UI to write it, and `orders/create.php` doesn't
+enforce it yet either (needs to, so the pause actually blocks orders, not
+just hides the restaurant from the list). Full plan, scope questions, and
+suggested build order in `docs/16_Handover_I4_Followups_And_Order_Toggle.md`.
+Nothing built yet — say "start toggle" or "start I4 followups" to begin.

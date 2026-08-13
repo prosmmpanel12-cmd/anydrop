@@ -88,6 +88,20 @@ function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCod
         return $result;
     }
 
+    // I4 follow-up (docs/16 Part B, point 3) — restaurants.operational_status
+    // already gates restaurants/list.php's is_open_now, but nothing on the
+    // order-placement path checked it, so a paused restaurant could still
+    // receive orders (stale cached list, deep link, a scheduled order
+    // placed earlier now coming due). Checked here — the shared
+    // price_cart() — rather than only in orders/create.php, so
+    // cart/validate.php's checkout-screen check (see that file's kdoc:
+    // "the authoritative price/availability check") catches it too, not
+    // just the final place-order call.
+    if ($restaurant['operational_status'] !== 'open') {
+        $result['error'] = 'restaurant_not_accepting_orders';
+        return $result;
+    }
+
     $dueLimit = (float) get_setting('restaurant_due_limit', 2000);
     if ((float) $restaurant['current_due'] >= $dueLimit) {
         $result['error'] = 'restaurant_unavailable';

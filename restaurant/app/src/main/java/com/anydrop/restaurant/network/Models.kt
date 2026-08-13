@@ -71,6 +71,10 @@ data class Order(
     @SerializedName("payment_status") val paymentStatus: String,
     @SerializedName("delivery_instructions") val deliveryInstructions: String?,
     @SerializedName("estimated_prep_minutes") val estimatedPrepMinutes: Int?,
+    // I4 follow-up — "yyyy-MM-dd HH:mm:ss" or null (a normal ASAP order).
+    // format_order() has always returned this restaurant-side too; the
+    // Restaurant App just wasn't modeling it. See docs/16 Part A2.
+    @SerializedName("scheduled_for") val scheduledFor: String? = null,
     @SerializedName("created_at") val createdAt: String,
     val items: List<OrderItemLine> = emptyList(),
     @SerializedName("status_history") val statusHistory: List<OrderStatusHistoryEntry> = emptyList()
@@ -94,5 +98,11 @@ data class DashboardResult(
     @SerializedName("pending_orders") val pendingOrders: Int,
     @SerializedName("active_orders") val activeOrders: Int,
     val today: TodaySummary,
-    @SerializedName("current_due") val currentDue: Double
+    @SerializedName("current_due") val currentDue: Double,
+    @SerializedName("operational_status") val operationalStatus: String? = null
 )
+
+// ---- Part B — "Accepting orders" toggle (docs/16 Part B) ----
+
+data class OperationalStatusUpdateBody(@SerializedName("operational_status") val operationalStatus: String)
+data class OperationalStatusResult(@SerializedName("operational_status") val operationalStatus: String)
