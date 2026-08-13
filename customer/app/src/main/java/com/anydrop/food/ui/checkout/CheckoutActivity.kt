@@ -24,8 +24,11 @@ import com.anydrop.food.network.CreateOrderBody
 import com.anydrop.food.network.CartTotals
 import com.anydrop.food.ui.address.AddressEditorBottomSheet
 import com.anydrop.food.ui.common.InAppNotifier
+import com.anydrop.food.ui.common.ScheduleTimeSlotBottomSheet
 import com.anydrop.food.ui.orderstatus.OrderStatusActivity
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 /**
  * Phase 3 — Checkout: pick/add a delivery address, choose payment method,
@@ -78,6 +81,19 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
     // AddressEditorBottomSheet — cleared once the fix is delivered back to it.
     private var pendingSheetForLocation: AddressEditorBottomSheet? = null
 
+    // I4 — CheckoutActivity only gets a bare restaurantId via
+    // EXTRA_RESTAURANT_ID (see CartBottomSheetFragment), not a full
+    // RestaurantDetail, so these aren't in scope until loadRestaurantHours()
+    // resolves. Option (a) from the handover doc: one extra getMenu() call
+    // purely to read them, rather than threading them through as Intent
+    // extras from whichever screen launched Checkout. rowDeliveryTime itself
+    // renders immediately off the cart's existing scheduledFor regardless of
+    // whether this has returned yet — only *opening* the sheet to change the
+    // pick needs the bounds, and by then this call has almost certainly
+    // resolved.
+    private var restaurantOpeningTime: String? = null
+    private var restaurantClosingTime: String? = null
+
     private val locationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) fetchCurrentLocation() else {
@@ -104,14 +120,85 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
         binding.btnApplyCoupon.setOnClickListener { applyCoupon() }
         binding.btnRemoveCoupon.setOnClickListener { removeCoupon() }
         binding.rowViewAllOffers.setOnClickListener { openCouponsSheet() }
+        binding.rowDeliveryTime.setOnClickListener { openScheduleSheet() }
 
         // Pre-fill in case a coupon was already applied earlier in this
         // checkout session (e.g. user backed out and returned) — CartManager
         // is an in-memory singleton, so appliedCouponCode survives that.
         binding.inputCouponCode.setText(cart.appliedCouponCode.orEmpty())
 
+        // I4 — reflects whatever scheduledFor is already on the cart (picked
+        // on restaurant-detail, or from an earlier pass through this same
+        // Activity) before the hours call below has necessarily returned.
+        renderDeliveryTimeRow()
+
         loadAddresses()
         loadBill()
+        loadRestaurantHours()
+    }
+
+    /**
+     * I4 — fetches the restaurant's opening_time/closing_time purely to
+     * bound ScheduleTimeSlotBottomSheet's slot list (see field kdoc above).
+     * Non-fatal on failure: the sheet just falls back to treating the
+     * restaurant as having no configured hours (every slot for the rest of
+     * today offered) if this hasn't resolved, or failed, by the time the
+     * customer taps rowDeliveryTime — the server is the real source of
+     * truth at Place Order regardless.
+     */
+    private fun loadRestaurantHours() {
+        lifecycleScope.launch {
+            try {
+                val restaurant = api.getMenu(restaurantId).body()?.data?.restaurant
+                restaurantOpeningTime = restaurant?.openingTime
+                restaurantClosingTime = restaurant?.closingTime
+            } catch (e: Exception) {
+                // Non-fatal — see kdoc above.
+            }
+        }
+    }
+
+    /**
+     * I4 — "Deliver Now" while the cart has no scheduledFor, or
+     * "Today, h:mm a" once it does. Mirrors
+     * RestaurantDetailActivity.renderEtaRowText()'s scheduled-state format
+     * exactly; worth factoring into one shared helper instead of this
+     * copy-paste per the handover note — hasn't been done yet.
+     */
+    private fun renderDeliveryTimeRow() {
+        val scheduledFor = CartManager.getCart(restaurantId)?.scheduledFor
+        binding.deliveryTimeText.text = if (scheduledFor == null) {
+            getString(R.string.schedule_deliver_now)
+        } else {
+            val parsed = try {
+                SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(scheduledFor)
+            } catch (e: Exception) {
+                null
+            }
+            if (parsed != null) {
+                val timeText = SimpleDateFormat("h:mm a", Locale.getDefault()).format(parsed)
+                getString(R.string.detail_eta_scheduled_format, timeText)
+            } else {
+                getString(R.string.schedule_deliver_now)
+            }
+        }
+    }
+
+    /** I4 — same sheet, same usage pattern as RestaurantDetailActivity's
+     * ETA row: pass the restaurant's hours + the cart's current pick, apply
+     * whatever comes back straight onto the cart, re-render, sync. */
+    private fun openScheduleSheet() {
+        val sheet = ScheduleTimeSlotBottomSheet.newInstance(
+            openingTime = restaurantOpeningTime,
+            closingTime = restaurantClosingTime,
+            currentSelection = CartManager.getCart(restaurantId)?.scheduledFor
+        )
+        sheet.onSelected = { picked ->
+            CartManager.getCart(restaurantId)?.scheduledFor = picked
+            renderDeliveryTimeRow()
+            com.anydrop.food.data.CartSyncManager.scheduleSync(this@CheckoutActivity)
+        }
+        sheet.show(supportFragmentManager, "schedule_time")
     }
 
     private fun openAddressEditor(editing: Address? = null) {
@@ -432,7 +519,12 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
                         deliveryAddressId = addressId,
                         paymentMethod = paymentMethod,
                         couponCode = CartManager.getCart(restaurantId)?.appliedCouponCode,
-                        deliveryInstructions = instructions
+                        deliveryInstructions = instructions,
+                        // I4 — null for a normal "Deliver Now" order; server
+                        // re-validates independently regardless (same-day,
+                        // 20-min lead, within open hours), see the
+                        // scheduled_time_* 422 handling below.
+                        scheduledFor = CartManager.getCart(restaurantId)?.scheduledFor
                     )
                 )
                 val result = response.body()?.data
@@ -440,7 +532,10 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
                     // Only this restaurant's cart clears — any other
                     // restaurant's cart the customer also has going stays
                     // exactly as it was (multi-restaurant cart, see
-                    // CartManager.kt).
+                    // CartManager.kt). removeCart() deletes the whole
+                    // RestaurantCart object (and cleans up
+                    // pendingScheduledFor), so scheduledFor doesn't need a
+                    // separate reset here — it goes with the rest of the cart.
                     CartManager.removeCart(restaurantId)
                     // syncNow (not scheduleSync) — order placement is a hard
                     // exit point, no guarantee this Activity survives long
@@ -466,6 +561,14 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
                         "invalid_coupon" -> getString(R.string.coupon_invalid)
                         "coupon_min_order_not_met" -> getString(R.string.coupon_min_order_not_met)
                         "coupon_usage_limit_reached" -> getString(R.string.coupon_usage_limit_reached)
+                        // I4 — one generic message covering all four
+                        // scheduled_time_* codes from validate_scheduled_for()
+                        // rather than a message per code (design decision left
+                        // open in the handover doc; either was fine).
+                        "scheduled_time_not_today",
+                        "scheduled_time_too_soon",
+                        "scheduled_time_outside_open_hours",
+                        "invalid_scheduled_time" -> getString(R.string.schedule_time_unavailable)
                         null -> getString(R.string.could_not_place_order)
                         else -> errInfo.code
                     }

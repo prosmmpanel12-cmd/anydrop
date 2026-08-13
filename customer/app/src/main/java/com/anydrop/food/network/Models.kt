@@ -263,6 +263,14 @@ data class RestaurantDetail(
     // rendering rather than assuming it's present.
     @SerializedName("distance_km") val distanceKm: Double? = null,
     @SerializedName("estimated_delivery_minutes") val etaMinutes: Int? = null,
+    // I4 — raw "HH:MM:SS" strings straight off the restaurants row, null if
+    // this restaurant never had hours configured. Used only to bound the
+    // "Schedule for later" slot list to today's remaining open hours; the
+    // server re-validates the actual chosen slot independently in
+    // orders/create.php, so a stale/wrong value here can't create a bad
+    // order — worst case the picker offers a slot that then gets rejected.
+    @SerializedName("opening_time") val openingTime: String? = null,
+    @SerializedName("closing_time") val closingTime: String? = null,
     // Same nullable-despite-always-present Gson caveat as tags/gallery above.
     val offers: List<RestaurantOffer>? = emptyList()
 )
@@ -366,6 +374,10 @@ data class CartSyncRestaurant(
     @SerializedName("restaurant_id") val restaurantId: Int,
     @SerializedName("restaurant_name") val restaurantName: String? = null,
     @SerializedName("coupon_code") val couponCode: String? = null,
+    // I4 — "yyyy-MM-dd HH:mm:ss" or null ("Deliver Now"). Sent as-is on
+    // save/restore, same convention as couponCode above; the server only
+    // re-validates the real value once, at order-create time.
+    @SerializedName("scheduled_for") val scheduledFor: String? = null,
     val items: List<CartSyncItem>
 )
 
@@ -381,7 +393,12 @@ data class CreateOrderBody(
     @SerializedName("delivery_address_id") val deliveryAddressId: Int,
     @SerializedName("payment_method") val paymentMethod: String, // "upi" | "cod"
     @SerializedName("coupon_code") val couponCode: String? = null,
-    @SerializedName("delivery_instructions") val deliveryInstructions: String? = null
+    @SerializedName("delivery_instructions") val deliveryInstructions: String? = null,
+    // I4 — "yyyy-MM-dd HH:mm:ss", same-day only; omit/null for a normal
+    // "Deliver Now" order. Server re-validates independently (same-day,
+    // 20-min minimum lead, within restaurant's open hours) — see
+    // validate_scheduled_for() in backend/lib/orders.php.
+    @SerializedName("scheduled_for") val scheduledFor: String? = null
 )
 
 /** One addon snapshot as stored in order_items.addons_json at order time —
@@ -437,6 +454,8 @@ data class Order(
     @SerializedName("grand_total") val grandTotal: Double,
     @SerializedName("payment_method") val paymentMethod: String,
     @SerializedName("payment_status") val paymentStatus: String,
+    // I4 — "yyyy-MM-dd HH:mm:ss" or null (a normal "Now" order).
+    @SerializedName("scheduled_for") val scheduledFor: String? = null,
     @SerializedName("estimated_prep_minutes") val estimatedPrepMinutes: Int?,
     @SerializedName("created_at") val createdAt: String,
     val items: List<OrderItemLine> = emptyList(),

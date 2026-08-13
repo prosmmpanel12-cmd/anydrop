@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- features.md §I4 — one row inside fragment_schedule_time.xml's
+     scheduleSlotList: either the pinned "Deliver Now" option or one
+     same-day time slot. Tapping any row selects it and dismisses the
+     sheet immediately — there's no separate "Apply" step, same
+     one-tap-to-pick pattern as MenuFiltersBottomSheet's sort options. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/scheduleRowRoot"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingVertical="14dp"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true">
+
+    <TextView
+        android:id="@+id/scheduleRowLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textSize="15sp"
+        android:textColor="@color/text_primary"
+        tools:text="8:30 PM" />
+
+    <ImageView
+        android:id="@+id/scheduleRowCheck"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:src="@drawable/ic_check_circle"
+        app:tint="@color/anydrop_primary"
+        android:visibility="gone" />
+
+</LinearLayout>

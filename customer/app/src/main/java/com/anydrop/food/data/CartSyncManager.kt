@@ -66,6 +66,7 @@ object CartSyncManager {
                         restaurantId = cart.restaurantId,
                         restaurantName = cart.restaurantName,
                         couponCode = cart.appliedCouponCode,
+                        scheduledFor = cart.scheduledFor,
                         items = cart.getLines().map {
                             CartSyncItem(
                                 menuItemId = it.item.id,
@@ -133,7 +134,8 @@ object CartSyncManager {
                     val restaurantCart = RestaurantCart(
                         restaurantId = synced.restaurantId,
                         restaurantName = synced.restaurantName.orEmpty(),
-                        appliedCouponCode = synced.couponCode
+                        appliedCouponCode = synced.couponCode,
+                        scheduledFor = synced.scheduledFor
                     )
                     lines.forEach { restaurantCart.lines[it.item.id] = it }
                     restaurantCart

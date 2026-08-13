@@ -508,21 +508,32 @@ class RestaurantDetailActivity : AppCompatActivity() {
             binding.detailLocationRow.visibility = android.view.View.GONE
         }
 
-        // features.md §6 — ETA row. restaurant.etaMinutes (from this
-        // screen's own GPS-resolved menu.php call) wins over the
-        // EXTRA_ETA_MINUTES intent extra (Home's older pre-GPS value)
-        // whenever both are present, since it reflects this screen's own
-        // location fix rather than whatever Home had at card-render time.
+        // features.md §I4 — ETA row. Shows "N mins · Schedule for later"
+        // with no active pick, or "Today, h:mm a" once the customer has
+        // picked a same-day slot for this restaurant (checked against
+        // CartManager, since the pick lives on the cart — see
+        // CartManager.getScheduledFor). Tapping the row always opens
+        // ScheduleTimeSlotBottomSheet, whichever state it's in.
         val intentEta = intent.getIntExtra(EXTRA_ETA_MINUTES, -1).takeIf { it > 0 }
         val eta = restaurant.etaMinutes ?: intentEta
         if (eta != null) {
-            binding.detailEta.text = getString(R.string.detail_eta_format, eta)
+            renderEtaRowText(eta)
             binding.detailEtaRow.visibility = android.view.View.VISIBLE
         } else {
             binding.detailEtaRow.visibility = android.view.View.GONE
         }
         binding.detailEtaRow.setOnClickListener {
-            InAppNotifier.show(this, getString(R.string.coming_soon), InAppNotifier.Type.INFO)
+            val sheet = com.anydrop.food.ui.common.ScheduleTimeSlotBottomSheet.newInstance(
+                openingTime = restaurant.openingTime,
+                closingTime = restaurant.closingTime,
+                currentSelection = CartManager.getScheduledFor(restaurant.id)
+            )
+            sheet.onSelected = { picked ->
+                CartManager.setScheduledFor(restaurant.id, picked)
+                renderEtaRowText(eta ?: 0)
+                com.anydrop.food.data.CartSyncManager.scheduleSync(this)
+            }
+            sheet.show(supportFragmentManager, "schedule_time")
         }
 
         if (!restaurant.offerBadgeText.isNullOrBlank()) {
@@ -604,6 +615,33 @@ class RestaurantDetailActivity : AppCompatActivity() {
                         binding.coverImage.setPadding(0, 0, 0, 0)
                     }
                 )
+            }
+        }
+    }
+
+    /**
+     * features.md §I4 — renders the ETA row's text: "N mins · Schedule for
+     * later" while no same-day slot is picked (CartManager.getScheduledFor
+     * is null), or "Today, h:mm a" once one is. [etaMinutesFallback] is
+     * only used for the unscheduled state's "N mins" — pass whatever value
+     * was already resolved in bindRestaurantDetail (0 is a safe fallback
+     * since the row is hidden entirely when eta is genuinely unavailable).
+     */
+    private fun renderEtaRowText(etaMinutesFallback: Int) {
+        val scheduledFor = CartManager.getScheduledFor(restaurantId)
+        if (scheduledFor == null) {
+            binding.detailEta.text = getString(R.string.detail_eta_format, etaMinutesFallback)
+        } else {
+            val parsed = try {
+                java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(scheduledFor)
+            } catch (e: Exception) {
+                null
+            }
+            binding.detailEta.text = if (parsed != null) {
+                val timeText = java.text.SimpleDateFormat("h:mm a", Locale.getDefault()).format(parsed)
+                getString(R.string.detail_eta_scheduled_format, timeText)
+            } else {
+                getString(R.string.detail_eta_format, etaMinutesFallback)
             }
         }
     }

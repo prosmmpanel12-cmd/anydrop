@@ -279,6 +279,68 @@ function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCod
 }
 
 /** Shapes an `orders` row + its items for API responses (customer/restaurant views). */
+/**
+ * I4 — "Schedule for later", same-day only (app owner's explicit scope call:
+ * no date picker, just a same-day time slot). Validates the raw string the
+ * client sent against the *current* server time and the restaurant's
+ * opening_time/closing_time — never trusts the client's idea of "today" or
+ * "is that slot even open".
+ *
+ * Returns ['error' => null, 'value' => 'Y-m-d H:i:s'|null] on success
+ * (null value = no schedule requested, i.e. a normal "Now" order), or
+ * ['error' => <code>, 'value' => null] on a bad slot.
+ */
+function validate_scheduled_for(array $restaurant, $raw): array
+{
+    if ($raw === null || $raw === '') {
+        return ['error' => null, 'value' => null];
+    }
+
+    $ts = is_string($raw) ? strtotime($raw) : false;
+    if ($ts === false) {
+        return ['error' => 'invalid_scheduled_time', 'value' => null];
+    }
+
+    $now = time();
+    // Same calendar day only — reject anything not dated "today" in the
+    // server's timezone, per app owner's scope call (no future-date picker).
+    if (date('Y-m-d', $ts) !== date('Y-m-d', $now)) {
+        return ['error' => 'scheduled_time_not_today', 'value' => null];
+    }
+
+    // Minimum lead time so the restaurant/rider actually have a chance to
+    // act on it — same 20-minute floor the "ASAP" ETA already assumes
+    // elsewhere in this file (see estimated prep+delivery in format_order
+    // callers). A slot in the past or seconds away isn't "scheduling" it,
+    // it's just a confusing "Now" order.
+    $minLeadSeconds = 20 * 60;
+    if ($ts < $now + $minLeadSeconds) {
+        return ['error' => 'scheduled_time_too_soon', 'value' => null];
+    }
+
+    // Bound to the restaurant's open hours for today, if configured. A
+    // restaurant with no hours set (both NULL) is treated as always-open,
+    // same assumption restaurants/list.php's is_open_now falls back to.
+    $opening = $restaurant['opening_time'] ?? null;
+    $closing = $restaurant['closing_time'] ?? null;
+    if ($opening && $closing) {
+        $today = date('Y-m-d', $now);
+        $openTs = strtotime("$today $opening");
+        $closeTs = strtotime("$today $closing");
+        if ($openTs !== false && $closeTs !== false && $closeTs > $openTs) {
+            // Only handles same-day open/close windows (e.g. 09:00–23:00).
+            // Restaurants open past midnight aren't modelled here — same
+            // limitation the rest of this codebase has around opening_time/
+            // closing_time, not something new introduced by this feature.
+            if ($ts < $openTs || $ts > $closeTs) {
+                return ['error' => 'scheduled_time_outside_open_hours', 'value' => null];
+            }
+        }
+    }
+
+    return ['error' => null, 'value' => date('Y-m-d H:i:s', $ts)];
+}
+
 function format_order(PDO $db, array $order): array
 {
     $itemsStmt = $db->prepare('SELECT * FROM order_items WHERE order_id = :id');
@@ -323,6 +385,11 @@ function format_order(PDO $db, array $order): array
         'payment_method' => $order['payment_method'],
         'payment_status' => $order['payment_status'],
         'delivery_instructions' => $order['delivery_instructions'],
+        // I4 — 'Y-m-d H:i:s' or null ("Now" order). Restaurant/rider apps
+        // don't consume this yet (not built this session), but the field
+        // is safe to expose already since it's just null until I4's create
+        // path starts populating it.
+        'scheduled_for' => $order['scheduled_for'] ?? null,
         'estimated_prep_minutes' => $order['estimated_prep_minutes'] !== null ? (int) $order['estimated_prep_minutes'] : null,
         'created_at' => $order['created_at'],
         'items' => $items,

@@ -3,7 +3,7 @@
  * POST /api/v1/orders
  * Auth: Customer token
  * Request:  { "restaurant_id", "items": [...], "delivery_address_id", "payment_method": "upi"|"cod",
- *             "coupon_code"?, "delivery_instructions"? }
+ *             "coupon_code"?, "delivery_instructions"?, "scheduled_for"? }
  * Response: { "order": {...}, "order_code": "QRX-..." }
  *
  * Re-validates the cart server-side (never trusts client totals), checks the
@@ -35,6 +35,10 @@ $paymentMethod = $body['payment_method'];
 $addressId = isset($body['delivery_address_id']) ? (int) $body['delivery_address_id'] : null;
 $couponCode = $body['coupon_code'] ?? null;
 $instructions = isset($body['delivery_instructions']) ? trim((string) $body['delivery_instructions']) : null;
+// I4 — optional same-day "Schedule for later" slot, "Y-m-d H:i:s" (or any
+// strtotime-parseable string) from the app's slot picker. Validated below
+// against the priced restaurant row, once we have it.
+$scheduledForRaw = $body['scheduled_for'] ?? null;
 
 if (!in_array($paymentMethod, ['upi', 'cod'], true)) {
     respond_error('validation_error', 422, ['fields' => ['payment_method']]);
@@ -69,6 +73,15 @@ if ($priced['error']) {
 $otpRequired = $paymentMethod === 'upi' || (bool) get_setting('otp_required_for_cod', false);
 $otpLength = (int) get_setting('otp_length', 4);
 
+// I4 — validated after pricing (needs $priced['restaurant']'s open hours),
+// before the insert transaction opens, so a bad slot fails fast with a
+// normal 422 rather than a mid-transaction rollback.
+$scheduleCheck = validate_scheduled_for($priced['restaurant'], $scheduledForRaw);
+if ($scheduleCheck['error'] !== null) {
+    respond_error($scheduleCheck['error'], 422, ['fields' => ['scheduled_for']]);
+}
+$scheduledFor = $scheduleCheck['value'];
+
 try {
     $db->beginTransaction();
 
@@ -87,12 +100,12 @@ try {
             order_code, customer_id, restaurant_id, status,
             item_total, delivery_charge, platform_fee, packing_charge, tax_amount, discount_amount,
             grand_total, commission_amount, payment_method, payment_status,
-            delivery_address_id, delivery_instructions, coupon_id, delivery_otp
+            delivery_address_id, delivery_instructions, scheduled_for, coupon_id, delivery_otp
         ) VALUES (
             :code, :cust, :rest, \'pending\',
             :item_total, :delivery_charge, :platform_fee, :packing_charge, :tax_amount, :discount_amount,
             :grand_total, :commission_amount, :payment_method, :payment_status,
-            :address_id, :instructions, :coupon_id, :otp
+            :address_id, :instructions, :scheduled_for, :coupon_id, :otp
         )'
     );
     $insertOrder->execute([
@@ -111,6 +124,7 @@ try {
         'payment_status' => $paymentMethod === 'cod' ? 'pending' : 'pending',
         'address_id' => $addressId,
         'instructions' => $instructions,
+        'scheduled_for' => $scheduledFor,
         'coupon_id' => $priced['coupon_id'],
         'otp' => $deliveryOtp,
     ]);

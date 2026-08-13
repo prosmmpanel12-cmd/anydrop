@@ -335,4 +335,16 @@
     <string name="detail_offers_count_format">%1$d offer%2$s</string>
     <string name="offers_sheet_title">Offers for you</string>
 
+    <!-- I4 — "Schedule for later" slot picker sheet, same-day only. -->
+    <string name="schedule_sheet_title">Schedule for later</string>
+    <string name="schedule_sheet_subtitle">Today, pick a time you\'d like this delivered by</string>
+    <string name="schedule_deliver_now">Deliver Now</string>
+    <string name="schedule_no_slots_today">This restaurant has no more delivery slots open for today</string>
+    <string name="detail_eta_scheduled_format">Today, %1$s</string>
+    <!-- I4 — one generic message covering all four scheduled_time_* 422
+         codes from orders/create.php (not_today / too_soon /
+         outside_open_hours / invalid), same call CheckoutActivity already
+         makes for other Place Order failures rather than a message per code. -->
+    <string name="schedule_time_unavailable">That delivery time isn\'t available anymore. Pick another.</string>
+
 </resources>

@@ -172,6 +172,15 @@ respond_ok([
         // features.md §6 additions below — all null/empty-safe, see comments above.
         'distance_km' => $distanceKm,
         'estimated_delivery_minutes' => $etaMinutes,
+        // features.md §I4 — "Schedule for later" time-slot picker needs the
+        // restaurant's remaining open hours *today* to bound its slot list
+        // (same-day only, per app owner's scope call). Raw TIME strings
+        // ("HH:MM:SS") straight off the restaurants row, same as the
+        // is_open_now computation in restaurants/list.php — null if the
+        // restaurant never had hours configured, in which case the app
+        // should just hide "Schedule for later" entirely.
+        'opening_time' => $restaurant['opening_time'],
+        'closing_time' => $restaurant['closing_time'],
         'offers' => array_map(fn($o) => [
             'id' => (int) $o['id'],
             'title' => $o['title'],

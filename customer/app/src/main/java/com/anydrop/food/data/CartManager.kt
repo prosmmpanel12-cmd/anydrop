@@ -57,7 +57,17 @@ data class RestaurantCart(
     val restaurantId: Int,
     var restaurantName: String,
     val lines: LinkedHashMap<Int, CartLine> = LinkedHashMap(), // key = menu_item_id
-    var appliedCouponCode: String? = null
+    var appliedCouponCode: String? = null,
+    // I4 — "yyyy-MM-dd HH:mm:ss" chosen on the restaurant-detail "Schedule
+    // for later" sheet, or null for a normal "Deliver Now" order. Same
+    // scope/lifetime as appliedCouponCode above: lives on this in-memory
+    // cart, synced to the server via CartSyncManager so it survives an app
+    // kill, and cleared whenever the cart itself is cleared (checkout
+    // success, restaurant switch, logout). The server is still the one
+    // that decides whether the slot is actually valid — see
+    // validate_scheduled_for() in backend/lib/orders.php — this is just
+    // what the picker last set.
+    var scheduledFor: String? = null
 ) {
     fun totalItemCount(): Int = lines.values.sumOf { it.quantity }
     fun totalPrice(): Double = lines.values.sumOf { it.unitPrice * it.quantity }
@@ -70,6 +80,39 @@ object CartManager {
     // reorder themselves in the cart sheet every time an item is added.
     private val carts = LinkedHashMap<Int, RestaurantCart>()
 
+    // I4 — the "Schedule for later" row on RestaurantDetailActivity can be
+    // tapped *before* the customer has added anything to their cart (it
+    // sits right under the restaurant header, above the menu). A
+    // RestaurantCart only exists once there's at least one line in it (see
+    // [add]/[setCustomized]), so a picked slot with nothing in the cart yet
+    // is held here instead of forcing an empty phantom RestaurantCart into
+    // existence — that would make hasAnyItems()/totalItemCount() lie and
+    // show a 0-item entry in the cart sheet. Applied onto the real
+    // RestaurantCart the moment one gets created for this restaurant.
+    private val pendingScheduledFor = HashMap<Int, String?>()
+
+    fun getScheduledFor(restaurantId: Int): String? =
+        carts[restaurantId]?.scheduledFor ?: pendingScheduledFor[restaurantId]
+
+    fun setScheduledFor(restaurantId: Int, scheduledFor: String?) {
+        val cart = carts[restaurantId]
+        if (cart != null) {
+            cart.scheduledFor = scheduledFor
+        } else {
+            pendingScheduledFor[restaurantId] = scheduledFor
+        }
+    }
+
+    /** Applies any pending (pre-cart) schedule pick onto a just-created
+     * RestaurantCart — called from [add]/[setCustomized] right after
+     * `getOrPut` so a slot picked before the first item was added isn't
+     * silently dropped. No-op if nothing was pending for this restaurant. */
+    private fun applyPendingSchedule(cart: RestaurantCart) {
+        if (pendingScheduledFor.containsKey(cart.restaurantId)) {
+            cart.scheduledFor = pendingScheduledFor.remove(cart.restaurantId)
+        }
+    }
+
     /**
      * Adds [item] to [restaurantId]'s cart, creating that restaurant's cart
      * if this is the first item from it. Never touches any other
@@ -77,7 +120,7 @@ object CartManager {
      */
     fun add(restaurantId: Int, item: MenuItem, restaurantName: String? = null) {
         val cart = carts.getOrPut(restaurantId) {
-            RestaurantCart(restaurantId, restaurantName.orEmpty())
+            RestaurantCart(restaurantId, restaurantName.orEmpty()).also { applyPendingSchedule(it) }
         }
         if (!restaurantName.isNullOrBlank()) {
             cart.restaurantName = restaurantName
@@ -114,7 +157,7 @@ object CartManager {
             return
         }
         val cart = carts.getOrPut(restaurantId) {
-            RestaurantCart(restaurantId, restaurantName.orEmpty())
+            RestaurantCart(restaurantId, restaurantName.orEmpty()).also { applyPendingSchedule(it) }
         }
         if (!restaurantName.isNullOrBlank()) {
             cart.restaurantName = restaurantName
@@ -164,6 +207,11 @@ object CartManager {
      * checkout for that restaurant, or when the user explicitly clears it. */
     fun removeCart(restaurantId: Int) {
         carts.remove(restaurantId)
+        // Also drop any pending (pre-cart) schedule pick for this
+        // restaurant — otherwise a slot chosen for an order that just got
+        // placed would silently carry over onto the *next* cart started
+        // with this restaurant.
+        pendingScheduledFor.remove(restaurantId)
     }
 
     fun hasAnyItems(): Boolean = carts.isNotEmpty()
@@ -173,6 +221,7 @@ object CartManager {
     /** Clears every restaurant's cart — used on logout. */
     fun clear() {
         carts.clear()
+        pendingScheduledFor.clear()
     }
 
     /**

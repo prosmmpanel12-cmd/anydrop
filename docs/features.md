@@ -400,7 +400,7 @@ working before starting the next — do not batch multiple together.
 ## Phase I — New feature requests (queued, not yet scoped in code)
 
 ### I1. Reorder button on Order History
-**Status: Not started**
+**Status: ✅ Done — built, Gradle-build-verified via GitHub Actions (Build Customer APK #8, 2026-08-12).**
 **What:** On each past order card in `OrderHistoryActivity`, a "Reorder" button that refills
 the cart with the same items in one tap and takes the user straight to the cart/checkout,
 instead of re-browsing the restaurant menu.
@@ -413,7 +413,7 @@ original order — decide whether to silently skip them or show a "N items no lo
 available" note before adding the rest to cart.
 
 ### I2. Order tracking status timeline (visual stepper)
-**Status: Not started — backend already tracks status, UI-only**
+**Status: ✅ Done — built, Gradle-build-verified, confirmed working on-device (2026-08-12).**
 **What:** On `OrderStatusActivity`, replace/augment the current status display with a visual
 stepper: **Placed → Accepted → Preparing → Out for delivery → Delivered**, highlighting the
 current step and checking off completed ones.
@@ -424,19 +424,22 @@ current step and checking off completed ones.
 equivalent) so each step maps to the right backend value, including any edge states
 (cancelled/rejected) that fall outside the 5-step happy path.
 
-### I3. Search filters — cuisine, price range, rating
-**Status: Not started — search currently only supports sort, not filters**
-**What:** Add filter options to Search (cuisine type, price range, rating) alongside the
+### I3. Search filters — cuisine, price range, rating, nearby
+**Status: ✅ Done — built, Gradle-build-verified, confirmed working on-device (2026-08-12).**
+**What:** Add filter options to Search (cuisine type, price range, rating, **nearby** —
+restaurants within a chosen distance of the user's current location) alongside the
 existing sort. Likely a filter bottom sheet similar in spirit to Feature 1's menu filters
 sheet, but for restaurant search results.
 **Files to touch:**
-- `customer/app/src/main/java/com/anydrop/customer/ui/search/SearchResultsAdapter.kt`
+- `customer/app/src/main/java/com/anydrop/food/ui/search/SearchResultsAdapter.kt`
 - Search activity/fragment (find the screen hosting `SearchResultsAdapter`)
 - New: a `SearchFiltersBottomSheet.kt` + layout
-- Backend search endpoint — check if cuisine/price/rating are already filterable
+- Backend search endpoint — check if cuisine/price/rating/distance are already filterable
   server-side or only client-side on already-fetched results; add query params if needed
 **Notes:** Reuse Feature 1's filter-sheet pattern (chips, sticky Apply/Clear footer) for
-visual consistency instead of designing a new pattern from scratch.
+visual consistency instead of designing a new pattern from scratch. "Nearby" needs the
+user's current lat/lng (check how distance is already computed elsewhere, e.g. restaurant
+detail's "1.5 km" line, and reuse that same source/permission flow rather than a new one).
 
 ### I4. Scheduled orders ("Schedule for later")
 **Status: Not started — currently a "Coming soon" toast**

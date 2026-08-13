@@ -3000,3 +3000,20 @@ tested end to end, or (b) do a build-only sanity pass now (gradle
 sync/compile) to catch any migration mistakes before billing is sorted,
 since the map rendering blank is expected/fine for that kind of check.
 Say which.
+
+## I4 — Scheduled orders, backend + partial Android (2026-08-13, in progress)
+
+Started I4 ("Schedule for later") per app owner's explicit scope call:
+**same-day only** — a time-slot picker bounded to today's remaining open
+hours, not a date+time picker.
+
+**Backend is done.** Android has models, cart storage, the slot-picker
+sheet, and the restaurant-detail entry point built and wired.
+`CheckoutActivity.kt` is the one remaining piece — layout row exists,
+click handler + API wiring doesn't yet.
+
+Full detail — file-by-file list of what's done, exactly what
+`CheckoutActivity.kt` still needs, and the design decisions made along the
+way (lead time, slot interval, same-day-only scope, etc.) — in
+`docs/15_Handover_I4_Scheduled_Orders.md`. Say **"continue I4"** to pick
+this up.

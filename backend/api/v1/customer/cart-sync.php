@@ -3,7 +3,7 @@
  * GET  /api/v1/customer/cart-sync.php   — restore the customer's saved cart
  * POST /api/v1/customer/cart-sync.php   — replace the customer's saved cart
  *   Request: { "carts": [
- *     { "restaurant_id": 5, "coupon_code": "TEST50", "items": [
+ *     { "restaurant_id": 5, "coupon_code": "TEST50", "scheduled_for": "2026-08-13 20:30:00", "items": [
  *       { "menu_item_id": 12, "quantity": 2, "addon_ids": [3,4], "special_instructions": "less spicy" }, ...
  *     ] }, ...
  *   ] }
@@ -35,6 +35,7 @@ $db = Database::get();
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $stmt = $db->prepare(
         "SELECT cci.restaurant_id, cci.menu_item_id, cci.quantity, cci.coupon_code,
+                cci.scheduled_for,
                 cci.addon_ids, cci.special_instructions,
                 r.name AS restaurant_name,
                 mi.name AS item_name, mi.description AS item_description,
@@ -88,6 +89,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 'restaurant_id' => $rid,
                 'restaurant_name' => $row['restaurant_name'],
                 'coupon_code' => $row['coupon_code'],
+                // I4 — "yyyy-MM-dd HH:mm:ss" or null ("Now"), same repeated-
+                // per-row-of-this-restaurant convention as coupon_code above.
+                'scheduled_for' => $row['scheduled_for'],
                 'items' => [],
             ];
         }
@@ -123,8 +127,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $del->execute(['cid' => $customerId]);
 
         $ins = $db->prepare(
-            'INSERT INTO customer_cart_items (customer_id, restaurant_id, menu_item_id, quantity, coupon_code, addon_ids, special_instructions)
-             VALUES (:cid, :rid, :mid, :qty, :coupon, :addons, :instructions)'
+            'INSERT INTO customer_cart_items (customer_id, restaurant_id, menu_item_id, quantity, coupon_code, scheduled_for, addon_ids, special_instructions)
+             VALUES (:cid, :rid, :mid, :qty, :coupon, :scheduled, :addons, :instructions)'
         );
         // §2.6 bug fix (found this session): this INSERT already listed the
         // addon_ids/special_instructions columns, but the execute() call
@@ -138,6 +142,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $couponCode = isset($cart['coupon_code']) && $cart['coupon_code'] !== ''
                 ? substr((string) $cart['coupon_code'], 0, 50)
                 : null;
+            // I4 — persisted as-is; this is just cart storage, not the order.
+            // The authoritative same-day/open-hours check happens once, at
+            // orders/create.php, right before the order is written — doing
+            // it again here would just be a second copy of that logic to
+            // keep in sync, and a stale/invalid value sitting in the cart
+            // is harmless (worst case: the picker re-opens at checkout).
+            $scheduledFor = null;
+            if (!empty($cart['scheduled_for']) && is_string($cart['scheduled_for'])) {
+                $ts = strtotime($cart['scheduled_for']);
+                if ($ts !== false) {
+                    $scheduledFor = date('Y-m-d H:i:s', $ts);
+                }
+            }
             $items = is_array($cart['items'] ?? null) ? $cart['items'] : [];
 
             if ($restaurantId <= 0 || empty($items)) {
@@ -162,6 +179,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'mid' => $menuItemId,
                     'qty' => $quantity,
                     'coupon' => $couponCode,
+                    'scheduled' => $scheduledFor,
                     'addons' => !empty($addonIds) ? json_encode($addonIds) : null,
                     'instructions' => $specialInstructions,
                 ]);

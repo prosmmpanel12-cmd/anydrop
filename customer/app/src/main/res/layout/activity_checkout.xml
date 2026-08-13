@@ -72,6 +72,54 @@
                 android:textColor="@color/anydrop_primary"
                 app:cornerRadius="10dp" />
 
+            <!-- I4 — "Schedule for later", same-day only. Tapping opens
+                 ScheduleTimeSlotBottomSheet (same sheet the restaurant-detail
+                 ETA row uses); this row lets the customer change or clear
+                 the pick they made there, without going back. -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/schedule_sheet_title"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <LinearLayout
+                android:id="@+id/rowDeliveryTime"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_card_rounded"
+                android:padding="12dp"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_bolt"
+                    app:tint="@color/veg_green" />
+
+                <TextView
+                    android:id="@+id/deliveryTimeText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:textSize="14sp"
+                    android:textColor="@color/text_primary"
+                    tools:text="Deliver Now" />
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_chevron_down"
+                    app:tint="@color/text_secondary" />
+
+            </LinearLayout>
+
             <!-- Payment method -->
             <TextView
                 android:layout_width="wrap_content"
