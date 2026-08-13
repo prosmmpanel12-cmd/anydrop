@@ -308,7 +308,12 @@ data class CartItemLine(
 data class CartValidateBody(
     @SerializedName("restaurant_id") val restaurantId: Int,
     val items: List<CartItemLine>,
-    @SerializedName("coupon_code") val couponCode: String? = null
+    @SerializedName("coupon_code") val couponCode: String? = null,
+    // Bug fix (2026-08-13) — sent whenever the cart already has a slot
+    // picked, so the backend's open-hours check on this preview matches
+    // the same "scheduled order, skip the right-now check" behavior as
+    // the real POST /orders call. See lib/orders.php price_cart().
+    @SerializedName("scheduled_for") val scheduledFor: String? = null
 )
 
 data class CartInvalidItem(

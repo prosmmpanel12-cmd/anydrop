@@ -93,6 +93,8 @@
     <string name="below_min_order_amount">Add a few more items to meet this restaurant\'s minimum order amount</string>
     <string name="below_min_order_amount_with_amount">Add ₹%1$.0f more to your cart to order</string>
     <string name="could_not_place_order">Couldn\'t place order</string>
+    <string name="restaurant_closed_error">This restaurant is closed right now. Try again during its open hours.</string>
+    <string name="restaurant_paused_error">This restaurant isn\'t accepting orders right now. Please try again shortly.</string>
     <string name="remove_coupon">Remove</string>
     <string name="lbl_coupon">Coupon</string>
     <string name="view_all_offers">View all offers &amp; coupons</string>

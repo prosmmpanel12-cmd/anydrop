@@ -29,9 +29,14 @@ require_fields($body, ['restaurant_id', 'items']);
 $restaurantId = (int) $body['restaurant_id'];
 $items = is_array($body['items']) ? $body['items'] : [];
 $couponCode = $body['coupon_code'] ?? null;
+// Optional — same-day scheduled slot, if the checkout screen already has
+// one picked. Passed through to price_cart() so this preview doesn't
+// falsely reject a scheduled order just because the restaurant happens to
+// be closed for a "Deliver Now" order right now (see lib/orders.php).
+$scheduledForRaw = $body['scheduled_for'] ?? null;
 
 $db = Database::get();
-$priced = price_cart($db, $restaurantId, $items, $couponCode, $owner['owner_id']);
+$priced = price_cart($db, $restaurantId, $items, $couponCode, $owner['owner_id'], $scheduledForRaw);
 
 if ($priced['error'] && empty($priced['line_items'])) {
     respond_error($priced['error'], 422);

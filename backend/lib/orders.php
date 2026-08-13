@@ -45,7 +45,7 @@ function generate_order_code(PDO $db): string
  *   coupon_id: int|null, error: string|null
  * }
  */
-function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCode, int $customerId): array
+function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCode, int $customerId, $scheduledForRaw = null): array
 {
     $result = [
         'valid' => false,
@@ -100,6 +100,34 @@ function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCod
     if ($restaurant['operational_status'] !== 'open') {
         $result['error'] = 'restaurant_not_accepting_orders';
         return $result;
+    }
+
+    // Bug fix (2026-08-13) — the check above only caught the on-demand
+    // pause (operational_status busy/temp_closed/etc.), never the
+    // restaurant's fixed opening_time/closing_time/working_days schedule.
+    // restaurants/list.php's is_open_now already factors all of that in
+    // (operational_status === 'open' AND today's a working day AND current
+    // time is within the window) to decide what shows as "open" on the
+    // Home/list screens, but nothing on the order-placement path re-checked
+    // it — so a restaurant well past closing_time (operational_status still
+    // sitting at its 'open' default) could still have orders placed against
+    // it. Only applies to "Now" orders: a scheduled order's slot is checked
+    // against ITS OWN target time by validate_scheduled_for() below/after
+    // this function returns, not against right-now, so we skip this
+    // right-now check whenever a scheduled_for was sent.
+    if ($scheduledForRaw === null || $scheduledForRaw === '') {
+        if ($restaurant['opening_time'] && $restaurant['closing_time']) {
+            $nowTs = time();
+            $currentTime = date('H:i:s', $nowTs);
+            $currentDow = (int) date('N', $nowTs); // 1 (Mon) - 7 (Sun)
+            $days = explode(',', (string) $restaurant['working_days']);
+            $dayMatches = in_array((string) $currentDow, $days, true);
+            $timeMatches = ($currentTime >= $restaurant['opening_time'] && $currentTime <= $restaurant['closing_time']);
+            if (!$dayMatches || !$timeMatches) {
+                $result['error'] = 'restaurant_closed';
+                return $result;
+            }
+        }
     }
 
     $dueLimit = (float) get_setting('restaurant_due_limit', 2000);

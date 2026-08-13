@@ -55,7 +55,11 @@ if ($addressId !== null) {
     }
 }
 
-$priced = price_cart($db, $restaurantId, $items, $couponCode, $customerId);
+// scheduledForRaw passed in so price_cart() knows whether to check the
+// restaurant's hours against right-now (a "Deliver Now" order) or skip
+// that check (a scheduled order — validate_scheduled_for() below checks
+// its own target slot against the restaurant's hours instead).
+$priced = price_cart($db, $restaurantId, $items, $couponCode, $customerId, $scheduledForRaw);
 
 if ($priced['error']) {
     // H4 follow-up (2026-08-10) — attach min_order_amount + item_total

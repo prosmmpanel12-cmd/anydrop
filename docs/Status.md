@@ -3090,3 +3090,51 @@ enforce it yet either (needs to, so the pause actually blocks orders, not
 just hides the restaurant from the list). Full plan, scope questions, and
 suggested build order in `docs/16_Handover_I4_Followups_And_Order_Toggle.md`.
 Nothing built yet — say "start toggle" or "start I4 followups" to begin.
+
+**Note (2026-08-13, later):** this section is stale — Part A and Part B
+from `docs/16` were in fact built later the same day (restaurant-facing
+`status-update.php` endpoint, `DashboardActivity`'s "Accepting orders"
+switch, `scheduled_for` surfaced in both apps). See the bug-fix entry
+below for what was still missing even after that.
+
+---
+
+## Bug fix pass — closed restaurant could still receive orders (2026-08-13)
+
+**Reported by app owner:** orders were getting placed against restaurants
+that were closed (outside their `opening_time`/`closing_time`/
+`working_days` window).
+
+**Root cause, confirmed by reading `lib/orders.php`'s `price_cart()`:**
+the Part B pause-toggle work added a check for
+`restaurants.operational_status !== 'open'`, but that only covers the
+on-demand pause (busy/temp_closed/etc.) — it never re-checked the
+restaurant's fixed hours the way `restaurants/list.php`'s `is_open_now`
+does. A restaurant sitting at its default `operational_status = 'open'`
+(i.e. never paused) but simply outside its opening hours could still have
+a "Deliver Now" order placed against it, because nothing on the order path
+looked at `opening_time`/`closing_time`/`working_days` at all.
+
+**Fix:**
+- `backend/lib/orders.php` — `price_cart()` now takes an optional
+  `$scheduledForRaw` param. For a "Deliver Now" order (no scheduled slot),
+  it now runs the same open-hours/working-day check `restaurants/list.php`
+  uses, and fails fast with a new `restaurant_closed` error if the
+  restaurant is outside its window. Scheduled orders skip this right-now
+  check (their own target slot is already checked by
+  `validate_scheduled_for()`), so scheduling ahead for a restaurant that's
+  currently closed still works correctly.
+- `backend/api/v1/orders/create.php` and `backend/api/v1/cart/validate.php`
+  — both now pass `scheduled_for` through to `price_cart()` so the actual
+  order-placement call and the checkout bill-preview call agree.
+- Customer App — `CartValidateBody` gained `scheduled_for` (sent from both
+  `loadBill()` and `applyCoupon()` in `CheckoutActivity`), and the
+  place-order error handling now shows a real message for
+  `restaurant_closed` / `restaurant_not_accepting_orders` instead of
+  falling through to the raw error code string (`R.string.restaurant_closed_error`,
+  `R.string.restaurant_paused_error` — new strings in `strings.xml`).
+
+**Not yet done:** a Gradle build/sanity pass on the Customer App changes,
+and a live device retest placing an order against a restaurant that's
+currently outside its hours (should now fail with a clear message) and
+one that's within hours (should still succeed as before).

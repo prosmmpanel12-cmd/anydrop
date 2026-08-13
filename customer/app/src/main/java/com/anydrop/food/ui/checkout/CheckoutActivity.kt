@@ -337,7 +337,8 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
                     CartValidateBody(
                         restaurantId = restaurantId,
                         items = cartLines(),
-                        couponCode = CartManager.getCart(restaurantId)?.appliedCouponCode
+                        couponCode = CartManager.getCart(restaurantId)?.appliedCouponCode,
+                        scheduledFor = CartManager.getCart(restaurantId)?.scheduledFor
                     )
                 )
                 val totals = response.body()?.data
@@ -375,7 +376,8 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
                     CartValidateBody(
                         restaurantId = restaurantId,
                         items = cartLines(),
-                        couponCode = code
+                        couponCode = code,
+                        scheduledFor = CartManager.getCart(restaurantId)?.scheduledFor
                     )
                 )
                 val totals = response.body()?.data
@@ -551,6 +553,12 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
                         "invalid_coupon" -> getString(R.string.coupon_invalid)
                         "coupon_min_order_not_met" -> getString(R.string.coupon_min_order_not_met)
                         "coupon_usage_limit_reached" -> getString(R.string.coupon_usage_limit_reached)
+                        // Bug fix (2026-08-13) — these two used to fall through
+                        // to the generic `else -> errInfo.code` branch, showing
+                        // the raw error code string to the customer instead of
+                        // a real message.
+                        "restaurant_closed" -> getString(R.string.restaurant_closed_error)
+                        "restaurant_not_accepting_orders" -> getString(R.string.restaurant_paused_error)
                         // I4 — one generic message covering all four
                         // scheduled_time_* codes from validate_scheduled_for()
                         // rather than a message per code (design decision left
