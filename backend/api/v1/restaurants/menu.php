@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/favorites.php';
 require_once __DIR__ . '/../../../lib/geo.php';
+require_once __DIR__ . '/../../../lib/restaurant_status.php';
 
 header('Access-Control-Allow-Origin: *');
 header('Cache-Control: max-age=300');
@@ -81,8 +82,15 @@ $catStmt = $db->prepare(
 $catStmt->execute(['rid' => $restaurantId]);
 $categories = $catStmt->fetchAll();
 
+// bugs.md §6.3 follow-up (out-of-stock) — previously filtered to
+// is_available = 1 only, so an out-of-stock item just silently vanished
+// from the menu with no way for the customer to see it existed. Now
+// fetched regardless of is_available and returned with the flag so the
+// app can render it greyed-out ("Out of stock") instead of hiding it.
+// Ordering keeps in-stock items first within each category (menu_items'
+// existing ORDER BY name is applied within that split, not overridden).
 $itemStmt = $db->prepare(
-    'SELECT * FROM menu_items WHERE restaurant_id = :rid AND is_available = 1 AND deleted_at IS NULL ORDER BY name ASC'
+    'SELECT * FROM menu_items WHERE restaurant_id = :rid AND deleted_at IS NULL ORDER BY is_available DESC, name ASC'
 );
 $itemStmt->execute(['rid' => $restaurantId]);
 $items = $itemStmt->fetchAll();
@@ -108,6 +116,9 @@ foreach ($items as $item) {
         'image_url' => $item['image_url'],
         'is_recommended' => (bool) $item['is_recommended'],
         'is_bestseller' => (bool) $item['is_bestseller'],
+        // bugs.md §6.3 follow-up — out-of-stock flag, see the item query
+        // comment above for why unavailable items are included at all now.
+        'is_available' => (bool) $item['is_available'],
         // features.md §1 dietary-preference chips — see
         // 13_migration_menu_item_dietary_flags.sql. Default 0/false on
         // rows created before that migration ran.
@@ -154,6 +165,13 @@ if (!empty($itemsByCategory[0])) {
 // badge, because that data was never fetched for the detail screen. Now
 // included directly in the menu response (single round trip) alongside the
 // items, so the detail screen has everything it needs without a second call.
+// bugs.md §6.3 follow-up — restaurant detail page never showed an
+// open/closed/paused badge at all, unlike Home cards and search results
+// (which already had it). Same compute_restaurant_status() helper those
+// two use, so all three surfaces can never show contradictory status for
+// the same restaurant.
+$statusFlags = compute_restaurant_status($restaurant);
+
 respond_ok([
     'restaurant' => [
         'id' => (int) $restaurant['id'],
@@ -163,6 +181,8 @@ respond_ok([
         'cover_url' => $restaurant['cover_url'],
         'cuisine_tags' => $restaurant['cuisine_tags'],
         'is_veg_only' => (bool) $restaurant['is_veg_only'],
+        'is_open_now' => $statusFlags['is_open_now'],
+        'is_paused' => $statusFlags['is_paused'],
         'min_order_amount' => (float) $restaurant['min_order_amount'],
         'rating_avg' => (float) $restaurant['rating_avg'],
         'rating_count' => (int) ($restaurant['rating_count'] ?? 0),

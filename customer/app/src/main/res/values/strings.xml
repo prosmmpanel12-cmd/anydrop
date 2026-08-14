@@ -65,6 +65,8 @@
     <!-- Restaurant detail -->
     <string name="btn_add_to_cart">Add</string>
     <string name="highly_reordered">Highly reordered</string>
+    <!-- bugs.md §6.3 follow-up -->
+    <string name="out_of_stock">Out of stock</string>
     <string name="percent_off">%1$d%% OFF</string>
     <string name="menu_empty">Menu isn\'t available yet</string>
 
@@ -169,6 +171,8 @@
     <string name="logout_confirm_message">You\'ll need to log in again to place orders.</string>
     <string name="btn_edit">Edit</string>
     <string name="btn_delete">Delete</string>
+    <!-- Bug 6.2 — Address Book "Set as default" tap target -->
+    <string name="btn_set_default">Set as default</string>
     <string name="delete_address_confirm">Delete this address?</string>
     <string name="label_default">DEFAULT</string>
 
@@ -282,6 +286,13 @@
     <string name="service_area_unavailable_title">We\'re not available in your area yet</string>
     <string name="service_area_unavailable_message">No restaurants deliver here right now — we\'re working on it. Coming soon!</string>
     <string name="service_area_retry">Try again</string>
+    <!-- Bug 6.1 — Home GPS-off banner. Soft-nudge variant only: the
+         "unavailable" variant intentionally reuses
+         service_area_unavailable_title instead of a new string here, per
+         the bug spec's "don't invent a second, slightly-different message"
+         requirement. -->
+    <string name="gps_off_banner_soft">Turn on location for a better experience</string>
+    <string name="change_address">Change address</string>
 
     <!-- §2.6/1.9 — dish customization / item detail sheet -->
     <string name="item_detail_title">Item details</string>

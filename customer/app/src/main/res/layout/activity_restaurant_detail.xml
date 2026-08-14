@@ -224,6 +224,20 @@
                     android:textSize="13sp"
                     android:textColor="@color/text_secondary" />
 
+                <!-- bugs.md §6.3 follow-up — detail page previously showed
+                     no open/paused/closed status at all, unlike the Home
+                     card and search result for the same restaurant. Same
+                     three-state text + color as RestaurantAdapter's
+                     restaurantStatus (Open/Temporarily unavailable/Closed),
+                     bound the same way in bindRestaurantDetail(). -->
+                <TextView
+                    android:id="@+id/detailStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
                 <!-- features.md §6 — address + distance row, e.g. "2.7 km ·
                      Sardarpura". Distance only shows once a GPS fix resolves
                      (distance_km null until then) — see

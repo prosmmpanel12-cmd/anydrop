@@ -15,14 +15,34 @@
         <!-- usesCleartextTraffic: needed for local KS Web HTTP backend during
              development, same as the customer app (see network/ApiClient.kt). -->
 
+        <!-- Launcher moved here from LoginActivity this session — plays the
+             brand entrance animation, then routes to Dashboard or Login. -->
         <activity
-            android:name=".ui.login.LoginActivity"
-            android:exported="true">
+            android:name=".ui.splash.SplashActivity"
+            android:exported="true"
+            android:theme="@style/Theme.AnydropRestaurant">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".ui.login.LoginActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.signup.SignupActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.signup.OtpVerifyActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.signup.SignupSuccessActivity"
+            android:exported="false" />
 
         <activity
             android:name=".ui.dashboard.DashboardActivity"

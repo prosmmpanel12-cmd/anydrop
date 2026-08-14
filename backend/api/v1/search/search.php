@@ -26,6 +26,7 @@ require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/favorites.php';
+require_once __DIR__ . '/../../../lib/restaurant_status.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -133,24 +134,15 @@ $now = new DateTime();
 $currentTime = $now->format('H:i:s');
 $currentDow = (int) $now->format('N');
 
-function compute_open_now(array $r, string $currentTime, int $currentDow): bool
-{
-    if ($r['operational_status'] !== 'open' || !$r['opening_time'] || !$r['closing_time']) {
-        return false;
-    }
-    $days = explode(',', (string) $r['working_days']);
-    $dayMatches = in_array((string) $currentDow, $days, true);
-    $timeMatches = ($currentTime >= $r['opening_time'] && $currentTime <= $r['closing_time']);
-    return $dayMatches && $timeMatches;
-}
-
 $restaurantResults = [];
 foreach ($mergedRestaurants as $r) {
-    $isOpenNow = compute_open_now($r, $currentTime, $currentDow);
-    // Part B follow-up — same "paused vs outside hours" distinction as
-    // restaurants/list.php; kept in sync since both feed the same
-    // Restaurant model/card UI on the Android side.
-    $isPaused = in_array($r['operational_status'], ['busy', 'temp_closed'], true);
+    // Consolidated into compute_restaurant_status() (bugs.md §6.3
+    // follow-up) — this file's own local compute_open_now() is gone;
+    // restaurants/list.php and restaurants/menu.php use the same
+    // function now, so all three surfaces can't drift apart.
+    $statusFlags = compute_restaurant_status($r, $currentTime, $currentDow);
+    $isOpenNow = $statusFlags['is_open_now'];
+    $isPaused = $statusFlags['is_paused'];
 
     $distanceKm = null;
     if ($lat !== null && $lng !== null && $r['latitude'] !== null && $r['longitude'] !== null) {
@@ -223,7 +215,7 @@ foreach ($rawItems as $it) {
         'closing_time' => $it['r_closing_time'],
         'working_days' => $it['r_working_days'],
     ];
-    $isOpenNow = compute_open_now($rArr, $currentTime, $currentDow);
+    $isOpenNow = compute_restaurant_status($rArr, $currentTime, $currentDow)['is_open_now'];
 
     $distanceKm = null;
     if ($lat !== null && $lng !== null && $it['r_lat'] !== null && $it['r_lng'] !== null) {

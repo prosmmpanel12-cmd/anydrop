@@ -69,6 +69,25 @@
             android:visibility="gone"
             tools:visibility="visible" />
 
+        <!-- bugs.md §6.3 follow-up — out of stock. Same pill style as
+             itemHighlyReordered above, error-colored instead of
+             success-colored. Visible only when item.isAvailable is
+             false, bound in MenuAdapter.ItemVH.bind(). -->
+        <TextView
+            android:id="@+id/itemOutOfStock"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_pill_highly_reordered"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="3dp"
+            android:text="@string/out_of_stock"
+            android:textColor="@color/error_fg"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
     </LinearLayout>
 
     <FrameLayout

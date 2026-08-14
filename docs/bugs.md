@@ -200,9 +200,224 @@ show the same line two days running defeats the point of having 40-50.
 | 3.2 | No restaurant-side write path for discount/bestseller flags | 🟡 Medium | Restaurant App |
 | 3.3 | Service-area check is city-wide, not radius-precise | 🟢 Low | UX accuracy |
 | 4.1 | Notification system has no template pool / triggers yet | 🔴 (scope gap, not a bug) | Notifications |
+| 6.1 | Home GPS-off banner (Zomato-style, dynamic text) — spec only, not built | 🆕 Feature, not yet built | Address/GPS |
+| 6.2 | Address Book "set as default" — no such action exists in code | 🔴 High (missing feature) | Address Book |
+| 6.3 | `orders/create.php` never checks restaurant operational_status | 🔴 High (ops/money) | Restaurant status |
 
 **Priority for fixing, independent of new-feature work:** 1.1 and 2.2 are
 the two that matter most before anything money- or auth-related ships
 further (1.1 before the restaurant discount/coupon UI goes live, 2.2
 before real users ever hit production). 1.2 matters before COD OTP is
 ever turned on. The rest can ride alongside the new roadmap items below.
+
+---
+
+## 6. Reported 2026-08-14 (from live device screenshots + follow-up clarification)
+
+### 6.1 🆕 Feature spec — Home screen GPS-off banner (Zomato used only
+as a visual reference, not literal copy)
+Clarified 2026-08-14: the earlier screenshot was from **Zomato**, shown
+only as a style/behaviour reference — nothing from it should be copied
+into Anydrop as-is (colours, copy, or literal layout). What's wanted is
+the same *behaviour*, rebuilt with Anydrop's own UI. This replaces the
+original 6.1 entry above (which was written before this was clarified —
+searching the zip for Zomato's exact on-screen strings was, correctly,
+never going to find anything, since that screen was never part of this
+app to begin with).
+
+**What to build, on `HomeActivity`** (not `LocationPickerActivity` —
+this is a persistent Home-screen banner, not a bottom sheet):
+
+1. A dismissible-but-reappearing top banner shown on Home whenever device
+   location (GPS + network provider, same `isProviderEnabled` check
+   `LocationPickerActivity.fetchCurrentLocation()` already does) is off
+   **and** the active address is a live-location one, or there's no
+   active address at all yet. If the active address is a saved address
+   (`ActiveAddressManager.get()?.isLiveLocation == false`), the banner
+   should NOT show — a saved address doesn't need live GPS to keep
+   working, so there's nothing to warn about.
+2. The banner's text must be **dynamic based on whether Anydrop
+   currently serves the resolved area**, not a single static message:
+   - If a location can still be resolved somehow (e.g. last-known fix,
+     or the active saved address's lat/lng) and `restaurants/list.php`
+     for that lat/lng returns at least one restaurant → banner reads
+     something like "Turn on location for a better experience" (soft
+     nudge, not blocking — matches `setServiceAreaUnavailable`'s existing
+     "restaurants exist, just help us find you" tone).
+   - If nothing can be resolved at all, or the resolved/last-known area
+     has zero restaurants (same emptiness check `loadRestaurants()`
+     already does for `setServiceAreaUnavailable`) → banner reads
+     something like "We're not available in this area yet — try a
+     different address" — i.e. reuse the existing
+     `setServiceAreaUnavailable(true)` state/copy rather than inventing
+     a second, slightly-different "not available" message. **Don't
+     build a second unavailable-area banner that says something
+     different from the one that already exists** — that's exactly the
+     "client gets confused by two different messages for the same
+     situation" risk called out below.
+3. Tapping the banner (or a location icon on it) opens
+   `LocationPickerActivity` — same destination `deliveryLocationText`'s
+   tap already opens, don't build a second location-selection flow.
+4. **Explicit "Change address" button** on the banner (separate tap
+   target from the banner body, per the request) — same destination as
+   point 3. The point of a dedicated button rather than only relying on
+   "tap the banner text" is discoverability: a plain text banner without
+   an obvious button reads as informational-only to a lot of users, who
+   then don't realize tapping it does anything.
+
+**Consistency requirement — this is the "client should have zero
+confusion" part of the ask, and it's the part most likely to get missed
+building this incrementally:** once this banner exists, there are now
+*three* places a user can end up being told "no service here" —
+(a) this new banner, (b) `setServiceAreaUnavailable`'s existing
+restaurant-list empty-state, (c) whatever the person eventually resolves
+bug 6.3's badge/booking-block work into. All three must use the **same**
+copy and the **same** "figure out if this area has restaurants" check
+(`restaurants/list.php`'s existing result set, not a separately-invented
+availability check) — otherwise it's entirely possible for a user to see
+one screen say "available" and another say "not available" for the exact
+same location, which is a worse experience than any single version of
+this banner alone. Whoever builds this should grep for
+`setServiceAreaUnavailable` and `empty_restaurants` first and reuse
+those strings/that state rather than writing new ones.
+
+**Not yet built. No code written for this in this session** — this
+entry exists so the spec is captured precisely before the next session
+starts implementing it, rather than starting from the screenshot again.
+
+### 6.2 🔴 Address Book — "set as default" doesn't switch because no
+client-side action exists yet (backend already supports it — confirmed)
+Checked `AddressAdapter.kt`, `AddressBookActivity.kt`, and
+`backend/api/v1/customer/addresses.php` directly. The gap is narrower
+than it first looks:
+
+- **Backend is already fully ready** — `addresses.php`'s `PUT` (edit) and
+  `POST` (create) both already accept `is_default` in the body, and both
+  already correctly clear every other address's `is_default` first
+  (`UPDATE customer_addresses SET is_default = 0 WHERE customer_id = :cid`)
+  before setting the new one — so there's no double-default risk, that
+  logic is already correct. **No new backend endpoint needs to be
+  built.**
+- **The gap is entirely client-side**: `AddressAdapter` only *reads*
+  `address.isDefault` to show/hide a badge — there's no tap handler on
+  any row, no "Set as default" button anywhere, and no code calling the
+  `PUT` endpoint with `is_default: true`. The UI simply never asks the
+  backend to change it.
+
+**One thing to watch when wiring this up** — `PUT`'s handler calls
+`require_fields($body, ['full_address'])` before touching anything else,
+meaning a bare `{"is_default": true}` request **will be rejected** with
+`validation_error`. A "Set as default" tap must send the *entire*
+existing address payload (same fields `AddressEditorBottomSheet`'s save
+already sends) with `is_default` flipped to `true`, not just that one
+field on its own — otherwise this looks like it works in a quick test
+and then fails the first time it's tried on an address missing some
+optional field the request happened to include by accident.
+
+**What to build**: a "Set as default" tap target per row in
+`AddressAdapter`/the address list layout (icon or text button, not the
+whole row — the row already has its own tap-to-select behaviour
+elsewhere in the app, e.g. picking delivery address at Checkout, so
+overloading the same tap for two different actions would itself be a
+confusion risk) → calls the existing `PUT` endpoint with the full
+address payload + `is_default: true` → re-fetches/re-renders the list on
+success so the badge moves immediately, no stale state until the next
+manual refresh.
+
+**Client-confusion note, since this was specifically asked for**: once
+this exists, `ActiveAddressManager`'s "currently selected delivery
+address for this session" and `customer_addresses.is_default` (the
+"default/preferred address across sessions") are now two related but
+separate concepts — setting a new default should NOT silently also
+switch what's active on Home right this moment (that's a separate,
+deliberate action via the Location Picker), and picking a different
+address at checkout for one order should NOT silently change the
+account's default either. Keep those two flows from bleeding into each
+other, or the "which address is really mine" question gets more
+confusing, not less.
+
+### 6.3 ✅ Orders can still be placed on a closed/paused restaurant —
+**resolved, see `docs/17_Handover_Bugs_6.1_6.2_2026-08-14.md` update below**
+(2026-08-14 session #2). The `orders/create.php` gap described below was
+already fixed in the I4 followups session (`price_cart()` in
+`backend/lib/orders.php`, dated 2026-08-13) — this entry just hadn't been
+updated to reflect that. The clarifying question below **is now
+answered**: the restaurant detail page was the surface with no badge at
+all (Home cards and search results already had one) — fixed this
+session by adding `is_open_now`/`is_paused` to `menu.php` and a status
+label to `RestaurantDetailActivity`, reusing the same shared
+`compute_restaurant_status()` helper (new, `backend/lib/`) that
+`list.php` and `search.php` now also call instead of each having their
+own copy. Out-of-stock (the other open question in this entry) was also
+built this session — see the new entry below.
+
+### 6.3 🔴 Orders can still be placed on a closed/paused restaurant
+(ORIGINAL — kept for history, see ✅ update above)
+(badge itself already exists — don't rebuild it)
+Checked thoroughly before writing this up, because the first read of the
+bug report turned out to be wrong: **a status badge already exists and
+already works.** `restaurants/list.php` computes `is_open_now` /
+`is_paused` from the schema's `operational_status` column and returns
+both; `RestaurantAdapter.kt` (customer app, Home restaurant cards)
+already renders "Open" (green), "Temporarily unavailable" (amber,
+dimmed) for `busy`/`temp_closed`, or "Closed" (red, dimmed) — so if a
+restaurant's `operational_status` is genuinely set to something other
+than `open`, the card already shows that correctly. **Two narrower real
+gaps, confirmed by reading the actual files:**
+
+- **`orders/create.php` never checks `operational_status` (or `status`)
+  at all before accepting an order** — grepped the whole file, no
+  restaurant-status condition exists anywhere in it. So even though the
+  Home screen badge might correctly show a restaurant as closed/paused,
+  nothing server-side stops an order from being placed on it anyway —
+  e.g. via a stale cached menu screen, a deep link, or simply the
+  request being sent directly. This is the one that actually needs a
+  code fix: fetch `operational_status`/`status` in `create.php` before
+  pricing/inserting, reject with `restaurant_not_accepting_orders` if
+  not `open`/`approved`.
+- **No "out of stock" state exists in the schema at all** —
+  `operational_status`'s ENUM is
+  `open, closed, busy, vacation, temp_closed, admin_disabled`. There's
+  no restaurant-wide "out of stock" value, only per-item stock (if that
+  even exists yet — needs checking against the menu-items table
+  separately). If the person's asking for a distinct "Out of stock"
+  badge specifically (not just closed/paused), that's a schema +
+  UI addition, not something the existing badge logic already covers.
+
+**Needs clarifying from the person**: was the restaurant in question
+actually showing as "Open" on its card while still being unable to
+fulfil orders (confirms the `orders/create.php` gap above is the real
+issue), or was there no badge at all on that particular screen (would
+point somewhere the existing `RestaurantAdapter` logic doesn't reach —
+e.g. the restaurant detail page, or search results, worth checking those
+render the same badge before assuming they do)?
+
+### 6.4 🟡 Out of stock (per-item) — customer-side done, restaurant-side
+NOT started (2026-08-14 session #2)
+Turned out `menu_items.is_available` (TINYINT, schema already had it) was
+already fully enforced everywhere on the read/order path — `menu.php`,
+`search.php`, `category-items.php`, `popular-items.php` all filtered
+`is_available = 1`, and `price_cart()` already rejected an unavailable
+item at order time with reason `unavailable`. The only gaps: nothing
+ever showed an unavailable item to the customer (it was just silently
+hidden), and **nothing in the restaurant app can set `is_available` at
+all** — no toggle exists anywhere, so right now it can only be flipped
+directly in the DB.
+
+**Done this session (customer side only):**
+- `menu.php` — no longer filters `is_available = 1` out of the query;
+  now returns every item (in-stock ones first) with an `is_available`
+  flag.
+- `MenuItem` model, `MenuAdapter.kt`, `item_menu_item.xml` — unavailable
+  items now show an "Out of stock" pill, dimmed row, and the ADD
+  button/qty stepper are hidden and unwired (not just disabled).
+
+**NOT started — restaurant app toggle.** Explicitly deferred by the
+person this session ("restaurant app is being built later") — the
+restaurant app itself needs building out first before this specific
+toggle makes sense to add. When that work starts, this is the one
+concrete backend question to check first: **does a PUT/PATCH endpoint
+for `menu_items` (analogous to `customer/addresses.php`'s PUT) already
+exist for the restaurant side, or does one need to be built from
+scratch?** — wasn't checked this session, don't assume either way.
+

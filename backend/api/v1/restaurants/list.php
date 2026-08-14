@@ -14,6 +14,7 @@ require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/favorites.php';
 require_once __DIR__ . '/../../../lib/geo.php';
+require_once __DIR__ . '/../../../lib/restaurant_status.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -110,22 +111,12 @@ if (!empty($all)) {
 
 $results = [];
 foreach ($all as $r) {
-    $isOpenNow = false;
-    if ($r['operational_status'] === 'open' && $r['opening_time'] && $r['closing_time']) {
-        $days = explode(',', (string) $r['working_days']);
-        $dayMatches = in_array((string) $currentDow, $days, true);
-        $timeMatches = ($currentTime >= $r['opening_time'] && $currentTime <= $r['closing_time']);
-        $isOpenNow = $dayMatches && $timeMatches;
-    }
-    // Part B follow-up — distinguishes "closed because it's outside its
-    // fixed hours" from "on-demand paused right now" so the app can show
-    // "Temporarily unavailable" instead of a plain "Closed" for the
-    // latter, since the restaurant could resume any minute. Only
-    // meaningful when $isOpenNow is already false — a restaurant that's
-    // both within its hours and 'busy'/'temp_closed' is correctly
-    // !isOpenNow too (operational_status !== 'open' short-circuits the
-    // check above), and this flag is what tells the app why.
-    $isPaused = in_array($r['operational_status'], ['busy', 'temp_closed'], true);
+    // Consolidated into compute_restaurant_status() (bugs.md §6.3
+    // follow-up) — was inline here and duplicated separately in
+    // search.php; restaurants/menu.php now uses the same function too.
+    $statusFlags = compute_restaurant_status($r, $currentTime, $currentDow);
+    $isOpenNow = $statusFlags['is_open_now'];
+    $isPaused = $statusFlags['is_paused'];
 
     if ($filter === 'open_now' && !$isOpenNow) {
         continue;

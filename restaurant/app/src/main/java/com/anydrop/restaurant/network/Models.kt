@@ -25,6 +25,33 @@ data class PageMeta(
 
 data class LoginBody(val email: String, val password: String)
 
+// --- Restaurant Partner Signup (email OTP verify -> create pending account) ---
+
+data class RequestOtpBody(val email: String)
+
+data class RequestOtpResult(
+    val message: String,
+    @SerializedName("debug_otp") val debugOtp: String? = null
+)
+
+data class VerifyOtpBody(val email: String, val otp: String)
+
+data class VerifyOtpResult(val verified: Boolean, val email: String)
+
+data class SignupBody(
+    val name: String,
+    @SerializedName("owner_name") val ownerName: String,
+    @SerializedName("owner_mobile") val ownerMobile: String,
+    @SerializedName("owner_email") val ownerEmail: String,
+    val password: String,
+    val address: String? = null
+)
+
+data class SignupResult(
+    val restaurant: RestaurantProfile,
+    val status: String
+)
+
 data class RestaurantProfile(
     val id: Int,
     val name: String,

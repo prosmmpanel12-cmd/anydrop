@@ -471,6 +471,25 @@ class RestaurantDetailActivity : AppCompatActivity() {
         restaurantName = restaurant.name
         binding.detailRestaurantName.text = restaurant.name
         binding.detailCuisines.text = restaurant.cuisineTags ?: restaurant.address ?: ""
+
+        // bugs.md §6.3 follow-up — same three-state text/color as
+        // RestaurantAdapter's Home card badge (Open/Temporarily
+        // unavailable/Closed), reused as-is rather than inventing new
+        // copy, per the "three places must agree" requirement in bugs.md
+        // §6.1. Unlike the Home card, the detail page isn't dimmed here —
+        // the user already chose to open this restaurant; the label alone
+        // is enough to warn them before they try to order.
+        if (restaurant.isOpenNow) {
+            binding.detailStatus.text = "Open"
+            binding.detailStatus.setTextColor(getColor(R.color.success_fg))
+        } else if (restaurant.isPaused) {
+            binding.detailStatus.text = getString(R.string.restaurant_temporarily_unavailable)
+            binding.detailStatus.setTextColor(getColor(R.color.paused_fg))
+        } else {
+            binding.detailStatus.text = "Closed"
+            binding.detailStatus.setTextColor(getColor(R.color.error_fg))
+        }
+
         binding.detailRating.text = String.format(Locale.getDefault(), "%.1f", restaurant.ratingAvg)
 
         // "By Xk+" ratings-count label (bug 1.1) — formats e.g. 1500 -> "By 1.5K+", 800 -> "By 800+"

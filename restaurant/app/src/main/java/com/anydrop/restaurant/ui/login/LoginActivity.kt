@@ -3,14 +3,17 @@ package com.anydrop.restaurant.ui.login
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import android.view.animation.AnimationUtils
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.anydrop.restaurant.R
 import com.anydrop.restaurant.data.TokenManager
 import com.anydrop.restaurant.databinding.ActivityLoginBinding
 import com.anydrop.restaurant.network.ApiClient
 import com.anydrop.restaurant.network.LoginBody
 import com.anydrop.restaurant.ui.common.InAppNotifier
 import com.anydrop.restaurant.ui.dashboard.DashboardActivity
+import com.anydrop.restaurant.ui.signup.SignupActivity
 import kotlinx.coroutines.launch
 
 class LoginActivity : AppCompatActivity() {
@@ -30,7 +33,29 @@ class LoginActivity : AppCompatActivity() {
             return
         }
 
+        playEntranceAnimation()
+
         binding.btnLogin.setOnClickListener { attemptLogin() }
+        binding.btnGoSignup.setOnClickListener {
+            startActivity(Intent(this, SignupActivity::class.java))
+            overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        }
+    }
+
+    /** Same cascading fade-up used across the signup flow (res/anim/form_field_in.xml)
+     * — each field/row is offset a little later than the one above it so the screen
+     * doesn't just pop in all at once, matching the Zomato/Swiggy-style onboarding feel. */
+    private fun playEntranceAnimation() {
+        val views = listOf(
+            binding.loginTitle, binding.loginSubtitle, binding.inputEmail,
+            binding.inputPassword, binding.btnLogin, binding.loginSignupRow
+        )
+        views.forEachIndexed { index, view ->
+            val anim = AnimationUtils.loadAnimation(this, R.anim.form_field_in).apply {
+                startOffset = index * 60L
+            }
+            view.startAnimation(anim)
+        }
     }
 
     private fun attemptLogin() {

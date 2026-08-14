@@ -86,6 +86,19 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
     /** null = no tag filter; one of near_fast / pure_veg / under_200 / open_now / rating_4. */
     private var activeFilter: String? = null
 
+    // Bug 6.1 — GPS-off banner's "does the resolved/last-known area have
+    // restaurants" signal. Deliberately reuses the SAME result set
+    // loadRestaurants() already fetches for setServiceAreaUnavailable
+    // (restaurants/list.php's plain, unfiltered response) rather than a
+    // separately-invented availability check — see the consistency
+    // requirement in docs/bugs.md §6.1. Only updated from an actual
+    // unfiltered/uncategorised/un-veg'd plain Home load (same
+    // isUnfilteredDefaultView gate setServiceAreaUnavailable uses), so a
+    // category/filter chip being active doesn't wrongly flip this.
+    // Starts optimistic (true) so the banner doesn't flash "unavailable"
+    // before the first load has actually told us anything.
+    private var lastAreaHasRestaurants: Boolean = true
+
     private val searchHandler = Handler(Looper.getMainLooper())
     private var searchRunnable: Runnable? = null
 
@@ -245,11 +258,15 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
         // it via locationPickerLauncher above, which picks up whatever the
         // picker screen changed (activated a saved address, or added+saved
         // a new one through its own editor sheet).
-        binding.deliveryLocationText.setOnClickListener {
-            locationPickerLauncher.launch(
-                Intent(this, com.anydrop.food.ui.address.LocationPickerActivity::class.java)
-            )
-        }
+        binding.deliveryLocationText.setOnClickListener { openLocationPicker() }
+
+        // Bug 6.1 — banner body and its explicit "Change address" button
+        // both open the same LocationPickerActivity destination
+        // deliveryLocationText's tap already does (spec point 3 + 4) —
+        // routed through openLocationPicker() so there's one launch site,
+        // not a second flow.
+        binding.gpsOffBanner.setOnClickListener { openLocationPicker() }
+        binding.btnGpsOffChangeAddress.setOnClickListener { openLocationPicker() }
 
         setupSearch()
         setupVoiceSearch()
@@ -284,6 +301,48 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
         // Local-only, no network — see FavoritesManager.isSaved kdoc.
         restaurantAdapter.refreshSavedStates()
         searchAdapter.refreshSavedStates()
+        // Bug 6.1 — the most common way GPS actually changes state is the
+        // user leaving Home for system Location settings (from this same
+        // banner or elsewhere) and coming back, so re-check on every
+        // resume, not just on the loads below.
+        updateGpsOffBanner()
+    }
+
+    private fun openLocationPicker() {
+        locationPickerLauncher.launch(
+            Intent(this, com.anydrop.food.ui.address.LocationPickerActivity::class.java)
+        )
+    }
+
+    // Bug 6.1 — Home GPS-off banner. Visibility is device-location-state +
+    // active-address-type only (spec point 1); text is the dynamic part
+    // (spec point 2). The "unavailable" text branch deliberately reuses
+    // @string/service_area_unavailable_title — the exact same string
+    // setServiceAreaUnavailable's screen shows below — rather than a new
+    // string, so this banner and that screen can never disagree about the
+    // same area. Same GPS+network provider check
+    // LocationPickerActivity.fetchCurrentLocation() already does.
+    private fun updateGpsOffBanner() {
+        val active = ActiveAddressManager.get(this)
+        // A saved (non-live) address doesn't need live GPS to keep
+        // working — nothing to warn about.
+        if (active != null && !active.isLiveLocation) {
+            binding.gpsOffBanner.visibility = android.view.View.GONE
+            return
+        }
+        val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+        val hasGps = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
+        val hasNetwork = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        if (hasGps || hasNetwork) {
+            binding.gpsOffBanner.visibility = android.view.View.GONE
+            return
+        }
+        binding.gpsOffBanner.visibility = android.view.View.VISIBLE
+        binding.gpsOffBannerText.text = if (lastAreaHasRestaurants) {
+            getString(R.string.gps_off_banner_soft)
+        } else {
+            getString(R.string.service_area_unavailable_title)
+        }
     }
 
     override fun onDestroy() {
@@ -1242,10 +1301,17 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
                 if (list.isEmpty() && isUnfilteredDefaultView) {
                     setServiceAreaUnavailable(true)
                     setEmptyState(false, getString(R.string.empty_restaurants))
+                    lastAreaHasRestaurants = false
                 } else {
                     setServiceAreaUnavailable(false)
                     setEmptyState(list.isEmpty(), getString(R.string.empty_restaurants))
+                    // Only a genuine unfiltered read tells us anything about
+                    // the area itself — a filtered/categorised/searched
+                    // empty result doesn't mean the area has no
+                    // restaurants, so don't touch the flag for those.
+                    if (isUnfilteredDefaultView) lastAreaHasRestaurants = true
                 }
+                updateGpsOffBanner()
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -1257,6 +1323,7 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
                     "Couldn't load restaurants. Pull down to retry.",
                     InAppNotifier.Type.ERROR
                 )
+                updateGpsOffBanner()
             }
         }
     }

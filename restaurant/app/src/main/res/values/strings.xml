@@ -7,6 +7,45 @@
     <string name="hint_email">Email address</string>
     <string name="hint_password">Password</string>
     <string name="btn_login">Log In</string>
+    <string name="login_no_account">New restaurant partner?</string>
+    <string name="login_go_signup">Sign up</string>
+
+    <!-- Splash -->
+    <string name="splash_tagline">Partner Dashboard</string>
+
+    <!-- Signup -->
+    <string name="signup_title">Partner With Anydrop</string>
+    <string name="signup_subtitle">Grow your restaurant with us</string>
+    <string name="hint_restaurant_name">Restaurant name</string>
+    <string name="hint_owner_name">Owner name</string>
+    <string name="hint_owner_mobile">Mobile number</string>
+    <string name="hint_confirm_password">Confirm password</string>
+    <string name="hint_address">Restaurant address (optional)</string>
+    <string name="btn_continue">Continue</string>
+    <string name="signup_have_account">Already a partner?</string>
+    <string name="signup_go_login">Log in</string>
+    <string name="error_fill_all_fields">Please fill all required fields</string>
+    <string name="error_passwords_dont_match">Passwords don\'t match</string>
+    <string name="error_invalid_mobile">Enter a valid 10-digit mobile number</string>
+    <string name="error_invalid_email">Enter a valid email address</string>
+    <string name="error_password_short">Password must be at least 6 characters</string>
+    <string name="error_email_registered">This email is already registered — try logging in</string>
+
+    <!-- OTP verify -->
+    <string name="otp_title">Verify your email</string>
+    <string name="otp_subtitle_format">We\'ve sent a 6-digit code to %1$s</string>
+    <string name="btn_verify">Verify &amp; Continue</string>
+    <string name="otp_resend_in_format">Resend code in %1$ds</string>
+    <string name="otp_resend_now">Resend code</string>
+    <string name="otp_resent">OTP resent</string>
+    <string name="error_otp_incomplete">Enter the full 6-digit code</string>
+    <string name="error_otp_invalid">Incorrect code — try again</string>
+    <string name="error_otp_expired">Code expired — request a new one</string>
+
+    <!-- Signup success -->
+    <string name="signup_success_title">Application Submitted!</string>
+    <string name="signup_success_body">Our team will review your details and approve your restaurant within 24\u201348 hours. You\'ll be able to log in once approved.</string>
+    <string name="btn_back_to_login">Back to Login</string>
 
     <!-- Dashboard -->
     <string name="dashboard_title">Orders</string>

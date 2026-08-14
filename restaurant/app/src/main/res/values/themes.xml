@@ -9,4 +9,23 @@
         <item name="android:textColorPrimary">@color/text_primary</item>
         <item name="android:textColorSecondary">@color/text_secondary</item>
     </style>
+
+    <!-- Single-digit OTP input box (ui/signup/OtpVerifyActivity) — six of these
+         in a row, auto-advancing on input, same visual language as
+         bg_card_rounded used everywhere else in this app for input fields. -->
+    <style name="OtpDigitBox">
+        <item name="android:layout_width">44dp</item>
+        <item name="android:layout_height">52dp</item>
+        <item name="android:layout_marginStart">4dp</item>
+        <item name="android:layout_marginEnd">4dp</item>
+        <item name="android:background">@drawable/bg_card_rounded</item>
+        <item name="android:gravity">center</item>
+        <item name="android:inputType">number</item>
+        <item name="android:maxLength">1</item>
+        <item name="android:textSize">22sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:cursorVisible">true</item>
+        <item name="android:imeOptions">actionNext</item>
+    </style>
 </resources>

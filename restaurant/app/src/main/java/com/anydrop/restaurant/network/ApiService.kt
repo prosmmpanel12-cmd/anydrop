@@ -11,6 +11,15 @@ interface ApiService {
     @POST("auth/restaurant-login.php")
     suspend fun login(@Body body: LoginBody): Response<ApiResponse<LoginResult>>
 
+    @POST("auth/restaurant-request-otp.php")
+    suspend fun requestSignupOtp(@Body body: RequestOtpBody): Response<ApiResponse<RequestOtpResult>>
+
+    @POST("auth/restaurant-verify-otp.php")
+    suspend fun verifySignupOtp(@Body body: VerifyOtpBody): Response<ApiResponse<VerifyOtpResult>>
+
+    @POST("auth/restaurant-signup.php")
+    suspend fun signup(@Body body: SignupBody): Response<ApiResponse<SignupResult>>
+
     @GET("restaurant/orders-list.php")
     suspend fun getOrders(
         @Query("status") status: String? = null,

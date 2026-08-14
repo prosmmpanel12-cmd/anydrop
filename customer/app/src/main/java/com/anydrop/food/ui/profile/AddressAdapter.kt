@@ -10,7 +10,15 @@ import com.anydrop.food.network.Address
 class AddressAdapter(
     private val onEdit: (Address) -> Unit,
     private val onDelete: (Address) -> Unit,
-    private val onActivate: (Address) -> Unit
+    private val onActivate: (Address) -> Unit,
+    // Bug 6.2 — separate from onActivate on purpose: onActivate is the
+    // existing "tap the card to make this the current delivery address for
+    // this session" behavior (ActiveAddressManager, local/on-device only).
+    // onSetDefault is the new "make this the account's default address
+    // across sessions" action (customer_addresses.is_default, server-side).
+    // See docs/bugs.md §6.2's "client-confusion note" for why these two
+    // must not be merged into one tap target.
+    private val onSetDefault: (Address) -> Unit
 ) : RecyclerView.Adapter<AddressAdapter.VH>() {
 
     private val items = mutableListOf<Address>()
@@ -48,6 +56,12 @@ class AddressAdapter(
             } else {
                 binding.addressReceiver.visibility = View.GONE
             }
+
+            // Bug 6.2 — nothing useful to tap on the row that's already the
+            // default, so hide the button there instead of leaving a
+            // no-op tap target.
+            binding.btnSetDefaultAddress.visibility = if (address.isDefault) View.GONE else View.VISIBLE
+            binding.btnSetDefaultAddress.setOnClickListener { onSetDefault(address) }
 
             binding.btnEditAddress.setOnClickListener { onEdit(address) }
             binding.btnDeleteAddress.setOnClickListener { onDelete(address) }

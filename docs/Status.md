@@ -3630,4 +3630,33 @@ server)**
    action item, not a code fix — nobody has confirmed that yet as far as
    this doc knows.
 
+---
+
+## Bugs §6.1/6.2/6.3/6.4 + out-of-stock (2026-08-14, two sessions)
+
+Full detail in `docs/17_Handover_Bugs_6.1_6.2_2026-08-14.md` (session 1:
+6.1 GPS-off banner, 6.2 address "set as default") and
+`docs/18_Handover_Bugs_6.3_Verify_And_OutOfStock_2026-08-14.md`
+(session 2: 6.3 turned out already fixed elsewhere — just badge-gap on
+the restaurant detail page remained and got fixed; out-of-stock built
+customer-side, restaurant-app toggle explicitly deferred since that app
+isn't built out yet). **Nothing from either session is build-verified**
+— same no-SDK/no-network limitation as Phase J above. See doc 18's
+own "Left for next session" for the full list.
+
+---
+
+## Admin Panel — full spec + Payment/Email-OTP architecture + Analytics (2026-08-14, later)
+
+Planning-only session per app owner's full requirement dump (Roles &
+Permissions, Area Management, every Admin Panel module, Payout system,
+Email OTP multi-provider failover, Payment Provider architecture with
+UPIPE as launch provider, and a large Analytics & Reports module). Full
+detail in `docs/19_Admin_Panel_Full_Spec_And_Payment_Email_Architecture_2026-08-14.md`
+— cross-checked against the existing schema so nothing already-built
+gets re-specified; every genuinely new table/column is flagged there.
+**Referral system explicitly excluded from all planning per app owner's
+instruction.** Nothing in that doc has been built yet — say which item
+to start with (doc's own §14 has a recommended build order).
+
 

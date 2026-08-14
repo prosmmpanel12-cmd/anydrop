@@ -40,7 +40,8 @@ class AddressBookActivity : AppCompatActivity(), AddressEditorBottomSheet.Locati
         adapter = AddressAdapter(
             onEdit = { address -> openEditor(address) },
             onDelete = { address -> confirmDelete(address) },
-            onActivate = { address -> activateAddress(address) }
+            onActivate = { address -> activateAddress(address) },
+            onSetDefault = { address -> setDefaultAddress(address) }
         )
         binding.contentList.layoutManager = LinearLayoutManager(this)
         binding.contentList.adapter = adapter
@@ -67,6 +68,48 @@ class AddressBookActivity : AppCompatActivity(), AddressEditorBottomSheet.Locati
     private fun activateAddress(address: Address) {
         com.anydrop.food.data.ActiveAddressManager.set(this, address)
         InAppNotifier.show(this, "Delivering to this address now", InAppNotifier.Type.SUCCESS)
+    }
+
+    // Bug 6.2 — addresses.php's PUT handler calls
+    // require_fields($body, ['full_address']) before touching anything
+    // else, so a bare {"is_default": true} body gets rejected as
+    // validation_error. Must send the address's full existing payload
+    // (same fields AddressEditorBottomSheet's save already sends) with
+    // is_default flipped to true, not just that one field alone. This is
+    // deliberately separate from activateAddress() above — setting the
+    // account-wide default must NOT also silently switch what's active on
+    // Home right now; that stays a distinct, deliberate action via the
+    // Location Picker.
+    private fun setDefaultAddress(address: Address) {
+        lifecycleScope.launch {
+            try {
+                val body = com.anydrop.food.network.AddAddressBody(
+                    label = address.label,
+                    addressType = address.addressType,
+                    fullAddress = address.fullAddress,
+                    houseFlatNo = address.houseFlatNo,
+                    floor = address.floor,
+                    landmark = address.landmark,
+                    receiverName = address.receiverName,
+                    receiverPhone = address.receiverPhone,
+                    latitude = address.latitude,
+                    longitude = address.longitude,
+                    isDefault = true,
+                    photoUrl = address.photoUrl
+                )
+                val response = api.updateAddress(address.id, body)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    InAppNotifier.show(this@AddressBookActivity, "Default address updated", InAppNotifier.Type.SUCCESS)
+                    // Re-fetch so the badge moves immediately — no stale
+                    // state until the next manual refresh (spec requirement).
+                    loadAddresses()
+                } else {
+                    InAppNotifier.show(this@AddressBookActivity, "Couldn't set default address", InAppNotifier.Type.ERROR)
+                }
+            } catch (e: Exception) {
+                InAppNotifier.show(this@AddressBookActivity, "Network error", InAppNotifier.Type.ERROR)
+            }
+        }
     }
 
     private fun confirmDelete(address: Address) {

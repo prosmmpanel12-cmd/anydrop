@@ -229,6 +229,13 @@ data class MenuItem(
     @SerializedName("is_kids_choice") val isKidsChoice: Boolean = false,
     @SerializedName("prep_time_minutes") val prepTimeMinutes: Int,
     @SerializedName("is_saved") val isSaved: Boolean = false,
+    // bugs.md §6.3 follow-up — out-of-stock. Previously the item just
+    // never appeared at all (menu.php filtered it server-side); now it's
+    // included and this flag tells the app to render it greyed out
+    // instead. Defaulted true so an old cached response missing this
+    // field (shouldn't happen post-rollout, but just in case) doesn't
+    // wrongly grey out every item.
+    @SerializedName("is_available") val isAvailable: Boolean = true,
     val variants: List<MenuVariant> = emptyList(),
     val addons: List<MenuAddon> = emptyList()
 )
@@ -254,6 +261,12 @@ data class RestaurantDetail(
     @SerializedName("cover_url") val coverUrl: String?,
     @SerializedName("cuisine_tags") val cuisineTags: String?,
     @SerializedName("is_veg_only") val isVegOnly: Boolean,
+    // bugs.md §6.3 follow-up — detail page previously had no open/paused
+    // badge at all (Home cards and search results already did). Same
+    // is_open_now/is_paused fields those two send, now computed by the
+    // same shared compute_restaurant_status() on the backend.
+    @SerializedName("is_open_now") val isOpenNow: Boolean = true,
+    @SerializedName("is_paused") val isPaused: Boolean = false,
     @SerializedName("min_order_amount") val minOrderAmount: Double,
     @SerializedName("rating_avg") val ratingAvg: Double,
     @SerializedName("rating_count") val ratingCount: Int = 0,

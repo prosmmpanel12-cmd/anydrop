@@ -152,6 +152,20 @@ class MenuAdapter(
                 binding.itemImage.setImageDrawable(null)
             }
 
+            // bugs.md §6.3 follow-up — out of stock. Previously these
+            // items never reached the app at all (menu.php filtered them
+            // out server-side), so there was nothing to render here.
+            binding.itemOutOfStock.visibility = if (!item.isAvailable) View.VISIBLE else View.GONE
+            binding.root.alpha = if (item.isAvailable) 1.0f else 0.5f
+            binding.itemImage.alpha = if (item.isAvailable) 1.0f else 0.6f
+            // ADD button / qty stepper both hidden rather than just
+            // disabled — a dimmed-but-tappable-looking button reads as a
+            // bug, not as "unavailable".
+            if (!item.isAvailable) {
+                binding.btnAdd.visibility = View.GONE
+                binding.qtyStepper.visibility = View.GONE
+            }
+
             val isSaved = savedOverrides[item.id] ?: item.isSaved
             binding.itemBookmark.setImageResource(
                 if (isSaved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark_outline
@@ -172,25 +186,31 @@ class MenuAdapter(
                 )
             }
 
-            setQtyUiImmediate(item)
+            // Out-of-stock rows skip qty/cart wiring entirely — the
+            // controls are hidden above, and price_cart() (bugs.md §6.3's
+            // server-side check) would reject an add anyway, but no point
+            // wiring click listeners onto GONE views.
+            if (item.isAvailable) {
+                setQtyUiImmediate(item)
 
-            binding.btnAdd.setOnClickListener {
-                CartAddHelper.add(binding.root.context, restaurantId, restaurantName, item) {
+                binding.btnAdd.setOnClickListener {
+                    CartAddHelper.add(binding.root.context, restaurantId, restaurantName, item) {
+                        refreshQtyUi(item)
+                        onCartChanged()
+                    }
+                }
+                binding.btnIncrease.setOnClickListener {
+                    CartAddHelper.add(binding.root.context, restaurantId, restaurantName, item) {
+                        refreshQtyUi(item)
+                        onCartChanged()
+                    }
+                }
+                binding.btnDecrease.setOnClickListener {
+                    CartManager.decrease(restaurantId, item)
+                    CartSyncManager.scheduleSync(binding.root.context)
                     refreshQtyUi(item)
                     onCartChanged()
                 }
-            }
-            binding.btnIncrease.setOnClickListener {
-                CartAddHelper.add(binding.root.context, restaurantId, restaurantName, item) {
-                    refreshQtyUi(item)
-                    onCartChanged()
-                }
-            }
-            binding.btnDecrease.setOnClickListener {
-                CartManager.decrease(restaurantId, item)
-                CartSyncManager.scheduleSync(binding.root.context)
-                refreshQtyUi(item)
-                onCartChanged()
             }
 
             // Card body opens the dish detail/customization sheet (§2.6/1.9) —
