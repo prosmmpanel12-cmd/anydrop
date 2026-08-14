@@ -4,12 +4,17 @@
  * Auth: Customer token
  *
  * features.md H5 — "View all offers & coupons" page on Checkout. Lists
- * every coupon usable for a given restaurant's order: platform-wide
+ * every PUBLIC coupon usable for a given restaurant's order: platform-wide
  * (restaurant_id IS NULL) + that restaurant's own (restaurant_id = :rid),
- * active + currently in-date. Same eligibility columns
+ * active + is_public=1 + currently in-date. Same eligibility columns
  * lib/orders.php's price_cart() already queries by, so a coupon shown
  * here as "usable" agrees with what actually applies at checkout — this
  * endpoint doesn't reimplement pricing, it just lists + flags.
+ *
+ * Private coupons (is_public=0) are intentionally excluded here — they
+ * never show on this "suggest a coupon" list, but remain fully
+ * redeemable by typed code at Checkout, since price_cart() looks a
+ * coupon up by `code` and does not filter on is_public at all.
  *
  * `item_total` is optional (Checkout always has it — the current cart's
  * pre-discount total — so the list can show "Add ₹40 more to use this"
@@ -45,7 +50,7 @@ if (!$restaurantId) {
 $itemTotal = isset($_GET['item_total']) ? (float) $_GET['item_total'] : null;
 
 $stmt = $db->prepare(
-    'SELECT * FROM coupons WHERE is_active = 1
+    'SELECT * FROM coupons WHERE is_active = 1 AND is_public = 1
      AND (restaurant_id IS NULL OR restaurant_id = :rid)
      AND (valid_from IS NULL OR valid_from <= NOW())
      AND (valid_until IS NULL OR valid_until >= NOW())

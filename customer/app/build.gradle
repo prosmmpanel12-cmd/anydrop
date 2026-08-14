@@ -53,6 +53,13 @@ dependencies {
     implementation 'androidx.coordinatorlayout:coordinatorlayout:1.2.0'
     implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0'
     implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.7.0'
+    // Cart-abandonment notification (Phase J) needs a reliable "whole app
+    // went to background" signal, not tied to any single Activity's
+    // onPause (which fires on every screen transition, not just a real
+    // backgrounding) — ProcessLifecycleOwner is the standard AndroidX tool
+    // for exactly this. Small, well-established artifact, no other new
+    // dependency needed for it.
+    implementation 'androidx.lifecycle:lifecycle-process:2.7.0'
     implementation 'androidx.fragment:fragment-ktx:1.6.2'
 
     // Networking — talks to the Phase 1 PHP/MySQL backend

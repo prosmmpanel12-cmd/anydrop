@@ -1,5 +1,6 @@
 package com.anydrop.food.ui.address
 
+import android.app.AlertDialog
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -52,6 +53,13 @@ class LocationPickerActivity : AppCompatActivity(), AddressEditorBottomSheet.Loc
     private var pendingSheetForLocation: AddressEditorBottomSheet? = null
     private var resolvingPlainLocation = false
 
+    /** True only while resolving a fix on behalf of an actual "Use current
+     * location" row tap — set right before requestCurrentLocationRow(false)
+     * kicks off resolution, cleared once that resolution completes (success
+     * or failure). Keeps the silent on-open auto-resolve (distance lines
+     * only) from also activating live location as the delivery address. */
+    private var explicitRowTap = false
+
     private val addAddressLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK) loadAddresses()
@@ -62,6 +70,7 @@ class LocationPickerActivity : AppCompatActivity(), AddressEditorBottomSheet.Loc
             if (granted) fetchCurrentLocation() else {
                 resolvingPlainLocation = false
                 pendingSheetForLocation = null
+                explicitRowTap = false
                 binding.currentLocationSubtitle.text = getString(R.string.location_picker_use_current_location)
                 InAppNotifier.show(this, "Location permission denied", InAppNotifier.Type.INFO)
             }
@@ -74,7 +83,10 @@ class LocationPickerActivity : AppCompatActivity(), AddressEditorBottomSheet.Loc
 
         binding.btnBack.setOnClickListener { finish() }
 
-        binding.rowUseCurrentLocation.setOnClickListener { requestCurrentLocationRow() }
+        binding.rowUseCurrentLocation.setOnClickListener {
+            explicitRowTap = true
+            requestCurrentLocationRow()
+        }
         // Map-first flow (H6 part 2) now that MapPinDropActivity exists —
         // replaces the direct-to-AddressEditorBottomSheet path this row
         // used during part 1. The editor sheet itself is untouched and
@@ -246,7 +258,15 @@ class LocationPickerActivity : AppCompatActivity(), AddressEditorBottomSheet.Loc
             resolvingPlainLocation = false
             pendingSheetForLocation = null
             binding.currentLocationSubtitle.text = getString(R.string.location_picker_use_current_location)
-            InAppNotifier.show(this, "Turn on location services to use this", InAppNotifier.Type.INFO)
+            // Phase I — GPS-off flow. The old behaviour was a toast that
+            // dead-ended (no live fix possible, nothing else offered). Only
+            // show the explicit choice for a real row tap; the silent
+            // on-open auto-resolve should just quietly give up, same as
+            // before, since the user hasn't asked for anything yet.
+            if (explicitRowTap) {
+                explicitRowTap = false
+                showLocationServicesOffChoice()
+            }
             return
         }
         val provider = if (hasGps) LocationManager.GPS_PROVIDER else LocationManager.NETWORK_PROVIDER
@@ -260,9 +280,43 @@ class LocationPickerActivity : AppCompatActivity(), AddressEditorBottomSheet.Loc
         } catch (e: SecurityException) {
             resolvingPlainLocation = false
             pendingSheetForLocation = null
+            explicitRowTap = false
             binding.currentLocationSubtitle.text = getString(R.string.location_picker_use_current_location)
             InAppNotifier.show(this, "Location permission needed", InAppNotifier.Type.INFO)
         }
+    }
+
+    /** Phase I — explicit choice when neither GPS nor network location is
+     * on: let the user either jump to system Location settings and retry,
+     * or fall back to picking a saved address instead of silently stalling
+     * on a row that can never resolve. Only saved addresses are offered as
+     * the fallback (not "browse without an address") since that's already
+     * one tap away via back + the saved-addresses list below. */
+    private fun showLocationServicesOffChoice() {
+        if (isFinishing || isDestroyed) return
+        val hasSavedAddresses = addresses.isNotEmpty()
+        val builder = AlertDialog.Builder(this)
+            .setTitle(getString(R.string.location_services_off_title))
+            .setMessage(
+                if (hasSavedAddresses) {
+                    getString(R.string.location_services_off_message_with_saved)
+                } else {
+                    getString(R.string.location_services_off_message_no_saved)
+                }
+            )
+            .setPositiveButton(getString(R.string.location_services_off_turn_on)) { _, _ ->
+                startActivity(Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+            }
+        if (hasSavedAddresses) {
+            builder.setNegativeButton(getString(R.string.location_services_off_choose_saved)) { dialog, _ ->
+                dialog.dismiss()
+                // Saved-addresses list is already the rest of this screen —
+                // nothing further to navigate to, just let the user tap a row.
+            }
+        } else {
+            builder.setNegativeButton(android.R.string.cancel, null)
+        }
+        builder.show()
     }
 
     private fun onLocationResolved(location: Location) {
@@ -292,6 +346,21 @@ class LocationPickerActivity : AppCompatActivity(), AddressEditorBottomSheet.Loc
             resolvingPlainLocation = false
             binding.currentLocationSubtitle.text = addressLine
                 ?: "%.4f, %.4f".format(location.latitude, location.longitude)
+        }
+
+        // Phase I fix — the row tap used to only fill the subtitle/distance
+        // lines and never actually made "current location" a deliverable
+        // address; ActiveAddressManager.set() required a saved-address row
+        // with a real id, which a raw GPS fix doesn't have. explicitRowTap
+        // is only true for a genuine tap (not the silent on-open resolve,
+        // which would otherwise activate live location before the user
+        // chose anything).
+        if (explicitRowTap) {
+            explicitRowTap = false
+            ActiveAddressManager.setLiveLocation(this, location.latitude, location.longitude, addressLine)
+            InAppNotifier.show(this, getString(R.string.location_picker_address_activated), InAppNotifier.Type.SUCCESS)
+            setResult(RESULT_OK)
+            finish()
         }
     }
 }

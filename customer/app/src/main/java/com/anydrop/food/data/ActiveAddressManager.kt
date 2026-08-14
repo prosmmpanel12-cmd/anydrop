@@ -26,13 +26,24 @@ object ActiveAddressManager {
     private const val KEY_SHORT_TEXT = "active_address_short_text"
     private const val KEY_LAT = "active_address_lat"
     private const val KEY_LNG = "active_address_lng"
+    private const val KEY_IS_LIVE = "active_address_is_live"
+
+    /** Sentinel id for a "use live location" selection — there's no saved
+     * `Address` row behind it, so there's nothing real to store here. Kept
+     * distinct from -1 (which `get()` already uses to mean "unset") so a
+     * live selection round-trips through SharedPreferences unambiguously. */
+    private const val LIVE_LOCATION_ID = -2
 
     data class ActiveAddress(
         val id: Int,
         val label: String,
         val shortText: String,
         val latitude: Double?,
-        val longitude: Double?
+        val longitude: Double?,
+        /** True when this came from "Use current location" (Phase I),
+         * not a saved address row. Screens that need to re-fetch a fresh
+         * fix (rather than trust a possibly-stale lat/lng) can check this. */
+        val isLiveLocation: Boolean = false
     )
 
     private var cached: ActiveAddress? = null
@@ -52,7 +63,8 @@ object ActiveAddressManager {
                 label = prefs.getString(KEY_LABEL, null) ?: "Selected address",
                 shortText = prefs.getString(KEY_SHORT_TEXT, null).orEmpty(),
                 latitude = if (prefs.contains(KEY_LAT)) prefs.getFloat(KEY_LAT, 0f).toDouble() else null,
-                longitude = if (prefs.contains(KEY_LNG)) prefs.getFloat(KEY_LNG, 0f).toDouble() else null
+                longitude = if (prefs.contains(KEY_LNG)) prefs.getFloat(KEY_LNG, 0f).toDouble() else null,
+                isLiveLocation = prefs.getBoolean(KEY_IS_LIVE, false)
             )
         }
         cacheLoaded = true
@@ -67,8 +79,31 @@ object ActiveAddressManager {
             label = address.label ?: address.addressType.replaceFirstChar { it.uppercase() },
             shortText = address.fullAddress,
             latitude = address.latitude,
-            longitude = address.longitude
+            longitude = address.longitude,
+            isLiveLocation = false
         )
+        persist(context, active)
+    }
+
+    /** Phase I — "Use current location" picker row. Sets the active
+     * delivery location straight from a resolved GPS/network fix, with no
+     * backing saved-address row (id = LIVE_LOCATION_ID). [addressLine] is
+     * whatever the Geocoder reverse-lookup produced (or a raw lat/lng
+     * string fallback) — same pattern already used for the sheet-fill flow
+     * elsewhere in the picker/Checkout/AddressBook. */
+    fun setLiveLocation(context: Context, latitude: Double, longitude: Double, addressLine: String?) {
+        val active = ActiveAddress(
+            id = LIVE_LOCATION_ID,
+            label = "Current location",
+            shortText = addressLine ?: "%.4f, %.4f".format(latitude, longitude),
+            latitude = latitude,
+            longitude = longitude,
+            isLiveLocation = true
+        )
+        persist(context, active)
+    }
+
+    private fun persist(context: Context, active: ActiveAddress) {
         cached = active
         cacheLoaded = true
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -76,6 +111,7 @@ object ActiveAddressManager {
             .putInt(KEY_ID, active.id)
             .putString(KEY_LABEL, active.label)
             .putString(KEY_SHORT_TEXT, active.shortText)
+            .putBoolean(KEY_IS_LIVE, active.isLiveLocation)
             .apply {
                 if (active.latitude != null) putFloat(KEY_LAT, active.latitude.toFloat()) else remove(KEY_LAT)
                 if (active.longitude != null) putFloat(KEY_LNG, active.longitude.toFloat()) else remove(KEY_LNG)
@@ -93,6 +129,7 @@ object ActiveAddressManager {
             .remove(KEY_SHORT_TEXT)
             .remove(KEY_LAT)
             .remove(KEY_LNG)
+            .remove(KEY_IS_LIVE)
             .apply()
     }
 }

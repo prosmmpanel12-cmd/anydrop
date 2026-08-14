@@ -29,8 +29,15 @@ object NotificationHelper {
 
     const val CHANNEL_OFFERS = "anydrop_offers"
     const val CHANNEL_REMINDERS = "anydrop_reminders"
+    // Phase J — separate channel from CHANNEL_REMINDERS (meal
+    // reminders/engagement) since a cart-abandonment nudge is a different
+    // kind of alert (action-needed on something already started, not a
+    // generic "come order something") — letting the user mute one without
+    // muting the other.
+    const val CHANNEL_CART_ABANDONMENT = "anydrop_cart_abandonment"
     private const val NOTIF_ID_OFFER = 1001
     const val NOTIF_ID_REMINDER = 2001
+    const val NOTIF_ID_CART_ABANDONMENT = 3001
 
     private const val REQUEST_CODE_NOTIF_PERMISSION = 5001
 
@@ -52,6 +59,14 @@ object NotificationHelper {
                 "Meal reminders",
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply { description = "Daily reminders when it's time to order" }
+        )
+
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_CART_ABANDONMENT,
+                "Cart reminders",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply { description = "Nudges when you've left items in your cart" }
         )
     }
 
@@ -147,6 +162,25 @@ object NotificationHelper {
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
 
         NotificationManagerCompat.from(context).notify(NOTIF_ID_REMINDER, builder.build())
+    }
+
+    /** Phase J cart-abandonment nudge — separate id/channel from the meal
+     * reminder so the two can't overwrite each other in the status bar if
+     * both happen to be pending at once. */
+    fun showCartAbandonmentReminder(context: Context, title: String, message: String) {
+        if (!hasPermission(context)) return
+        ensureChannels(context)
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_CART_ABANDONMENT)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setAutoCancel(true)
+            .setContentIntent(openHomeIntent(context))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+
+        NotificationManagerCompat.from(context).notify(NOTIF_ID_CART_ABANDONMENT, builder.build())
     }
 
     private fun safeDownloadBitmap(urlString: String): Bitmap? {

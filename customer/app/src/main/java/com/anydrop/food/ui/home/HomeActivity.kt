@@ -33,7 +33,7 @@ import com.anydrop.food.network.PopularItem
 import com.anydrop.food.network.PromoBanner
 import com.anydrop.food.network.Restaurant
 import com.anydrop.food.network.SearchItem
-import com.anydrop.food.notifications.MealReminderScheduler
+import com.anydrop.food.notifications.DailyEngagementScheduler
 import com.anydrop.food.notifications.NotificationHelper
 import com.anydrop.food.ui.cart.CartBottomSheetFragment
 import com.anydrop.food.ui.common.NotificationPermissionDialog
@@ -268,7 +268,11 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
         // Shown once per app open, on Home.
         NotificationHelper.ensureChannels(this)
         NotificationPermissionDialog.showOnce(this)
-        MealReminderScheduler.scheduleDailyReminders(this)
+        // Phase J — supersedes the old MealReminderScheduler (2 fixed
+        // lunch/dinner slots, 2 hardcoded copy strings) with 5 daily slots
+        // drawing from the 40-50 template pool, deduped via
+        // EngagementNotificationHistory. See DailyEngagementScheduler's kdoc.
+        DailyEngagementScheduler.scheduleDailyEngagement(this)
     }
 
     override fun onResume() {

@@ -156,8 +156,9 @@ function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCod
         }
 
         $unitPrice = (float) $item['price'];
-        if ((float) $item['discount_percent'] > 0) {
-            $unitPrice = round($unitPrice * (1 - (float) $item['discount_percent'] / 100), 2);
+        $discountPercent = min(100, max(0, (float) $item['discount_percent']));
+        if ($discountPercent > 0) {
+            $unitPrice = round($unitPrice * (1 - $discountPercent / 100), 2);
         }
 
         $variantName = null;

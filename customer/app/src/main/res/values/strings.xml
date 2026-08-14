@@ -182,6 +182,11 @@
     <string name="location_picker_empty_saved">No saved addresses yet — add one to get started</string>
     <string name="location_picker_address_activated">Delivering to this address now</string>
     <string name="location_picker_nearby_coming_soon">Nearby suggestions coming soon</string>
+    <string name="location_services_off_title">Location is turned off</string>
+    <string name="location_services_off_message_with_saved">Turn on location to use your current position, or choose one of your saved addresses below.</string>
+    <string name="location_services_off_message_no_saved">Turn on location to use your current position, or add an address to deliver to instead.</string>
+    <string name="location_services_off_turn_on">Turn on location</string>
+    <string name="location_services_off_choose_saved">Choose saved address</string>
 
     <!-- H6 part 2 — Map pin-drop screen (screenshot 13) -->
     <string name="map_pin_drop_title">Select delivery location</string>

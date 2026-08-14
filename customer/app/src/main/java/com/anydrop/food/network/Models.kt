@@ -409,7 +409,13 @@ data class CreateOrderBody(
     // "Deliver Now" order. Server re-validates independently (same-day,
     // 20-min minimum lead, within restaurant's open hours) — see
     // validate_scheduled_for() in backend/lib/orders.php.
-    @SerializedName("scheduled_for") val scheduledFor: String? = null
+    @SerializedName("scheduled_for") val scheduledFor: String? = null,
+    // bugs.md #2.4 — client-generated UUID, one per place-order attempt.
+    // A retried request (timeout-then-retry) that reuses the same key
+    // gets the original order back instead of creating a duplicate. See
+    // CheckoutActivity.placeOrder()'s kdoc for how the key's lifetime is
+    // scoped.
+    @SerializedName("idempotency_key") val idempotencyKey: String? = null
 )
 
 /** One addon snapshot as stored in order_items.addons_json at order time —

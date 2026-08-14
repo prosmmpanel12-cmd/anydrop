@@ -3138,3 +3138,496 @@ looked at `opening_time`/`closing_time`/`working_days` at all.
 and a live device retest placing an order against a restaurant that's
 currently outside its hours (should now fail with a clear message) and
 one that's within hours (should still succeed as before).
+
+---
+
+## Full re-audit — corrections + new scope (2026-08-13, later)
+
+App owner asked for a ground-truth re-check of the codebase (not just doc
+claims) before adding new scope. Findings below.
+
+### Corrections to earlier claims in this doc
+- **§2.5 Floating "Menu" jump button** — built, but **simplified vs original
+  spec**: uses a plain `FloatingActionButton` + `PopupMenu`
+  (`showCategoryJumpMenu()` in `RestaurantDetailActivity.kt`), not the
+  planned `ExtendedFloatingActionButton` + `BottomSheetDialog`. **Missing:
+  item counts per category** ("Pizza — 17") — `categoryPositions` only
+  stores `(name, headerPosition)`, no count. Functionally usable, visually/
+  informationally short of spec.
+- **Closed-restaurant card dimming** — ✅ confirmed done. `RestaurantAdapter.kt`
+  sets `binding.root.alpha = 0.5f` for both `Closed` and `isPaused` states.
+- **§2.7 Dish-photo carousel + story-style progress bars** — ✅ confirmed
+  done. `DishPhotoCarouselView` wired in `RestaurantAdapter.kt` via
+  `restaurant.gallery`, with attach/detach-gated timers
+  (`isCarouselVisible`) as originally specced.
+- **§2.3 Service-area "not available yet" state** — ✅ confirmed done
+  (this doc previously listed it as not built — that was wrong).
+  `HomeActivity.kt`'s `setServiceAreaUnavailable()` shows a full-screen
+  state when the **plain, unfiltered** Home feed returns zero restaurants.
+  **Gap:** this is a blanket "no restaurants at all" check, not a
+  per-address/per-coordinate "does this specific point have delivery
+  coverage" check — see new scope below.
+- **Qorix naming** — ✅ clean. Searched entire repo; only remaining
+  mentions are historical/documentation text in this file (the rename
+  changelog itself). No source, resource, package, or config references
+  `qorix` anywhere.
+
+### Newly confirmed NOT built
+- **Admin Panel** — the `admin/` folder doesn't exist at all yet (Phase 5
+  untouched). Any admin-side coupon/banner-approval work depends on this.
+- **Rider App** — folder doesn't exist. `orders/track.php` (customer-facing
+  poll endpoint) exists and reads `riders.last_lat/last_lng`, but there is
+  **no rider-side endpoint that writes those columns**, no background
+  location service, no accept/reject/pickup flow, and no Customer-App live
+  map screen consuming `track.php` yet. Live tracking is 0% wired beyond
+  the read-side placeholder.
+- **Cart-abandonment reminder** — doesn't exist. Only two fixed local
+  notifications exist today (`MealReminderScheduler`/`MealReminderWorker`
+  — a lunch reminder at 13:30 and dinner at 20:30, same message every day,
+  WorkManager-based). No notification template pool, no cart-add-then-
+  leave detection, no 15-minute delayed trigger.
+- **Restaurant/Admin coupon creation** — only `coupons/list.php` exists
+  (customer-facing read/eligibility check). No write endpoint anywhere,
+  no `is_public`/visibility column on `coupons` table, no Restaurant App
+  or Admin Panel screen.
+
+### Bugs / financial loopholes found this pass
+1. **`menu_items.discount_percent` has no upper-bound validation.**
+   `price_cart()` computes `unitPrice = unitPrice * (1 - discount_percent/100)`
+   with no `min(discount_percent, 100)` clamp anywhere (not in the DB
+   column, not at read time). Since this field is currently only ever set
+   via a manual `UPDATE ... SET discount_percent=X` in phpMyAdmin (no UI
+   exists — flagged as a known limitation earlier in this doc), a typo
+   like `discount_percent=150` silently produces a **negative unit price**,
+   which flows straight into `item_total` and `grand_total`. No server-side
+   floor (`max(0, unitPrice)`) exists to catch this. **Real money-loss risk
+   once a restaurant-side discount UI ships** (§ new scope item 1 below) —
+   needs a `CHECK (discount_percent BETWEEN 0 AND 100)` or equivalent
+   application-level clamp before that UI goes live.
+2. **Delivery OTP is only returned for `payment_method === 'upi'` orders**
+   (`orders/track.php`). Since UPI isn't even wired yet (COD is the only
+   real path today per this doc's Known Limitations), **no live order
+   currently gets a delivery OTP at all** — the OTP-verification safety
+   step effectively doesn't run for any real order right now. Worth
+   deciding: should COD orders also get a delivery OTP (most platforms do,
+   to prevent wrong-address/wrong-person drops)? Flagging as a decision
+   needed, not fixing unilaterally.
+3. No other rounding/negative-total issues found — `price_cart()`'s coupon
+   discount is correctly capped at `min(discount, item_total)` and again at
+   `max_discount_amount`, and `quantity` is floored at `max(1, qty)`, so
+   those two paths are safe.
+
+### New scope requested this session (not started — planning only)
+
+**1. Restaurant + Admin coupon creation, with public visibility + min-cart-value**
+- `min_order_amount` **already exists** in the `coupons` schema and is
+  already enforced in `price_cart()` and shown in `coupons/list.php` — no
+  schema change needed for that part.
+- **Needed:** new `coupons.is_public` (or `visibility` ENUM) column,
+  DEFAULT 0/private. When a restaurant or admin creates a coupon, it can
+  toggle public on/off. `coupons/list.php` (the customer-facing "suggest
+  a coupon" screen) needs a `WHERE is_public = 1` filter added so only
+  public coupons get suggested there — private ones still work if a
+  customer types the code manually at Checkout (existing `cart/validate`
+  path), they just don't get surfaced/suggested.
+- **Needed:** `POST/GET/PUT /restaurant/coupons` (restaurant scoped to own
+  `restaurant_id`, same ownership pattern as `/restaurant/menu`) **and**
+  an Admin Panel equivalent for platform-wide coupons (`restaurant_id IS
+  NULL`) — but Admin Panel doesn't exist yet, so the admin half is blocked
+  on Phase 5 starting.
+- **Needed:** Restaurant App screen — "My Coupons" (create/edit/toggle
+  active + toggle public, discount type/value, min order, max discount,
+  validity dates).
+
+**2. GPS-off / service-area address flow (Add Address + Home)**
+Three distinct states, all around "does this location have delivery
+coverage":
+- **GPS off entirely:** Add Address screen should open with two clear
+  choices — "Use live location" (triggers the OS location-permission/
+  enable-GPS prompt) or "Choose a saved address" — instead of just
+  silently falling back to network-provider location the way
+  `MapPinDropActivity`/`LocationPickerActivity` do today.
+- **Live location resolved, but zero delivery coverage there:** show the
+  existing §2.3 "sorry, not available in your area yet" state — this part
+  already works for the blanket empty-Home-feed case, but needs to be
+  reachable from address-resolution specifically (right now it only fires
+  from the plain Home-feed API response, not from a location/address pick
+  event).
+- **A saved/selected address has coverage:** once picked, re-run the same
+  restaurant-list fetch scoped to that address's lat/lng and show results
+  normally — this is close to already working (Home already fetches by
+  lat/lng) but needs to be confirmed it's the address's coordinates driving
+  the fetch, not just whatever the last GPS fix was.
+- **Backend:** current `restaurants/list.php` already computes
+  `distance_km` per point — no new endpoint strictly needed, just needs to
+  be called with the chosen address's coordinates instead of assuming
+  live GPS every time.
+
+**3. Cart-abandonment + notification-template pool**
+- New table needed, e.g. `notification_templates` (id, title, body,
+  category) seeded with ~40-50 varied "chatpata" copy variants — rotated
+  so the same 2 fixed lines don't repeat daily forever.
+- **Daily engagement notifications:** pick ~4-5 templates/day per customer
+  (random or rotating, avoiding immediate repeats) — needs a scheduler.
+  Since this is customer-app-local today (`MealReminderScheduler` uses
+  WorkManager, no backend/FCM involved), either extend that same
+  local-WorkManager pattern with a bigger template pool, or move to real
+  FCM (ties into `features.md` I6, already flagged as not built) so the
+  same push can arrive even if the app isn't foregrounded.
+- **Cart-abandonment (15 min):** needs to detect "item added to cart" +
+  "app backgrounded/left" as a pair of events, then a one-shot 15-minute
+  delayed local notification ("items in your cart" style) that
+  self-cancels if the user places the order or empties the cart before it
+  fires. `CartManager` already tracks cart state client-side — this is a
+  new `WorkManager` one-shot job keyed off cart-non-empty + app-background,
+  cancelled on order-placed/cart-cleared.
+
+**Nothing in this "new scope" section has been built yet — planning only,
+per this session's request. Say which item to start with.**
+
+---
+
+## Updated priority roadmap (2026-08-13, final re-order per app owner)
+
+App owner's explicit re-priority this session: **Admin Panel + Restaurant
+coupon creation move up now** (both can be built together — coupon
+creation needs an admin half and a restaurant half anyway). **Rider App
+pushed to dead last** — do not start until everything else below is done.
+40-50 notification templates + cart-abandonment reminder added as its own
+item. Full bug list moved to `docs/bugs.md` (new file, this session) —
+two items from it (1.1, 2.2) are called out below as blockers on other
+work, not standalone fixes.
+
+### Phase H — Coupon system (Admin Panel + Restaurant App, build together)
+1. **Bug 1.1 first** (`docs/bugs.md`) — clamp `discount_percent` to 0-100
+   in `price_cart()` before any UI that sets discounts goes live. Small,
+   isolated, must land before item 4 below.
+2. Schema: `coupons.is_public` (default 0), `coupons.created_by_type`
+   ENUM(`admin`,`restaurant`), `coupons.created_by_id`.
+3. Backend: `POST/GET/PUT /restaurant/coupons` (scoped to caller's own
+   `restaurant_id`, same ownership pattern as `/restaurant/menu`).
+   `coupons/list.php` (customer "suggest a coupon" screen) gets a
+   `WHERE is_public = 1` filter — private coupons still redeemable by
+   typed code at Checkout, just not suggested.
+4. **Admin Panel (Phase 5, starting now instead of later):**
+   - Admin login (session-based)
+   - Dashboard (basic stats — can be minimal for v1)
+   - Restaurant approval/suspension screen (closes bug 3.1's
+     "restaurants have no approval workflow" gap)
+   - Coupon creation screen (platform-wide, `restaurant_id IS NULL`)
+   - Settings page — editor for `app_settings` (delivery charge, platform
+     fee, tax %, OTP rules, `otp_required_for_cod`, etc.) — closes
+     another piece of bug 3.1
+5. Restaurant App: "My Coupons" screen — create/edit code, discount
+   type/value, **min order amount** (field already exists in schema,
+   just needs a form field), max discount, validity dates, active
+   toggle, **public/private toggle**.
+6. Test both creation paths end-to-end, confirm a restaurant-created
+   coupon and an admin-created coupon both show correctly (public ones
+   suggested, private ones only work by typed code) on Checkout.
+
+### Phase I — GPS-off / address-resolution flow
+7. Add Address screen: explicit "Use live location" vs "Choose a saved
+   address" choice when GPS is off, instead of silently falling back to
+   network-provider location.
+8. Wire the existing §2.3 "not available in your area yet" state to also
+   fire from address-pick events (currently only fires from the plain
+   Home-feed empty response).
+9. Confirm restaurant-list fetch uses the selected/saved address's
+   lat/lng (not last-GPS-fix) once an address is chosen and has coverage.
+
+### Phase J — Notifications (40-50 templates + cart abandonment)
+10. **Bug 2.2 first** (`docs/bugs.md`) — remove/gate `debug_otp` from the
+    live API response before notification/engagement work risks drawing
+    more real users into a still-open auth hole. Small, isolated.
+11. New `notification_templates` table, seeded with 40-50 varied
+    "chatpata" copy variants across a few categories (hunger/craving,
+    offer-style, re-engagement, etc.).
+12. Daily engagement: pick ~4-5 templates/customer/day, rotating so nothing
+    repeats within a set window (closes bugs.md §4.2's dedup gap from day 1).
+    Extend the existing `MealReminderScheduler`/WorkManager pattern, or
+    move to real FCM if push-when-backgrounded matters (ties into
+    `features.md`'s I6, still not built either way).
+13. Cart-abandonment: `CartManager` cart-non-empty + app-backgrounded pair
+    of events → one-shot 15-minute delayed local notification,
+    self-cancels on order-placed or cart-cleared.
+14. Along the way, fix bug 1.3 (coupon usage race — add a unique
+    constraint on `coupon_usages(coupon_id, customer_id)`) and bug 2.1
+    (OTP request rate limit) and bug 2.4 (order-creation idempotency) —
+    small, isolated, no reason to leave them for later once touching
+    adjacent code.
+
+### Phase K — Rider App + Live Tracking (explicitly LAST, per app owner)
+15. Everything in the old Phase 4 (`04_Phase_Plan.md`) — rider login,
+    background location service, `POST /rider/location` (doesn't exist
+    yet — `track.php` currently only reads `riders.last_lat/lng`, nothing
+    writes them), Customer App live map screen, delivery-OTP verify flow.
+    Bug 1.2 (OTP generation/display mismatch) gets fixed as part of this
+    phase, since it's meaningless to fix in isolation before a rider flow
+    exists to actually use the OTP.
+
+**Everything above is planning only as of this message — nothing in
+Phase H/I/J/K has been built yet.** Say which phase/item to start with.
+
+---
+
+## Restaurant App full scope + pre-order rating (2026-08-13, later)
+
+App owner supplied a full restaurant-app feature wishlist (Dashboard,
+Menu Management, Order Management, Restaurant Management, Delivery
+Management, Payments, Offers, Analytics, Reviews, Notifications, Staff
+Management, Settings) plus a new customer-facing feature request: let a
+customer star-rate a restaurant **without ordering** (a lighter-weight
+"impression" rating, dampened so it can't out-rank real order-based
+reviews just from taps). Full prioritized breakdown, what already exists
+vs what's new, what stays deferred to Phase K (Rider App), and the
+proposed rating-weight formula are all in
+`docs/18_Restaurant_App_Full_Scope_And_Rating_System.md` — say "start
+menu management" (top of that doc's recommended order) to begin, or name
+any other item from it directly.
+
+**Nothing in that doc has been built yet — planning only.**
+
+---
+
+## Bug 1.1 + Phase H (item 6, list-only) + Phase I items 7-9 (2026-08-14)
+
+Picked up from the phase list above. Done this session:
+
+**Bug 1.1 — `discount_percent` not clamped (`docs/bugs.md`)**
+- `lib/orders.php`'s `price_cart()` now clamps `discount_percent` to
+  `[0, 100]` at read time (`min(100, max(0, ...))`) before applying it to
+  `unitPrice`, so a bad value can no longer push price negative or
+  discount above 100%. Checked every other write path
+  (`auto-update-bestseller-discount.php` already clamps to 0-90,
+  `seed-demo-catalog.php` is fixed seed data, no restaurant/admin write
+  UI exists yet) — the read-time clamp is the actual fix given there's no
+  live write path to also guard yet. Re-add a write-time clamp once
+  Phase H item 5 (restaurant "My Coupons"/menu-discount form) ships.
+
+**Phase H item 6 (partial — public/private list filtering only, not the
+full item)**
+- Added migration `18_migration_coupon_is_public.sql` — `coupons.is_public
+  TINYINT(1) DEFAULT 1` (idempotent conditional-ALTER, same pattern as
+  06/16/17). Existing coupons default to public (today's behaviour,
+  unchanged) since nothing creates private ones yet.
+- `coupons/list.php` (the Checkout "view all offers" endpoint) now filters
+  `is_public = 1` — private coupons won't be suggested there. Confirmed
+  `price_cart()`'s coupon lookup (`lib/orders.php`) matches by `code` only
+  with no `is_public` filter, so a private coupon still redeems correctly
+  by typed code at Checkout.
+- **Not done**: nothing yet sets `is_public = 0` on any coupon — that's
+  items 1-5 of Phase H (schema fields beyond this one, the "public vs
+  private" input on both admin and restaurant coupon-creation forms).
+  This session only made the list endpoint respect the flag once
+  something eventually sets it.
+
+**Phase I — items 7-9, all done**
+- Item 9 (confirm restaurant list uses selected address, not last GPS
+  fix) — turned out to already be correct. `HomeActivity.loadRestaurants()`
+  reads lat/lng from `ActiveAddressManager.get()` only;
+  `ApiService.getRestaurants()` has exactly one caller in the whole
+  customer app (`HomeActivity`) and no other code path feeds it a raw
+  `LocationManager` fix. No change needed, verified only.
+- Item 8 (service-area-unavailable should also fire from an address pick,
+  not just the plain Home-feed response) — also turned out to already be
+  wired correctly as of H6: `deliveryLocationText`'s tap →
+  `LocationPickerActivity` → `locationPickerLauncher` callback →
+  `resolveActiveAddressThenLoad(forceRefresh = true)` → `loadRestaurants()`,
+  the exact same function whose empty-result branch already calls
+  `setServiceAreaUnavailable(true)` when `isBrowsingDefaultHome()` is
+  true. An address-pick that returns zero restaurants on the plain feed
+  now shows the same unavailable state a blank first-open does. No change
+  needed, verified only.
+- Item 7 (explicit "Use live location" vs "Choose a saved address" when
+  GPS is off) — this one had a real gap, now fixed in
+  `LocationPickerActivity.kt`:
+  - The "Use current location" row previously never actually set current
+    location as the deliverable address at all — `onLocationResolved()`
+    only filled the subtitle/distance-line UI. Added
+    `ActiveAddressManager.setLiveLocation(lat, lng, addressLine)` (new
+    method, `ActiveAddressManager.kt`) and wired the row tap
+    (`explicitRowTap` flag, only true for a genuine tap — not the silent
+    on-open distance-line resolve) to call it and close the picker with
+    `RESULT_OK`, same as picking a saved address does.
+  - `ActiveAddressManager.ActiveAddress` gained `isLiveLocation: Boolean`
+    and a sentinel `id = -2` for a live-location selection (no backing
+    saved-address row), distinct from -1 ("unset"). `set()` (saved
+    address) and the new `setLiveLocation()` both funnel through a shared
+    `persist()`. Confirmed nothing in `HomeActivity` uses
+    `ActiveAddressManager.get().id` as a real address id for any API call
+    — no collision risk from the sentinel.
+  - GPS-off case: was a dead-end toast ("Turn on location services to use
+    this") with nothing else offered. Now shows an explicit
+    `AlertDialog` (`showLocationServicesOffChoice()`) — "Turn on
+    location" (deep-links to `Settings.ACTION_LOCATION_SOURCE_SETTINGS`)
+    vs "Choose saved address" (dismisses back onto the picker's own
+    saved-addresses list) when the account has saved addresses, or just
+    "Turn on location" / Cancel when it doesn't. Only triggers for a real
+    row tap, not the silent on-open auto-resolve.
+  - New strings: `location_services_off_title`,
+    `location_services_off_message_with_saved`,
+    `location_services_off_message_no_saved`,
+    `location_services_off_turn_on`, `location_services_off_choose_saved`.
+
+**Not touched this session**: Phase H items 1-5 (schema + both
+creation-form UIs), Phase J, Phase K, and bugs 1.2/1.3/2.1/2.2/2.4.
+
+---
+
+## Phase J — Notifications + bugs 1.3/2.1/2.2/2.4 (2026-08-14, later)
+
+Continued straight from the session above. **Not fully finished — see
+"Left for next session" at the bottom.** Everything below has been
+written but **not build-verified** (no Android SDK / Gradle available in
+this environment to actually compile and run it) — treat as needing a
+real build + device/emulator smoke-test as the very next step.
+
+### Security bugs fixed first (per the roadmap's explicit ordering)
+
+**Bug 2.2 — `debug_otp` exposed in every API response (🔴 pre-launch
+blocker, now fixed)**
+- `customer-request-otp.php` only includes `debug_otp` in its response
+  when `app_settings.debug_otp_enabled = '1'`. Defaults to `'0'` (off) —
+  seeded by migration `19_migration_otp_security_settings.sql`.
+- **Action needed before any real launch**: confirm this row is `'0'` (or
+  absent) on whatever DB actually goes live. It's safe by default, but
+  worth a manual check since it's exactly the kind of setting a stray
+  `UPDATE` during testing could flip and forget.
+
+**Bug 2.1 — OTP request had no rate limit (fixed)**
+- Same file: 60-second per-email cooldown before a new OTP row is
+  inserted (`app_settings.otp_request_cooldown_seconds`, also seeded by
+  migration 19). Returns `429 otp_request_cooldown` with
+  `retry_after_seconds` when hit.
+
+**Bug 1.3 — coupon usage-limit TOCTOU race (fixed)**
+- `orders/create.php`: right before the `coupon_usages` insert, inside
+  the same transaction, now does `SELECT ... FOR UPDATE` on the coupon
+  row and re-checks `usage_limit_per_user`/`usage_limit_total` against a
+  fresh count. A losing concurrent request throws and the whole
+  transaction (order + items + status history, not just the coupon
+  usage) rolls back — the customer sees `coupon_usage_limit_reached`
+  instead of a duplicate redemption slipping through. Deliberately not a
+  blanket `UNIQUE KEY (coupon_id, customer_id)` — that would break
+  legitimately-multi-use coupons (`usage_limit_per_user` can be `> 1` or
+  `NULL`).
+
+**Bug 2.4 — no idempotency protection on `POST /orders` (fixed, client +
+server)**
+- Server: `orders.idempotency_key` column + unique
+  `(customer_id, idempotency_key)` constraint (migration
+  `20_migration_order_idempotency_key.sql`, nullable — older requests
+  without a key are unaffected). A repeated request with the same key
+  returns the original order instead of creating a duplicate; the
+  concurrent-race version of the same thing (two requests, same key,
+  genuinely simultaneous) is caught in `create.php`'s catch block by
+  matching the constraint-violation message and handing back the winner.
+- Client: `CheckoutActivity` already disabled the Place Order button
+  on tap (pre-existing, not new this session) — what was missing was the
+  idempotency key itself. Now generates one UUID per place-order attempt,
+  sends it as `idempotency_key`, and **keeps** the same key across a
+  network-exception retry (the request may have actually landed) but
+  **clears** it on a clean error response (validation/coupon rejection —
+  nothing was created, safe to mint a fresh key next time).
+
+### Template pool + rotation (bugs.md §4.1 scope gap, §4.2)
+
+- `notifications/NotificationTemplates.kt` — 45 templates (within the
+  40-50 ask), split into three categories the roadmap called for:
+  HUNGER (craving copy, 15), OFFER (generic discount-style copy, 15),
+  REENGAGEMENT ("miss you" copy, 15). Kept **on-device**, not a backend
+  table — there's no real push channel yet to deliver a server-picked
+  template through (`features.md` §I6 is still "not started"), so a
+  backend table would have nothing to drive. Move this pool server-side
+  whenever I6/FCM actually lands.
+- `notifications/EngagementNotificationHistory.kt` — bugs.md #4.2 fix.
+  SharedPreferences log of which template ids were shown on which day,
+  7-day no-repeat rotation window (45 templates / ~5 per day ≈ 9 days of
+  inventory, comfortably more than the window), self-prunes anything
+  older than the window. Uses plain millis-since-epoch day-bucketing, not
+  `java.time.LocalDate` — minSdk is 24 and no desugaring is configured,
+  so the API-26+ `java.time` classes weren't safe to reach for here.
+
+### Daily engagement (4-5/customer/day)
+
+- `notifications/DailyEngagementWorker.kt` — picks a template not in the
+  rotation window (falls back to `all.random()` in the — currently
+  unreachable at this pool size — case every template is within-window),
+  shows it via a new `NotificationHelper.showMealReminder` call, then
+  records it shown.
+- `notifications/DailyEngagementScheduler.kt` — **5** separate daily
+  `PeriodicWorkRequest`s at fixed times (9:30, 12:45, 16:00, 19:30,
+  21:45), same one-job-per-slot shape the old `MealReminderScheduler`
+  already used for its 2 slots (WorkManager periodic work has a 15-min
+  floor and isn't built for "fire N times a day" as a single job).
+  `HomeActivity.onCreate()` now calls this instead of the old
+  `MealReminderScheduler.scheduleDailyReminders()`.
+- `MealReminderScheduler.kt`/`MealReminderWorker.kt` (the old 2-slot,
+  2-hardcoded-string setup) are **left in the codebase but no longer
+  called from anywhere** — harmless dead code, not deleted in case the
+  old copy is wanted back for some reason. Safe to delete in a later
+  cleanup pass once the new system's been confirmed working.
+
+### Cart-abandonment (15-min delayed, self-cancelling)
+
+- **`AnydropApplication.kt` is a new file** — the app had no custom
+  `Application` subclass at all before this. Registered in
+  `AndroidManifest.xml` (`android:name=".AnydropApplication"`). Observes
+  `ProcessLifecycleOwner` (needs the new `androidx.lifecycle:lifecycle-process:2.7.0`
+  dependency, added to `app/build.gradle` — wasn't already present) for a
+  real "the whole app was backgrounded/foregrounded" signal, deliberately
+  not any single Activity's onPause/onStop (which also fires on ordinary
+  in-app screen navigation and would false-trigger constantly).
+- `notifications/CartAbandonmentScheduler.kt` +
+  `notifications/CartAbandonmentWorker.kt` — on backgrounding, if
+  `CartManager.hasAnyItems()`, schedules a one-shot 15-minute delayed
+  notification (`ExistingWorkPolicy.REPLACE` — a fresh backgrounding
+  restarts the 15-minute clock rather than an old near-expired timer
+  winning). On foregrounding, cancels it. The worker itself **also**
+  re-checks `CartManager.hasAnyItems()` live at fire time (rather than
+  trusting the 15-minute-old snapshot) — covers "order placed while still
+  backgrounded" without needing every single cart-clearing call site in
+  the app to remember to call `.cancel()`. `CheckoutActivity`'s
+  order-success path calls `.cancel()` explicitly too, belt-and-suspenders.
+- `NotificationHelper.kt` gained a separate `CHANNEL_CART_ABANDONMENT`
+  channel + `NOTIF_ID_CART_ABANDONMENT` (3001) and a
+  `showCartAbandonmentReminder()` function — kept distinct from the meal
+  reminder channel/id so the two notification types can't silently
+  overwrite each other in the status bar and so a user can mute one
+  without muting the other.
+
+### Left for next session
+
+1. **No build/compile verification done** — this was all written and
+   reasoned through file-by-file, but there's no Android SDK in this
+   environment to actually run Gradle. First thing next session: build
+   the customer app, fix whatever the compiler catches (import ordering,
+   any typo), and smoke-test on an emulator — specifically (a) the 5
+   daily engagement notifications actually fire and don't repeat within a
+   week, (b) backgrounding the app with a non-empty cart and waiting 15
+   min shows the cart-abandonment notification, (c) reopening the app
+   within 15 min cancels it, (d) placing an order also cancels it.
+2. **Migrations 18/19/20 need to actually be run** against whatever DB is
+   in use — nothing in this session executed them, they were only
+   written to `backend/sql/`.
+3. **Old `MealReminderScheduler`/`MealReminderWorker` cleanup** — dead
+   code now, fine to delete once the new 5-slot system is confirmed
+   working end-to-end.
+4. **No logout wiring exists for either scheduler** (pre-existing gap,
+   not introduced this session — the old `MealReminderScheduler.cancelAll()`
+   was never called from anywhere either). Worth fixing alongside
+   whichever future session touches logout, so a signed-out account
+   doesn't keep getting engagement pushes.
+5. Still entirely untouched: **Phase H items 1-5** (coupon schema fields
+   beyond `is_public`, admin coupon-creation form, restaurant "My
+   Coupons" screen), **Phase K** (Rider App + Live Tracking, explicitly
+   last per app owner), and **bug 1.2** (COD OTP generated but never
+   shown to the customer — deferred to Phase K on purpose, since fixing
+   it in isolation before a rider flow exists has nothing to verify
+   against).
+6. Bug 2.3 (GitHub PAT pasted in chat) is still just a "confirm revoked"
+   action item, not a code fix — nobody has confirmed that yet as far as
+   this doc knows.
+
+

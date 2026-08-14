@@ -92,6 +92,14 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
     private var restaurantOpeningTime: String? = null
     private var restaurantClosingTime: String? = null
 
+    // bugs.md #2.4 — set fresh the first time placeOrder() runs after this
+    // Activity was created (or after a completed attempt fully failed and
+    // the user is trying again from scratch), reused as-is for the
+    // duration of one in-flight place-order call so a client-side retry of
+    // that same call (not currently automatic, but this makes it safe if
+    // one's ever added) doesn't get treated as a new attempt server-side.
+    private var pendingIdempotencyKey: String? = null
+
     private val locationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) fetchCurrentLocation() else {
@@ -501,6 +509,16 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
         val paymentMethod = if (binding.radioUpi.isChecked) "upi" else "cod"
         val instructions = binding.inputInstructions.text?.toString()?.trim().orEmpty().ifEmpty { null }
 
+        // bugs.md #2.4 — reuse the same key if one's already pending for
+        // this attempt (defensive; the button-disable above should already
+        // prevent a second concurrent tap from reaching here), otherwise
+        // mint a fresh one. Cleared in both the error branches below so a
+        // *new* tap after a fully-failed attempt is treated as a genuinely
+        // new order server-side, not a retry of the failed one.
+        val idempotencyKey = pendingIdempotencyKey ?: java.util.UUID.randomUUID().toString().also {
+            pendingIdempotencyKey = it
+        }
+
         binding.btnPlaceOrder.isEnabled = false
         lifecycleScope.launch {
             try {
@@ -516,7 +534,8 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
                         // re-validates independently regardless (same-day,
                         // 20-min lead, within open hours), see the
                         // scheduled_time_* 422 handling below.
-                        scheduledFor = CartManager.getCart(restaurantId)?.scheduledFor
+                        scheduledFor = CartManager.getCart(restaurantId)?.scheduledFor,
+                        idempotencyKey = idempotencyKey
                     )
                 )
                 val result = response.body()?.data
@@ -529,6 +548,14 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
                     // pendingScheduledFor), so scheduledFor doesn't need a
                     // separate reset here — it goes with the rest of the cart.
                     CartManager.removeCart(restaurantId)
+                    // Phase J — belt-and-suspenders alongside
+                    // CartAbandonmentWorker's own live re-check: if a timer
+                    // happens to already be pending (rare — would need the
+                    // app to have been backgrounded then reopened into
+                    // Checkout without CartAbandonmentScheduler.cancel()
+                    // having fired, which AnydropApplication's onStart
+                    // already handles) cancel it explicitly here too.
+                    com.anydrop.food.notifications.CartAbandonmentScheduler.cancel(this@CheckoutActivity)
                     // syncNow (not scheduleSync) — order placement is a hard
                     // exit point, no guarantee this Activity survives long
                     // enough for a 1s-debounced sync to fire.
@@ -571,10 +598,20 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
                         else -> errInfo.code
                     }
                     InAppNotifier.show(this@CheckoutActivity, message, InAppNotifier.Type.ERROR)
+                    pendingIdempotencyKey = null
                     binding.btnPlaceOrder.isEnabled = true
                 }
             } catch (e: Exception) {
                 InAppNotifier.show(this@CheckoutActivity, "Network error while placing the order.", InAppNotifier.Type.ERROR)
+                // bugs.md #2.4 — deliberately NOT cleared here. A network
+                // exception (timeout, connection drop) is exactly the case
+                // this key exists for: the request may have actually landed
+                // server-side. Keeping the same key means the user's next
+                // tap is treated as a retry of this attempt (server returns
+                // the already-created order) rather than creating a second
+                // one — only a clean error *response* (validation failure,
+                // coupon rejected, etc.) above means nothing was created,
+                // which is when it's safe to mint a fresh key next time.
                 binding.btnPlaceOrder.isEnabled = true
             }
         }
