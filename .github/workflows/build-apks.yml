@@ -2,7 +2,7 @@ name: Build Anydrop APKs
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   workflow_dispatch: {}
 
 jobs:
