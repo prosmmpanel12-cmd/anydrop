@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shared top bar OPEN/CLOSED pill (docs/restorent/19, §3) — small
+     filled dot for the "open, accepting orders" state. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@color/veg_green" />
+    <size android:width="8dp" android:height="8dp" />
+</shape>

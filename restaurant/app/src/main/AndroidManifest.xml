@@ -44,18 +44,18 @@
             android:name=".ui.signup.SignupSuccessActivity"
             android:exported="false" />
 
+        <!-- Bottom-nav shell (docs/restorent/19 §3/§10 item 2) — replaces
+             DashboardActivity and MenuManagementActivity as the post-login
+             entry point; both are now fragments (Orders/Menu tabs) hosted
+             here alongside the new Insights/Account tabs. -->
         <activity
-            android:name=".ui.dashboard.DashboardActivity"
-            android:exported="false" />
+            android:name=".ui.main.MainActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ui.orderdetail.OrderDetailActivity"
             android:exported="false" />
-
-        <activity
-            android:name=".ui.menu.MenuManagementActivity"
-            android:exported="false"
-            android:windowSoftInputMode="adjustResize" />
 
     </application>
 

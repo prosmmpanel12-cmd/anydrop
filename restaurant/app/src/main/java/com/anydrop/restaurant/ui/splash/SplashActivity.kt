@@ -9,16 +9,17 @@ import android.view.animation.AnimationUtils
 import androidx.appcompat.app.AppCompatActivity
 import com.anydrop.restaurant.R
 import com.anydrop.restaurant.data.TokenManager
-import com.anydrop.restaurant.ui.dashboard.DashboardActivity
 import com.anydrop.restaurant.ui.login.LoginActivity
+import com.anydrop.restaurant.ui.main.MainActivity
 
 /**
  * New launcher Activity (was LoginActivity before this session). Plays the
  * same scale+overshoot logo / fade-up text entrance the Customer app uses
  * on its splash (res/anim/splash_logo_in.xml, splash_text_in.xml — copied
  * as-is so both apps open with a matching brand moment), then routes to
- * Dashboard (already logged in) or Login, exactly like LoginActivity's old
- * isLoggedIn() check used to, just one hop earlier.
+ * MainActivity's bottom-nav shell (already logged in) or Login, exactly
+ * like LoginActivity's old isLoggedIn() check used to, just one hop
+ * earlier.
  */
 class SplashActivity : AppCompatActivity() {
 
@@ -51,7 +52,7 @@ class SplashActivity : AppCompatActivity() {
     private fun proceed() {
         if (isFinishing) return
         val tokenManager = TokenManager(this)
-        val next = if (tokenManager.isLoggedIn()) DashboardActivity::class.java else LoginActivity::class.java
+        val next = if (tokenManager.isLoggedIn()) MainActivity::class.java else LoginActivity::class.java
         startActivity(Intent(this, next))
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
         finish()

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Loading-state building block (docs/restorent/19, §9.4).
+     Rounded-square placeholder for the 60x60 menu-item photo
+     thumbnail slot planned in §5 (not built yet — placeholder
+     icon until photo upload ships). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/skeleton_base" />
+    <corners android:radius="8dp" />
+</shape>

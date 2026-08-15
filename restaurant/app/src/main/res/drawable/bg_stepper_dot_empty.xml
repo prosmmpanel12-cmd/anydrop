@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Orders tab redesign (docs/restorent/19, §4) — outline-only dot for
+     an upcoming (not-yet-reached) step in the horizontal status stepper. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@color/surface" />
+    <stroke android:width="1.5dp" android:color="@color/outline" />
+    <size android:width="10dp" android:height="10dp" />
+</shape>

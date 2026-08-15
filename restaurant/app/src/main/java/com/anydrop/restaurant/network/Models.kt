@@ -118,7 +118,11 @@ data class AcceptBody(@SerializedName("estimated_prep_minutes") val estimatedPre
 data class TodaySummary(
     @SerializedName("orders_count") val ordersCount: Int,
     val earnings: Double,
-    @SerializedName("commission_owed") val commissionOwed: Double
+    @SerializedName("commission_owed") val commissionOwed: Double,
+    // UI plan §4 "Today" snapshot strip — null until at least one order has
+    // gone accepted -> ready today (see dashboard.php); the stat chip shows
+    // a placeholder ("—") rather than a misleading "0 min" in that case.
+    @SerializedName("avg_prep_minutes") val avgPrepMinutes: Int? = null
 )
 
 data class DashboardResult(

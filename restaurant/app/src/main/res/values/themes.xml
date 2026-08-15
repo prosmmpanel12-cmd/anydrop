@@ -4,6 +4,9 @@
         <item name="colorPrimaryVariant">@color/anydrop_primary_dark</item>
         <item name="colorOnPrimary">@color/white</item>
         <item name="colorSecondary">@color/anydrop_secondary</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+        <item name="colorOutline">@color/outline</item>
         <item name="android:windowBackground">@color/background</item>
         <item name="android:statusBarColor">@color/anydrop_primary</item>
         <item name="android:textColorPrimary">@color/text_primary</item>

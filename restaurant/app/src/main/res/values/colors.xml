@@ -35,4 +35,13 @@
     <color name="status_done_bg">#E7F6E9</color>
     <color name="status_done_fg">#1E7B34</color>
     <color name="anydrop_launcher_bg">#0B0B0B</color>
+
+    <!-- Loading states (docs/restorent/19, §9.4) -->
+    <color name="skeleton_base">#E8E8E8</color>
+    <color name="skeleton_shimmer_highlight">#F5F5F5</color>
+
+    <!-- Orders tab redesign (docs/restorent/19, §8) -->
+    <color name="warning_amber">#F9A825</color>
+    <color name="warning_amber_bg">#FFF3D6</color>
+    <color name="stat_chip_bg">#F2F2F2</color>
 </resources>

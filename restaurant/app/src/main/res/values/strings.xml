@@ -47,7 +47,13 @@
     <string name="signup_success_body">Our team will review your details and approve your restaurant within 24\u201348 hours. You\'ll be able to log in once approved.</string>
     <string name="btn_back_to_login">Back to Login</string>
 
-    <!-- Dashboard -->
+    <!-- Bottom nav shell (docs/restorent/19 §3) -->
+    <string name="nav_orders">Orders</string>
+    <string name="nav_menu">Menu</string>
+    <string name="nav_insights">Insights</string>
+    <string name="nav_account">Account</string>
+
+    <!-- Orders tab (formerly "Dashboard") -->
     <string name="dashboard_title">Orders</string>
     <string name="tab_new">New</string>
     <string name="tab_active">Active</string>
@@ -55,9 +61,39 @@
     <string name="empty_orders">No orders here right now</string>
     <string name="today_summary">Today: %1$d orders · ₹%2$s earned</string>
     <string name="btn_logout">Log out</string>
-    <string name="btn_menu_management">Menu</string>
     <string name="accepting_orders_label">Accepting orders</string>
     <string name="status_update_failed">Couldn\'t update — try again</string>
+
+    <!-- Orders tab redesign (docs/restorent/19 §4, §10 item 3) -->
+    <string name="section_new_orders">New</string>
+    <string name="section_in_progress">In progress</string>
+    <string name="section_completed_today">Completed today</string>
+    <string name="stat_orders_label">Orders</string>
+    <string name="stat_earnings_label">Earnings</string>
+    <string name="stat_avg_prep_label">Avg prep</string>
+    <string name="stat_placeholder">—</string>
+    <string name="stat_avg_prep_format">%1$d min</string>
+    <string name="countdown_format">%1$d:%2$02d</string>
+    <string name="countdown_expired">Accept now</string>
+    <string name="step_preparing">Preparing</string>
+    <string name="step_ready">Ready</string>
+    <string name="step_handed_to_rider">Handed to rider</string>
+    <string name="btn_mark_next_step">Mark next step</string>
+    <string name="empty_new_orders">No new orders right now</string>
+    <string name="empty_in_progress_orders">Nothing in progress</string>
+    <string name="empty_completed_orders">Nothing completed yet today</string>
+    <string name="restaurant_open_label">Open</string>
+    <string name="restaurant_closed_label">Closed</string>
+    <string name="dialog_close_restaurant_title">Stop accepting orders?</string>
+    <string name="dialog_close_restaurant_message">New orders won\'t be able to reach you until you switch back to Open.</string>
+    <string name="btn_confirm_close">Yes, close</string>
+
+    <!-- Insights tab (placeholder — real content is §10 item 6) -->
+    <string name="insights_coming_soon_title">Insights are coming soon</string>
+    <string name="insights_coming_soon_body">Today/week/month stats, earnings, and your best-selling items will show up here.</string>
+
+    <!-- Account tab (placeholder — real content is §10 item 5) -->
+    <string name="account_coming_soon_body">Profile editing, payout details, and notification preferences will show up here.</string>
 
     <!-- Order detail -->
     <string name="order_detail_title">Order Detail</string>

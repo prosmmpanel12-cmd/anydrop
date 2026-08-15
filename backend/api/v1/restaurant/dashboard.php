@@ -45,6 +45,21 @@ $todayStmt = $db->prepare(
 $todayStmt->execute(['rid' => $restaurantId]);
 $today = $todayStmt->fetch();
 
+// UI plan §4 "Today" snapshot strip (docs/restorent/19) — average time from
+// accept to ready, today's orders only, orders that reached 'ready' or
+// beyond (accepted_at/ready_at are both set by orders-accept.php /
+// orders-status.php respectively; an order still short of 'ready' has a
+// null ready_at and is correctly excluded rather than counted as 0 minutes).
+$avgPrepStmt = $db->prepare(
+    "SELECT AVG(TIMESTAMPDIFF(MINUTE, accepted_at, ready_at)) AS avg_minutes
+     FROM orders
+     WHERE restaurant_id = :rid AND DATE(created_at) = CURDATE()
+       AND accepted_at IS NOT NULL AND ready_at IS NOT NULL"
+);
+$avgPrepStmt->execute(['rid' => $restaurantId]);
+$avgPrepRow = $avgPrepStmt->fetch();
+$avgPrepMinutes = $avgPrepRow['avg_minutes'] !== null ? (int) round((float) $avgPrepRow['avg_minutes']) : null;
+
 $dueStmt = $db->prepare('SELECT current_due, operational_status FROM restaurants WHERE id = :rid LIMIT 1');
 $dueStmt->execute(['rid' => $restaurantId]);
 $restaurantRow = $dueStmt->fetch();
@@ -61,6 +76,7 @@ respond_ok([
         'orders_count' => (int) $today['orders_count'],
         'earnings' => (float) $today['earnings'],
         'commission_owed' => (float) $today['commission'],
+        'avg_prep_minutes' => $avgPrepMinutes,
     ],
     'current_due' => $currentDue,
     'operational_status' => $operationalStatus,

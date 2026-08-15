@@ -12,7 +12,7 @@ import com.anydrop.restaurant.databinding.ActivityLoginBinding
 import com.anydrop.restaurant.network.ApiClient
 import com.anydrop.restaurant.network.LoginBody
 import com.anydrop.restaurant.ui.common.InAppNotifier
-import com.anydrop.restaurant.ui.dashboard.DashboardActivity
+import com.anydrop.restaurant.ui.main.MainActivity
 import com.anydrop.restaurant.ui.signup.SignupActivity
 import kotlinx.coroutines.launch
 
@@ -100,7 +100,7 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun goToDashboard() {
-        startActivity(Intent(this, DashboardActivity::class.java))
+        startActivity(Intent(this, MainActivity::class.java))
         finish()
     }
 }
