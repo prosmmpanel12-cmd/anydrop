@@ -1,0 +1,120 @@
+# Anydrop Restaurant App — UI Plan
+Reference study: Zomato Restaurant Partner app, Swiggy Owner app + a few merchant-app concepts (Behance/Dribbble). Goal: bring Anydrop's restaurant app up to the same "feels professional" bar, not copy their branding.
+
+---
+
+## 1. What Zomato/Swiggy partner apps get right (patterns to borrow)
+
+| Pattern | Why it works |
+|---|---|
+| **Bottom tab nav** (Orders / Menu / Analytics / Account) | Owner jumps between these constantly during service — a single top-bar link (like our current "Menu" text button) is too slow to reach mid-rush. |
+| **Live order = countdown timer chip** on the card | Restaurant staff need to know "how long left to accept" at a glance, not by opening the order. |
+| **Order status = horizontal stepper**, not a text label | Received → Preparing → Ready → Picked up. One glance tells kitchen + counter staff where things stand. |
+| **Menu editor = category tabs at top + item rows with a thumbnail photo** | Photo-first browsing because owners scan by dish look, not just name. |
+| **One-tap "Turn OFF menu item" switch right on the list row** | Out-of-stock happens mid-service; owner shouldn't need to open an edit form for it (we already do this right). |
+| **Home screen = today's snapshot card** (orders today, earnings today, rating) above the order list | Gives the owner a reason to open the app even when there's no new order. |
+| **Big, unmissable restaurant OPEN/CLOSED toggle**, always visible, never buried in settings | Single biggest lever an owner has; Zomato/Swiggy both pin it to the top of every screen. |
+
+---
+
+## 2. Anydrop's current state vs. target
+
+We already have: Splash → Signup/Login → Dashboard (order list) → Order Detail → Menu Management (built last session).
+
+Gaps vs. Zomato/Swiggy pattern:
+- No bottom navigation — everything is squeezed into Dashboard's top bar (Menu button, Logout, status toggle all crammed together).
+- Order cards show status as plain text, no visual stepper/timer.
+- Menu items have no photo slot in the list row (upload isn't built yet either).
+- No "today's snapshot" — owner opens app straight into a raw order list.
+- No dedicated Analytics/Earnings screen at all yet.
+- No Notifications/Account screen — profile & restaurant details aren't editable from the app yet.
+
+---
+
+## 3. Proposed navigation structure
+
+```
+Bottom Nav (4 tabs, always visible after login)
+├── 🧾 Orders      (current Dashboard, redesigned — see §4)
+├── 📋 Menu        (existing Menu Management screen — see §5)
+├── 📊 Insights     (NEW — today's stats, past earnings — see §6)
+└── 👤 Account      (NEW — restaurant profile, timings, logout — see §7)
+```
+
+The restaurant OPEN/CLOSED toggle stays pinned in a top bar **above** the bottom nav on every tab — same reasoning Zomato/Swiggy use it for.
+
+---
+
+## 4. Orders tab (redesigned Dashboard)
+
+**Top, always visible:**
+- Restaurant name + big OPEN/CLOSED pill switch (green/red), tap to confirm before closing.
+- "Today" snapshot strip: Orders count · Earnings · Avg prep time — 3 small stat chips in a row.
+
+**Order list, grouped into sections (not one flat list):**
+1. **New (needs action)** — cards with a countdown ring/timer ("Accept within 1:45"), Accept / Reject buttons directly on the card.
+2. **In progress** — horizontal status stepper (Preparing → Ready → Handed to rider) with a "Mark next step" button.
+3. **Completed today** — collapsed, tap to expand.
+
+Each order card: order #, item count + total, customer area (not full address for privacy), and the stepper/timer as described above.
+
+---
+
+## 5. Menu tab (extend what we built)
+
+Keep the category-card structure already built, add:
+- **Photo thumbnail** (60×60, rounded) on the left of every item row — placeholder icon until photo upload ships.
+- **Category tabs as a horizontal scroll strip** at the top (Starters | Mains | Desserts...) instead of stacked cards, once a restaurant has 5+ categories — stacked cards get long to scroll through.
+- Drag-handle icon on category rows for reordering (`sort_order` field already exists in the backend, UI just needs to send it on reorder).
+- Small "🔍 Search menu" bar at the top — backend already supports `?search=` on `menu-items-list.php`, just needs wiring.
+
+---
+
+## 6. Insights tab (new)
+
+- Date range selector (Today / This week / This month).
+- Cards: Total orders, Total earnings, Average order value, Cancellation rate.
+- Simple bar chart: orders per day (last 7 days).
+- Top 5 best-selling items this week (uses `is_bestseller` flag we already track).
+
+*(Backend note: none of this data is exposed yet — needs a new `restaurant/insights.php` endpoint aggregating the `orders` table. Flagging as the next backend piece, not building it in this plan doc.)*
+
+---
+
+## 7. Account tab (new)
+
+- Restaurant profile: name, cuisine tags, address, opening/closing time — editable form (fields already exist in `restaurants` table).
+- Bank/payout details section (view-only for now if payouts aren't built yet).
+- Notification preferences toggle.
+- Logout (moved here from the Dashboard top bar, decluttering it).
+
+---
+
+## 8. Visual language
+
+Keep the existing palette — it already reads close to Swiggy's warm-orange identity, no need to change it:
+
+| Token | Value | Use |
+|---|---|---|
+| Primary | `#E64A19` | buttons, active tab, OPEN toggle |
+| Primary container | `#FFE0D3` | chips, switch tracks |
+| Veg green | `#2E7D32` | veg dot, veg switch |
+| Non-veg red | `#C62828` | non-veg dot |
+
+New additions needed:
+- A "warning/pending" amber (`#F9A825`-ish) for the order countdown timer as it runs low.
+- A neutral gray-100 background for stat chips/cards so they sit apart from the white order cards.
+
+Typography/spacing: keep current Material defaults — the issue isn't the type scale, it's the information hierarchy (flat lists vs. grouped/prioritized), which §4–§7 above address directly.
+
+---
+
+## 9. Build order (suggested, one PR-sized chunk at a time)
+
+1. Bottom nav shell (4 tabs, empty Insights/Account screens as placeholders) — unblocks everything else.
+2. Orders tab redesign: sections + timer + stepper (highest daily-use impact).
+3. Menu tab: photo thumbnail slot + search bar wiring (backend already ready).
+4. Account tab: profile edit form.
+5. Insights tab: needs new backend endpoint first, then the UI.
+
+Say the word and I'll start on #1 (bottom nav shell) next — that's the one everything else hangs off of.
