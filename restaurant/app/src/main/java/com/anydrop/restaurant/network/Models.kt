@@ -133,3 +133,60 @@ data class DashboardResult(
 
 data class OperationalStatusUpdateBody(@SerializedName("operational_status") val operationalStatus: String)
 data class OperationalStatusResult(@SerializedName("operational_status") val operationalStatus: String)
+
+// ---- Menu Management (Tier 1, docs/18) ----
+
+data class MenuCategory(
+    val id: Int,
+    val name: String,
+    @SerializedName("sort_order") val sortOrder: Int,
+    @SerializedName("is_active") val isActive: Boolean,
+    @SerializedName("item_count") val itemCount: Int = 0
+)
+
+data class CategoriesListResult(val categories: List<MenuCategory>)
+data class CategoryResult(val category: MenuCategory)
+
+data class CategoryCreateBody(val name: String, @SerializedName("sort_order") val sortOrder: Int? = null)
+data class CategoryUpdateBody(
+    val name: String? = null,
+    @SerializedName("sort_order") val sortOrder: Int? = null,
+    @SerializedName("is_active") val isActive: Boolean? = null
+)
+
+data class MenuItem(
+    val id: Int,
+    @SerializedName("category_id") val categoryId: Int,
+    val name: String,
+    val description: String?,
+    val price: Double,
+    @SerializedName("discount_percent") val discountPercent: Double,
+    @SerializedName("is_veg") val isVeg: Boolean,
+    @SerializedName("image_url") val imageUrl: String?,
+    @SerializedName("is_available") val isAvailable: Boolean,
+    @SerializedName("is_recommended") val isRecommended: Boolean,
+    @SerializedName("is_bestseller") val isBestseller: Boolean,
+    @SerializedName("prep_time_minutes") val prepTimeMinutes: Int
+)
+
+data class MenuItemsListResult(val items: List<MenuItem>)
+data class MenuItemResult(val item: MenuItem)
+
+data class MenuItemCreateBody(
+    @SerializedName("category_id") val categoryId: Int,
+    val name: String,
+    val price: Double,
+    val description: String? = null,
+    @SerializedName("is_veg") val isVeg: Boolean = true,
+    @SerializedName("prep_time_minutes") val prepTimeMinutes: Int? = null
+)
+
+data class MenuItemUpdateBody(
+    @SerializedName("category_id") val categoryId: Int? = null,
+    val name: String? = null,
+    val description: String? = null,
+    val price: Double? = null,
+    @SerializedName("is_veg") val isVeg: Boolean? = null,
+    @SerializedName("is_available") val isAvailable: Boolean? = null,
+    @SerializedName("prep_time_minutes") val prepTimeMinutes: Int? = null
+)

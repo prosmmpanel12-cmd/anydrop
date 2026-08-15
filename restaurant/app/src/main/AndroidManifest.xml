@@ -52,6 +52,11 @@
             android:name=".ui.orderdetail.OrderDetailActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".ui.menu.MenuManagementActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
     </application>
 
 </manifest>

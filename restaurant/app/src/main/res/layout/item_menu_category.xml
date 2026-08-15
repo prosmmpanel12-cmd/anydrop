@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/surface"
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginTop="12dp"
+    android:padding="12dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/categoryNameText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary" />
+
+        <TextView
+            android:id="@+id/categoryItemCountText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary"
+            android:paddingEnd="10dp" />
+
+        <TextView
+            android:id="@+id/btnEditCategory"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="✏️"
+            android:padding="6dp" />
+
+        <TextView
+            android:id="@+id/btnDeleteCategory"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🗑️"
+            android:padding="6dp" />
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/itemsRecycler"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:nestedScrollingEnabled="false" />
+
+    <TextView
+        android:id="@+id/emptyItemsText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/empty_items_in_category"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp"
+        android:paddingVertical="8dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/btnAddItem"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/btn_add_item"
+        android:textColor="@color/anydrop_primary"
+        android:textStyle="bold"
+        android:paddingTop="8dp" />
+
+</LinearLayout>

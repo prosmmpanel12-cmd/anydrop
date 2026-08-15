@@ -43,4 +43,33 @@ interface ApiService {
 
     @POST("restaurant/status-update.php")
     suspend fun updateOperationalStatus(@Body body: OperationalStatusUpdateBody): Response<ApiResponse<OperationalStatusResult>>
+
+    // ---- Menu Management (Tier 1, docs/18) ----
+
+    @GET("restaurant/categories-list.php")
+    suspend fun getCategories(): Response<ApiResponse<CategoriesListResult>>
+
+    @POST("restaurant/categories-create.php")
+    suspend fun createCategory(@Body body: CategoryCreateBody): Response<ApiResponse<CategoryResult>>
+
+    @POST("restaurant/categories-update.php")
+    suspend fun updateCategory(@Query("id") categoryId: Int, @Body body: CategoryUpdateBody): Response<ApiResponse<CategoryResult>>
+
+    @POST("restaurant/categories-delete.php")
+    suspend fun deleteCategory(@Query("id") categoryId: Int): Response<ApiResponse<Map<String, Any>>>
+
+    @GET("restaurant/menu-items-list.php")
+    suspend fun getMenuItems(
+        @Query("category_id") categoryId: Int? = null,
+        @Query("search") search: String? = null
+    ): Response<ApiResponse<MenuItemsListResult>>
+
+    @POST("restaurant/menu-items-create.php")
+    suspend fun createMenuItem(@Body body: MenuItemCreateBody): Response<ApiResponse<MenuItemResult>>
+
+    @POST("restaurant/menu-items-update.php")
+    suspend fun updateMenuItem(@Query("id") itemId: Int, @Body body: MenuItemUpdateBody): Response<ApiResponse<MenuItemResult>>
+
+    @POST("restaurant/menu-items-delete.php")
+    suspend fun deleteMenuItem(@Query("id") itemId: Int): Response<ApiResponse<Map<String, Any>>>
 }

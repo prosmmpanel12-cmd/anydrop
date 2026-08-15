@@ -55,6 +55,7 @@
     <string name="empty_orders">No orders here right now</string>
     <string name="today_summary">Today: %1$d orders · ₹%2$s earned</string>
     <string name="btn_logout">Log out</string>
+    <string name="btn_menu_management">Menu</string>
     <string name="accepting_orders_label">Accepting orders</string>
     <string name="status_update_failed">Couldn\'t update — try again</string>
 
@@ -71,4 +72,31 @@
     <string name="items_label">Items</string>
     <string name="customer_note_label">Delivery instructions</string>
     <string name="bill_total_label">Item total</string>
+
+    <!-- Menu Management -->
+    <string name="menu_management_title">Menu Management</string>
+    <string name="btn_add_category">+ Category</string>
+    <string name="btn_add_item">+ Item</string>
+    <string name="hint_category_name">Category name (e.g. Starters)</string>
+    <string name="hint_item_name">Item name</string>
+    <string name="hint_item_price">Price (₹)</string>
+    <string name="hint_item_description">Description (optional)</string>
+    <string name="label_veg">Veg</string>
+    <string name="label_available">Available</string>
+    <string name="empty_categories">No categories yet — add one to start building your menu</string>
+    <string name="empty_items_in_category">No items in this category yet</string>
+    <string name="dialog_add_category_title">Add Category</string>
+    <string name="dialog_edit_category_title">Edit Category</string>
+    <string name="dialog_add_item_title">Add Menu Item</string>
+    <string name="dialog_edit_item_title">Edit Menu Item</string>
+    <string name="btn_save">Save</string>
+    <string name="btn_delete">Delete</string>
+    <string name="confirm_delete_category">Delete this category? Items inside it will stay but the category will be hidden.</string>
+    <string name="confirm_delete_item">Delete this item? This can\'t be undone.</string>
+    <string name="menu_save_failed">Couldn\'t save — check the details and try again</string>
+    <string name="menu_load_failed">Couldn\'t load menu — pull to refresh</string>
+    <string name="menu_item_saved">Item saved</string>
+    <string name="menu_category_saved">Category saved</string>
+    <string name="menu_item_deleted">Item deleted</string>
+    <string name="menu_category_deleted">Category deleted</string>
 </resources>

@@ -72,6 +72,9 @@ class DashboardActivity : AppCompatActivity() {
         binding.tabActive.setOnClickListener { selectTab(Tab.ACTIVE) }
         binding.tabHistory.setOnClickListener { selectTab(Tab.HISTORY) }
         binding.btnLogout.setOnClickListener { logout() }
+        binding.btnMenuManagement.setOnClickListener {
+            startActivity(Intent(this, com.anydrop.restaurant.ui.menu.MenuManagementActivity::class.java))
+        }
         binding.switchAcceptingOrders.setOnCheckedChangeListener { _, isChecked ->
             if (!suppressToggleListener) toggleAcceptingOrders(isChecked)
         }
