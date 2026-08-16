@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Account tab / Edit Profile (docs/restorent/19 §7, §10 item 5). Same
-     white-header-with-back-button shell as activity_order_detail.xml for
-     consistency with the app's other detail screens (the dark "ink" top
-     bar from the palette refresh is MainActivity's shared chrome only —
-     see doc 19 §10 item 7, pre-login/detail screens are a separate,
-     not-yet-done pass). -->
+     header-with-back-button shell as activity_order_detail.xml for
+     consistency with the app's other detail screens. Header updated
+     2026-08-16 (doc 19 §10 item 7, pre-login/detail screens ink pass) from
+     a plain white bar to the same dark "ink" treatment as
+     activity_order_detail.xml's header, matching MainActivity's shared
+     chrome. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -18,14 +19,14 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:padding="16dp"
-        android:background="@color/surface">
+        android:background="@color/anydrop_ink">
 
         <ImageView
             android:id="@+id/btnBack"
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:src="@drawable/ic_back"
-            app:tint="@color/text_primary"
+            app:tint="@color/text_on_ink"
             android:contentDescription="@null"
             android:clickable="true"
             android:focusable="true"
@@ -39,7 +40,7 @@
             android:text="@string/edit_profile_title"
             android:textSize="18sp"
             android:textStyle="bold"
-            android:textColor="@color/text_primary" />
+            android:textColor="@color/text_on_ink" />
 
         <TextView
             android:id="@+id/btnSaveProfile"

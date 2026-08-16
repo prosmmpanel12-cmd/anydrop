@@ -1,0 +1,13 @@
+<!-- Soft ink circle backdrop, sits behind an icon (currently just
+     activity_signup_success.xml's check-circle). Added 2026-08-16, pre-
+     login ink pass (docs/restorent/19 §10 item 7) — gives that screen a
+     touch of the app's dark "ink" palette without recoloring its whole
+     background (that screen's green success icon/copy reads best on a
+     light surface, so the ink treatment here is scoped to a soft circle
+     behind the icon rather than the full screen). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <!-- anydrop_ink (#1E223D) at ~10% alpha — a soft tint, not a solid
+         block, so the green success icon still reads clearly on top. -->
+    <solid android:color="#1A1E223D" />
+</shape>

@@ -8,13 +8,25 @@
     android:gravity="center"
     android:padding="32dp">
 
-    <ImageView
-        android:id="@+id/successIcon"
-        android:layout_width="88dp"
-        android:layout_height="88dp"
-        android:src="@drawable/ic_check_circle"
-        android:contentDescription="@null"
-        app:tint="@color/success_fg" />
+    <!-- Pre-login ink pass (2026-08-16, docs/restorent/19 §10 item 7): added
+         the soft ink circle behind the icon (bg_icon_circle_ink.xml) as
+         this screen's touch of the app's dark-chrome palette — the rest of
+         the screen stays on the light background since the green success
+         icon/copy reads best there. -->
+    <FrameLayout
+        android:layout_width="128dp"
+        android:layout_height="128dp"
+        android:background="@drawable/bg_icon_circle_ink">
+
+        <ImageView
+            android:id="@+id/successIcon"
+            android:layout_width="88dp"
+            android:layout_height="88dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_check_circle"
+            android:contentDescription="@null"
+            app:tint="@color/success_fg" />
+    </FrameLayout>
 
     <TextView
         android:id="@+id/successTitle"

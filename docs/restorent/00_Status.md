@@ -1,3 +1,75 @@
+## 2026-08-16 — Pre-login/detail screens ink pass (this session, closes doc 19 §10 item 7)
+
+Continuing from the uploaded `account-tab-fixed` zip, which already had
+both items from the top of `NEXT_SESSION_PROMPT.md` applied (confirmed
+by reading the code, not just the doc): `AccountFragment.kt` matches
+`fragment_account.xml`'s current IDs and no longer crashes, and
+`MainActivity.kt`'s `loadOperationalStatus()` already reads
+`isOpen = summary.operationalStatus == "open"`. Nothing to redo there —
+moved straight to the next queued item, doc 19 §10 item 7.
+
+### ✅ Done this session
+- **`bg_hero_curved.xml`** (shared by `activity_login.xml` +
+  `activity_signup.xml`) — gradient switched from
+  `anydrop_primary`/`anydrop_primary_dark` (orange) to
+  `anydrop_ink`/`anydrop_ink_light`, so both screens' hero panels match
+  the app's main dark chrome instead of clashing with it. White hero
+  text and the orange form-card accents underneath are unchanged.
+- **`activity_splash.xml`** — background moved from flat
+  `anydrop_primary` to `anydrop_ink`; app name recolored to
+  `text_on_ink`, tagline to `text_on_ink_muted` (was
+  `anydrop_primary_container`, tuned for an orange background).
+- **`activity_otp_verify.xml`** — `btnBack` moved out of the plain
+  background into its own `anydrop_ink` header bar (same pattern as
+  order detail's header), tinted `text_on_ink`. `otpTitle`/
+  `otpSubtitle` keep their existing IDs/positions — `OtpVerifyActivity.kt`
+  needed no changes.
+- **`activity_order_detail.xml`** — header background `@color/surface`
+  (white) → `@color/anydrop_ink`; back icon + title recolored to
+  `text_on_ink`.
+- **`activity_edit_profile.xml`** — same header treatment as order
+  detail, applied here too even though it wasn't in doc 19's original
+  six-screen list (it didn't exist yet when that item was written) —
+  its own header comment explicitly said "the dark ink top bar ... is a
+  separate, not-yet-done pass," which is this pass. Comment updated to
+  reflect that it's now done.
+- **`activity_signup_success.xml`** — new `bg_icon_circle_ink.xml`
+  drawable (a translucent ~10%-alpha ink circle, not solid) placed
+  behind the existing green check-circle icon. Deliberately did **not**
+  ink the whole screen background here — the success green icon/copy
+  reads best on the light surface, so this screen's ink touch is scoped
+  to the icon backdrop rather than a full-screen change, per the plan
+  doc's own note that this pass "needs its own layout pass per screen,
+  not a token swap."
+- Updated `docs/restorent/19_Restaurant_App_UI_Plan.md` §10 item 7 to
+  ✅ with a summary of what was actually done, and pointed its "next up"
+  line at the Admin approve/reject screen.
+
+### 🟡 Known gaps / not done this session
+- **No build/visual verification** — same standing sandbox limitation,
+  called out again because this change touches 7 layout files across
+  the whole pre-login/detail-screen surface; a real toolchain should
+  eyeball all of them (contrast of white/text-on-ink text against the
+  ink header bars especially) before shipping.
+- Didn't re-touch typography/spacing on any of these screens, only
+  color, consistent with the rest of the palette-refresh work.
+- The translucent-ink circle behind the signup-success icon is a new
+  pattern not used anywhere else in the app (everywhere else ink is
+  either full-opacity chrome or not used at all) — flagging as a
+  judgment call in case the app owner prefers a different treatment
+  there.
+
+### ⏭️ Next
+Per `NEXT_SESSION_PROMPT.md`'s standing order: Admin-side "Approve/
+Reject pending restaurants" screen next, then the rest of doc 18's
+recommended build order (coupons, notification bell, reviews reply,
+settings, payments, analytics, staff, Rider App last). Build
+verification with a real toolchain remains the single biggest
+outstanding risk project-wide — now an even larger unverified surface
+after this session.
+
+---
+
 ## 2026-08-16 — Account tab / Edit Profile UI, PARTIAL (later session — continues the entry below)
 
 Continues the "backend + models only" entry directly below this one.

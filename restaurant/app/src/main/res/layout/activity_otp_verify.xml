@@ -1,22 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Pre-login ink pass (2026-08-16, docs/restorent/19 §10 item 7): btnBack
+     moved into its own ink header bar (same background/tint pattern as
+     activity_order_detail.xml's header) instead of floating unstyled on
+     the plain background — gives this screen the same "consistent header
+     treatment" as the app's other back-button screens. otpTitle/
+     otpSubtitle keep their IDs/positions unchanged (OtpVerifyActivity.kt
+     sets otpSubtitle's text at runtime), just shifted into the padded
+     body below the header. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/background"
-    android:padding="28dp">
+    android:background="@color/background">
 
-    <ImageView
-        android:id="@+id/btnBack"
-        android:layout_width="28dp"
-        android:layout_height="28dp"
-        android:layout_marginBottom="24dp"
-        android:src="@drawable/ic_back"
-        android:contentDescription="@null"
-        android:clickable="true"
-        android:focusable="true"
-        android:background="?attr/selectableItemBackgroundBorderless" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="16dp"
+        android:background="@color/anydrop_ink">
+
+        <ImageView
+            android:id="@+id/btnBack"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_back"
+            app:tint="@color/text_on_ink"
+            android:contentDescription="@null"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackgroundBorderless" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="28dp">
 
     <TextView
         android:id="@+id/otpTitle"
@@ -98,4 +120,5 @@
         android:focusable="true"
         android:background="?attr/selectableItemBackground" />
 
+    </LinearLayout>
 </LinearLayout>

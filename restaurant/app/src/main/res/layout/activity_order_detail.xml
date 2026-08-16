@@ -6,20 +6,24 @@
     android:orientation="vertical"
     android:background="@color/background">
 
+    <!-- Pre-login/detail ink pass (2026-08-16, docs/restorent/19 §10 item 7):
+         header background was @color/surface (white); switched to
+         @color/anydrop_ink with text_on_ink icon/text tints to match the
+         app's main dark chrome instead of a plain white bar. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:padding="16dp"
-        android:background="@color/surface">
+        android:background="@color/anydrop_ink">
 
         <ImageView
             android:id="@+id/btnBack"
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:src="@drawable/ic_back"
-            app:tint="@color/text_primary" />
+            app:tint="@color/text_on_ink" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -28,7 +32,7 @@
             android:text="@string/order_detail_title"
             android:textSize="18sp"
             android:textStyle="bold"
-            android:textColor="@color/text_primary" />
+            android:textColor="@color/text_on_ink" />
     </LinearLayout>
 
     <ScrollView

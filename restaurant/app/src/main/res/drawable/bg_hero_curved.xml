@@ -1,8 +1,16 @@
+<!-- Pre-login ink pass (2026-08-16, docs/restorent/19 §10 item 7): was an
+     orange gradient (anydrop_primary -> anydrop_primary_dark); switched to
+     the "ink" dark-navy family so Login/Signup's hero panel matches the
+     app's main chrome (top bar/bottom nav, see activity_main.xml) instead
+     of clashing with it. The white hero text and the orange form-card
+     accents (buttons, icon tints, box strokes) underneath are unchanged,
+     so this keeps the same "dark chrome + orange accent" pattern used
+     everywhere else in the app. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
     <gradient
         android:angle="315"
-        android:startColor="@color/anydrop_primary"
-        android:endColor="@color/anydrop_primary_dark" />
+        android:startColor="@color/anydrop_ink"
+        android:endColor="@color/anydrop_ink_light" />
     <corners
         android:bottomLeftRadius="32dp"
         android:bottomRightRadius="32dp" />
