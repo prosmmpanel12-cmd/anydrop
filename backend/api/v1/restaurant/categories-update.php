@@ -2,10 +2,13 @@
 /**
  * POST /api/v1/restaurant/categories-update.php?id={category_id}
  * Auth: Restaurant token (must own the category)
- * Request: { "name"?: "...", "sort_order"?: int, "is_active"?: bool }
+ * Request: { "name"?: "...", "sort_order"?: int, "is_active"?: bool, "image_url"?: string }
  * Response: { "category": {...} }
  * Partial update — only fields present in the body are changed, same
  * pattern as orders-status.php / status-update.php elsewhere in this API.
+ *
+ * image_url: same null-skip convention as menu-items-update.php's field of
+ * the same name — requires backend/sql/22_migration_category_image.sql.
  */
 
 require_once __DIR__ . '/../../../config/database.php';
@@ -55,6 +58,10 @@ if (array_key_exists('is_active', $body) && $body['is_active'] !== null) {
     $fields[] = 'is_active = :is_active';
     $params['is_active'] = $body['is_active'] ? 1 : 0;
 }
+if (array_key_exists('image_url', $body) && $body['image_url'] !== null) {
+    $fields[] = 'image_url = :image_url';
+    $params['image_url'] = $body['image_url'] !== '' ? $body['image_url'] : null;
+}
 
 if (!empty($fields)) {
     $sql = 'UPDATE menu_categories SET ' . implode(', ', $fields) . ' WHERE id = :id';
@@ -63,7 +70,7 @@ if (!empty($fields)) {
 }
 
 $fetch = $db->prepare(
-    'SELECT c.id, c.name, c.sort_order, c.is_active,
+    'SELECT c.id, c.name, c.image_url, c.sort_order, c.is_active,
             (SELECT COUNT(*) FROM menu_items i
              WHERE i.category_id = c.id AND i.deleted_at IS NULL) AS item_count
      FROM menu_categories c WHERE c.id = :id LIMIT 1'
@@ -75,6 +82,7 @@ respond_ok([
     'category' => [
         'id' => (int) $row['id'],
         'name' => $row['name'],
+        'image_url' => $row['image_url'],
         'sort_order' => (int) $row['sort_order'],
         'is_active' => (bool) $row['is_active'],
         'item_count' => (int) $row['item_count'],

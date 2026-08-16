@@ -76,6 +76,14 @@ interface ApiService {
     @POST("restaurant/menu-items-delete.php")
     suspend fun deleteMenuItem(@Query("id") itemId: Int): Response<ApiResponse<Map<String, Any>>>
 
+    @Multipart
+    @POST("restaurant/menu-item-photo-upload.php")
+    suspend fun uploadMenuItemPhoto(@Part photo: MultipartBody.Part): Response<ApiResponse<MenuItemPhotoUploadResult>>
+
+    @Multipart
+    @POST("restaurant/category-photo-upload.php")
+    suspend fun uploadCategoryPhoto(@Part photo: MultipartBody.Part): Response<ApiResponse<CategoryPhotoUploadResult>>
+
     // ---- Account tab / Edit Profile (docs/restorent/19 §7, §10 item 5) ----
 
     @GET("restaurant/profile-get.php")

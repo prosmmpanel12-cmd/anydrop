@@ -8,6 +8,7 @@ import androidx.recyclerview.widget.RecyclerView
 import coil.load
 import com.anydrop.restaurant.R
 import com.anydrop.restaurant.databinding.ItemMenuFoodBinding
+import com.anydrop.restaurant.network.ApiClient
 import com.anydrop.restaurant.network.MenuItem
 
 /**
@@ -56,7 +57,13 @@ class MenuItemAdapter(
                 binding.itemThumb.imageTintList = null
                 binding.itemThumb.setPadding(0, 0, 0, 0)
                 binding.itemThumb.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
-                binding.itemThumb.load(item.imageUrl) {
+                // Bug fix (NEXT_SESSION_PROMPT.md item 5) — image_url is a
+                // relative path from the API; needs the same static-files
+                // base-URL prefix EditProfileActivity's logo preview uses,
+                // not the raw path. Harmless before now since image_url
+                // was always null, but broke the moment real values start
+                // coming back from menu-items-create/update.php.
+                binding.itemThumb.load(ApiClient.baseUrlForStaticFiles(context) + item.imageUrl) {
                     placeholder(R.drawable.ic_food_placeholder)
                     error(R.drawable.ic_food_placeholder)
                     crossfade(true)

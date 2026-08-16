@@ -155,6 +155,24 @@ reasonable next design pass but needs its own layout pass per screen,
 not a token swap, so it wasn't safe to do blind in the time available
 here.
 
+### 8.1.1 App owner feedback (2026-08-16, after real-device testing) — revert to orange+white ✅
+
+After trying the ink chrome on a real device, the app owner's call was
+that the original **orange + white** combo (pre-8.1, see §8.2 below)
+looked better than orange + Midnight Blue ink. **Done**: palette reverted
+back to orange + white — `colors.xml`'s primary tokens restored and the
+`anydrop_ink`/`text_on_ink*` tokens removed, `activity_main.xml`'s top
+bar/bottom nav background back to `@color/surface`, `themes.xml`'s status
+bar back to primary/light-icons, `bottom_nav_item_color.xml`'s unselected
+state back to `text_secondary`, plus every file touched in §10 item 7's
+ink pass undone (`bg_hero_curved.xml`, `activity_splash.xml`,
+`activity_otp_verify.xml`, `activity_order_detail.xml`,
+`activity_edit_profile.xml`, `activity_signup_success.xml` — the last of
+these also drops the now-orphaned `bg_icon_circle_ink.xml` drawable
+entirely). See `00_Status.md`'s 2026-08-16 "Palette revert" entry for the
+full file-by-file summary. Not build-verified — same standing sandbox
+limitation as every visual change in this project.
+
 ### 8.2 Original tokens (superseded 2026-08-16, kept for history)
 
 Prior palette — read close to Swiggy's warm-orange identity, changed

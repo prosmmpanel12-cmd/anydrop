@@ -4,7 +4,7 @@
  * Auth: Restaurant token
  * Request: any subset of { name, address, cuisine_tags, opening_time,
  *                           closing_time, working_days, description,
- *                           logo_url, cover_url }
+ *                           logo_url, cover_url, latitude, longitude }
  * Response: { "restaurant": {...full row, minus password_hash} }
  *
  * docs/restorent/19 §7 (Account tab) / §10 item 5. Partial update, same
@@ -13,10 +13,15 @@
  * Deliberately restricted to a restaurant-safe column subset — mirrors
  * status-update.php's own restraint. NOT settable here: status
  * (admin-only approval gate), operational_status (status-update.php's
- * job), current_due/commission_percent (platform ledger), latitude/
- * longitude (needs its own map-picker flow, out of scope this pass —
- * see docs/restorent/00_Status.md for the flagged follow-up), and
+ * job), current_due/commission_percent (platform ledger), and
  * owner_email/password (would need re-auth, not a plain profile field).
+ *
+ * latitude/longitude were excluded here (see prior revision of this kdoc)
+ * pending a map-picker flow — added 2026-08-16 per app owner's real-device
+ * feedback (docs/restorent/00_Status.md), reusing the Customer app's H6
+ * pin-drop pattern client-side. Both optional/nullable, set together (a
+ * lone lat with no lng, or vice versa, is rejected as malformed rather
+ * than silently half-applied).
  *
  * logo_url/cover_url are plain string fields here, same pattern as H6's
  * address-photo.php + addresses.php split: logo-upload.php does the
@@ -130,12 +135,72 @@ if (array_key_exists('cover_url', $body)) {
     $params['cover_url'] = $body['cover_url'] !== '' ? $body['cover_url'] : null;
 }
 
+// latitude/longitude — set together via the map-picker flow (see kdoc
+// above). Both keys must be present and non-null if either is — a lone
+// coordinate is ambiguous (was the other one meant to stay unchanged, or
+// meant to be cleared?) so it's rejected outright rather than guessed at,
+// same "don't silently half-apply" reasoning as logo-upload.php's split
+// from this endpoint. DECIMAL(10,8)/DECIMAL(11,8) per 01_Database_Schema.md
+// — a plain numeric-range sanity check (-90..90 / -180..180) here catches
+// an obviously malformed payload before it hits the DB; MySQL's own
+// column precision handles the rest.
+$hasLat = array_key_exists('latitude', $body);
+$hasLng = array_key_exists('longitude', $body);
+if ($hasLat !== $hasLng) {
+    respond_error('validation_error', 422, ['fields' => ['latitude', 'longitude']]);
+}
+if ($hasLat && $hasLng) {
+    $lat = $body['latitude'];
+    $lng = $body['longitude'];
+    if ($lat !== null && $lng !== null) {
+        if (!is_numeric($lat) || !is_numeric($lng) ||
+            (float) $lat < -90 || (float) $lat > 90 ||
+            (float) $lng < -180 || (float) $lng > 180) {
+            respond_error('validation_error', 422, ['fields' => ['latitude', 'longitude']]);
+        }
+        $fields[] = 'latitude = :latitude';
+        $fields[] = 'longitude = :longitude';
+        $params['latitude'] = (float) $lat;
+        $params['longitude'] = (float) $lng;
+    } else {
+        // Both explicitly null — clears a previously-set location.
+        $fields[] = 'latitude = :latitude';
+        $fields[] = 'longitude = :longitude';
+        $params['latitude'] = null;
+        $params['longitude'] = null;
+    }
+}
+
 $db = Database::get();
+
+// If logo_url is being changed, capture the previous value first so the
+// old file on disk can be deleted after the UPDATE succeeds — otherwise
+// every re-upload (Edit Profile > pick new logo > Save) leaves the prior
+// file orphaned in uploads/restaurant_logos/ forever. Fetched before the
+// UPDATE runs since afterward the old value is gone from the row.
+$oldLogoUrl = null;
+if (array_key_exists('logo_url', $body)) {
+    $prevStmt = $db->prepare('SELECT logo_url FROM restaurants WHERE id = :id LIMIT 1');
+    $prevStmt->execute(['id' => $restaurantId]);
+    $oldLogoUrl = $prevStmt->fetchColumn() ?: null;
+}
 
 if (!empty($fields)) {
     $sql = 'UPDATE restaurants SET ' . implode(', ', $fields) . ' WHERE id = :id';
     $upd = $db->prepare($sql);
     $upd->execute($params);
+}
+
+// Delete the old logo file now that the new logo_url (or null, if
+// cleared) is committed. Guarded so this only ever unlinks a file inside
+// uploads/restaurant_logos/ — never trusts the DB value as a raw path
+// without confirming it resolves inside that directory first.
+if ($oldLogoUrl !== null && $oldLogoUrl !== ($params['logo_url'] ?? null)) {
+    $uploadsDir = realpath(__DIR__ . '/../../../uploads/restaurant_logos');
+    $oldPath = realpath(__DIR__ . '/../../../' . $oldLogoUrl);
+    if ($uploadsDir && $oldPath && strpos($oldPath, $uploadsDir) === 0) {
+        @unlink($oldPath);
+    }
 }
 
 $fetch = $db->prepare('SELECT * FROM restaurants WHERE id = :id LIMIT 1');

@@ -87,7 +87,9 @@ This schema is designed to work within InfinityFree's MySQL limits (single DB, n
 ## 2. Menu Tables
 
 ### `menu_categories`
-| id | restaurant_id (FK) | name | sort_order | is_active |
+| id | restaurant_id (FK) | name | image_url | sort_order | is_active |
+
+`image_url` added by `backend/sql/22_migration_category_image.sql` (nullable, same shape as `menu_items.image_url` below) — not in the original `01_schema.sql`.
 
 ### `menu_items`
 | Column | Type | Notes |

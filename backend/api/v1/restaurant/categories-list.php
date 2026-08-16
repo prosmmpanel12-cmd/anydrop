@@ -12,6 +12,9 @@
  * item_count is a live COUNT of that category's non-deleted menu_items,
  * not a stored counter — cheap at this scale and can never drift out of
  * sync with menu-items-create/delete below.
+ *
+ * image_url added per app-owner real-device-feedback item 4 (photo
+ * upload) — requires backend/sql/22_migration_category_image.sql.
  */
 
 require_once __DIR__ . '/../../../config/database.php';
@@ -30,7 +33,7 @@ $restaurantId = $owner['owner_id'];
 $db = Database::get();
 
 $stmt = $db->prepare(
-    'SELECT c.id, c.name, c.sort_order, c.is_active,
+    'SELECT c.id, c.name, c.image_url, c.sort_order, c.is_active,
             (SELECT COUNT(*) FROM menu_items i
              WHERE i.category_id = c.id AND i.deleted_at IS NULL) AS item_count
      FROM menu_categories c
@@ -43,6 +46,7 @@ $rows = $stmt->fetchAll();
 $categories = array_map(fn($c) => [
     'id' => (int) $c['id'],
     'name' => $c['name'],
+    'image_url' => $c['image_url'],
     'sort_order' => (int) $c['sort_order'],
     'is_active' => (bool) $c['is_active'],
     'item_count' => (int) $c['item_count'],

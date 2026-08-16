@@ -2,13 +2,19 @@
 /**
  * POST /api/v1/restaurant/categories-create.php
  * Auth: Restaurant token
- * Request: { "name": "...", "sort_order"?: int }
+ * Request: { "name": "...", "sort_order"?: int, "image_url"?: string }
  * Response: { "category": {...} }
  *
  * sort_order defaults to "append to the end" (current max + 1) when the
  * client doesn't send one — CategoryCreateBody.sortOrder is nullable and
  * MenuFragment.saveCategory() never actually passes it today, so this
  * default path is what every category creation currently hits.
+ *
+ * image_url (optional): app-owner real-device-feedback item 4. Requires
+ * backend/sql/22_migration_category_image.sql to have been run — column
+ * didn't exist in the original schema. Same upload-then-save split as
+ * menu-items-create.php's image_url: category-photo-upload.php uploads
+ * the file and returns this path first.
  */
 
 require_once __DIR__ . '/../../../config/database.php';
@@ -40,14 +46,16 @@ if (isset($body['sort_order']) && $body['sort_order'] !== null) {
     $maxStmt->execute(['rid' => $restaurantId]);
     $sortOrder = ((int) $maxStmt->fetch()['m']) + 1;
 }
+$imageUrl = isset($body['image_url']) && $body['image_url'] !== '' ? (string) $body['image_url'] : null;
 
 $insert = $db->prepare(
-    'INSERT INTO menu_categories (restaurant_id, name, sort_order, is_active)
-     VALUES (:rid, :name, :sort_order, 1)'
+    'INSERT INTO menu_categories (restaurant_id, name, image_url, sort_order, is_active)
+     VALUES (:rid, :name, :image_url, :sort_order, 1)'
 );
 $insert->execute([
     'rid' => $restaurantId,
     'name' => $name,
+    'image_url' => $imageUrl,
     'sort_order' => $sortOrder,
 ]);
 $newId = (int) $db->lastInsertId();
@@ -56,6 +64,7 @@ respond_ok([
     'category' => [
         'id' => $newId,
         'name' => $name,
+        'image_url' => $imageUrl,
         'sort_order' => $sortOrder,
         'is_active' => true,
         'item_count' => 0,

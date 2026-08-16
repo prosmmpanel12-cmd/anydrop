@@ -80,6 +80,8 @@ data class RestaurantProfileDetail(
     @SerializedName("owner_mobile") val ownerMobile: String? = null,
     @SerializedName("owner_email") val ownerEmail: String? = null,
     val address: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
     @SerializedName("logo_url") val logoUrl: String? = null,
     @SerializedName("cover_url") val coverUrl: String? = null,
     @SerializedName("cuisine_tags") val cuisineTags: String? = null,
@@ -102,6 +104,8 @@ data class ProfileResult(val restaurant: RestaurantProfileDetail)
 data class ProfileUpdateBody(
     val name: String? = null,
     val address: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
     @SerializedName("cuisine_tags") val cuisineTags: String? = null,
     @SerializedName("opening_time") val openingTime: String? = null,
     @SerializedName("closing_time") val closingTime: String? = null,
@@ -193,18 +197,27 @@ data class MenuCategory(
     val name: String,
     @SerializedName("sort_order") val sortOrder: Int,
     @SerializedName("is_active") val isActive: Boolean,
-    @SerializedName("item_count") val itemCount: Int = 0
+    @SerializedName("item_count") val itemCount: Int = 0,
+    @SerializedName("image_url") val imageUrl: String? = null
 )
 
 data class CategoriesListResult(val categories: List<MenuCategory>)
 data class CategoryResult(val category: MenuCategory)
 
-data class CategoryCreateBody(val name: String, @SerializedName("sort_order") val sortOrder: Int? = null)
+data class CategoryCreateBody(
+    val name: String,
+    @SerializedName("sort_order") val sortOrder: Int? = null,
+    @SerializedName("image_url") val imageUrl: String? = null
+)
 data class CategoryUpdateBody(
     val name: String? = null,
     @SerializedName("sort_order") val sortOrder: Int? = null,
-    @SerializedName("is_active") val isActive: Boolean? = null
+    @SerializedName("is_active") val isActive: Boolean? = null,
+    @SerializedName("image_url") val imageUrl: String? = null
 )
+
+/** category-photo-upload.php's response shape, mirrors LogoUploadResult. */
+data class CategoryPhotoUploadResult(@SerializedName("image_url") val imageUrl: String)
 
 data class MenuItem(
     val id: Int,
@@ -230,7 +243,8 @@ data class MenuItemCreateBody(
     val price: Double,
     val description: String? = null,
     @SerializedName("is_veg") val isVeg: Boolean = true,
-    @SerializedName("prep_time_minutes") val prepTimeMinutes: Int? = null
+    @SerializedName("prep_time_minutes") val prepTimeMinutes: Int? = null,
+    @SerializedName("image_url") val imageUrl: String? = null
 )
 
 data class MenuItemUpdateBody(
@@ -240,5 +254,9 @@ data class MenuItemUpdateBody(
     val price: Double? = null,
     @SerializedName("is_veg") val isVeg: Boolean? = null,
     @SerializedName("is_available") val isAvailable: Boolean? = null,
-    @SerializedName("prep_time_minutes") val prepTimeMinutes: Int? = null
+    @SerializedName("prep_time_minutes") val prepTimeMinutes: Int? = null,
+    @SerializedName("image_url") val imageUrl: String? = null
 )
+
+/** menu-item-photo-upload.php's response shape, mirrors LogoUploadResult. */
+data class MenuItemPhotoUploadResult(@SerializedName("image_url") val imageUrl: String)

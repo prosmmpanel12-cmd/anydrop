@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Account tab / Edit Profile (docs/restorent/19 §7, §10 item 5). Same
      header-with-back-button shell as activity_order_detail.xml for
-     consistency with the app's other detail screens. Header updated
-     2026-08-16 (doc 19 §10 item 7, pre-login/detail screens ink pass) from
-     a plain white bar to the same dark "ink" treatment as
-     activity_order_detail.xml's header, matching MainActivity's shared
-     chrome. -->
+     consistency with the app's other detail screens. Header reverted
+     2026-08-16 (§8.1.1) back to a plain white bar, undoing the ink-pass
+     treatment applied earlier the same day. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -19,14 +17,14 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:padding="16dp"
-        android:background="@color/anydrop_ink">
+        android:background="@color/surface">
 
         <ImageView
             android:id="@+id/btnBack"
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:src="@drawable/ic_back"
-            app:tint="@color/text_on_ink"
+            app:tint="@color/text_primary"
             android:contentDescription="@null"
             android:clickable="true"
             android:focusable="true"
@@ -40,7 +38,7 @@
             android:text="@string/edit_profile_title"
             android:textSize="18sp"
             android:textStyle="bold"
-            android:textColor="@color/text_on_ink" />
+            android:textColor="@color/text_primary" />
 
         <TextView
             android:id="@+id/btnSaveProfile"
@@ -152,6 +150,47 @@
                     android:inputType="textPostalAddress|textMultiLine"
                     android:minLines="2" />
             </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Location Picker entry point (app-owner real-device feedback,
+                 2026-08-16, docs/restorent/00_Status.md item 3) — opens
+                 LocationPickerActivity, result is staged locally same as
+                 the logo picker above (only actually saved via
+                 profile-update.php on Save, see save()/onActivityResult
+                 handling in EditProfileActivity.kt). Row label switches
+                 between "Set..."/"...set ✓" based on whether a location is
+                 currently staged, same on/off-state pattern as elsewhere
+                 in this screen. -->
+            <LinearLayout
+                android:id="@+id/rowSetLocation"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_input_outline"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="14dp"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_target"
+                    app:tint="@color/text_secondary"
+                    android:contentDescription="@null" />
+
+                <TextView
+                    android:id="@+id/locationRowText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="10dp"
+                    android:text="@string/row_set_location"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp" />
+
+            </LinearLayout>
 
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"

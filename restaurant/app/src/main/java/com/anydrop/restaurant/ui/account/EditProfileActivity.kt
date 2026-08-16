@@ -1,5 +1,6 @@
 package com.anydrop.restaurant.ui.account
 
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
@@ -40,6 +41,12 @@ import java.util.Locale
  * so cancelling out of this screen (back button, no Save) never leaves
  * an orphaned upload half-applied to the profile. See logo-upload.php's
  * kdoc for the same reasoning on the backend side.
+ *
+ * Location picker (app-owner real-device feedback, 2026-08-16,
+ * docs/restorent/00_Status.md item 3) follows the same staging pattern —
+ * LocationPickerActivity returns a lat/lng via activity result, staged
+ * locally in [pickedLat]/[pickedLng], only sent to profile-update.php
+ * when Save is actually tapped.
  */
 class EditProfileActivity : AppCompatActivity() {
 
@@ -50,6 +57,14 @@ class EditProfileActivity : AppCompatActivity() {
     private var pickedLogoUri: Uri? = null
     private var currentLogoUrl: String? = null
     private var saveInFlight = false
+
+    // Staged location pick — null until the user actually opens the map
+    // and confirms, same "only applied on Save" pattern as pickedLogoUri
+    // above. Pre-filled from the loaded profile in populate() if one was
+    // already saved, so re-saving the form without touching the location
+    // row doesn't accidentally clear it.
+    private var pickedLat: Double? = null
+    private var pickedLng: Double? = null
 
     // 1 (Monday) .. 7 (Sunday), matches lib validation on profile-update.php
     // (PHP's date('N') convention, same as lib/restaurant_status.php).
@@ -69,10 +84,32 @@ class EditProfileActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             if (uri != null) {
                 pickedLogoUri = uri
+                // See populate()'s comment below — activity_edit_profile.xml's
+                // app:tint on logoPreview is meant for the ic_store
+                // placeholder only, and must be cleared once a real image
+                // (here, the freshly-picked local Uri) is showing.
+                binding.logoPreview.imageTintList = null
                 binding.logoPreview.load(uri) {
                     placeholder(R.drawable.ic_store)
                     error(R.drawable.ic_store)
                     crossfade(true)
+                    listener(onError = { _, _ ->
+                        binding.logoPreview.imageTintList = androidx.core.content.ContextCompat.getColorStateList(this@EditProfileActivity, R.color.text_secondary)
+                    })
+                }
+            }
+        }
+
+    private val pickLocationLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                val data = result.data ?: return@registerForActivityResult
+                val lat = data.getDoubleExtra(LocationPickerActivity.EXTRA_RESULT_LAT, Double.NaN)
+                val lng = data.getDoubleExtra(LocationPickerActivity.EXTRA_RESULT_LNG, Double.NaN)
+                if (!lat.isNaN() && !lng.isNaN()) {
+                    pickedLat = lat
+                    pickedLng = lng
+                    renderLocationRowState()
                 }
             }
         }
@@ -94,6 +131,7 @@ class EditProfileActivity : AppCompatActivity() {
         binding.logoPickerRow.setOnClickListener { pickLogoLauncher.launch("image/*") }
         binding.rowOpeningTime.setOnClickListener { showTimePicker(isOpening = true) }
         binding.rowClosingTime.setOnClickListener { showTimePicker(isOpening = false) }
+        binding.rowSetLocation.setOnClickListener { openLocationPicker() }
         binding.btnSaveProfile.setOnClickListener { save() }
     }
 
@@ -117,16 +155,33 @@ class EditProfileActivity : AppCompatActivity() {
 
         currentLogoUrl = profile.logoUrl
         if (!profile.logoUrl.isNullOrBlank()) {
+            // activity_edit_profile.xml sets app:tint on logoPreview so the
+            // ic_store *placeholder* renders muted-grey. That tint applies
+            // to whatever drawable is currently on the ImageView though,
+            // not just the placeholder — so a real logo bitmap loaded on
+            // top was getting tinted grey too, making it look like the
+            // photo wasn't showing at all. Clear on success, restore on
+            // error (falls back to the ic_store placeholder look).
             binding.logoPreview.load(ApiClient.baseUrlForStaticFiles(this) + profile.logoUrl) {
                 placeholder(R.drawable.ic_store)
                 error(R.drawable.ic_store)
                 crossfade(true)
+                listener(
+                    onSuccess = { _, _ -> binding.logoPreview.imageTintList = null },
+                    onError = { _, _ ->
+                        binding.logoPreview.imageTintList = androidx.core.content.ContextCompat.getColorStateList(this@EditProfileActivity, R.color.text_secondary)
+                    }
+                )
             }
         }
 
         parseTime(profile.openingTime, isOpening = true)
         parseTime(profile.closingTime, isOpening = false)
         renderTimeText()
+
+        pickedLat = profile.latitude
+        pickedLng = profile.longitude
+        renderLocationRowState()
 
         val selectedDays = (profile.workingDays ?: "1,2,3,4,5,6,7")
             .split(",")
@@ -164,6 +219,25 @@ class EditProfileActivity : AppCompatActivity() {
     private fun renderTimeText() {
         binding.openingTimeText.text = formatDisplayTime(openingHour, openingMinute)
         binding.closingTimeText.text = formatDisplayTime(closingHour, closingMinute)
+    }
+
+    private fun openLocationPicker() {
+        val intent = Intent(this, LocationPickerActivity::class.java)
+        val lat = pickedLat
+        val lng = pickedLng
+        if (lat != null && lng != null) {
+            intent.putExtra(LocationPickerActivity.EXTRA_EXISTING_LAT, lat)
+            intent.putExtra(LocationPickerActivity.EXTRA_EXISTING_LNG, lng)
+        }
+        pickLocationLauncher.launch(intent)
+    }
+
+    private fun renderLocationRowState() {
+        binding.locationRowText.text = if (pickedLat != null && pickedLng != null) {
+            getString(R.string.row_location_set)
+        } else {
+            getString(R.string.row_set_location)
+        }
     }
 
     private fun formatDisplayTime(hour: Int, minute: Int): String {
@@ -215,6 +289,8 @@ class EditProfileActivity : AppCompatActivity() {
                 val body = ProfileUpdateBody(
                     name = name,
                     address = binding.inputAddress.text?.toString()?.trim().orEmpty(),
+                    latitude = pickedLat,
+                    longitude = pickedLng,
                     cuisineTags = binding.inputCuisineTags.text?.toString()?.trim().orEmpty(),
                     openingTime = String.format(Locale.US, "%02d:%02d", openingHour, openingMinute),
                     closingTime = String.format(Locale.US, "%02d:%02d", closingHour, closingMinute),

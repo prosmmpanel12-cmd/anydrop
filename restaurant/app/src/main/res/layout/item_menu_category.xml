@@ -28,6 +28,21 @@
             android:paddingEnd="10dp"
             android:visibility="gone" />
 
+        <!-- Category thumbnail (NEXT_SESSION_PROMPT.md item 6) — same
+             44dp bg_skeleton_thumb pattern as item_menu_food.xml's
+             itemThumb. No distinct category placeholder icon exists yet,
+             so ic_food_placeholder is reused here too (tinted fallback,
+             same as MenuItemAdapter's no-photo state). Hidden in reorder
+             mode along with the other row controls. -->
+        <ImageView
+            android:id="@+id/categoryThumb"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginEnd="10dp"
+            android:scaleType="centerCrop"
+            android:background="@drawable/bg_skeleton_thumb"
+            android:contentDescription="@null" />
+
         <TextView
             android:id="@+id/categoryNameText"
             android:layout_width="0dp"

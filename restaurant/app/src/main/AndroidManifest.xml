@@ -3,6 +3,10 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Location Picker (Edit Profile), 2026-08-16 — same permissions as
+         the Customer app's H6 pin-drop screen. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <application
         android:allowBackup="true"
@@ -14,6 +18,17 @@
 
         <!-- usesCleartextTraffic: needed for local KS Web HTTP backend during
              development, same as the customer app (see network/ApiClient.kt). -->
+
+        <!-- Google Maps SDK key — same key/setup pattern as the Customer
+             app's manifest (see that file's kdoc for the full "why" —
+             Android-restricted, resolves via
+             restaurant/app/src/debug|release/res/values/google_maps_api.xml,
+             gitignored, not yet added). Placeholder until a real restricted
+             key exists — map area shows grey/blank until then, same as the
+             Customer app. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="@string/google_maps_key" />
 
         <!-- Launcher moved here from LoginActivity this session — plays the
              brand entrance animation, then routes to Dashboard or Login. -->
@@ -63,6 +78,12 @@
             android:name=".ui.account.EditProfileActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
+
+        <!-- Location Picker for Edit Profile (app-owner real-device
+             feedback, 2026-08-16, docs/restorent/00_Status.md item 3). -->
+        <activity
+            android:name=".ui.account.LocationPickerActivity"
+            android:exported="false" />
 
     </application>
 

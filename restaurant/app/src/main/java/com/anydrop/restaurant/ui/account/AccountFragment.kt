@@ -121,12 +121,26 @@ class AccountFragment : Fragment() {
         b.profileHoursText.text = formatHours(profile.openingTime, profile.closingTime)
 
         if (!profile.logoUrl.isNullOrBlank()) {
+            // fragment_account.xml sets app:tint on this ImageView so the
+            // ic_store *placeholder* renders muted-grey — but an
+            // ImageView's tint applies to whatever drawable is currently
+            // set, not just the placeholder, so a real logo bitmap loaded
+            // on top would get tinted grey too (looked like the photo
+            // "wasn't showing"). Clear the tint on load success; restore
+            // it if the load errors back to the ic_store fallback.
             b.profileLogoThumb.load(ApiClient.baseUrlForStaticFiles(requireContext()) + profile.logoUrl) {
                 placeholder(R.drawable.ic_store)
                 error(R.drawable.ic_store)
                 crossfade(true)
+                listener(
+                    onSuccess = { _, _ -> b.profileLogoThumb.imageTintList = null },
+                    onError = { _, _ ->
+                        b.profileLogoThumb.imageTintList = androidx.core.content.ContextCompat.getColorStateList(requireContext(), R.color.text_secondary)
+                    }
+                )
             }
         } else {
+            b.profileLogoThumb.imageTintList = androidx.core.content.ContextCompat.getColorStateList(requireContext(), R.color.text_secondary)
             b.profileLogoThumb.setImageResource(R.drawable.ic_store)
         }
 

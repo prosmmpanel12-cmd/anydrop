@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Location Picker for restaurant profile (app-owner real-device feedback,
+     2026-08-16, docs/restorent/00_Status.md item 3). Trimmed version of the
+     Customer app's activity_map_pin_drop.xml (H6 part 2) — same fixed-
+     center-pin-over-a-panning-map pattern and reverse-geocode-on-idle
+     behavior, but no photo picker and no receiver-details form since this
+     is just setting one restaurant's own location, not a delivery address
+     with a recipient. See LocationPickerActivity.kt for the logic this
+     layout is bound to. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="16dp"
+        android:background="@color/surface">
+
+        <ImageView
+            android:id="@+id/btnBack"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_back"
+            app:tint="@color/text_primary"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            tools:ignore="ContentDescription" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:text="@string/location_picker_title" />
+
+    </LinearLayout>
+
+    <!-- Map area: MapView + fixed center pin overlay + floating "use
+         current location" pill. weight=1 so the bottom panel below gets
+         whatever wrap_content space it needs first. -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <!-- Requires a real com.google.android.geo.API_KEY in
+             AndroidManifest.xml (currently a placeholder in strings.xml's
+             google_maps_key — see that manifest entry's kdoc) — map area
+             will show blank/grey until a real Android-restricted key
+             exists. Code is structurally complete either way. -->
+        <com.google.android.gms.maps.MapView
+            android:id="@+id/mapView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- Fixed center pin — map pans underneath it, pin never moves,
+             same pattern as the Customer app's centerPin. -->
+        <ImageView
+            android:id="@+id/centerPin"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_map_center_pin"
+            tools:ignore="ContentDescription" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnUseCurrentLocation"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="16dp"
+            android:backgroundTint="@color/surface"
+            android:text="@string/location_picker_use_current_location"
+            android:textAllCaps="false"
+            android:textColor="@color/anydrop_secondary"
+            app:cornerRadius="24dp"
+            app:icon="@drawable/ic_target"
+            app:iconGravity="textStart"
+            app:iconTint="@color/anydrop_secondary" />
+
+    </FrameLayout>
+
+    <!-- Bottom panel: resolved address + confirm button. No form fields —
+         this screen only sets latitude/longitude; the address text field
+         itself stays on the Edit Profile screen behind this one. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_dialog_rounded_top"
+        android:elevation="8dp"
+        android:padding="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_card_rounded"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="12dp">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_location"
+                app:tint="@color/anydrop_secondary"
+                tools:ignore="ContentDescription" />
+
+            <TextView
+                android:id="@+id/textResolvedAddress"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                tools:text="Kamla Nehru Nagar, Jodhpur, Rajasthan, India" />
+
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnConfirmLocation"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginTop="16dp"
+            android:backgroundTint="@color/anydrop_primary"
+            android:text="@string/btn_confirm_location"
+            app:cornerRadius="12dp" />
+
+    </LinearLayout>
+
+</LinearLayout>

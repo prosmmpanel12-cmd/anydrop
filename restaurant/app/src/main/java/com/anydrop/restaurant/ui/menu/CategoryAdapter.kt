@@ -6,9 +6,13 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
+import com.anydrop.restaurant.R
 import com.anydrop.restaurant.databinding.ItemMenuCategoryBinding
+import com.anydrop.restaurant.network.ApiClient
 import com.anydrop.restaurant.network.MenuCategory
 import com.anydrop.restaurant.network.MenuItem
 
@@ -89,8 +93,31 @@ class CategoryAdapter(
             val items = itemsByCategory[category.id] ?: emptyList()
             binding.categoryItemCountText.text = "${items.size} item${if (items.size == 1) "" else "s"}"
 
+            // Thumbnail (NEXT_SESSION_PROMPT.md item 6) — same
+            // placeholder/real-image pattern as MenuItemAdapter's
+            // itemThumb, reusing ic_food_placeholder since no distinct
+            // category placeholder icon exists yet.
+            if (!category.imageUrl.isNullOrBlank()) {
+                binding.categoryThumb.imageTintList = null
+                binding.categoryThumb.setPadding(0, 0, 0, 0)
+                binding.categoryThumb.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                binding.categoryThumb.load(ApiClient.baseUrlForStaticFiles(context) + category.imageUrl) {
+                    placeholder(R.drawable.ic_food_placeholder)
+                    error(R.drawable.ic_food_placeholder)
+                    crossfade(true)
+                }
+            } else {
+                val secondaryTint = ContextCompat.getColor(context, R.color.text_secondary)
+                val insetPx = (10 * context.resources.displayMetrics.density).toInt()
+                binding.categoryThumb.setPadding(insetPx, insetPx, insetPx, insetPx)
+                binding.categoryThumb.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                binding.categoryThumb.setImageResource(R.drawable.ic_food_placeholder)
+                binding.categoryThumb.imageTintList = android.content.res.ColorStateList.valueOf(secondaryTint)
+            }
+
             if (reorderMode) {
                 binding.dragHandle.visibility = View.VISIBLE
+                binding.categoryThumb.visibility = View.GONE
                 binding.itemsRecycler.visibility = View.GONE
                 binding.emptyItemsText.visibility = View.GONE
                 binding.btnAddItem.visibility = View.GONE
@@ -108,6 +135,7 @@ class CategoryAdapter(
 
             binding.dragHandle.visibility = View.GONE
             binding.dragHandle.setOnTouchListener(null)
+            binding.categoryThumb.visibility = View.VISIBLE
             binding.itemsRecycler.visibility = View.VISIBLE
             binding.btnAddItem.visibility = View.VISIBLE
             binding.btnEditCategory.visibility = View.VISIBLE

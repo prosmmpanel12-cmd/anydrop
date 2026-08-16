@@ -1,3 +1,528 @@
+## 2026-08-16 — Logo-upload bug: root cause found and fixed (this session, resolves the open investigation above)
+
+App owner tested against **localhost** (KS Web on-device), not a stale/
+missing InfinityFree URL — the previous entry's top suspect is ruled out
+by this session's direct evidence: upload succeeded (3 files visible in
+`uploads/restaurant_logos/` via file manager), and opening the uploaded
+file's URL directly in the phone's browser (`http://localhost:8080/anydrop/uploads/restaurant_logos/<file>.png`)
+rendered the correct orange AnyDrop logo fine. So serving, upload, and
+URL-building were never the problem.
+
+**Actual root cause:** `fragment_account.xml`'s `profileLogoThumb` and
+`activity_edit_profile.xml`'s `logoPreview` both set
+`app:tint="@color/text_secondary"` in XML, intended only to mute the
+`ic_store` placeholder icon's color. An ImageView's tint applies to
+*whatever drawable is currently set*, not just the placeholder — so once
+Coil loaded the real logo bitmap on top, it got tinted grey too, making
+a legitimate orange-logo photo render as a flat grey square. Looked
+exactly like "upload works, display doesn't."
+
+**Fix — `AccountFragment.kt` / `EditProfileActivity.kt` (3 call sites):**
+`profileLogoThumb`'s profile-load, `logoPreview`'s profile-load, and
+`logoPreview`'s picked-Uri preview-on-pick all now clear
+`imageTintList = null` via Coil's `listener(onSuccess = ...)` once a real
+image loads successfully, and restore the `text_secondary` tint via
+`onError` if the load fails back to the `ic_store` placeholder. No XML
+changes — the static `app:tint` still gives the placeholder its intended
+muted look at rest.
+
+**Also fixed same session:** `profile-update.php` now deletes the
+previous `logo_url` file from `uploads/restaurant_logos/` (realpath-
+guarded against path traversal) whenever a new logo overwrites it or a
+logo is cleared — previously every re-upload left the old file orphaned
+on disk forever.
+
+**Not yet build-verified** — same standing risk as always (no Android
+SDK in this sandbox). Next session opening Account/Edit Profile screens
+for the first time should confirm the logo now renders in its real
+colors, not tinted.
+
+---
+
+## 2026-08-16 — Dish + category photo upload: backend only, partial (this session, closes app-owner item 4 of 4's SMALLER half + DB half only — client/UI not started)
+
+Fourth and last of the four app-owner real-device-feedback items
+(NEXT_SESSION_PROMPT.md). **Backend + migration done this session; the
+Kotlin client (models, upload calls, dialog UI, adapter thumbnails) is
+NOT done — this session ran out before reaching it.** Anyone picking this
+up next should read this entry in full before touching client code, since
+the backend contract is now fixed and the client needs to match it exactly.
+
+### ✅ Done
+**Migration:**
+- `backend/sql/22_migration_category_image.sql` — new, adds
+  `menu_categories.image_url VARCHAR(255) NULL` (idempotent conditional-
+  ALTER, same pattern as `16_migration_address_photo.sql`). **Must be run
+  before `categories-create.php`/`categories-update.php` are hit** —
+  those two now unconditionally reference the `image_url` column in their
+  INSERT/UPDATE, so category creation will hard-fail with a SQL error on
+  any DB this migration hasn't been run against yet. `menu_items.image_url`
+  needed no migration — it already existed in `01_schema.sql`.
+- `docs/01_Database_Schema.md` updated to document the new column.
+
+**Backend — two new upload endpoints**, same shape/pattern as
+`logo-upload.php` (5MB cap, jpg/png/webp mime-sniff, upload-then-save
+split — endpoint only uploads and returns a path, doesn't write the DB):
+- `menu-item-photo-upload.php` — field name `photo`, saves to
+  `uploads/restaurant_dish_photos/`, returns `{ image_url: "..." }`.
+- `category-photo-upload.php` — field name `photo`, saves to
+  `uploads/category_photos/`, returns `{ image_url: "..." }`.
+  **Neither `restaurant_dish_photos/` nor `category_photos/` exists yet
+  in this repo** — same as `restaurant_logos/`'s situation from the
+  logo-upload bug investigation, `mkdir()`'s return isn't checked here
+  either, consistent with the existing pattern rather than a new gap.
+
+**Backend — existing endpoints extended to accept/return `image_url`:**
+- `menu-items-create.php` — now inserts the client-sent `image_url`
+  instead of hardcoding `NULL`.
+- `menu-items-update.php` — partial-update now accepts `image_url` (same
+  null-skip convention as its other fields — see the file's own kdoc for
+  why an explicit clear isn't reachable from this app's default Gson
+  setup anyway).
+- `categories-create.php` — now inserts/returns `image_url`.
+- `categories-update.php` — partial-update now accepts `image_url`, fetch
+  query now selects it.
+- `categories-list.php` — fetch query + response mapping now include
+  `image_url`.
+- All six touched/new PHP files brace-balance-checked by hand (still no
+  PHP CLI in this sandbox to actually lint them).
+
+### 🔴 Not done this session — the entire client half
+Nothing on the Kotlin side has been touched yet. Needed, in roughly this
+order:
+1. **`Models.kt`** — add `imageUrl`/`image_url` to `MenuCategory`,
+   `CategoryCreateBody`, `CategoryUpdateBody`, `MenuItemCreateBody`,
+   `MenuItemUpdateBody` (`MenuItem`/`MenuItemsListResult` already have
+   `imageUrl` from before — no change needed there). New result classes
+   for the two upload responses (mirror `LogoUploadResult`).
+2. **`ApiService.kt`** — two new `@Multipart @POST` calls,
+   `uploadMenuItemPhoto`/`uploadCategoryPhoto`, mirroring `uploadLogo`'s
+   signature (field name `photo`, not `logo`).
+3. **`dialog_add_menu_item.xml`** / **`dialog_add_category.xml`** — add a
+   photo-picker row to each, same visual pattern as
+   `activity_edit_profile.xml`'s `logoPickerRow` block (circular/rounded
+   preview + "Add/Change photo" label, tap launches
+   `ActivityResultContracts.GetContent()`).
+4. **`MenuFragment.kt`** — stage picked Uris the same way
+   `EditProfileActivity` stages `pickedLogoUri` (upload only fires on
+   dialog Save, not on pick — same cancel-safety reasoning as the logo).
+   `showItemDialog()`/`saveItem()` and `showCategoryDialog()`/
+   `saveCategory()` all need updating to carry the staged Uri through to
+   an upload call before the create/update API call, same two-step flow
+   as `EditProfileActivity.save()`.
+5. **`MenuItemAdapter.kt`** — **found a pre-existing bug while reviewing
+   this for the photo work**: `ItemViewHolder.bind()` calls
+   `binding.itemThumb.load(item.imageUrl)` with the raw relative path
+   from the API, not prefixed with
+   `ApiClient.baseUrlForStaticFiles(context)` the way
+   `EditProfileActivity`'s logo preview does it. This was harmless before
+   (image_url was always null, so this code path never actually ran) but
+   will load broken images the moment real `image_url` values start
+   coming back from `menu-items-create/update.php`. **Fix this in the
+   same pass as wiring up the picker**, don't ship photo upload without it.
+6. **`item_menu_category.xml`** + **`CategoryAdapter.kt`** — category
+   rows currently have zero image slot (checked this session — only
+   `categoryNameText`/`categoryItemCountText`/edit/delete icons). Needs a
+   new thumbnail `ImageView`, same 44dp rounded-square pattern as
+   `item_menu_food.xml`'s `itemThumb` (`bg_skeleton_thumb` background,
+   `ic_food_placeholder`-style tinted-icon fallback — no
+   category-specific placeholder icon exists yet, reusing
+   `ic_food_placeholder` is the pragmatic choice unless the app owner
+   wants a distinct one).
+
+### 🟡 Known gaps / not done this session
+- No build/PHP-lint verification, same standing sandbox limitation.
+- Upload directories (`restaurant_dish_photos/`, `category_photos/`) not
+  confirmed created on the live server — same open question as
+  `restaurant_logos/` from the logo-upload bug investigation, compounding
+  it: there are now three restaurant-app upload directories whose
+  existence on InfinityFree is unconfirmed, not just one.
+- The still-unresolved `BASE_URL`-points-at-`localhost` question from the
+  logo-upload bug entry applies here too — untested against a live
+  backend either way.
+
+### ⏭️ Next
+Finish the client half in the order listed above (Models → ApiService →
+dialog XML → MenuFragment wiring → MenuItemAdapter bug fix →
+CategoryAdapter thumbnail), then this is genuinely done and all four
+app-owner items are closed. After that: resume build verification
+(NEXT_SESSION_PROMPT.md's standing priority list) — this is now the
+single largest chunk of never-build-tested code in the project.
+
+---
+
+
+
+Third of the four app-owner real-device-feedback items. Reuses the
+Customer app's H6 pin-drop pattern end to end, per the app owner's
+explicit ask, trimmed down for a single-restaurant-address use case (no
+photo picker, no receiver-details form, no saved-addresses list).
+
+### ✅ Done
+**Backend:**
+- `profile-update.php` — accepts `latitude`/`longitude` together (rejects
+  a lone coordinate as malformed rather than silently half-applying),
+  range-validated (-90..90 / -180..180), can be explicitly cleared with
+  nulls. `restaurants` table already had these columns
+  (`01_Database_Schema.md`) — no migration needed.
+- `profile-get.php` — no change needed, already `SELECT *`s the row.
+- `Models.kt` — `latitude`/`longitude` added to `RestaurantProfileDetail`
+  and `ProfileUpdateBody`. Confirmed the default (non-`serializeNulls()`)
+  Gson instance `ApiClient.kt` uses omits null fields from the JSON body
+  entirely when neither is set, matching `array_key_exists`'s
+  both-or-neither check on the PHP side — no mismatch between "never
+  picked" and "explicitly cleared."
+
+**Client:**
+- `build.gradle` — added `play-services-maps:19.1.0` (same version as
+  Customer app).
+- `AndroidManifest.xml` — `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION`
+  permissions, `com.google.android.geo.API_KEY` meta-data (placeholder —
+  see caveat below), registered `LocationPickerActivity`.
+- `strings.xml` — `google_maps_key` placeholder + all location-picker/row
+  strings.
+- Ported drawables from the Customer app: `ic_map_center_pin.xml`,
+  `ic_target.xml`, `bg_dialog_rounded_top.xml`.
+- New `activity_location_picker.xml` — trimmed copy of the Customer
+  app's `activity_map_pin_drop.xml`: fixed center pin over a pannable
+  map, reverse-geocoded address line, single confirm button.
+- New `LocationPickerActivity.kt` — trimmed copy of
+  `MapPinDropActivity.kt`'s GPS-fetch/reverse-geocode/camera-idle-debounce
+  logic. Returns the picked lat/lng/address line via activity result
+  instead of saving directly; opens centered on the restaurant's
+  *existing* saved location if one is already set (via
+  `EXTRA_EXISTING_LAT`/`EXTRA_EXISTING_LNG`), rather than always
+  defaulting to device GPS or the hardcoded Osian/Jodhpur fallback.
+- `activity_edit_profile.xml` — new "Set restaurant location on map" row
+  below the address field, styled like the existing opening/closing-time
+  rows.
+- `EditProfileActivity.kt` — launches the picker via
+  `registerForActivityResult`, stages the result in `pickedLat`/
+  `pickedLng` (same "only applied on Save" pattern as the logo picker —
+  cancelling out of Edit Profile without saving never touches the
+  server), pre-fills from the loaded profile so re-saving the form
+  without touching the location row doesn't clear a location that was
+  already there, includes both in the `ProfileUpdateBody` sent on Save,
+  and swaps the row's label between "Set…"/"…set ✓" based on staged
+  state.
+- All new/edited XML validated as well-formed; all edited/new Kotlin
+  files brace-balance-checked; `profile-update.php` brace-balance-checked
+  (no PHP CLI in this sandbox to actually lint it — standing limitation).
+  Cross-checked every layout ID against its Kotlin `binding.` reference
+  by hand — all match.
+
+### 🟡 Known gaps / not done this session
+- **No build/visual verification** — same standing sandbox limitation as
+  every prior session. This is the first screen in the Restaurant app
+  that touches Google Maps at all, so it's also the first real test of
+  whether `play-services-maps` actually resolves/renders correctly in
+  this app's Gradle setup — worth extra attention on first real build.
+- **`google_maps_key` is still a placeholder** (`YOUR_ANDROID_RESTRICTED_MAPS_KEY_HERE`,
+  same as the Customer app's own unresolved placeholder) — the map area
+  will render blank/grey until a real Android-restricted Maps SDK key is
+  provisioned and swapped in for both apps. This isn't new to this
+  session — the Customer app's H6 doc already flagged its own copy of
+  this same key as not yet real — but it now blocks two screens instead
+  of one.
+- No distance-sanity-check (e.g. "this pin looks far from the address you
+  typed") — the Customer app doesn't have an equivalent for restaurants
+  to reuse (its `DistanceUtil` is delivery-address-specific, comparing
+  against the customer's current location, which isn't the right
+  comparison here), and it wasn't asked for. Worth a follow-up if the app
+  owner wants it.
+
+### ⏭️ Next
+Last remaining app-owner item: dish/category photo upload (dish photos:
+DB-ready, just needs an upload endpoint + UI, similar shape to
+logo-upload.php; categories: needs a new migration first, bigger lift).
+
+---
+
+## 2026-08-16 — Logo-upload bug: investigation (this session, docs-only — no code changed, still not reproducible)
+
+Second of the four app-owner real-device-feedback items (item 2 of 4 in
+the "App owner feedback from real-device testing" entry further down).
+Still **not reproducible in this sandbox** — no PHP runtime, no network,
+no live server access — but re-read `logo-upload.php`, `EditProfileActivity.kt`,
+`address-photo.php` (the working reference), and both apps' `ApiClient.kt`
+end to end, and one finding changes the ranking of suspects from the
+original bug-report entry.
+
+### 🔴 New, higher-priority suspect: `BASE_URL` is still `localhost:8080`, not InfinityFree
+The original bug report entry listed "confirm the app points at the live
+InfinityFree URL, not a stale/local BASE_URL" as its **least likely**
+suspect. Checked it directly this session — and it isn't stale, it looks
+like it was **never set in the first place**:
+- `restaurant/app/.../network/ApiClient.kt` line 19:
+  `BASE_URL = "http://localhost:8080/anydrop/api/v1/"`. The file's own
+  kdoc says *"Only this constant needs to change when the backend moves
+  to InfinityFree"* — phrased as a future step, not a completed one.
+- `customer/app/.../network/ApiClient.kt` has the identical value and an
+  identical "when the backend moves to InfinityFree" comment.
+- Grepped the **entire repo** for any InfinityFree-style hostname
+  (`.infinityfreeapp.com`, `.epizy.com`, `.rf.gd`, etc.) — zero real
+  domains found anywhere, only placeholder examples in
+  `backend/scripts/seed-*.php`'s doc-comments (`yourdomain.infinityfreeapp.com`).
+- `docs/Status.md`'s Phase-3 entry states plainly: *"Backend currently
+  runs locally on-device (KS Web) — must migrate to InfinityFree before
+  real use. Only `config/config.php` and each app's `ApiClient.kt` base
+  URL need to change."* Nothing in this repo snapshot shows that swap
+  ever happened for either app.
+
+**Why this matters more than a "logo upload specifically is broken" bug:**
+if `BASE_URL` really is still `localhost:8080` in whatever APK build the
+app owner tested, that URL is only reachable from the same device the
+backend is running on (or over a LAN, not from a phone hitting it as
+"the internet"). That would make it look like *everything* fails, not
+just logo upload — unless the app owner's phone/backend setup has some
+other way of making `localhost:8080` resolve to something real for them
+(e.g. testing PHP locally via KS Web **on the same device**, per
+`docs/Status.md`'s "runs locally on-device (KS Web)" wording — this is
+plausible for earlier testing, worth asking directly rather than
+assuming). **Needs a direct question to the app owner**: what URL is the
+tested build's `BASE_URL` actually pointing at, and is a real
+InfinityFree domain provisioned yet? If yes and this was just missed in
+this zip export, the rest of this entry's original suspects (upload-dir
+permissions, ini limits) become the live ones again, in the original
+order.
+
+### Also checked this session, ruled out
+- **Client-side multipart flow** — `uploadLogo()` in
+  `EditProfileActivity.kt` copies the picked content-`Uri` to a cache
+  file, builds `MultipartBody.Part.createFormData("logo", ...)`, matches
+  `logo-upload.php`'s expected `$_FILES['logo']` field name exactly. No
+  bug found here, consistent with the original bug-report entry.
+- **PHP logic vs. the known-working reference** — diffed
+  `logo-upload.php` against the Customer app's working
+  `address-photo.php` line by line: identical validation/mkdir/
+  move_uploaded_file structure, only directory name and filename prefix
+  differ. Rules out a restaurant-specific server-side logic bug; if the
+  live backend is reachable at all, this endpoint should behave exactly
+  like the working one.
+- **Upload-directory precedent in the repo** — `backend/uploads/address_photos/`
+  exists in this repo snapshot (created manually per
+  `12_Handover_H6_Map_PinDrop_Photo.md`'s deployment checklist, "created
+  empty, `.gitkeep` only" — though no `.gitkeep` survived into this zip
+  export specifically). `backend/uploads/restaurant_logos/` does **not**
+  exist anywhere in this repo. Since backend deployment to InfinityFree
+  is a **manual FTP/cPanel folder copy** (confirmed via the H6 doc's
+  deployment checklist — there's no CI/CD step for the backend, only for
+  APK builds per `05_Build_Pipeline.md`), whether `restaurant_logos/`
+  exists on the live server depends entirely on whether it was in
+  whatever `backend/` copy was last uploaded there, or on `mkdir()`
+  succeeding on first use (unchecked return value — still the top
+  suspect if BASE_URL turns out fine).
+
+### ⏭️ Next
+This needs one direct question answered before further investigation is
+useful: **what does the tested build's `BASE_URL` actually point at, and
+does a live InfinityFree domain exist yet?** Once that's answered:
+- If BASE_URL is the problem: needs a real InfinityFree domain, then
+  `ApiClient.kt` updated in both apps, a rebuild, and a retest — likely
+  fixes far more than just logo upload if so.
+- If BASE_URL is fine (e.g. real domain already swapped in on the app
+  owner's actual tested build, and this repo zip just doesn't reflect
+  it): fall back to the original ranked list — `restaurant_logos/`
+  directory permissions/creation first, then PHP ini upload limits —
+  with real PHP error-log access to confirm which.
+Remaining two of the four app-owner items after this: live location for
+restaurant profile, then dish/category photo upload.
+
+---
+
+## 2026-08-16 — Palette revert: back to orange + white (this session, closes doc 19 §8.1.1 item 1 of 4)
+
+First of the four app-owner real-device-feedback items (see the entry
+directly below this one) tackled, per app owner's own ranking of it as
+lowest-risk/do-first. Full revert of the 2026-08-16 "Exotic Orange +
+Midnight Blue ink" palette refresh and the "Pre-login/detail screens ink
+pass" that followed it — both entries are further down this file, kept
+for history.
+
+### ✅ Done
+- **`colors.xml`** — `anydrop_primary` back to `#E64A19`, `anydrop_primary_dark`
+  back to `#B23C14`, `anydrop_primary_container` back to `#FFE0D3`; the
+  `anydrop_ink`/`anydrop_ink_light`/`text_on_ink`/`text_on_ink_muted`
+  tokens removed entirely (grepped first to confirm nothing else in
+  `res/` referenced them before deleting).
+- **`activity_main.xml`** — shared top bar and `BottomNavigationView`
+  backgrounds both back to `@color/surface` (white); `restaurantNameText`
+  back to `@color/text_primary`.
+- **`themes.xml`** — `statusBarColor` back to `@color/anydrop_primary`;
+  `windowLightStatusBar` left `false` (orange is still dark enough to
+  need light status-bar icons, same as the pre-refresh app).
+- **`bottom_nav_item_color.xml`** — unselected state back to
+  `@color/text_secondary`; checked state (`anydrop_primary`) unchanged.
+- **`bg_hero_curved.xml`** — gradient back to
+  `anydrop_primary`/`anydrop_primary_dark` (was `anydrop_ink`/
+  `anydrop_ink_light`), used by both `activity_login.xml` and
+  `activity_signup.xml`'s hero panels.
+- **`activity_splash.xml`** — background back to flat `anydrop_primary`;
+  app name back to `@color/white`, tagline back to
+  `@color/anydrop_primary_container`.
+- **`activity_otp_verify.xml`** — `btnBack` moved back out of a header
+  bar to floating unstyled on the plain background (its pre-ink-pass
+  structure) — this one was a structural revert, not just a token swap,
+  since the ink pass had introduced a whole new header `LinearLayout`
+  that didn't exist before it.
+- **`activity_order_detail.xml`** — header background back to
+  `@color/surface`; back icon + title back to `@color/text_primary`.
+- **`activity_edit_profile.xml`** — same header revert as order detail.
+- **`activity_signup_success.xml`** — removed the `FrameLayout`/
+  `bg_icon_circle_ink` backdrop entirely, back to a plain `ImageView` for
+  the success icon (its pre-ink-pass state, since the ink pass had
+  *added* this backdrop rather than recoloring an existing one).
+  `bg_icon_circle_ink.xml` deleted as an orphaned drawable — confirmed
+  nothing else referenced it first.
+- Confirmed clean: grepped the whole `restaurant/` module afterward for
+  `anydrop_ink`/`text_on_ink` — zero remaining references anywhere.
+- Updated `19_Restaurant_App_UI_Plan.md` §8.1.1 to ✅ with a summary.
+
+### 🟡 Known gaps / not done this session
+- **No build/visual verification** — same standing sandbox limitation as
+  every prior palette change. All 10 edited XML files were validated as
+  well-formed (parsed cleanly), but that only catches syntax errors, not
+  visual regressions — a real toolchain should eyeball all 10
+  screens/files before shipping, same priority order as the original
+  refresh (global chrome first, then the 6 pre-login/detail screens).
+- Three of the four app-owner feedback items remain: the logo-upload bug,
+  live location for restaurant profile, and dish/category photo upload —
+  app owner asked to go through them one at a time, this was just the
+  first.
+
+### ⏭️ Next
+App owner's remaining three real-device-feedback items, one at a time,
+per their original numbering: bug report (logo upload), then live
+location, then photo upload. Build verification remains the standing
+biggest risk project-wide.
+
+---
+
+## 2026-08-16 — App owner feedback from real-device testing (this session, docs-only — no code changed)
+
+App owner tested the build on a real device (first real-device test this
+project has had). Four items came back — recorded here in full so
+nothing gets lost, **not fixed/built this session per app owner's own
+instruction** ("mention karo, baad mai kar lenge" — document now, build
+later). Each item below is a candidate for a future session.
+
+### 1. Palette: revert to orange + white — see doc 19 §8.1.1
+App owner's verdict after seeing the ink chrome live: the original
+orange + white combo (pre-2026-08-16 palette refresh) looked better than
+orange + Midnight Blue ink. Decision recorded in
+`19_Restaurant_App_UI_Plan.md` §8.1.1 — revert is deferred to its own
+session, not done here. When that session happens, it needs to undo
+**both** the original palette-refresh entry (further down this file)
+**and** the "Pre-login/detail screens ink pass" entry directly below
+this one — the ink pass extended ink into 7 more files that didn't exist
+when the original refresh shipped, so a revert has to cover all of them,
+not just `colors.xml`/`activity_main.xml`.
+
+### 2. 🔴 Bug report: Logo upload not working on live device
+> **Update:** re-investigated in the 2026-08-16 "Logo-upload bug:
+> investigation" entry above this one — that entry reprioritizes the list
+> below, promoting the BASE_URL check from "less likely" to the top
+> suspect. Read that entry first; this one is kept for history.
+
+App owner reports the Edit Profile logo picker/upload doesn't work
+against the live (InfinityFree) backend. **Not reproducible in this
+sandbox** — no PHP runtime, no network, no way to hit the live server or
+see its error log, so this is a bug report to investigate with a real
+toolchain, not a diagnosed-and-fixed issue. Reading `logo-upload.php` and
+`EditProfileActivity.kt` end to end (this session) didn't turn up an
+obvious client-side logic bug — the multipart flow (copy content-Uri to
+a cache file, `MultipartBody.Part.createFormData("logo", ...)`, same
+pattern as the Customer app's working `address-photo.php` upload)
+matches the backend's expected `$_FILES['logo']` field name. Most likely
+suspects for whoever debugs this next, roughly in order of likelihood on
+InfinityFree specifically:
+- **`uploads/restaurant_logos/` directory permissions/creation** —
+  `logo-upload.php`'s `mkdir($uploadDir, 0755, true)` return value isn't
+  checked, and `move_uploaded_file()`'s failure just returns a generic
+  `upload_failed` 500 with no detail on *why*. If InfinityFree's
+  `open_basedir` or file-ownership rules block `mkdir`/`move_uploaded_file`
+  outside an existing folder, this fails silently from the client's
+  point of view — worth creating `uploads/restaurant_logos/` manually via
+  cPanel/FTP first and re-testing, and/or temporarily logging
+  `error_get_last()` after a failed `move_uploaded_file()` call.
+- **PHP `upload_max_filesize`/`post_max_size` ini limits** — InfinityFree
+  free tier has historically set these lower than typical (sometimes
+  2MB), which would silently truncate/reject an upload before it even
+  reaches `logo-upload.php`'s own 5MB check (`$_FILES['logo']['error']`
+  would come back as `UPLOAD_ERR_INI_SIZE`, which the current check
+  `!== UPLOAD_ERR_OK` does catch, but it reports as a generic
+  `validation_error` rather than anything actionable, and the file may
+  be well under 5MB and still get rejected).
+- Less likely but worth a quick check: confirm the Restaurant app's
+  network config actually points at the live InfinityFree URL and not a
+  stale/local `BASE_URL` in `ApiClient.kt` for this build.
+- **Next step**: once someone has real access to the live PHP error log,
+  a single failed upload attempt should immediately show which of the
+  above it is — flagging so the next session doesn't have to re-derive
+  this list from scratch.
+
+### 3. 🆕 Feature request: live location for restaurant profile
+> **Update:** built in the 2026-08-16 "Live location picker for
+> restaurant profile" entry above — that entry has the full
+> implementation summary. Read that entry first; this one is kept for
+> history.
+
+App owner wants a "use my current location" option when updating the
+restaurant's address, instead of (or alongside) typing it in as free
+text. This is **not new scope** — `profile-update.php`'s own kdoc
+already flags `latitude`/`longitude` as deliberately excluded from that
+endpoint, with the comment *"needs its own map-picker flow, out of scope
+this pass"* (written when that endpoint was first built). The Customer
+app already has exactly this pattern built and working —
+`ui/address/LocationPickerActivity.kt` (GPS "use current location"
+button) and `ui/address/MapPinDropActivity.kt` (drag-a-pin-on-a-map
+confirm step) — so the Restaurant app's version should be able to reuse
+that same approach rather than designing one from scratch. Needs, for a
+future session:
+- Backend: a restaurant-specific endpoint (or extend `profile-update.php`)
+  to accept/store `latitude`/`longitude` on the `restaurants` row —
+  currently only settable via direct DB access.
+- Client: a location-picker entry point from `EditProfileActivity`
+  (probably next to the address field), reusing/adapting the Customer
+  app's `LocationPickerActivity`/`MapPinDropActivity` Kotlin.
+
+### 4. 🆕 Feature request: photo upload for dishes (menu items) and categories
+App owner wants to be able to upload a photo per dish and per category
+from the Restaurant Management app's Menu tab (currently: no image field
+in either the Add/Edit Menu Item dialog or the Add Category dialog —
+checked `dialog_add_menu_item.xml`/`dialog_add_category.xml`, neither
+has any image UI). Where things currently stand, checked this session:
+- **Menu items (dishes): DB is already ready.** `menu_items.image_url`
+  has existed in the schema since `01_schema.sql` (used to render the
+  Customer app's dish photos, `MenuAdapter.kt` etc.) — but
+  `menu-items-create.php` hardcodes `'image_url' => null` on create, and
+  neither create nor update endpoints currently accept an image upload.
+  So this is "wire up the existing column," not "add a new column" —
+  should be the smaller of the two halves. Suggested approach: same
+  split as the logo (`logo-upload.php` uploads-and-returns-a-path,
+  `profile-update.php` writes the path) — a new
+  `menu-item-photo-upload.php` (or extend `menu-items-update.php` to
+  accept multipart) plus an image-picker row in
+  `dialog_add_menu_item.xml`/`MenuFragment.kt`.
+- **Categories: DB is NOT ready.** `menu_categories` has no `image_url`
+  (or any image) column at all — needs a new migration
+  (`backend/sql/2X_migration_category_image.sql`, following the numbering
+  convention of the existing `sql/` migrations) before any category-photo
+  UI work can start. This is the larger of the two halves.
+- Both would need their own upload endpoint (mirroring
+  `logo-upload.php`'s 5MB-cap/mime-sniff pattern) and their own picker UI
+  in the Menu tab's add/edit dialogs, plus rendering the photo in
+  `MenuItemAdapter`/`CategoryAdapter`'s existing rows.
+
+### ⏭️ Next
+App owner explicitly deferred all four of the above — no code changed
+this session, docs only. Still standing ahead of all four: build
+verification (see `NEXT_SESSION_PROMPT.md`) and the Admin approve/reject
+screen, unless the app owner reprioritizes one of today's four items
+above them.
+
+---
+
 ## 2026-08-16 — Pre-login/detail screens ink pass (this session, closes doc 19 §10 item 7)
 
 Continuing from the uploaded `account-tab-fixed` zip, which already had

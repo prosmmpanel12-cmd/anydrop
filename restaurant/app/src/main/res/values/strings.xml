@@ -1,6 +1,10 @@
 <resources>
     <string name="app_name">Anydrop Restaurant</string>
 
+    <!-- Google Maps SDK key placeholder — same as Customer app's strings.xml
+         entry, see AndroidManifest.xml's kdoc on the meta-data tag using it. -->
+    <string name="google_maps_key" translatable="false">YOUR_ANDROID_RESTRICTED_MAPS_KEY_HERE</string>
+
     <!-- Login -->
     <string name="login_title">Restaurant Login</string>
     <string name="login_subtitle">Sign in with your registered email</string>
@@ -124,6 +128,20 @@
     <string name="profile_save_failed">Couldn\'t save — check the details and try again</string>
     <string name="profile_saved">Profile updated</string>
     <string name="logo_upload_failed">Couldn\'t upload the logo — try again</string>
+    <string name="btn_add_photo">Add photo</string>
+    <string name="btn_change_photo">Change photo</string>
+    <string name="photo_upload_failed">Couldn\'t upload the photo — try again</string>
+    <string name="row_set_location">Set restaurant location on map</string>
+    <string name="row_location_set">Location set ✓ (tap to change)</string>
+
+    <!-- Location Picker (Edit Profile), 2026-08-16 — reuses Customer app's
+         H6 MapPinDropActivity copy/strings pattern, trimmed for a single
+         restaurant-address use case (no photo, no saved-addresses list). -->
+    <string name="location_picker_title">Restaurant Location</string>
+    <string name="location_picker_use_current_location">Use current location</string>
+    <string name="location_picker_resolving_address">Locating…</string>
+    <string name="location_picker_geocode_failed">Couldn\'t resolve an address for this point</string>
+    <string name="btn_confirm_location">Confirm location</string>
 
     <!-- Order detail -->
     <string name="order_detail_title">Order Detail</string>

@@ -1,6 +1,7 @@
 package com.anydrop.restaurant.ui.menu
 
 import android.app.AlertDialog
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -9,11 +10,13 @@ import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
 import com.anydrop.restaurant.R
 import com.anydrop.restaurant.databinding.DialogAddCategoryBinding
 import com.anydrop.restaurant.databinding.DialogAddMenuItemBinding
@@ -28,6 +31,11 @@ import com.anydrop.restaurant.network.MenuItemCreateBody
 import com.anydrop.restaurant.network.MenuItemUpdateBody
 import com.anydrop.restaurant.ui.common.InAppNotifier
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import java.io.File
+import java.io.FileOutputStream
 
 /**
  * Menu tab (§5 of the UI plan) — formerly its own pushed screen
@@ -35,12 +43,15 @@ import kotlinx.coroutines.launch
  * slide transition), now one of four bottom-nav tabs hosted by
  * `MainActivity`.
  *
- * §10 item 4: photo thumbnail slot (`MenuItemAdapter`, `item.imageUrl`
- * via Coil — placeholder icon until photo upload ships), the `?search=`
- * bar wired to `menu-items-list.php` (debounced), the §9.2 skeleton
- * state shown on first load, the §5 category-tabs-strip (shown once
- * there are 5+ active categories), and drag-to-reorder on category rows
- * (persisted via `categories-update.php`'s `sort_order` field).
+ * §10 item 4: photo thumbnail slot (`MenuItemAdapter`/`CategoryAdapter`,
+ * `imageUrl` via Coil, placeholder icon when unset), photo picking + the
+ * matching upload-then-save flow for both dish and category photos (this
+ * fragment stages picked Uris the same way `EditProfileActivity` stages
+ * its logo pick — see `pickedItemPhotoUri`/`pickedCategoryPhotoUri`), the
+ * `?search=` bar wired to `menu-items-list.php` (debounced), the §9.2
+ * skeleton state shown on first load, the §5 category-tabs-strip (shown
+ * once there are 5+ active categories), and drag-to-reorder on category
+ * rows (persisted via `categories-update.php`'s `sort_order` field).
  *
  * Tier 1 "Menu Management" (docs/18). Category + food item add/edit/
  * delete, price update, veg/non-veg toggle (on the add/edit form), and
@@ -54,9 +65,8 @@ import kotlinx.coroutines.launch
  * add real complexity for a combination that doesn't make sense anyway
  * (you can't meaningfully reorder categories you can't all see).
  *
- * Not in this pass: photo upload itself (still server-side only via
- * whatever admin/seed path populates image_url), customization/add-on
- * group UI, item availability time-of-day windows.
+ * Not in this pass: customization/add-on group UI, item availability
+ * time-of-day windows.
  */
 class MenuFragment : Fragment() {
 
@@ -87,6 +97,57 @@ class MenuFragment : Fragment() {
     // §10 item 4 follow-up — drag-to-reorder.
     private var reorderMode = false
     private var isSavingReorder = false
+
+    // Dish/category photo upload (NEXT_SESSION_PROMPT.md item 4). Same
+    // "stage a local Uri, upload only fires on dialog Save" pattern as
+    // EditProfileActivity.pickedLogoUri — cancelling the add/edit dialog
+    // never orphans a DB write (the uploaded file itself being an orphan
+    // is an acceptable cheap cost, same reasoning as the logo). The
+    // *Dialog vars point at whichever add/edit dialog is currently open,
+    // if any, so the activity-result callback (which fires independently
+    // of any dialog) can update the right preview and clears back to null
+    // in each dialog's onDismiss so a stale reference can't leak into the
+    // next dialog opened.
+    private var pickedItemPhotoUri: Uri? = null
+    private var currentItemDialogBinding: DialogAddMenuItemBinding? = null
+    private var pickedCategoryPhotoUri: Uri? = null
+    private var currentCategoryDialogBinding: DialogAddCategoryBinding? = null
+
+    private val pickItemPhotoLauncher =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            if (uri != null) {
+                pickedItemPhotoUri = uri
+                currentItemDialogBinding?.let { b ->
+                    b.itemPhotoPreview.imageTintList = null
+                    b.itemPhotoPreview.setPadding(0, 0, 0, 0)
+                    b.itemPhotoPreview.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                    b.itemPhotoPreview.load(uri) {
+                        placeholder(R.drawable.ic_food_placeholder)
+                        error(R.drawable.ic_food_placeholder)
+                        crossfade(true)
+                    }
+                    b.itemPhotoLabel.text = getString(R.string.btn_change_photo)
+                }
+            }
+        }
+
+    private val pickCategoryPhotoLauncher =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            if (uri != null) {
+                pickedCategoryPhotoUri = uri
+                currentCategoryDialogBinding?.let { b ->
+                    b.categoryPhotoPreview.imageTintList = null
+                    b.categoryPhotoPreview.setPadding(0, 0, 0, 0)
+                    b.categoryPhotoPreview.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                    b.categoryPhotoPreview.load(uri) {
+                        placeholder(R.drawable.ic_food_placeholder)
+                        error(R.drawable.ic_food_placeholder)
+                        crossfade(true)
+                    }
+                    b.categoryPhotoLabel.text = getString(R.string.btn_change_photo)
+                }
+            }
+        }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -171,6 +232,10 @@ class MenuFragment : Fragment() {
 
     override fun onDestroyView() {
         pendingSearchRunnable?.let { searchHandler.removeCallbacks(it) }
+        // AlertDialogs aren't tied to the fragment view lifecycle and
+        // would otherwise leak a reference to a detached dialog binding.
+        currentItemDialogBinding = null
+        currentCategoryDialogBinding = null
         super.onDestroyView()
         _binding = null
     }
@@ -357,6 +422,22 @@ class MenuFragment : Fragment() {
         val dialogBinding = DialogAddCategoryBinding.inflate(layoutInflater)
         dialogBinding.inputCategoryName.setText(existing?.name ?: "")
 
+        pickedCategoryPhotoUri = null
+        currentCategoryDialogBinding = dialogBinding
+        val existingCategoryImageUrl = existing?.imageUrl
+        if (!existingCategoryImageUrl.isNullOrBlank()) {
+            dialogBinding.categoryPhotoPreview.imageTintList = null
+            dialogBinding.categoryPhotoPreview.setPadding(0, 0, 0, 0)
+            dialogBinding.categoryPhotoPreview.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+            dialogBinding.categoryPhotoPreview.load(ApiClient.baseUrlForStaticFiles(requireContext()) + existingCategoryImageUrl) {
+                placeholder(R.drawable.ic_food_placeholder)
+                error(R.drawable.ic_food_placeholder)
+                crossfade(true)
+            }
+            dialogBinding.categoryPhotoLabel.text = getString(R.string.btn_change_photo)
+        }
+        dialogBinding.categoryPhotoPickerRow.setOnClickListener { pickCategoryPhotoLauncher.launch("image/*") }
+
         AlertDialog.Builder(requireContext())
             .setTitle(if (existing == null) R.string.dialog_add_category_title else R.string.dialog_edit_category_title)
             .setView(dialogBinding.root)
@@ -366,19 +447,33 @@ class MenuFragment : Fragment() {
                     InAppNotifier.show(activity, getString(R.string.menu_save_failed), InAppNotifier.Type.ERROR)
                     return@setPositiveButton
                 }
-                saveCategory(existing, name)
+                saveCategory(existing, name, pickedCategoryPhotoUri)
             }
             .setNegativeButton(R.string.btn_cancel, null)
+            .setOnDismissListener { currentCategoryDialogBinding = null }
             .show()
     }
 
-    private fun saveCategory(existing: MenuCategory?, name: String) {
+    private fun saveCategory(existing: MenuCategory?, name: String, photoUri: Uri?) {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
+                // Upload the photo first (if a new one was picked), same
+                // two-step split as EditProfileActivity's logo handling —
+                // the upload endpoint only saves the file and returns a
+                // path, it never touches the DB itself.
+                var imageUrlToSave: String? = null
+                if (photoUri != null) {
+                    imageUrlToSave = uploadCategoryPhoto(photoUri)
+                    if (imageUrlToSave == null) {
+                        InAppNotifier.show(activity, getString(R.string.photo_upload_failed), InAppNotifier.Type.ERROR)
+                        return@launch
+                    }
+                }
+
                 val ok = if (existing == null) {
-                    api.createCategory(CategoryCreateBody(name = name)).isSuccessful
+                    api.createCategory(CategoryCreateBody(name = name, imageUrl = imageUrlToSave)).isSuccessful
                 } else {
-                    api.updateCategory(existing.id, CategoryUpdateBody(name = name)).isSuccessful
+                    api.updateCategory(existing.id, CategoryUpdateBody(name = name, imageUrl = imageUrlToSave)).isSuccessful
                 }
                 if (ok) {
                     InAppNotifier.show(activity, getString(R.string.menu_category_saved), InAppNotifier.Type.SUCCESS)
@@ -389,6 +484,35 @@ class MenuFragment : Fragment() {
             } catch (e: Exception) {
                 InAppNotifier.show(activity, getString(R.string.menu_save_failed), InAppNotifier.Type.ERROR)
             }
+        }
+    }
+
+    /** Same copy-to-cache-file-then-multipart-upload approach as
+     * EditProfileActivity.uploadLogo() — content Uris from GetContent()
+     * aren't guaranteed to expose a real filesystem path. */
+    private suspend fun uploadCategoryPhoto(uri: Uri): String? {
+        val context = context ?: return null
+        val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+        val ext = when (mimeType) {
+            "image/png" -> "png"
+            "image/webp" -> "webp"
+            else -> "jpg"
+        }
+        val tempFile = File(context.cacheDir, "category_photo_upload.$ext")
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            FileOutputStream(tempFile).use { output -> input.copyTo(output) }
+        } ?: return null
+
+        val requestBody = tempFile.asRequestBody(mimeType.toMediaTypeOrNull())
+        val part = MultipartBody.Part.createFormData("photo", tempFile.name, requestBody)
+
+        val response = api.uploadCategoryPhoto(part)
+        tempFile.delete()
+
+        return if (response.isSuccessful && response.body()?.success == true) {
+            response.body()?.data?.imageUrl
+        } else {
+            null
         }
     }
 
@@ -427,6 +551,22 @@ class MenuFragment : Fragment() {
         dialogBinding.inputItemDescription.setText(existingItem?.description ?: "")
         dialogBinding.switchIsVeg.isChecked = existingItem?.isVeg ?: true
 
+        pickedItemPhotoUri = null
+        currentItemDialogBinding = dialogBinding
+        val existingItemImageUrl = existingItem?.imageUrl
+        if (!existingItemImageUrl.isNullOrBlank()) {
+            dialogBinding.itemPhotoPreview.imageTintList = null
+            dialogBinding.itemPhotoPreview.setPadding(0, 0, 0, 0)
+            dialogBinding.itemPhotoPreview.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+            dialogBinding.itemPhotoPreview.load(ApiClient.baseUrlForStaticFiles(requireContext()) + existingItemImageUrl) {
+                placeholder(R.drawable.ic_food_placeholder)
+                error(R.drawable.ic_food_placeholder)
+                crossfade(true)
+            }
+            dialogBinding.itemPhotoLabel.text = getString(R.string.btn_change_photo)
+        }
+        dialogBinding.itemPhotoPickerRow.setOnClickListener { pickItemPhotoLauncher.launch("image/*") }
+
         AlertDialog.Builder(requireContext())
             .setTitle(if (existingItem == null) R.string.dialog_add_item_title else R.string.dialog_edit_item_title)
             .setView(dialogBinding.root)
@@ -441,9 +581,10 @@ class MenuFragment : Fragment() {
                     InAppNotifier.show(activity, getString(R.string.menu_save_failed), InAppNotifier.Type.ERROR)
                     return@setPositiveButton
                 }
-                saveItem(existingItem, targetCategoryId, name, price, description, isVeg)
+                saveItem(existingItem, targetCategoryId, name, price, description, isVeg, pickedItemPhotoUri)
             }
             .setNegativeButton(R.string.btn_cancel, null)
+            .setOnDismissListener { currentItemDialogBinding = null }
             .show()
     }
 
@@ -453,10 +594,23 @@ class MenuFragment : Fragment() {
         name: String,
         price: Double,
         description: String?,
-        isVeg: Boolean
+        isVeg: Boolean,
+        photoUri: Uri?
     ) {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
+                // Upload the photo first (if a new one was picked) — same
+                // upload-then-save split as the category flow above and
+                // EditProfileActivity's logo handling.
+                var imageUrlToSave: String? = null
+                if (photoUri != null) {
+                    imageUrlToSave = uploadItemPhoto(photoUri)
+                    if (imageUrlToSave == null) {
+                        InAppNotifier.show(activity, getString(R.string.photo_upload_failed), InAppNotifier.Type.ERROR)
+                        return@launch
+                    }
+                }
+
                 val ok = if (existing == null) {
                     api.createMenuItem(
                         MenuItemCreateBody(
@@ -464,7 +618,8 @@ class MenuFragment : Fragment() {
                             name = name,
                             price = price,
                             description = description,
-                            isVeg = isVeg
+                            isVeg = isVeg,
+                            imageUrl = imageUrlToSave
                         )
                     ).isSuccessful
                 } else {
@@ -475,7 +630,8 @@ class MenuFragment : Fragment() {
                             name = name,
                             price = price,
                             description = description,
-                            isVeg = isVeg
+                            isVeg = isVeg,
+                            imageUrl = imageUrlToSave
                         )
                     ).isSuccessful
                 }
@@ -488,6 +644,34 @@ class MenuFragment : Fragment() {
             } catch (e: Exception) {
                 InAppNotifier.show(activity, getString(R.string.menu_save_failed), InAppNotifier.Type.ERROR)
             }
+        }
+    }
+
+    /** Same copy-to-cache-file-then-multipart-upload approach as
+     * EditProfileActivity.uploadLogo() / uploadCategoryPhoto() above. */
+    private suspend fun uploadItemPhoto(uri: Uri): String? {
+        val context = context ?: return null
+        val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+        val ext = when (mimeType) {
+            "image/png" -> "png"
+            "image/webp" -> "webp"
+            else -> "jpg"
+        }
+        val tempFile = File(context.cacheDir, "item_photo_upload.$ext")
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            FileOutputStream(tempFile).use { output -> input.copyTo(output) }
+        } ?: return null
+
+        val requestBody = tempFile.asRequestBody(mimeType.toMediaTypeOrNull())
+        val part = MultipartBody.Part.createFormData("photo", tempFile.name, requestBody)
+
+        val response = api.uploadMenuItemPhoto(part)
+        tempFile.delete()
+
+        return if (response.isSuccessful && response.body()?.success == true) {
+            response.body()?.data?.imageUrl
+        } else {
+            null
         }
     }
 

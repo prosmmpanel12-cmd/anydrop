@@ -3,7 +3,7 @@
  * POST /api/v1/restaurant/menu-items-update.php?id={item_id}
  * Auth: Restaurant token (must own the item)
  * Request: any subset of { category_id, name, description, price, is_veg,
- *                           is_available, prep_time_minutes }
+ *                           is_available, prep_time_minutes, image_url }
  * Response: { "item": {...} }
  *
  * Partial update, same pattern as categories-update.php. Doubles as the
@@ -11,6 +11,10 @@
  * toggleItemAvailable() sends just { "is_available": bool }) and the
  * edit-item dialog's full-field save — same endpoint, different subsets
  * of the body populated.
+ *
+ * image_url: same upload-then-save split as menu-items-create.php — the
+ * client uploads via menu-item-photo-upload.php first, then sends the
+ * returned path here alongside whatever else is being edited.
  */
 
 require_once __DIR__ . '/../../../config/database.php';
@@ -84,6 +88,15 @@ if (array_key_exists('is_available', $body) && $body['is_available'] !== null) {
 if (array_key_exists('prep_time_minutes', $body) && $body['prep_time_minutes'] !== null) {
     $fields[] = 'prep_time_minutes = :prep_time_minutes';
     $params['prep_time_minutes'] = (int) $body['prep_time_minutes'];
+}
+if (array_key_exists('image_url', $body) && $body['image_url'] !== null) {
+    // Same null-skip convention as every other field on this endpoint.
+    // A true explicit-clear isn't reachable from this app today anyway —
+    // ApiClient.kt's default (non-serializeNulls()) Gson instance omits
+    // null fields from the JSON body entirely, same behavior
+    // profile-update.php's kdoc already notes for logo_url/lat/lng.
+    $fields[] = 'image_url = :image_url';
+    $params['image_url'] = $body['image_url'] !== '' ? $body['image_url'] : null;
 }
 
 if (!empty($fields)) {

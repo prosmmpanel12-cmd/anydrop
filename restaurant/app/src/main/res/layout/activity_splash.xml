@@ -1,16 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Pre-login ink pass (2026-08-16, docs/restorent/19 §10 item 7): background
-     was flat @color/anydrop_primary (orange); switched to @color/anydrop_ink
-     so the launcher's first frame matches the app's main dark chrome
-     (activity_main.xml's top bar/bottom nav) rather than the pre-refresh
-     orange splash. Tagline recolored to text_on_ink_muted (was
-     anydrop_primary_container, a light peach tuned for an orange
-     background) to keep it clearly secondary against dark ink. -->
+<!-- Reverted 2026-08-16 (§8.1.1) back to flat @color/anydrop_primary
+     (orange) background, matching the app-wide orange+white revert. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/anydrop_ink"
+    android:background="@color/anydrop_primary"
     android:gravity="center">
 
     <ImageView
@@ -29,7 +24,7 @@
         android:text="@string/app_name"
         android:textSize="24sp"
         android:textStyle="bold"
-        android:textColor="@color/text_on_ink"
+        android:textColor="@color/white"
         android:visibility="invisible" />
 
     <TextView
@@ -39,7 +34,7 @@
         android:layout_marginTop="4dp"
         android:text="@string/splash_tagline"
         android:textSize="14sp"
-        android:textColor="@color/text_on_ink_muted"
+        android:textColor="@color/anydrop_primary_container"
         android:visibility="invisible" />
 
 </LinearLayout>

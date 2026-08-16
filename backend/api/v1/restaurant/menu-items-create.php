@@ -14,6 +14,14 @@
  * MenuItemCreateBody doesn't expose them (no UI for them yet per
  * MenuFragment's dialog); they default to their schema defaults (0/0/0)
  * and stay restaurant-app-invisible until that UI exists.
+ *
+ * image_url (optional): the app-owner real-device-feedback item 4 photo
+ * upload. menu-item-photo-upload.php uploads the file and returns this
+ * path first; the client then sends it here as an ordinary string field,
+ * same upload-then-save split as logo_url on profile-update.php. Not
+ * validated as a real path (no ownership check needed — unlike
+ * category_id, this can't be pointed at another restaurant's data, it's
+ * just a relative file path).
  */
 
 require_once __DIR__ . '/../../../config/database.php';
@@ -40,6 +48,7 @@ $isVeg = array_key_exists('is_veg', $body) ? (bool) $body['is_veg'] : true;
 $prepTimeMinutes = isset($body['prep_time_minutes']) && $body['prep_time_minutes'] !== null
     ? (int) $body['prep_time_minutes']
     : 15;
+$imageUrl = isset($body['image_url']) && $body['image_url'] !== '' ? (string) $body['image_url'] : null;
 
 if ($name === '' || $price <= 0) {
     respond_error('validation_error', 422, ['fields' => ['name', 'price']]);
@@ -59,7 +68,7 @@ $insert = $db->prepare(
          is_veg, image_url, is_available, is_recommended, is_bestseller, prep_time_minutes)
      VALUES
         (:rid, :cid, :name, :description, :price, 0,
-         :is_veg, NULL, 1, 0, 0, :prep_time_minutes)'
+         :is_veg, :image_url, 1, 0, 0, :prep_time_minutes)'
 );
 $insert->execute([
     'rid' => $restaurantId,
@@ -68,6 +77,7 @@ $insert->execute([
     'description' => $description,
     'price' => $price,
     'is_veg' => $isVeg ? 1 : 0,
+    'image_url' => $imageUrl,
     'prep_time_minutes' => $prepTimeMinutes,
 ]);
 $newId = (int) $db->lastInsertId();
@@ -81,7 +91,7 @@ respond_ok([
         'price' => $price,
         'discount_percent' => 0.0,
         'is_veg' => $isVeg,
-        'image_url' => null,
+        'image_url' => $imageUrl,
         'is_available' => true,
         'is_recommended' => false,
         'is_bestseller' => false,

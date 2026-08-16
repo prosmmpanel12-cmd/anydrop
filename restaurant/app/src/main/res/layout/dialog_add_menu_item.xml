@@ -10,6 +10,53 @@
         android:orientation="vertical"
         android:padding="20dp">
 
+        <!-- Photo picker (NEXT_SESSION_PROMPT.md item 4) — same staged-
+             upload pattern as EditProfileActivity's logoPickerRow: upload
+             only fires on dialog Save, never on pick, so cancelling the
+             dialog never orphans a DB write. Rounded-square (not circular)
+             since this is a dish photo, not a logo. -->
+        <LinearLayout
+            android:id="@+id/itemPhotoPickerRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingBottom="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/stat_chip_bg"
+                app:strokeColor="@color/outline"
+                app:strokeWidth="1dp">
+
+                <ImageView
+                    android:id="@+id/itemPhotoPreview"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_food_placeholder"
+                    android:padding="20dp"
+                    app:tint="@color/text_secondary"
+                    android:contentDescription="@null" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <TextView
+                android:id="@+id/itemPhotoLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/btn_add_photo"
+                android:textColor="@color/anydrop_primary"
+                android:textStyle="bold"
+                android:textSize="13sp" />
+        </LinearLayout>
+
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content">

@@ -1,12 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 2026-08-16 palette refresh (docs/restorent/19 §8.1) — unselected state
-     recolored from @color/text_secondary (#6E6E6E, a light-surface gray
-     with poor contrast on the new dark @color/anydrop_ink bottom nav) to
-     @color/text_on_ink_muted, a muted lavender-gray pulled from the ink
-     tone itself so unselected icons still read as part of the dark bar
-     rather than fighting it. Checked state keeps the brand orange, which
-     now pops harder against dark navy than it did against white. -->
+<!-- Reverted 2026-08-16 (§8.1.1) back to @color/text_secondary for the
+     unselected state, matching the white bottom nav background restored
+     in activity_main.xml. Checked state unchanged (brand orange). -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:color="@color/anydrop_primary" android:state_checked="true" />
-    <item android:color="@color/text_on_ink_muted" />
+    <item android:color="@color/text_secondary" />
 </selector>
