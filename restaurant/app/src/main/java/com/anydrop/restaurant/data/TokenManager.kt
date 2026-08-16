@@ -19,6 +19,13 @@ class TokenManager(context: Context) {
 
     fun getRestaurantName(): String? = prefs.getString(KEY_NAME, null)
 
+    /** Called after a successful Edit Profile save so the top bar
+     * (activity_main.xml's restaurantNameText) reflects a renamed
+     * restaurant immediately, without waiting for the next full login. */
+    fun updateRestaurantName(name: String) {
+        prefs.edit().putString(KEY_NAME, name).apply()
+    }
+
     fun isLoggedIn(): Boolean = !getToken().isNullOrEmpty()
 
     fun clear() {

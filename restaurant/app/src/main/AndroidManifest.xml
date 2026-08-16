@@ -57,6 +57,13 @@
             android:name=".ui.orderdetail.OrderDetailActivity"
             android:exported="false" />
 
+        <!-- Account tab / Edit Profile (docs/restorent/19 §7, §10 item 5,
+             NEXT_SESSION_PROMPT.md item 1). -->
+        <activity
+            android:name=".ui.account.EditProfileActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
     </application>
 
 </manifest>

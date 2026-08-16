@@ -1,3 +1,190 @@
+## 2026-08-16 — Account tab / Edit Profile UI, PARTIAL (later session — continues the entry below)
+
+Continues the "backend + models only" entry directly below this one.
+**Still not finished — paused again partway through the UI half.**
+`EditProfileActivity` (the form) is done; `AccountFragment` (the tab
+itself) is not.
+
+### ✅ Done this session
+- **`EditProfileActivity.kt` + `activity_edit_profile.xml`** — the full
+  form: circular logo picker (tap opens gallery via
+  `ActivityResultContracts.GetContent()`, same copy-to-cache-file +
+  multipart approach as the Customer app's `MapPinDropActivity`
+  address-photo upload), name/address/cuisine-tags/description fields
+  (`TextInputLayout`, same outlined style as Signup), opening/closing
+  time rows that open a plain `android.app.TimePickerDialog` (new
+  `bg_input_outline.xml` background + `ic_clock.xml`, both copied/
+  adapted from existing patterns), a working-days `ChipGroup` (Mon–Sun
+  mapped to backend's 1–7 `date('N')` convention, `Chip.isCheckable`
+  pattern copied from the Customer app's `SearchFiltersBottomSheet`
+  cuisine chips), and Save.
+  - Save order matches the backend's intended split (see
+    `logo-upload.php`'s kdoc): if a new logo was picked, `uploadLogo()`
+    fires first and its returned path is folded into the same
+    `updateProfile()` call as the rest of the form — a single
+    `ProfileUpdateBody`, one network round trip for the whole save.
+  - The profile is passed in from the caller as a JSON string extra
+    (`EditProfileActivity.EXTRA_PROFILE_JSON`, decoded with a plain
+    `Gson().fromJson`) rather than re-fetched here, since the caller
+    (`AccountFragment`) already has it from its own `getProfile()` load
+    — `RestaurantProfileDetail` isn't `Parcelable`, so a JSON string
+    extra was the lower-friction option over adding `@Parcelize` to a
+    model shared with plain Retrofit/Gson elsewhere.
+- Registered `EditProfileActivity` in `AndroidManifest.xml`
+  (`windowSoftInputMode="adjustResize"`, same as `MainActivity`/
+  `OtpVerifyActivity` — this screen has a scrolling form under a fixed
+  header, needs the keyboard to resize rather than pan).
+- **`fragment_account.xml` redesigned** — profile summary card (logo
+  thumbnail, name, address, hours — `MaterialCardView`, tap-through to
+  Edit Profile), a separate "Edit profile" row underneath, a
+  "Temporarily closed" `SwitchMaterial` in its own card, a view-only
+  payout card (UPI ID + outstanding balance rows), Logout unchanged at
+  the bottom. Wrapped in `SwipeRefreshLayout` (dependency already in
+  `build.gradle`, same as `fragment_orders.xml`) so a pull-to-refresh
+  can re-run `getProfile()`.
+- New shared resources: `bg_input_outline.xml` (outlined-box background
+  for the two tappable time rows), `ic_clock.xml` (copied from the
+  Customer app, wasn't in this app yet).
+- New strings for both screens added to `strings.xml` under "Account
+  tab" / "Edit Profile screen" headers.
+
+### 🔴 Not done yet — genuinely incomplete, not just unverified
+- **`AccountFragment.kt` itself was NOT rewritten this session** — the
+  new `fragment_account.xml` layout exists but nothing populates it
+  yet. The Kotlin file is still the old placeholder version (loads only
+  `restaurantNameText`/`btnLogout`, which no longer exist as IDs in the
+  new layout — **the account tab will crash on open (`NullPointerException`
+  from view-binding) until `AccountFragment.kt` is rewritten to match
+  the new layout's IDs**). This is the single most important thing to
+  fix next, before anything else.
+  - Needs: `getProfile()` call in `onViewCreated`/`onResume` (or via the
+    `SwipeRefreshLayout` listener), populating
+    `profileNameText`/`profileAddressText`/`profileHoursText`/
+    `profileLogoThumb` (Coil `.load()`, same pattern as
+    `EditProfileActivity`'s logo preview), `upiIdText`/`currentDueText`
+    from `RestaurantProfileDetail.upiId`/`currentDue`.
+  - `switchTempClosed` — set `isChecked` from
+    `operationalStatus == "temp_closed"` **without** firing its own
+    listener on that initial programmatic set (guard flag, or set
+    `isChecked` before attaching the listener), then on user toggle call
+    the existing `updateOperationalStatus()` with `"temp_closed"`/`"open"`,
+    with revert-on-failure same as `MainActivity.setOperationalStatus()`.
+  - `profileSummaryCard`/`btnEditProfileRow` — launch
+    `EditProfileActivity` via `registerForActivityResult` (not plain
+    `startActivity`), passing `Gson().toJson(profile)` as
+    `EXTRA_PROFILE_JSON`, and re-run `getProfile()` on a non-cancelled
+    result so a saved name/logo/hours change reflects immediately
+    without waiting for the next tab switch.
+  - `btnLogout` — unchanged logic from the old file, just needs porting
+    over (clear token, go to `LoginActivity`).
+- **`MainActivity.kt`'s flagged correctness fix — still NOT applied**:
+  `loadOperationalStatus()` still has
+  `isOpen = summary.operationalStatus != "busy"`. Needs to become
+  `isOpen = summary.operationalStatus == "open"` — otherwise once
+  `AccountFragment`'s temp-closed switch ships and can actually send
+  `"temp_closed"`, the top bar's pill will wrongly show green/open for
+  a temp-closed restaurant. Flagged in the entry below, still flagging
+  again here since it's still outstanding.
+- No build/compile verification, same standing project-wide limitation
+  — this session raises that risk further: `AccountFragment.kt`
+  currently doesn't even match its own layout's view-binding IDs, which
+  a real compile would catch immediately (view-binding-generated
+  property misses) but this sandbox cannot.
+
+### ⏭️ Next
+1. **Rewrite `AccountFragment.kt`** per the gaps above — this is not
+   optional polish, the tab is currently broken (see above).
+2. Apply the `MainActivity.kt` one-line fix.
+3. Then resume the rest of the standing queue per
+   `NEXT_SESSION_PROMPT.md` (pre-login ink pass, Admin approve/reject
+   screen, build verification queue).
+
+---
+
+## 2026-08-16 — Account tab / Restaurant Management profile (backend + models only, IN PROGRESS — this session)
+
+Per `NEXT_SESSION_PROMPT.md` / doc 19 §7 (Account tab) and §10 item 5.
+App owner picked this over the pre-login ink pass and the Admin
+approve/reject screen. **Session paused partway through — backend and
+Kotlin networking layer are done, but no screen UI exists yet.** This
+entry will be replaced/extended once the UI half is built.
+
+### ✅ Done
+- **3 new backend endpoints** (`backend/api/v1/restaurant/`):
+  - `profile-get.php` — GET, returns the full `restaurants` row (minus
+    `password_hash`) for the logged-in restaurant. Needed because
+    `restaurant-login.php` only returns this once at login time, and the
+    30-day token can far outlive that single response.
+  - `profile-update.php` — POST, partial update of a restaurant-safe
+    column subset: `name`, `address`, `cuisine_tags`, `opening_time`,
+    `closing_time`, `working_days`, `description`, `logo_url`,
+    `cover_url`. Deliberately excludes `status`, `operational_status`,
+    `current_due`, `commission_percent`, `latitude`/`longitude`,
+    `owner_email`/password — same restraint `status-update.php` already
+    uses. `opening_time`/`closing_time` are validated and normalized to
+    `HH:MM:SS`; `working_days` is validated as 1–7, deduped, and
+    canonically re-sorted before storing.
+  - `logo-upload.php` — multipart image upload, exact same
+    pattern/limits as H6's `address-photo.php` (5MB cap, mime-sniffed
+    jpeg/png/webp, safe random filename under
+    `backend/uploads/restaurant_logos/`). Deliberately only uploads and
+    returns a path — does **not** write `logo_url` to the DB itself, so
+    a user who picks a new logo then cancels out of Edit Profile without
+    saving doesn't leave a half-applied change. The app is expected to
+    pass the returned path to `profile-update.php` as an ordinary string
+    field, same split as H6's photo-upload + address-save.
+- **Kotlin networking layer** (Restaurant app):
+  - `Models.kt` — new `RestaurantProfileDetail` (full profile, richer
+    than the minimal `RestaurantProfile` used at login/signup),
+    `ProfileResult`, `ProfileUpdateBody`, `LogoUploadResult`.
+  - `ApiService.kt` — `getProfile()`, `updateProfile()`,
+    `uploadLogo()` (multipart, mirrors the Customer app's
+    `uploadAddressPhoto()`).
+  - `ApiClient.kt` — added `baseUrlForStaticFiles()`, same helper/
+    reasoning as the Customer app's, for turning `logo_url`'s relative
+    path into a loadable image URL.
+  - `TokenManager.kt` — added `updateRestaurantName()` so a rename in
+    Edit Profile can refresh the top bar's cached name immediately
+    without a fresh login.
+
+### 🔴 Not done yet — this is genuinely incomplete, not just unverified
+- **No UI built at all yet**: `EditProfileActivity.kt` +
+  `activity_edit_profile.xml` (the actual form — logo picker, name/
+  address/cuisine/description fields, opening/closing time pickers,
+  working-days chip toggle, save) don't exist yet.
+- **`AccountFragment.kt`/`fragment_account.xml` not redesigned yet** —
+  still the old placeholder (name + "coming soon" text + Logout) from
+  the bottom-nav-shell session. Planned redesign: profile summary card
+  (logo thumbnail, name, address, "Edit profile" row), a "Temporarily
+  closed" toggle (reusing `status-update.php`'s existing `temp_closed`
+  value — the top bar's own OPEN/CLOSED pill only ever sends
+  `open`/`busy`, so this is genuinely new client usage of a value the
+  backend already accepted but nothing sent yet), a view-only payout
+  card (UPI ID + outstanding `current_due`), Logout unchanged.
+- **A known correctness fix identified but not yet applied**:
+  `MainActivity.kt`'s pill currently computes
+  `isOpen = operationalStatus != "busy"`, which would incorrectly show
+  green/open for `temp_closed` once the Account tab can set that value.
+  Needs to become `isOpen = operationalStatus == "open"` once the
+  toggle above ships — flagging now so it isn't forgotten.
+- **No notification-preferences toggle** — doc 19 §7 lists one, but
+  there's no push/FCM infrastructure anywhere in the Restaurant app yet
+  (grepped — nothing) for a toggle to actually control. Deliberately
+  skipped rather than building a switch that does nothing; worth
+  revisiting once push notifications are actually built.
+- `AndroidManifest.xml` doesn't have `EditProfileActivity` registered
+  yet (doesn't exist yet to register).
+- No build/compile verification, same standing project-wide limitation.
+
+### ⏭️ Next
+Finish this session's UI half first (see gaps above), in one PR/zip so
+Account tab isn't left in a half-wired state — `AccountFragment` should
+not link to an Edit Profile screen that doesn't exist yet, and vice
+versa. Then resume the rest of the standing queue (pre-login ink pass,
+Admin approve/reject screen) per `NEXT_SESSION_PROMPT.md`.
+
+---
+
 ## 2026-08-16 — Palette refresh: Exotic Orange + Midnight Blue "ink" chrome (this session)
 
 App owner shared 8 color-pair reference images and asked for the best

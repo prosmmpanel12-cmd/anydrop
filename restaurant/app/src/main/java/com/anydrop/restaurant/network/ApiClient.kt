@@ -18,6 +18,13 @@ object ApiClient {
 
     private const val BASE_URL = "http://localhost:8080/anydrop/api/v1/"
 
+    /** Static-file root (".../anydrop/") for turning logo-upload.php's
+     * relative logo_url into a loadable image URL — same helper/reasoning
+     * as the Customer app's ApiClient.baseUrlForStaticFiles() (H6 pin-drop
+     * photo). Kept here rather than hardcoding the swap at each call site
+     * so BASE_URL only needs to change in one place. */
+    fun baseUrlForStaticFiles(context: Context): String = BASE_URL.removeSuffix("api/v1/")
+
     fun create(context: Context): ApiService {
         val tokenManager = TokenManager(context)
 

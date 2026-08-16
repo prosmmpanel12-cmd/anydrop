@@ -112,7 +112,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 val summary = api.getDashboard().body()?.data
                 if (summary != null) {
-                    isOpen = summary.operationalStatus != "busy"
+                    isOpen = summary.operationalStatus == "open"
                     renderPill()
                 }
             } catch (e: Exception) {

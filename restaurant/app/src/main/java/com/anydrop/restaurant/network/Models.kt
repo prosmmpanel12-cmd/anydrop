@@ -64,6 +64,54 @@ data class LoginResult(
     val token: String?
 )
 
+// ---- Account tab / Edit Profile (docs/restorent/19 §7, §10 item 5) ----
+
+/** Full restaurants row (minus password_hash) — profile-get.php /
+ * profile-update.php's response shape, richer than the minimal
+ * RestaurantProfile above used at login/signup time. Fields this app
+ * doesn't yet edit (latitude/longitude, gst/fssai, commission, etc.) are
+ * still modeled read-only here since profile-get.php returns the whole
+ * row — kept nullable/defaulted so a future column addition on the
+ * backend can't break deserialization of an older field set. */
+data class RestaurantProfileDetail(
+    val id: Int,
+    val name: String,
+    @SerializedName("owner_name") val ownerName: String? = null,
+    @SerializedName("owner_mobile") val ownerMobile: String? = null,
+    @SerializedName("owner_email") val ownerEmail: String? = null,
+    val address: String? = null,
+    @SerializedName("logo_url") val logoUrl: String? = null,
+    @SerializedName("cover_url") val coverUrl: String? = null,
+    @SerializedName("cuisine_tags") val cuisineTags: String? = null,
+    @SerializedName("opening_time") val openingTime: String? = null,
+    @SerializedName("closing_time") val closingTime: String? = null,
+    @SerializedName("working_days") val workingDays: String? = null,
+    val description: String? = null,
+    @SerializedName("upi_id") val upiId: String? = null,
+    @SerializedName("current_due") val currentDue: Double = 0.0,
+    val status: String? = null,
+    @SerializedName("operational_status") val operationalStatus: String? = null,
+    @SerializedName("rating_avg") val ratingAvg: Double = 0.0
+)
+
+data class ProfileResult(val restaurant: RestaurantProfileDetail)
+
+/** Partial update — only non-null fields are sent/changed, same convention
+ * as MenuItemUpdateBody. logo_url is set via a separate upload call first
+ * (logo-upload.php returns the path), then passed here like any other field. */
+data class ProfileUpdateBody(
+    val name: String? = null,
+    val address: String? = null,
+    @SerializedName("cuisine_tags") val cuisineTags: String? = null,
+    @SerializedName("opening_time") val openingTime: String? = null,
+    @SerializedName("closing_time") val closingTime: String? = null,
+    @SerializedName("working_days") val workingDays: String? = null,
+    val description: String? = null,
+    @SerializedName("logo_url") val logoUrl: String? = null
+)
+
+data class LogoUploadResult(@SerializedName("logo_url") val logoUrl: String)
+
 // ---- Orders ----
 
 data class OrderItemLine(

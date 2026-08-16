@@ -92,8 +92,38 @@
     <string name="insights_coming_soon_title">Insights are coming soon</string>
     <string name="insights_coming_soon_body">Today/week/month stats, earnings, and your best-selling items will show up here.</string>
 
-    <!-- Account tab (placeholder — real content is §10 item 5) -->
-    <string name="account_coming_soon_body">Profile editing, payout details, and notification preferences will show up here.</string>
+    <!-- Account tab (docs/restorent/19 §7, §10 item 5) -->
+    <string name="account_edit_profile_row">Edit profile</string>
+    <string name="account_temp_closed_label">Temporarily closed</string>
+    <string name="account_temp_closed_hint">Pause new orders without logging out</string>
+    <string name="account_payout_title">Payout details</string>
+    <string name="account_upi_label">UPI ID</string>
+    <string name="account_due_label">Outstanding balance</string>
+    <string name="account_not_set">Not set</string>
+    <string name="account_profile_load_failed">Couldn\'t load profile — pull down to try again</string>
+    <string name="account_hours_format">%1$s – %2$s</string>
+    <string name="account_working_days_summary_format">%1$d days/week</string>
+
+    <!-- Edit Profile screen -->
+    <string name="edit_profile_title">Edit Profile</string>
+    <string name="btn_change_logo">Change logo</string>
+    <string name="hint_cuisine_tags">Cuisine tags (comma separated)</string>
+    <string name="hint_profile_description">Description (optional)</string>
+    <string name="label_hours">Hours</string>
+    <string name="label_opening_time">Opening time</string>
+    <string name="label_closing_time">Closing time</string>
+    <string name="label_working_days">Working days</string>
+    <string name="day_short_mon">Mon</string>
+    <string name="day_short_tue">Tue</string>
+    <string name="day_short_wed">Wed</string>
+    <string name="day_short_thu">Thu</string>
+    <string name="day_short_fri">Fri</string>
+    <string name="day_short_sat">Sat</string>
+    <string name="day_short_sun">Sun</string>
+    <string name="error_working_days_required">Select at least one working day</string>
+    <string name="profile_save_failed">Couldn\'t save — check the details and try again</string>
+    <string name="profile_saved">Profile updated</string>
+    <string name="logo_upload_failed">Couldn\'t upload the logo — try again</string>
 
     <!-- Order detail -->
     <string name="order_detail_title">Order Detail</string>

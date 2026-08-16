@@ -1,9 +1,12 @@
 package com.anydrop.restaurant.network
 
+import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.POST
+import retrofit2.http.Part
 import retrofit2.http.Query
 
 interface ApiService {
@@ -72,4 +75,16 @@ interface ApiService {
 
     @POST("restaurant/menu-items-delete.php")
     suspend fun deleteMenuItem(@Query("id") itemId: Int): Response<ApiResponse<Map<String, Any>>>
+
+    // ---- Account tab / Edit Profile (docs/restorent/19 §7, §10 item 5) ----
+
+    @GET("restaurant/profile-get.php")
+    suspend fun getProfile(): Response<ApiResponse<ProfileResult>>
+
+    @POST("restaurant/profile-update.php")
+    suspend fun updateProfile(@Body body: ProfileUpdateBody): Response<ApiResponse<ProfileResult>>
+
+    @Multipart
+    @POST("restaurant/logo-upload.php")
+    suspend fun uploadLogo(@Part logo: MultipartBody.Part): Response<ApiResponse<LogoUploadResult>>
 }
