@@ -1,4 +1,290 @@
-## 2026-08-15 — Orders tab redesign, OrderAdapter + OrdersFragment rebuild (this session)
+## 2026-08-16 — Palette refresh: Exotic Orange + Midnight Blue "ink" chrome (this session)
+
+App owner shared 8 color-pair reference images and asked for the best
+one applied to the app, plus a general UI-quality pass, with the plan
+doc (`19_Restaurant_App_UI_Plan.md`) kept in sync. See that doc's new
+§8.1 for the full picked-palette rationale (short version: warm hues
+are the deliberate, non-negotiable choice for a food app — established
+appetite-suppressing effect of blue in F&B branding ruled out every
+blue-led pair in the reference set as the primary color) and §8.2 for
+the superseded original table.
+
+### ✅ Done
+- **Token-level palette swap** — `colors.xml`: primary `#E64A19` →
+  `#F54F1B` ("Exotic Orange"), plus three new tokens for a dark "ink"
+  surface family (`anydrop_ink` `#1E223D` "Midnight Blue",
+  `anydrop_ink_light`, `text_on_ink`, `text_on_ink_muted`) that didn't
+  exist before.
+- **Ink applied to nav chrome** — `activity_main.xml`'s shared top bar
+  and `BottomNavigationView` background both switched from plain white
+  (`@color/surface`) to `@color/anydrop_ink`; `restaurantNameText`
+  recolored to `text_on_ink`; `bottom_nav_item_color.xml`'s unselected
+  state recolored from `text_secondary` (too low-contrast on dark navy)
+  to the new `text_on_ink_muted`. `themes.xml`'s `statusBarColor` moved
+  to `anydrop_ink` to match, with `windowLightStatusBar=false` (status
+  bar icons need to be light-colored against a dark bar now — safe to
+  set directly, `minSdk 24` is well above the API 23 floor for that
+  attribute).
+- **Confirmed this cascades app-wide with no other edits needed** —
+  grepped for the old hex values (`#E64A19`/`#B23C14`/`#FFE0D3`)
+  anywhere else in `res/`; none hardcoded outside `colors.xml` itself,
+  so every button/switch/active-state pulling from `colorPrimary` or
+  `@color/anydrop_primary` picked up the new orange automatically.
+
+### 🟡 Known gaps / not done this session
+- **No build/visual verification** — same standing sandbox limitation.
+  This is a genuinely higher-risk change than most prior sessions'
+  additive ones: it touches the app's global theme/status-bar color and
+  a shared layout every screen sits inside, so a mistake here is
+  visible everywhere rather than isolated to one screen. First real-
+  toolchain step should be opening the app and eyeballing the top bar
+  contrast, bottom nav legibility (checked vs. unchecked), and status
+  bar icon color before anything else in this session's queue.
+- **Pre-login/detail screens not touched** — `activity_login.xml`,
+  `activity_signup.xml`, `activity_otp_verify.xml`,
+  `activity_signup_success.xml`, `activity_splash.xml`,
+  `activity_order_detail.xml` still use plain white full-screen
+  backgrounds from before this refresh. Not an oversight — flagged
+  explicitly as plan §10 item 7, a follow-up visual pass, since giving
+  them a matching ink treatment needs a per-screen layout look rather
+  than a token swap.
+- Didn't touch typography/spacing, only color — per the plan doc, the
+  bigger hierarchy issues (§4–§7) are structural, not color, and were
+  already addressed in earlier sessions' Orders/Menu tab redesigns.
+
+### ⏭️ Next
+Same standing top priority as every recent entry — **build both APKs
+with a real toolchain**, now with this session's theme/status-bar/nav
+chrome change added to the unverified pile (see `NEXT_SESSION_PROMPT.md`
+for the full running list). Then plan §10 item 7 (pre-login screens ink
+pass) if there's appetite for more visual polish before moving to
+Account tab (§10 item 5, unchanged from before).
+
+---
+
+## 2026-08-16 — Menu tab: category-tabs-strip + drag-to-reorder (this session)
+
+Per `NEXT_SESSION_PROMPT.md`, closing out the last two open pieces of §10
+item 4 — both were still stacked-cards-only / not-built as of the entry
+below. Backend support for both already existed as of this session's
+earlier "Backend: category/menu-item PHP endpoints" entry
+(`categories-update.php` accepts `sort_order`).
+
+### ✅ Done
+- **Category tabs strip** (§5) — new `CategoryTabAdapter.kt` +
+  `item_category_tab_chip.xml`, a horizontal `RecyclerView` of pill chips
+  ("All" + one per active category) inserted into `fragment_menu.xml`
+  between the search bar and the category list. `MenuFragment` shows it
+  only once there are 5+ active categories (`TAB_STRIP_MIN_CATEGORIES`)
+  and hides it while searching or reordering (see "mutually exclusive"
+  design note below). Selecting a tab other than "All" filters
+  `categoriesRecycler` down to that one category's card client-side — no
+  new network call, reuses whatever `categories`/`items` are already
+  loaded. New drawables `bg_chip_unselected.xml` (gray-100 pill) and
+  `bg_menu_tab_selected.xml` (solid `anydrop_primary` pill, matching §8's
+  color-token table which explicitly lists Primary for "active tab" —
+  deliberately not reusing the existing `bg_chip_selected.xml`, since
+  that one's default fill, `anydrop_primary_container`, is too light for
+  white chip text; that drawable is only safe as used elsewhere, retinted
+  per-status at runtime).
+- **Drag-to-reorder** (§5) — `CategoryAdapter.kt` gained a `reorderMode`
+  flag (default off) and a `moveItem()` used by a new `ItemTouchHelper`
+  (`MenuFragment`, vertical drag only, `isLongPressDragEnabled = false` —
+  the row's new ☰ drag-handle TextView starts the drag itself via
+  `ACTION_DOWN` instead). `MenuFragment`'s "⇅ Reorder"/"Done" toggle
+  (new header button) enters/exits reorder mode; entering it clears any
+  active search/tab filter and shows every active category collapsed to
+  just name + item count (items/edit/delete/add-item hidden — see
+  `CategoryAdapter`'s class doc for why). "Done" diffs the on-screen order
+  against each category's last-known `sortOrder`, calls
+  `categories-update.php` once per category whose position actually
+  changed (new sequential 0..n-1 values, not gapped), shows a
+  success/failure toast either way, then reloads from the server
+  regardless (so any partial-failure leaves the UI showing server truth,
+  not a half-applied local reorder).
+- **Design call, documented in both `MenuFragment`'s and
+  `CategoryAdapter`'s class docs**: search, tab-strip filtering, and
+  reorder mode are treated as mutually exclusive rather than combined.
+  Starting a search or entering reorder mode clears the tab selection;
+  entering reorder mode also clears any active search. Reordering only
+  ever operates on the full active-category list, never a filtered
+  subset — dragging within a filtered view wouldn't reflect real
+  positions relative to hidden categories.
+- Added a stale-selection guard in both `MenuFragment.applyDisplayFilter()`
+  and `CategoryTabAdapter.submitCategories()`: if the tab-selected category
+  gets deleted/deactivated elsewhere (e.g. the 🗑️ button) between loads,
+  selection silently falls back to "All" instead of filtering the list
+  down to nothing.
+
+### 🟡 Known gaps / not done this session
+- **No build/compile verification** — same standing limitation, seven
+  sessions running now. New unverified surface this session: the
+  `ItemTouchHelper.SimpleCallback` wiring itself (never compiled or
+  run in this project before), the nested-RecyclerView-inside-drag
+  interaction (dragging a `CategoryViewHolder` whose `itemsRecycler` is
+  set to a null adapter mid-drag), and `SwipeRefreshLayout.isEnabled`
+  toggling around reorder mode.
+- **Reordering only repositions active categories** — inactive
+  (soft-disabled) categories keep whatever `sort_order` they had before;
+  since they're invisible in every current UI surface this doesn't cause
+  a visible bug, but their stored `sort_order` can end up interleaved
+  with the newly-sequential active values. Worth a cleanup pass if/when
+  category restore (re-activating a disabled category) gets built.
+- **No "long-press anywhere on the row" drag start** — deliberately
+  scoped to the ☰ handle only (`isLongPressDragEnabled = false`), so a
+  future accidental long-press on the category name/count doesn't start
+  a drag by surprise. If real-device testing finds the handle's hit area
+  too small to grab reliably, widen its padding rather than falling back
+  to whole-row long-press.
+
+### ⏭️ Next
+§10 item 4 is now feature-complete client + server side (photo thumbnail,
+search, skeleton, tabs strip, drag-reorder). Per `NEXT_SESSION_PROMPT.md`'s
+standing top priority: **build both APKs with a real toolchain** —
+nothing in this project has been compiled since it started (now the
+oldest and largest pile of unverified surface, seven sessions deep) —
+before adding anything else. Then Account tab (§10 item 5).
+
+---
+
+## 2026-08-16 — Backend: category/menu-item PHP endpoints (this session)
+
+Per `NEXT_SESSION_PROMPT.md`'s note that this upload was a partial project
+export — the client side (`ApiService.kt`) already declared 8 endpoints
+under `restaurant/` that had no backend file in this zip. Built all 8
+now, following this codebase's existing conventions (`lib/response.php`,
+`lib/auth.php`'s `require_auth('restaurant')`, `Database::get()`,
+partial-update pattern from `status-update.php`/`orders-status.php`).
+
+### ✅ Done — `backend/api/v1/restaurant/`
+- **`categories-list.php`** (GET) — all of the restaurant's categories
+  (active + inactive; `CategoryAdapter.kt` already filters to
+  `is_active` client-side), with a live `item_count` subquery per row.
+- **`categories-create.php`** (POST) — `sort_order` defaults to
+  "append to end" when omitted (current client never sends it).
+- **`categories-update.php`** (POST, `?id=`) — partial update
+  (name / sort_order / is_active), ownership-checked.
+- **`categories-delete.php`** (POST, `?id=`) — soft-disable
+  (`is_active = 0`), **not** a hard delete: `menu_categories` has no
+  `deleted_at` column per `01_Database_Schema.md` §2, and this avoids
+  orphaning any `menu_items` still pointing at the category.
+- **`menu-items-list.php`** (GET, `?category_id=&search=`) — both
+  filters optional/combinable; `search` is a `name LIKE %q%` match.
+  Includes out-of-stock (`is_available = 0`) items, same reasoning as
+  the customer-facing `restaurants/menu.php`.
+- **`menu-items-create.php`** (POST) — validates `category_id` belongs
+  to the calling restaurant before inserting; `prep_time_minutes`
+  defaults to 15 (schema default) when omitted.
+- **`menu-items-update.php`** (POST, `?id=`) — partial update; doubles
+  as the out-of-stock toggle's write path (`{"is_available": bool}`
+  only) and the full edit-dialog save. Re-validates `category_id`
+  ownership if that field is being changed.
+- **`menu-items-delete.php`** (POST, `?id=`) — soft delete
+  (`deleted_at = NOW()`), since `menu_items` (unlike categories) does
+  have that column. Past orders are unaffected — `order_items` snapshots
+  `item_name_snapshot`/`unit_price` at order time rather than joining
+  live to `menu_items` (`01_Database_Schema.md` §"order_items").
+
+No `.htaccess` changes needed — the Restaurant App calls these `.php`
+files directly by path (`@GET("restaurant/categories-list.php")` etc.,
+same as the already-working `orders-list.php` etc.), not through the
+pretty-route rewrites those older endpoints also happen to have.
+
+### 🟡 Known gaps / not done this session
+- **No build/compile verification** — same standing PHP-side limitation:
+  no PHP CLI in this sandbox to lint-check, let alone a real DB to run
+  these against. Balanced braces/parens checked mechanically only.
+  First real-toolchain step: hit each endpoint once (Postman/curl) against
+  a seeded restaurant before trusting the Android client-side work from
+  earlier today against it.
+- **Client-side Menu tab work (photo thumbnail, search wiring, skeleton)
+  not touched this session** — that was already done per the entry
+  below; this session was backend-only, per the app owner's explicit
+  "pehle backend sahi karo" instruction.
+- `discount_percent`, `is_recommended`, `is_bestseller` aren't settable
+  through `menu-items-create.php`/`menu-items-update.php` — no UI sends
+  them yet (`MenuItemCreateBody`/`MenuItemUpdateBody` don't expose them
+  either), so they're left at their schema defaults for every item
+  created through this app so far.
+
+### ⏭️ Next
+Build/smoke-test both the backend (this session) and the client
+(2026-08-16 Menu tab entry below, 2026-08-15 Orders tab entry further
+below) together with a real toolchain — per `NEXT_SESSION_PROMPT.md`'s
+standing top priority, oldest unverified risk first. Then close out §10
+item 4 (category-tabs-strip + drag-to-reorder) before moving to Account
+tab (§10 item 5).
+
+---
+
+## 2026-08-16 — Menu tab: photo thumbnail + search + skeleton (this session, partial)
+
+Per `NEXT_SESSION_PROMPT.md` / doc 19 §10 item 4, picking up Menu
+Management after the Orders tab redesign. **This session only covers
+part of item 4** — photo thumbnail slot, search bar wiring, and the
+skeleton state. Category-tabs-strip (5+ categories) and drag-to-reorder
+are still not done — see gaps below.
+
+### ✅ Done
+- **Photo thumbnail slot** (`item_menu_food.xml` + `MenuItemAdapter.kt`):
+  44dp `ImageView` added before the veg dot, matching
+  `skeleton_menu_item_row.xml`'s already-built proportions (the plan's
+  §5 text says "60×60" but the skeleton built two sessions ago locked
+  in 44dp first, so this follows that rather than the plan doc — worth
+  reconciling if it's noticed). Loaded via Coil (`item.imageUrl`,
+  crossfade); falls back to a new `ic_food_placeholder.xml` (tinted
+  `text_secondary`, inset) when there's no photo yet or the load fails.
+  `restaurant/app/build.gradle` — added `io.coil-kt:coil:2.6.0`, same
+  version the Customer app already uses.
+- **Search bar** (`fragment_menu.xml` + `MenuFragment.kt`): pill-style
+  bar under the header (copied `bg_search_pill.xml`/`ic_search.xml`
+  from the Customer app for visual consistency), 400ms-debounced
+  `TextWatcher` calling `getMenuItems(search = query)` — the backend
+  `?search=` param the plan doc noted as "already ready." Categories
+  with zero matching items under an active search are filtered out of
+  the list client-side (an empty category card under a search felt
+  like noise); a `menu_search_no_results` string swaps in for the
+  usual empty-state text while a query is active.
+- **Skeleton state** (§9.2): new `skeleton_menu_category_card.xml`
+  (title bar + 3× the existing `skeleton_menu_item_row.xml`), wrapped
+  in `ShimmerFrameLayout` inside a `ScrollView`, same
+  show-on-first-load/hide-after-response pattern as the Orders tab's
+  per-section skeletons. Shown on true first load and on a fresh
+  search (new result set); **not** shown on pull-to-refresh — that
+  keeps `SwipeRefreshLayout`'s own small spinner per §9.1.
+
+### 🟡 Known gaps / not done this session
+- **No build/compile verification** — same standing limitation, now
+  six sessions running (no Android SDK, no network access in this
+  sandbox). New unverified surface this session: the Coil dependency
+  addition itself (never built with it in this project), `ImageView`
+  padding/scaleType toggling in `MenuItemAdapter.bind()`, and
+  `fragment_menu.xml`'s new `ScrollView`-wrapped skeleton stacked
+  inside the existing `SwipeRefreshLayout`/`FrameLayout`.
+- **Category-tabs-strip variant not built** — §5's "horizontal scroll
+  strip once a restaurant has 5+ categories" is still the old stacked
+  cards regardless of category count.
+- **Drag-to-reorder not built** — `sort_order` exists backend-side per
+  the plan doc, but no drag handle or reorder UI was added this
+  session.
+- **This zip fragment doesn't include the backend `restaurant/`
+  category/menu-item PHP endpoints** — `ApiService.kt` already
+  declared `getCategories()`/`getMenuItems(search=...)` from a prior
+  session, so this session only had to wire the client side. Not a
+  gap in the work itself, just a note that this upload was a partial
+  project export.
+
+### ⏭️ Next
+Per doc 19 §10, still within item 4: category-tabs-strip (5+
+categories) and drag-to-reorder, to close out Menu tab. Then, per
+`NEXT_SESSION_PROMPT.md`'s standing top priority — build both APKs
+with a real toolchain and smoke-test everything unverified so far
+(Orders tab redesign from 2026-08-15, plus this session's Menu tab
+changes) before moving to §10 item 5 (Account tab).
+
+---
+
+## 2026-08-15 — Orders tab redesign, OrderAdapter + OrdersFragment rebuild (earlier session)
 
 Per `NEXT_SESSION_PROMPT.md`'s "Next work, in order" list — items 1–3,
 continuing straight from the UI-groundwork entry directly below (same

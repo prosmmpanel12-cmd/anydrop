@@ -1,7 +1,9 @@
 package com.anydrop.restaurant.ui.menu
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -15,6 +17,17 @@ import com.anydrop.restaurant.network.MenuItem
  * items nested inside via MenuItemAdapter. Items are grouped client-side
  * from the flat menu-items-list.php response (keyed by category_id), same
  * shape the Customer App's own menu screen already groups by.
+ *
+ * §10 item 4 follow-up (this pass) — drag-to-reorder. `reorderMode` is
+ * driven by MenuFragment's "⇅ Reorder" toggle: while active, this adapter
+ * shows every active category (search/tab-strip filtering is bypassed by
+ * the fragment for the duration, see MenuFragment.enterReorderMode()) with
+ * a drag handle, and collapses each card down to just name + item count —
+ * items/edit/delete/add-item are hidden so a drag can't accidentally land
+ * on one of those controls mid-gesture. `moveItem()` only reorders the
+ * adapter's own in-memory list for live drag feedback; MenuFragment is the
+ * one that persists the final order (sort_order) to the backend once the
+ * user taps "Done".
  */
 class CategoryAdapter(
     private val context: Context,
@@ -23,11 +36,14 @@ class CategoryAdapter(
     private val onAddItem: (MenuCategory) -> Unit,
     private val onToggleItemAvailable: (MenuItem, Boolean) -> Unit,
     private val onEditItem: (MenuItem) -> Unit,
-    private val onDeleteItem: (MenuItem) -> Unit
+    private val onDeleteItem: (MenuItem) -> Unit,
+    private val onStartDrag: (RecyclerView.ViewHolder) -> Unit = {}
 ) : RecyclerView.Adapter<CategoryAdapter.CategoryViewHolder>() {
 
     private val categories = mutableListOf<MenuCategory>()
     private var itemsByCategory: Map<Int, List<MenuItem>> = emptyMap()
+    var reorderMode: Boolean = false
+        private set
 
     fun submitData(newCategories: List<MenuCategory>, newItems: List<MenuItem>) {
         categories.clear()
@@ -36,6 +52,23 @@ class CategoryAdapter(
         categories.addAll(newCategories.filter { it.isActive })
         itemsByCategory = newItems.groupBy { it.categoryId }
         notifyDataSetChanged()
+    }
+
+    fun setReorderMode(enabled: Boolean) {
+        if (reorderMode == enabled) return
+        reorderMode = enabled
+        notifyDataSetChanged()
+    }
+
+    /** Current on-screen order — MenuFragment reads this to compute new sort_order values. */
+    fun currentOrder(): List<MenuCategory> = categories.toList()
+
+    /** Live-reorders the in-memory list as the user drags; ItemTouchHelper calls this per swap. */
+    fun moveItem(fromPosition: Int, toPosition: Int) {
+        if (fromPosition == toPosition) return
+        val moved = categories.removeAt(fromPosition)
+        categories.add(toPosition, moved)
+        notifyItemMoved(fromPosition, toPosition)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CategoryViewHolder {
@@ -49,11 +82,36 @@ class CategoryAdapter(
 
     override fun getItemCount() = categories.size
 
+    @SuppressLint("ClickableViewAccessibility")
     inner class CategoryViewHolder(private val binding: ItemMenuCategoryBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(category: MenuCategory) {
             binding.categoryNameText.text = category.name
             val items = itemsByCategory[category.id] ?: emptyList()
             binding.categoryItemCountText.text = "${items.size} item${if (items.size == 1) "" else "s"}"
+
+            if (reorderMode) {
+                binding.dragHandle.visibility = View.VISIBLE
+                binding.itemsRecycler.visibility = View.GONE
+                binding.emptyItemsText.visibility = View.GONE
+                binding.btnAddItem.visibility = View.GONE
+                binding.btnEditCategory.visibility = View.GONE
+                binding.btnDeleteCategory.visibility = View.GONE
+                binding.dragHandle.setOnTouchListener { _, event ->
+                    if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                        onStartDrag(this)
+                    }
+                    false
+                }
+                binding.itemsRecycler.adapter = null
+                return
+            }
+
+            binding.dragHandle.visibility = View.GONE
+            binding.dragHandle.setOnTouchListener(null)
+            binding.itemsRecycler.visibility = View.VISIBLE
+            binding.btnAddItem.visibility = View.VISIBLE
+            binding.btnEditCategory.visibility = View.VISIBLE
+            binding.btnDeleteCategory.visibility = View.VISIBLE
 
             binding.itemsRecycler.layoutManager = LinearLayoutManager(context)
             binding.itemsRecycler.adapter = MenuItemAdapter(

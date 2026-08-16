@@ -1,0 +1,63 @@
+<?php
+/**
+ * POST /api/v1/restaurant/categories-create.php
+ * Auth: Restaurant token
+ * Request: { "name": "...", "sort_order"?: int }
+ * Response: { "category": {...} }
+ *
+ * sort_order defaults to "append to the end" (current max + 1) when the
+ * client doesn't send one — CategoryCreateBody.sortOrder is nullable and
+ * MenuFragment.saveCategory() never actually passes it today, so this
+ * default path is what every category creation currently hits.
+ */
+
+require_once __DIR__ . '/../../../config/database.php';
+require_once __DIR__ . '/../../../lib/response.php';
+require_once __DIR__ . '/../../../lib/auth.php';
+
+header('Access-Control-Allow-Origin: *');
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    respond_error('method_not_allowed', 405);
+}
+
+$owner = require_auth('restaurant');
+$restaurantId = $owner['owner_id'];
+
+$body = get_json_body();
+require_fields($body, ['name']);
+$name = trim((string) $body['name']);
+if ($name === '') {
+    respond_error('validation_error', 422, ['fields' => ['name']]);
+}
+
+$db = Database::get();
+
+if (isset($body['sort_order']) && $body['sort_order'] !== null) {
+    $sortOrder = (int) $body['sort_order'];
+} else {
+    $maxStmt = $db->prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM menu_categories WHERE restaurant_id = :rid');
+    $maxStmt->execute(['rid' => $restaurantId]);
+    $sortOrder = ((int) $maxStmt->fetch()['m']) + 1;
+}
+
+$insert = $db->prepare(
+    'INSERT INTO menu_categories (restaurant_id, name, sort_order, is_active)
+     VALUES (:rid, :name, :sort_order, 1)'
+);
+$insert->execute([
+    'rid' => $restaurantId,
+    'name' => $name,
+    'sort_order' => $sortOrder,
+]);
+$newId = (int) $db->lastInsertId();
+
+respond_ok([
+    'category' => [
+        'id' => $newId,
+        'name' => $name,
+        'sort_order' => $sortOrder,
+        'is_active' => true,
+        'item_count' => 0,
+    ],
+], 201);

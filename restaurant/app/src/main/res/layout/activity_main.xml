@@ -10,13 +10,20 @@
          OPEN/CLOSED pill, pinned above the bottom nav on every tab.
          Moved here from OrdersFragment as part of the Orders tab
          redesign (§10 item 3) — was a small SwitchMaterial inside
-         OrdersFragment's own top section before this. -->
+         OrdersFragment's own top section before this.
+
+         2026-08-16 palette refresh (§8.1): background swapped from plain
+         white (@color/surface) to the new @color/anydrop_ink dark navy —
+         restaurantNameText recolored to @color/text_on_ink (white) to
+         match. The OPEN/CLOSED pill's own light background
+         (bg_pill_open/bg_pill_closed) is untouched and still reads fine
+         as a light badge sitting on the dark bar. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:background="@color/surface"
+        android:background="@color/anydrop_ink"
         android:paddingHorizontal="16dp"
         android:paddingVertical="14dp"
         android:elevation="2dp">
@@ -28,7 +35,7 @@
             android:layout_weight="1"
             android:textSize="18sp"
             android:textStyle="bold"
-            android:textColor="@color/text_primary"
+            android:textColor="@color/text_on_ink"
             android:maxLines="1"
             android:ellipsize="end" />
 
@@ -67,11 +74,16 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
+    <!-- 2026-08-16 palette refresh (§8.1): background swapped to
+         @color/anydrop_ink to match the top bar, so the nav chrome reads
+         as one continuous dark "frame" around the white content area
+         instead of two separate white bars top and bottom. Item tint
+         swapped to bottom_nav_item_color's dark-surface variant (below). -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottomNav"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/surface"
+        android:background="@color/anydrop_ink"
         app:itemIconTint="@color/bottom_nav_item_color"
         app:itemTextColor="@color/bottom_nav_item_color"
         app:menu="@menu/bottom_nav_menu" />

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fork-and-plate placeholder shown in the menu item thumbnail slot
+     (item_menu_food.xml) until the item has a real photo, or if the
+     photo fails to load. Sized/tinted at the call site. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM7,7h1.5v3.5H10V7h1.5v6H10v4.5H8.5V13H7c-0.55,0 -1,-0.45 -1,-1V8C6,7.45 6.45,7 7,7zM17,7v10h-1.5v-4c-1.1,0 -2,-0.9 -2,-2V7H15v3.5c0,0.28 0.22,0.5 0.5,0.5S16,10.78 16,10.5V7H17z"/>
+</vector>

@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
 import com.anydrop.restaurant.R
 import com.anydrop.restaurant.databinding.ItemMenuFoodBinding
 import com.anydrop.restaurant.network.MenuItem
@@ -45,6 +46,28 @@ class MenuItemAdapter(
         fun bind(item: MenuItem) {
             binding.itemNameText.text = item.name
             binding.itemPriceText.text = "₹${"%.2f".format(item.price)}"
+
+            // §5 photo thumbnail slot — placeholder icon (inset, tinted, so
+            // it reads as "no photo yet" rather than a broken image) until
+            // photo upload ships and image_url starts getting populated;
+            // real photos fill the full 44dp square edge-to-edge.
+            val secondaryTint = ContextCompat.getColor(context, R.color.text_secondary)
+            if (!item.imageUrl.isNullOrBlank()) {
+                binding.itemThumb.imageTintList = null
+                binding.itemThumb.setPadding(0, 0, 0, 0)
+                binding.itemThumb.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                binding.itemThumb.load(item.imageUrl) {
+                    placeholder(R.drawable.ic_food_placeholder)
+                    error(R.drawable.ic_food_placeholder)
+                    crossfade(true)
+                }
+            } else {
+                val insetPx = (10 * context.resources.displayMetrics.density).toInt()
+                binding.itemThumb.setPadding(insetPx, insetPx, insetPx, insetPx)
+                binding.itemThumb.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                binding.itemThumb.setImageResource(R.drawable.ic_food_placeholder)
+                binding.itemThumb.imageTintList = android.content.res.ColorStateList.valueOf(secondaryTint)
+            }
 
             val vegColor = ContextCompat.getColor(context, if (item.isVeg) R.color.veg_green else R.color.nonveg_red)
             binding.vegDot.background.setTint(vegColor)

@@ -8,7 +8,11 @@
         <item name="colorOnSurfaceVariant">@color/text_secondary</item>
         <item name="colorOutline">@color/outline</item>
         <item name="android:windowBackground">@color/background</item>
-        <item name="android:statusBarColor">@color/anydrop_primary</item>
+        <!-- 2026-08-16 palette refresh (docs/restorent/19 §8.1) — status bar
+             now matches the new dark "ink" top bar in activity_main.xml
+             instead of the flat orange bar the old design used. -->
+        <item name="android:statusBarColor">@color/anydrop_ink</item>
+        <item name="android:windowLightStatusBar">false</item>
         <item name="android:textColorPrimary">@color/text_primary</item>
         <item name="android:textColorSecondary">@color/text_secondary</item>
     </style>

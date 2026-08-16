@@ -135,4 +135,14 @@
     <string name="menu_category_saved">Category saved</string>
     <string name="menu_item_deleted">Item deleted</string>
     <string name="menu_category_deleted">Category deleted</string>
+    <string name="menu_search_hint">Search menu</string>
+    <string name="menu_search_no_results">No items match \"%1$s\"</string>
+
+    <!-- §10 item 4 follow-up — category tabs strip + drag-to-reorder -->
+    <string name="menu_tab_all">All</string>
+    <string name="btn_reorder_categories">⇅ Reorder</string>
+    <string name="btn_reorder_done">Done</string>
+    <string name="menu_reorder_hint">Drag ☰ to reorder categories</string>
+    <string name="menu_reorder_saved">Category order saved</string>
+    <string name="menu_reorder_failed">Couldn\'t save the new order — pull to refresh and try again</string>
 </resources>

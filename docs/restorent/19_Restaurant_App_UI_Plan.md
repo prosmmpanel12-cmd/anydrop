@@ -92,7 +92,73 @@ Keep the category-card structure already built, add:
 
 ## 8. Visual language
 
-Keep the existing palette — it already reads close to Swiggy's warm-orange identity, no need to change it:
+### 8.1 Palette refresh (2026-08-16)
+
+The original palette (kept unchanged through 2026-08-15, see the old
+table below) was judged too flat to read as a considered design — plain
+white top bar, plain white bottom nav, single orange accent, nothing else
+doing any visual work. Picked a refreshed palette from a set of options
+the app owner shared (Instagram-style color-pair cards), cross-checked
+against current restaurant-dashboard / delivery-partner app UI trends
+(dark structural chrome + one bright accent color is the common pattern
+now, not flat white-everywhere):
+
+| Token | Value | Use |
+|---|---|---|
+| Primary | `#F54F1B` ("Exotic Orange") | buttons, active tab, OPEN toggle, bottom nav selected icon |
+| Primary dark | `#C93E12` | pressed states |
+| Primary container | `#FFDED2` | chips, switch tracks |
+| **Ink** (new) | `#1E223D` ("Midnight Blue") | top bar background, bottom nav background, status bar |
+| Ink light (new) | `#2A2F52` | elevated dark surfaces / pressed states on ink |
+| Text on ink (new) | `#FFFFFF` | text/icons on the ink top bar and bottom nav |
+| Text on ink, muted (new) | `#9AA0C3` | unselected bottom nav icons |
+| Veg green | `#2E7D32` | veg dot, veg switch |
+| Non-veg red | `#C62828` | non-veg dot |
+
+**Why this pair and not one of the other options offered:** food-app
+color psychology is a real, well-documented constraint, not just
+preference — warm hues (red/orange/yellow) read as appetizing and are
+what nearly every major food brand uses (Swiggy, Zomato, DoorDash,
+McDonald's); cool blues are established as appetite-*suppressing* and are
+deliberately rare in F&B branding. That ruled out picking any of the
+blue-led pairs (Champion Blue/Lavender Tonic, Atlantic Blue/Soft Sky
+Blue, Imperial Blue/White Convolvulus) as the *primary* color, however
+good they looked on their own. Exotic Orange kept the app in the same
+warm family as the color it's replacing (`#E64A19` → `#F54F1B`) — brand
+continuity, not a reskin from scratch — while reading more saturated and
+energetic. Midnight Blue then filled a real gap the old palette didn't
+have: a dark structural token for chrome, not content. It's used only on
+the top bar, bottom nav, and status bar — not on white content surfaces
+(`@color/surface`), so this is additive (a new second surface family) not
+a full switch away from the light-content-on-white approach that's
+already correct for order/menu cards.
+
+**Implemented this pass (colors.xml, themes.xml, activity_main.xml,
+bottom_nav_item_color.xml):** primary color values, status bar, top bar
+background + text, bottom nav background + item tint states. Because
+nearly every screen's buttons/switches/active states pull from
+`colorPrimary`/`@color/anydrop_primary` rather than a hardcoded hex, this
+one token-level change cascades automatically across the whole app
+(confirmed no screen hardcodes the old `#E64A19`/`#B23C14`/`#FFE0D3` hex
+values directly — grepped, only `colors.xml` itself had a comment
+mentioning them).
+
+**Not implemented this pass — flagged as follow-up, not silently
+skipped:** individual screens that hardcode `@color/surface` (white) as
+a full-screen background rather than inheriting from the shared chrome —
+`activity_login.xml`, `activity_signup.xml`, `activity_otp_verify.xml`,
+`activity_signup_success.xml`, `activity_splash.xml`,
+`activity_order_detail.xml` — weren't touched. Those are pre-login /
+detail screens outside the bottom-nav shell this pass focused on; giving
+them a matching ink accent (e.g. a dark hero panel on login/splash) is a
+reasonable next design pass but needs its own layout pass per screen,
+not a token swap, so it wasn't safe to do blind in the time available
+here.
+
+### 8.2 Original tokens (superseded 2026-08-16, kept for history)
+
+Prior palette — read close to Swiggy's warm-orange identity, changed
+above for the reasons in §8.1, not because it was wrong:
 
 | Token | Value | Use |
 |---|---|---|
@@ -158,5 +224,6 @@ Skeleton layout XML for a screen is written **in the same PR** as that screen's 
 4. Menu tab: photo thumbnail slot + search bar wiring + its skeleton state together (backend already ready).
 5. Account tab: profile edit form + its skeleton state together.
 6. Insights tab: needs new backend endpoint first, then the UI + its skeleton state together.
+7. **Pre-login/detail screens ink pass** (new, 2026-08-16) — give `activity_login.xml`, `activity_signup.xml`, `activity_otp_verify.xml`, `activity_signup_success.xml`, `activity_splash.xml`, and `activity_order_detail.xml` a matching visual pass against the §8.1 palette refresh (e.g. a dark `anydrop_ink` hero panel on login/splash, consistent header treatment on order detail) — these currently still use the plain white `@color/surface` background from before the refresh; flagged rather than silently left inconsistent.
 
 Say the word and I'll start on #1 (shared skeleton/shimmer piece) next — that's the one everything else hangs off of now.

@@ -8,6 +8,15 @@
     android:paddingVertical="8dp"
     android:background="?attr/selectableItemBackground">
 
+    <ImageView
+        android:id="@+id/itemThumb"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_marginEnd="10dp"
+        android:scaleType="centerCrop"
+        android:background="@drawable/bg_skeleton_thumb"
+        android:contentDescription="@null" />
+
     <View
         android:id="@+id/vegDot"
         android:layout_width="10dp"
