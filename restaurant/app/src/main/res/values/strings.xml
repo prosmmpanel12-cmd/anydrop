@@ -156,6 +156,16 @@
     <string name="row_set_location">Set restaurant location on map</string>
     <string name="row_location_set">Location set ✓ (tap to change)</string>
 
+    <!-- Location split into 2 parts (app-owner ask, 2026-08-17). -->
+    <string name="row_use_current_location">Use current location (GPS)</string>
+    <string name="row_choose_on_map">Choose on map</string>
+    <string name="row_current_location_set">Current location used ✓ (tap to refresh)</string>
+    <string name="row_map_location_set">Location set on map ✓ (tap to change)</string>
+    <string name="location_fetching">Fetching your location…</string>
+    <string name="location_gps_off">Turn on device location (GPS) and try again</string>
+    <string name="location_permission_denied">Location permission denied</string>
+    <string name="location_fetch_failed">Couldn\'t get your location, try \"Choose on map\" instead</string>
+
     <!-- Location Picker (Edit Profile), 2026-08-16 — reuses Customer app's
          H6 MapPinDropActivity copy/strings pattern, trimmed for a single
          restaurant-address use case (no photo, no saved-addresses list). -->

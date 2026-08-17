@@ -59,13 +59,24 @@ class EditProfileActivity : AppCompatActivity() {
     private var currentLogoUrl: String? = null
     private var saveInFlight = false
 
-    // Staged location pick — null until the user actually opens the map
-    // and confirms, same "only applied on Save" pattern as pickedLogoUri
-    // above. Pre-filled from the loaded profile in populate() if one was
-    // already saved, so re-saving the form without touching the location
-    // row doesn't accidentally clear it.
+    // Staged location pick — null until the user actually picks one (either
+    // via GPS or the map), same "only applied on Save" pattern as
+    // pickedLogoUri above. Pre-filled from the loaded profile in populate()
+    // if one was already saved, so re-saving the form without touching
+    // either location row doesn't accidentally clear it.
     private var pickedLat: Double? = null
     private var pickedLng: Double? = null
+
+    // Which row last set pickedLat/pickedLng — purely for
+    // renderLocationRowState()'s label text (app-owner ask, 2026-08-17:
+    // "2 bhag mein dalo"); both rows write into the exact same
+    // pickedLat/pickedLng and profile-update.php has no concept of "how"
+    // a location was set, so this never leaves the UI layer. Starts null
+    // (unknown/not-this-session) for a location loaded from the existing
+    // profile — renderLocationRowState() falls back to a source-agnostic
+    // label in that case.
+    private enum class LocationSource { GPS, MAP }
+    private var pickedLocationSource: LocationSource? = null
 
     // 1 (Monday) .. 7 (Sunday), matches lib validation on profile-update.php
     // (PHP's date('N') convention, same as lib/restaurant_status.php).
@@ -124,10 +135,76 @@ class EditProfileActivity : AppCompatActivity() {
                 if (!lat.isNaN() && !lng.isNaN()) {
                     pickedLat = lat
                     pickedLng = lng
+                    pickedLocationSource = LocationSource.MAP
                     renderLocationRowState()
                 }
             }
         }
+
+    // ---- "Use current location" (app-owner ask, 2026-08-17) — deliberately
+    // plain android.location.LocationManager + Geocoder, same APIs
+    // LocationPickerActivity's own GPS button already uses internally, but
+    // called directly here with **no Maps SDK/GoogleMap involved at all**.
+    // That's the actual point of splitting this into its own row: a
+    // restaurant owner standing in their own restaurant just wants their
+    // GPS fix saved, and that shouldn't require the Google Maps SDK to have
+    // initialized (or a real google_maps_key to be configured) at all — see
+    // CropActivity-style "no new dependency" reasoning elsewhere in this
+    // session, same spirit here with an SDK this app already has but
+    // doesn't need to invoke for this particular action. ----
+
+    private val currentLocationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) fetchCurrentLocationForRow()
+            else InAppNotifier.show(this, getString(R.string.location_permission_denied), InAppNotifier.Type.INFO)
+        }
+
+    private fun useCurrentLocation() {
+        val fineGranted = androidx.core.content.ContextCompat.checkSelfPermission(
+            this, android.Manifest.permission.ACCESS_FINE_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (fineGranted) {
+            fetchCurrentLocationForRow()
+        } else {
+            currentLocationPermissionLauncher.launch(android.Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+    private fun fetchCurrentLocationForRow() {
+        val locationManager = getSystemService(LOCATION_SERVICE) as android.location.LocationManager
+        val hasGps = locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)
+        val hasNetwork = locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
+        if (!hasGps && !hasNetwork) {
+            InAppNotifier.show(this, getString(R.string.location_gps_off), InAppNotifier.Type.INFO)
+            return
+        }
+        InAppNotifier.show(this, getString(R.string.location_fetching), InAppNotifier.Type.INFO)
+        val provider = if (hasGps) android.location.LocationManager.GPS_PROVIDER else android.location.LocationManager.NETWORK_PROVIDER
+        try {
+            val lastKnown = locationManager.getLastKnownLocation(provider)
+            if (lastKnown != null) {
+                onCurrentLocationResolved(lastKnown)
+            } else {
+                locationManager.requestSingleUpdate(
+                    provider,
+                    { location -> onCurrentLocationResolved(location) },
+                    android.os.Looper.getMainLooper()
+                )
+            }
+        } catch (e: SecurityException) {
+            // Permission race (revoked between the check and this call) —
+            // non-fatal, same handling as LocationPickerActivity's own copy
+            // of this same try/catch.
+        }
+    }
+
+    private fun onCurrentLocationResolved(location: android.location.Location) {
+        pickedLat = location.latitude
+        pickedLng = location.longitude
+        pickedLocationSource = LocationSource.GPS
+        renderLocationRowState()
+        InAppNotifier.show(this, getString(R.string.row_current_location_set), InAppNotifier.Type.SUCCESS)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -147,6 +224,7 @@ class EditProfileActivity : AppCompatActivity() {
         binding.rowOpeningTime.setOnClickListener { showTimePicker(isOpening = true) }
         binding.rowClosingTime.setOnClickListener { showTimePicker(isOpening = false) }
         binding.rowSetLocation.setOnClickListener { openLocationPicker() }
+        binding.rowUseCurrentLocation.setOnClickListener { useCurrentLocation() }
         binding.btnSaveProfile.setOnClickListener { save() }
     }
 
@@ -248,10 +326,20 @@ class EditProfileActivity : AppCompatActivity() {
     }
 
     private fun renderLocationRowState() {
-        binding.locationRowText.text = if (pickedLat != null && pickedLng != null) {
-            getString(R.string.row_location_set)
-        } else {
-            getString(R.string.row_set_location)
+        val hasLocation = pickedLat != null && pickedLng != null
+        // Both rows reflect the *same* staged pickedLat/pickedLng — there's
+        // only one location on a restaurant's profile, not one-per-row —
+        // but each row's own label reflects whichever source set it most
+        // recently, so re-opening this screen shows exactly what will be
+        // saved rather than always defaulting to one row's wording.
+        binding.useCurrentLocationRowText.text = when {
+            hasLocation && pickedLocationSource == LocationSource.GPS -> getString(R.string.row_current_location_set)
+            else -> getString(R.string.row_use_current_location)
+        }
+        binding.locationRowText.text = when {
+            hasLocation && pickedLocationSource == LocationSource.MAP -> getString(R.string.row_map_location_set)
+            hasLocation -> getString(R.string.row_location_set)
+            else -> getString(R.string.row_choose_on_map)
         }
     }
 

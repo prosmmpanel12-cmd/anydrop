@@ -64,9 +64,19 @@ import java.util.Locale
  */
 class MapPinDropActivity : AppCompatActivity(), OnMapReadyCallback {
 
+    companion object {
+        /** See AddressEditorBottomSheet's identical flag for why this
+         * matters — only the account's very first address should
+         * auto-become the default; every add after that must leave the
+         * user's actual default alone. Callers should pass
+         * `addresses.isEmpty()` from whatever address list they last loaded. */
+        const val EXTRA_IS_FIRST_ADDRESS = "is_first_address"
+    }
+
     private lateinit var binding: ActivityMapPinDropBinding
     private val api by lazy { ApiClient.create(this) }
     private var googleMap: GoogleMap? = null
+    private val isFirstAddress: Boolean by lazy { intent.getBooleanExtra(EXTRA_IS_FIRST_ADDRESS, false) }
 
     // Osian, Jodhpur — same fallback center used elsewhere in this project's
     // planning for this region; only used when no GPS fix is available at
@@ -427,7 +437,12 @@ class MapPinDropActivity : AppCompatActivity(), OnMapReadyCallback {
                 receiverPhone = receiverPhone,
                 latitude = resolvedLat,
                 longitude = resolvedLng,
-                isDefault = true,
+                // Bug fix — this was hardcoded `true`, so every address
+                // saved from the map pin-drop screen silently became the
+                // account default and demoted whatever the user had chosen
+                // before, even on a 2nd/3rd/etc. address. Only true when the
+                // caller told us this is the first address ever.
+                isDefault = isFirstAddress,
                 photoUrl = photoUrl
             )
 

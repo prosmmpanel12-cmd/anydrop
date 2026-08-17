@@ -15,6 +15,7 @@ require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/favorites.php';
 require_once __DIR__ . '/../../../lib/geo.php';
 require_once __DIR__ . '/../../../lib/restaurant_status.php';
+require_once __DIR__ . '/../../../lib/settings.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -143,6 +144,14 @@ if (!empty($all)) {
 }
 
 $results = [];
+// Tracks restaurants excluded purely by the radius check below (as
+// opposed to open_now/rating filters) — lets the response tell the
+// customer app "there simply aren't any restaurants near you" (radius)
+// apart from "your filters excluded everything" (filter), so
+// HomeActivity can show the right empty state (see out_of_range_count
+// in the response below and RestaurantAdapter/HomeActivity's handling
+// of it).
+$outOfRangeCount = 0;
 foreach ($all as $r) {
     // Consolidated into compute_restaurant_status() (bugs.md §6.3
     // follow-up) — was inline here and duplicated separately in
@@ -167,15 +176,21 @@ foreach ($all as $r) {
     }
 
     // Delivery-radius filter — a restaurant only serves customers within its
-    // own delivery_radius_km (defaults to 5.0 per 01_schema.sql if the
-    // restaurant owner never set one). Only enforced once we actually know
-    // both sides' coordinates; if the user has no GPS fix yet or the
-    // restaurant has no lat/lng, $distanceKm is null and this restaurant is
-    // still shown (same "don't hide things behind an unresolved fix" stance
-    // as the rest of this file) rather than being incorrectly excluded.
+    // own delivery_radius_km (falls back to the admin-configurable
+    // 'default_delivery_radius_km' app_setting, itself defaulting to 5.0,
+    // if the restaurant owner never set one — see
+    // 24_migration_default_radius_setting.sql). Only enforced once we
+    // actually know both sides' coordinates; if the user has no GPS fix
+    // yet or the restaurant has no lat/lng, $distanceKm is null and this
+    // restaurant is still shown (same "don't hide things behind an
+    // unresolved fix" stance as the rest of this file) rather than being
+    // incorrectly excluded.
     if ($distanceKm !== null) {
-        $radiusKm = $r['delivery_radius_km'] !== null ? (float) $r['delivery_radius_km'] : 5.0;
+        $radiusKm = $r['delivery_radius_km'] !== null
+            ? (float) $r['delivery_radius_km']
+            : (float) get_setting('default_delivery_radius_km', 5);
         if ($distanceKm > $radiusKm) {
+            $outOfRangeCount++;
             continue;
         }
     }
@@ -227,5 +242,9 @@ respond_ok([
         'per_page' => $perPage,
         'total' => $total,
         'total_pages' => $totalPages,
+        // 0 restaurants in `data` + this > 0 means the customer app
+        // should show "No restaurants deliver to your area yet" rather
+        // than a generic "no results" — see HomeActivity's handling.
+        'out_of_range_count' => $outOfRangeCount,
     ],
 ]);

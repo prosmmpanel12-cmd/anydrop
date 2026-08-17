@@ -151,17 +151,26 @@
                     android:minLines="2" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- Location Picker entry point (app-owner real-device feedback,
-                 2026-08-16, docs/restorent/00_Status.md item 3) — opens
-                 LocationPickerActivity, result is staged locally same as
-                 the logo picker above (only actually saved via
-                 profile-update.php on Save, see save()/onActivityResult
-                 handling in EditProfileActivity.kt). Row label switches
-                 between "Set..."/"...set ✓" based on whether a location is
-                 currently staged, same on/off-state pattern as elsewhere
-                 in this screen. -->
+            <!-- Location — split into two separate entry points (app-owner
+                 ask, 2026-08-17: "usko 2 bhag mein dalo — ek GPS se
+                 lat/long nikalega, ek choose on map wala"). Previously a
+                 single "Set Location" row that always opened the full map
+                 screen even for the common case of "I'm standing in my own
+                 restaurant right now, just use my GPS fix" — that always
+                 pulled in the Google Maps SDK (and its real API key
+                 requirement) for something that's really just a location
+                 permission + a GPS read. Now:
+                 - rowUseCurrentLocation: GPS fix + reverse-geocode, done
+                   entirely in EditProfileActivity.kt with plain
+                   LocationManager/Geocoder — no Maps SDK involved, works
+                   even before a real google_maps_key is configured.
+                 - rowChooseOnMap: unchanged, opens LocationPickerActivity
+                   for manually dragging a pin (still needs the Maps key).
+                 Both stage into the same pickedLat/pickedLng/
+                 pickedAddressLine fields and only actually save on the
+                 screen's normal Save button, same as before. -->
             <LinearLayout
-                android:id="@+id/rowSetLocation"
+                android:id="@+id/rowUseCurrentLocation"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
@@ -181,12 +190,44 @@
                     android:contentDescription="@null" />
 
                 <TextView
+                    android:id="@+id/useCurrentLocationRowText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="10dp"
+                    android:text="@string/row_use_current_location"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/rowSetLocation"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_input_outline"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="14dp"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_map_center_pin"
+                    app:tint="@color/text_secondary"
+                    android:contentDescription="@null" />
+
+                <TextView
                     android:id="@+id/locationRowText"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:layout_marginStart="10dp"
-                    android:text="@string/row_set_location"
+                    android:text="@string/row_choose_on_map"
                     android:textColor="@color/text_primary"
                     android:textSize="14sp" />
 

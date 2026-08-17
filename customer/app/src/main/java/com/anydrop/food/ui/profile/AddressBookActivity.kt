@@ -56,7 +56,10 @@ class AddressBookActivity : AppCompatActivity(), AddressEditorBottomSheet.Locati
         val sheet = if (address != null) {
             AddressEditorBottomSheet.newInstance(address)
         } else {
-            AddressEditorBottomSheet.newInstance()
+            // isFirstAddress drives whether this new address auto-becomes
+            // the account default (see AddressEditorBottomSheet kdoc) — the
+            // adapter's current item count is the live truth for that.
+            AddressEditorBottomSheet.newInstance(isFirstAddress = adapter.itemCount == 0)
         }
         sheet.onSaved = { loadAddresses() }
         sheet.show(supportFragmentManager, "address_editor")
@@ -125,8 +128,22 @@ class AddressBookActivity : AppCompatActivity(), AddressEditorBottomSheet.Locati
             try {
                 val response = api.deleteAddress(address.id)
                 if (response.isSuccessful && response.body()?.success == true) {
+                    // Bug fix — deleting an address never used to touch
+                    // ActiveAddressManager. If the address just deleted was
+                    // also the on-device "active" delivery address, Home
+                    // (and anywhere else reading ActiveAddressManager) kept
+                    // right on using its cached lat/lng/label for a row that
+                    // no longer exists server-side — screen looked
+                    // completely unchanged, so it *looked* like delete had
+                    // silently failed even though the server-side delete
+                    // succeeded. Clearing it here forces every screen to
+                    // re-resolve (or fall back to "no address") next time.
+                    val active = com.anydrop.food.data.ActiveAddressManager.get(this@AddressBookActivity)
+                    if (active != null && active.id == address.id) {
+                        com.anydrop.food.data.ActiveAddressManager.clear(this@AddressBookActivity)
+                    }
                     InAppNotifier.show(this@AddressBookActivity, "Address deleted", InAppNotifier.Type.SUCCESS)
-                    loadAddresses()
+                    loadAddresses(afterDelete = true)
                 } else {
                     InAppNotifier.show(this@AddressBookActivity, "Couldn't delete address", InAppNotifier.Type.ERROR)
                 }
@@ -136,14 +153,30 @@ class AddressBookActivity : AppCompatActivity(), AddressEditorBottomSheet.Locati
         }
     }
 
-    private fun loadAddresses() {
+    /** [afterDelete] is only true right after a successful delete — that's
+     * the one case where landing on an empty list should immediately pull up
+     * the add-address flow (which already has "Use current location" wired
+     * in via this Activity's LocationRequester implementation below) rather
+     * than stranding the user on a bare empty state they have to notice and
+     * tap into themselves. A plain refresh/initial load that happens to be
+     * empty (e.g. brand-new account) still just shows the empty state. */
+    private fun loadAddresses(afterDelete: Boolean = false) {
         binding.swipeRefresh.isRefreshing = true
         lifecycleScope.launch {
             try {
                 val addresses = api.getAddresses().body()?.data?.addresses ?: emptyList()
                 adapter.submit(addresses)
-                binding.emptyState.visibility = if (addresses.isEmpty()) android.view.View.VISIBLE else android.view.View.GONE
-                binding.contentList.visibility = if (addresses.isEmpty()) android.view.View.GONE else android.view.View.VISIBLE
+                val isEmpty = addresses.isEmpty()
+                binding.emptyState.visibility = if (isEmpty) android.view.View.VISIBLE else android.view.View.GONE
+                binding.contentList.visibility = if (isEmpty) android.view.View.GONE else android.view.View.VISIBLE
+                if (afterDelete && isEmpty) {
+                    InAppNotifier.show(
+                        this@AddressBookActivity,
+                        "Add a delivery address to keep ordering",
+                        InAppNotifier.Type.INFO
+                    )
+                    openEditor(null)
+                }
             } catch (e: Exception) {
                 InAppNotifier.show(this@AddressBookActivity, "Couldn't load addresses", InAppNotifier.Type.ERROR)
             } finally {

@@ -93,7 +93,10 @@ class LocationPickerActivity : AppCompatActivity(), AddressEditorBottomSheet.Loc
         // still reachable from "..." on an existing saved address (see
         // openEditor(address) below) for straight text-field edits.
         binding.rowAddAddress.setOnClickListener {
-            addAddressLauncher.launch(Intent(this, MapPinDropActivity::class.java))
+            addAddressLauncher.launch(
+                Intent(this, MapPinDropActivity::class.java)
+                    .putExtra(MapPinDropActivity.EXTRA_IS_FIRST_ADDRESS, addresses.isEmpty())
+            )
         }
 
         loadAddresses()

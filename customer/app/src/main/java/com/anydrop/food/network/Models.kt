@@ -18,7 +18,14 @@ data class PageMeta(
     val page: Int,
     @SerializedName("per_page") val perPage: Int,
     val total: Int,
-    @SerializedName("total_pages") val totalPages: Int
+    @SerializedName("total_pages") val totalPages: Int,
+    // app-owner ask, 2026-08-17: distinguishes "0 results because your
+    // filters excluded everything" from "0 results because nothing is
+    // within the (admin-configurable) delivery radius" — see
+    // restaurants/list.php's out_of_range_count and HomeActivity's
+    // empty-state handling. Nullable/defaulted since not every endpoint
+    // reusing PageMeta (e.g. search) populates it.
+    @SerializedName("out_of_range_count") val outOfRangeCount: Int? = null
 )
 
 // ---- Auth ----

@@ -292,6 +292,8 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
         DailyEngagementScheduler.scheduleDailyEngagement(this)
     }
 
+    private var isFirstResume = true
+
     override fun onResume() {
         super.onResume()
         updateCartBadge()
@@ -306,6 +308,19 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
         // banner or elsewhere) and coming back, so re-check on every
         // resume, not just on the loads below.
         updateGpsOffBanner()
+
+        // Bug fix — if the active address got cleared while Home was still
+        // sitting in the backstack (e.g. the user deleted it from Address
+        // Book, or deleted their only address entirely), the cache is now
+        // null but Home itself was never told to re-resolve, so the
+        // location bar/restaurant list kept showing whatever was on screen
+        // before — looked identical to "nothing happened." Skip the very
+        // first resume, since onCreate already just did this exact resolve.
+        if (!isFirstResume && ActiveAddressManager.get(this) == null) {
+            applyActiveAddressUi(null)
+            resolveActiveAddressThenLoad(forceRefresh = true)
+        }
+        isFirstResume = false
     }
 
     private fun openLocationPicker() {

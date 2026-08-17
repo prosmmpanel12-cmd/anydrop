@@ -38,9 +38,25 @@ class AddressEditorBottomSheet private constructor() : BottomSheetDialogFragment
         private const val ARG_RECEIVER_PHONE = "receiver_phone"
         private const val ARG_LATITUDE = "latitude"
         private const val ARG_LONGITUDE = "longitude"
+        private const val ARG_IS_FIRST_ADDRESS = "is_first_address"
 
-        /** Add-new-address mode. */
-        fun newInstance(): AddressEditorBottomSheet = AddressEditorBottomSheet()
+        /**
+         * Add-new-address mode. [isFirstAddress] should be true only when the
+         * caller's current address list is empty — that's the one case the
+         * backend/UX convention actually wants a brand-new address to become
+         * the account default automatically. Every other "add" (2nd, 3rd...
+         * address) must NOT silently flip is_default, or it clobbers
+         * whatever the user had already chosen as their default. Defaults to
+         * false so existing call sites that don't pass it don't regress into
+         * the old "always default" bug.
+         */
+        fun newInstance(isFirstAddress: Boolean = false): AddressEditorBottomSheet {
+            val sheet = AddressEditorBottomSheet()
+            sheet.arguments = Bundle().apply {
+                putBoolean(ARG_IS_FIRST_ADDRESS, isFirstAddress)
+            }
+            return sheet
+        }
 
         /** Edit-existing-address mode — pre-fills every field from `address`. */
         fun newInstance(address: Address): AddressEditorBottomSheet {
@@ -76,6 +92,7 @@ class AddressEditorBottomSheet private constructor() : BottomSheetDialogFragment
 
     private var editingAddressId: Int? = null
     private var selectedType: String = "home"
+    private var isFirstAddress: Boolean = false
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -91,6 +108,7 @@ class AddressEditorBottomSheet private constructor() : BottomSheetDialogFragment
 
         val args = arguments
         editingAddressId = if (args?.containsKey(ARG_ADDRESS_ID) == true) args.getInt(ARG_ADDRESS_ID) else null
+        isFirstAddress = args?.getBoolean(ARG_IS_FIRST_ADDRESS, false) ?: false
 
         if (editingAddressId != null) {
             binding.editorTitle.text = getString(R.string.edit_address_title)
@@ -128,7 +146,15 @@ class AddressEditorBottomSheet private constructor() : BottomSheetDialogFragment
     fun applyResolvedLocation(lat: Double, lng: Double, resolvedAddressLine: String?) {
         prefillLat = lat
         prefillLng = lng
-        if (!resolvedAddressLine.isNullOrBlank() && binding.inputArea.text.isNullOrBlank()) {
+        // Bug fix — this is only ever called in response to the user
+        // explicitly tapping "Use current location" (including re-tapping it
+        // to re-fetch a fresh fix), so the new fix should always win and
+        // overwrite whatever was in the field before (stale manual text, or
+        // a stale fix from an earlier tap). The old `&& text.isNullOrBlank()`
+        // guard meant a re-fetch silently did nothing once the field had any
+        // text in it — lat/lng updated but the visible address line didn't,
+        // so it looked like nothing happened.
+        if (!resolvedAddressLine.isNullOrBlank()) {
             binding.inputArea.setText(resolvedAddressLine)
         }
     }
@@ -189,7 +215,14 @@ class AddressEditorBottomSheet private constructor() : BottomSheetDialogFragment
             receiverPhone = receiverPhone,
             latitude = prefillLat,
             longitude = prefillLng,
-            isDefault = editingAddressId == null // first/new address becomes default; edits keep existing default state server-side
+            // Bug fix — this used to be `editingAddressId == null`, which
+            // made EVERY new address the default (not just the first one),
+            // silently overwriting whatever the user had actually chosen as
+            // default via "Set as default" in Address Book. Only the very
+            // first address (list was empty when this sheet opened) should
+            // auto-become default; edits keep the existing default state
+            // server-side either way.
+            isDefault = editingAddressId == null && isFirstAddress
         )
 
         binding.btnSaveAddress.isEnabled = false

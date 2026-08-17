@@ -203,7 +203,7 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
         val sheet = if (editing != null) {
             AddressEditorBottomSheet.newInstance(editing)
         } else {
-            AddressEditorBottomSheet.newInstance()
+            AddressEditorBottomSheet.newInstance(isFirstAddress = addresses.isEmpty())
         }
         sheet.onSaved = { loadAddresses() }
         sheet.show(supportFragmentManager, "address_editor")

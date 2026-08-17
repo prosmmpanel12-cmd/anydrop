@@ -1,3 +1,69 @@
+## 2026-08-17 (newest) — Admin-configurable default radius + "Use current location" split into its own GPS-only row
+
+Two more app-owner asks, both done:
+
+### ✅ Admin-configurable default delivery/search radius
+Ask: "5km default, baaki ka admin panel se distance aayega — 5km ke
+under koi restaurant ho to show karo, warna Not Available."
+
+- `restaurants/list.php` already filtered restaurants beyond
+  `delivery_radius_km` (per-restaurant, defaults to 5.0) — that part
+  existed since an earlier session. What was hardcoded was the **5.0
+  fallback itself**; now reads `app_settings['default_delivery_radius_km']`
+  via the existing `lib/settings.php` helper (`get_setting()`), seeded to
+  `5` by `backend/sql/24_migration_default_radius_setting.sql`. No admin
+  UI to edit this yet (the Admin Panel itself doesn't exist — see
+  NEXT_SESSION_PROMPT.md's standing backlog item), so for now it's a
+  direct `UPDATE app_settings SET value = '<km>' WHERE \`key\` =
+  'default_delivery_radius_km'` — same manual-SQL stopgap every other
+  app_settings value this project has needs until the Admin Panel ships.
+- The "Not Available" empty state the second half of this ask wants
+  **already existed** (`HomeActivity.setServiceAreaUnavailable()`,
+  `service_area_unavailable_title`/`_message` strings — "We're not
+  available in your area yet") — built in an earlier session, nothing new
+  needed there. It already fires whenever the plain unfiltered Home feed
+  comes back with 0 restaurants, which is exactly what happens once
+  nothing is within radius.
+- Also added `out_of_range_count` to `list.php`'s response `meta` (how
+  many restaurants were excluded specifically by the radius check, as
+  opposed to other filters) and a matching nullable field on the
+  Customer app's `PageMeta` — not consumed anywhere yet, but available
+  for a future "N restaurants nearby but outside your area" messaging
+  if ever wanted; today's binary Not-Available state doesn't need it.
+
+### ✅ Restaurant location split into 2 separate entry points
+Ask: "usko 2 bhag mein dalo — ek GPS se lat/long nikalega, ek choose on
+map wala."
+
+Previously Edit Profile had one "Set restaurant location on map" row
+that always opened `LocationPickerActivity` (the full Google-Maps-SDK
+screen) — even for the common "I'm standing in my restaurant right now,
+just use my GPS" case. Split into two rows in `activity_edit_profile.xml`:
+- **"Use current location (GPS)"** — new code, entirely inside
+  `EditProfileActivity.kt`, plain `LocationManager` + permission request,
+  **no Maps SDK involved at all**. Sets `pickedLat`/`pickedLng` directly
+  and shows a success toast. Notably this means the GPS half of location-
+  setting now works even before a real `google_maps_key` is configured
+  (see LocationPickerActivity's own kdoc for that standing caveat) — it
+  never touches `GoogleMap`.
+- **"Choose on map"** — unchanged, still opens `LocationPickerActivity`
+  for manually dragging a pin (still needs the real Maps key).
+- Both rows write into the same `pickedLat`/`pickedLng` staged fields
+  (only one location per restaurant, saved the same way either way);
+  a new `pickedLocationSource` enum (GPS/MAP, UI-only, never sent to the
+  backend) drives each row's own label text so re-opening the screen
+  shows which one was actually used most recently.
+
+### 🟡 Not build-verified
+Same standing sandbox limitation as every entry above.
+
+### 🔴 Before deploying
+Run `backend/sql/24_migration_default_radius_setting.sql` against the
+live DB (new app_settings row — INSERT ... ON DUPLICATE KEY UPDATE, safe
+to re-run, but still needs to run once).
+
+---
+
 ## 2026-08-17 (very latest) — Item #3 finished: Customer-app banner carousel built + wired
 
 Completed the piece flagged as "not started" in the previous entry.
