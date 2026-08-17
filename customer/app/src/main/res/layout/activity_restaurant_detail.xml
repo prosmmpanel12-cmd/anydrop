@@ -423,27 +423,22 @@
                 android:focusable="true" />
 
             <!-- In-menu category tab bar (§2.1) — built from the categories already present in
-                 the menu response (restaurant-owner-defined, sort_order-driven); tapping a chip
+                 the menu response (restaurant-owner-defined, sort_order-driven); tapping a tab
                  jumps the scroll position to that category's header. Hidden when there's only
-                 one category (nothing to jump between). -->
-            <HorizontalScrollView
+                 one category (nothing to jump between). Restyled to match Home's food-category
+                 row (icon in a circle + name below) instead of plain text chips — same tap/jump
+                 behavior, just the icon+name visual treatment carried over. -->
+            <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/categoryTabsScroll"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:scrollbars="none"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal"
+                android:paddingHorizontal="6dp"
+                android:clipToPadding="false"
                 android:visibility="gone"
-                tools:visibility="visible">
-
-                <com.google.android.material.chip.ChipGroup
-                    android:id="@+id/categoryTabsGroup"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:layout_marginTop="6dp"
-                    app:chipSpacingHorizontal="8dp"
-                    app:singleLine="true" />
-
-            </HorizontalScrollView>
+                tools:visibility="visible"
+                tools:listitem="@layout/item_menu_category_tab" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/menuList"
