@@ -243,6 +243,10 @@ data class MenuItem(
 data class MenuCategory(
     val id: Int?,
     val name: String,
+    // Category icon set via the Restaurant app's category photo upload —
+    // relative path, needs ApiClient.baseUrlForStaticFiles() prefix same
+    // as every other image_url field, see MenuAdapter's HeaderVH.
+    @SerializedName("image_url") val imageUrl: String? = null,
     val items: List<MenuItem>
 )
 

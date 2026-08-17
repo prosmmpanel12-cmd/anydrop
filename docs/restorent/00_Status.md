@@ -1,3 +1,124 @@
+## 2026-08-17 (later) — Customer app: dish photos, category icons, restaurant logo not rendering (bug report + fix)
+
+App owner reported that item 4's photo uploads (dish + category, plus
+the Restaurant app's Account-tab logo upload) weren't showing up
+anywhere on the **Customer app**'s restaurant detail screen — screenshot
+showed Butter Chicken/Dal Makhani with no thumbnails at all. Root cause
+was **three separate, unrelated gaps**, not one bug:
+
+1. **Dish photos** — `MenuAdapter.kt`'s `ItemVH.bind()` called
+   `binding.itemImage.load(item.imageUrl)` with the raw relative path
+   straight from `restaurants/menu.php`, not prefixed with
+   `ApiClient.baseUrlForStaticFiles(context)`. Exact same bug class as the
+   Restaurant app's `MenuItemAdapter` fix from item 4 — just never made
+   it to this app's own equivalent code. Fixed.
+2. **Category icons** — didn't exist on the customer side *at all*.
+   `restaurants/menu.php`'s category SQL never selected `image_url` and
+   never included it in the response, even though
+   `22_migration_category_image.sql` added the column and the Restaurant
+   app has been able to set it since item 4. Added `image_url` to the
+   category SELECT + response in `menu.php`, added `imageUrl` to the
+   Customer app's `MenuCategory` model, and gave
+   `item_menu_category_header.xml` an actual icon slot (was a bare
+   `TextView` before — now a `LinearLayout` with a 28dp rounded icon +
+   title, tinted `ic_menu_list` placeholder when unset, same
+   pattern as `MenuItemAdapter`'s no-photo state).
+3. **Restaurant logo** — also didn't exist anywhere in the Customer app's
+   UI. `RestaurantDetail.logoUrl` was already modeled (unused) since the
+   bug-1.1 fix session. Added a 40dp circular `detailLogoCard` next to
+   the restaurant name in `activity_restaurant_detail.xml`
+   (`layout_constraintStart_toEndOf` chained so the name's start
+   position collapses back to normal when the card is `gone`), bound
+   from `restaurant.logoUrl` in `RestaurantDetailActivity.kt`. Hidden
+   entirely (not a placeholder) when a restaurant hasn't set one yet.
+
+**Also fixed while in this code:** the restaurant *cover* image had the
+identical unprefixed-URL bug in two places in
+`RestaurantDetailActivity.kt` — the initial intent-extra load (before
+`menu.php` responds) and the re-bind once `menu.php`'s own
+`restaurant.coverUrl` comes back. Neither was reported, but it's the same
+root cause and cheap to fix in the same pass.
+
+### 🟡 Known gaps / not done this session
+- **No build verification** — same standing sandbox limitation as every
+  other session. These are static/logical fixes (grep-verified id
+  matches between XML and Kotlin, verified the SQL column exists per
+  `22_migration_category_image.sql`), not compiled or run.
+- **Did not audit every other `.load()` call in the Customer app** for
+  the same unprefixed-path pattern — a `grep -rn "\.load(" | grep -v
+  baseUrlForStaticFiles` this session turned up ~14 call sites total
+  (`SavedDishAdapter`, `OrderHistoryAdapter`, `SearchResultsAdapter`,
+  `PopularItemsAdapter`, `ItemDetailBottomSheetFragment`,
+  `FoodCategoryAdapter`, `PromoBannerAdapter`, `HomeActivity`'s promo
+  banner, `DishPhotoCarouselView`, `InAppNotifier`, `BannerCarousel`,
+  `SavedRestaurantAdapter`). Only the three the app owner actually
+  reported (+ the cover-image sibling bug) were fixed here. Some of these
+  may be legitimately fine (e.g. admin-configured banner URLs that are
+  already absolute), but each one should be checked the same way before
+  assuming it's safe — don't assume "same file pattern elsewhere" means
+  "already fixed."
+
+### ⏭️ Next
+Audit the remaining `.load()` call sites listed above one by one (same
+question each time: is this field a relative path from the backend, or
+already an absolute URL?) before the next round of on-device testing —
+cheap to do now, expensive to rediscover one broken image at a time
+during manual QA.
+
+---
+
+## 2026-08-17 — Item 4 client half: verified already complete, no code changes needed (this session)
+
+Opened this session expecting to do `NEXT_SESSION_PROMPT.md`'s checklist
+(Models.kt → ApiService.kt → dialog XMLs → MenuFragment.kt → MenuItemAdapter
+bug fix → category thumbnail). **Read every file on the checklist before
+writing anything, and all six items were already fully implemented and
+correctly wired** — `imageUrl`/upload-result classes in `Models.kt`,
+`uploadMenuItemPhoto`/`uploadCategoryPhoto` in `ApiService.kt`, both photo-
+picker rows in `dialog_add_menu_item.xml`/`dialog_add_category.xml`,
+the full staged-Uri-upload-on-Save flow in `MenuFragment.kt` (including
+edit-prefill loading the existing photo via `baseUrlForStaticFiles`), the
+`baseUrlForStaticFiles` prefix fix in `MenuItemAdapter.kt`, and the
+`categoryThumb` ImageView + load logic in `item_menu_category.xml`/
+`CategoryAdapter.kt`. All required strings (`btn_add_photo`,
+`btn_change_photo`, `photo_upload_failed`) exist too.
+
+This means the prior "not started" status in `00_Status.md`'s 2026-08-16
+entry and `NEXT_SESSION_PROMPT.md` was stale by the time of this upload —
+the client work must have been done in a session whose Status.md entry
+either wasn't written or didn't make it into this zip export. **Lesson
+for next time:** always read the actual files the checklist points at
+before assuming the doc's "not done" status is current, same caution
+`NEXT_SESSION_PROMPT.md` already flags for zip-export gaps in the other
+direction (missing files) — this is the mirror case (files present, doc
+just outdated).
+
+**All four app-owner real-device-feedback items are now fully done,
+backend + client, no remaining gaps.**
+
+### 🟡 Still open (unchanged, no sandbox tooling to act on these)
+- **No build/compile verification** — still no Android SDK, PHP CLI, or
+  network in this sandbox. Fourteen-plus sessions of code written and
+  never actually compiled/run. This is the single biggest risk in the
+  project and should be the very next real-world action once a toolchain
+  is available — see the priority list in `NEXT_SESSION_PROMPT.md`.
+- Three upload directories (`restaurant_logos/`, `restaurant_dish_photos/`,
+  `category_photos/`) still unconfirmed to exist on the live InfinityFree
+  server.
+- The logo-upload `BASE_URL`-points-at-`localhost` question is still open.
+
+### ⏭️ Next
+Per doc 18's recommended build order, now that item 4 is confirmed fully
+done: **Admin-side "Approve/Reject pending restaurants" screen** — still
+overdue, self-signup produces pending rows with no approval path except a
+manual DB `UPDATE`. After that, resume doc 18 §"Recommended build order"
+(coupons, notification bell, reviews reply, settings, payments, analytics,
+staff, then Rider App last). Build verification (above) should happen
+alongside/before this, the moment a real toolchain is available — it
+isn't gated on any of this feature work.
+
+---
+
 ## 2026-08-16 — Logo-upload bug: root cause found and fixed (this session, resolves the open investigation above)
 
 App owner tested against **localhost** (KS Web on-device), not a stale/

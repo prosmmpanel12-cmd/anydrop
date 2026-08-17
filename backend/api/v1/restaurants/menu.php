@@ -77,7 +77,7 @@ if ($lat !== null && $lng !== null && $restaurant['latitude'] !== null && $resta
 $etaMinutes = $distanceKm !== null ? (int) round(15 + $distanceKm * 4) : null;
 
 $catStmt = $db->prepare(
-    'SELECT id, name, sort_order FROM menu_categories WHERE restaurant_id = :rid AND is_active = 1 ORDER BY sort_order ASC'
+    'SELECT id, name, sort_order, image_url FROM menu_categories WHERE restaurant_id = :rid AND is_active = 1 ORDER BY sort_order ASC'
 );
 $catStmt->execute(['rid' => $restaurantId]);
 $categories = $catStmt->fetchAll();
@@ -147,6 +147,11 @@ foreach ($categories as $cat) {
     $result[] = [
         'id' => (int) $cat['id'],
         'name' => $cat['name'],
+        // Category icon (customer-side surfacing of the Restaurant app's
+        // category-photo-upload — 22_migration_category_image.sql). Raw
+        // relative path, same as every other image_url field here; the
+        // client prefixes it with its static-files base URL.
+        'image_url' => $cat['image_url'],
         'items' => $itemsByCategory[$cat['id']] ?? [],
     ];
 }

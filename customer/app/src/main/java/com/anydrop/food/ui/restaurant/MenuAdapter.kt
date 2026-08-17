@@ -14,6 +14,7 @@ import com.anydrop.food.ui.common.CartAddHelper
 import com.anydrop.food.ui.common.QtyStepperTransition
 import com.anydrop.food.databinding.ItemMenuCategoryHeaderBinding
 import com.anydrop.food.databinding.ItemMenuItemBinding
+import com.anydrop.food.network.ApiClient
 import com.anydrop.food.network.MenuCategory
 import com.anydrop.food.network.MenuItem
 
@@ -21,7 +22,7 @@ private const val TYPE_HEADER = 0
 private const val TYPE_ITEM = 1
 
 private sealed class Row {
-    data class Header(val title: String) : Row()
+    data class Header(val title: String, val imageUrl: String?) : Row()
     data class Item(val item: MenuItem) : Row()
 }
 
@@ -45,7 +46,7 @@ class MenuAdapter(
         rows.clear()
         categories.forEach { category ->
             if (category.items.isNotEmpty()) {
-                rows.add(Row.Header(category.name))
+                rows.add(Row.Header(category.name, category.imageUrl))
                 category.items.forEach { rows.add(Row.Item(it)) }
             }
         }
@@ -105,7 +106,7 @@ class MenuAdapter(
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         when (val row = rows[position]) {
-            is Row.Header -> (holder as HeaderVH).bind(row.title)
+            is Row.Header -> (holder as HeaderVH).bind(row.title, row.imageUrl)
             is Row.Item -> (holder as ItemVH).bind(row.item)
         }
     }
@@ -114,8 +115,26 @@ class MenuAdapter(
 
     private inner class HeaderVH(private val binding: ItemMenuCategoryHeaderBinding) :
         RecyclerView.ViewHolder(binding.root) {
-        fun bind(title: String) {
-            binding.root.text = title
+        fun bind(title: String, imageUrl: String?) {
+            binding.categoryHeaderTitle.text = title
+
+            val context = binding.root.context
+            if (!imageUrl.isNullOrBlank()) {
+                binding.categoryHeaderIcon.imageTintList = null
+                binding.categoryHeaderIcon.setPadding(0, 0, 0, 0)
+                binding.categoryHeaderIcon.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                binding.categoryHeaderIcon.load(ApiClient.baseUrlForStaticFiles(context) + imageUrl) {
+                    placeholder(R.drawable.ic_menu_list)
+                    error(R.drawable.ic_menu_list)
+                    crossfade(true)
+                }
+            } else {
+                val insetPx = (5 * context.resources.displayMetrics.density).toInt()
+                binding.categoryHeaderIcon.setPadding(insetPx, insetPx, insetPx, insetPx)
+                binding.categoryHeaderIcon.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                binding.categoryHeaderIcon.setImageResource(R.drawable.ic_menu_list)
+                binding.categoryHeaderIcon.imageTintList = androidx.core.content.ContextCompat.getColorStateList(context, R.color.text_secondary)
+            }
         }
     }
 
@@ -146,8 +165,14 @@ class MenuAdapter(
                 binding.itemDiscountBadge.visibility = View.GONE
             }
 
+            // Bug fix — image_url is a relative path from the API
+            // (uploads/restaurant_dish_photos/...), not a full URL. Needs
+            // the same static-files base-URL prefix every other image
+            // load in the app uses; loading the raw path meant dish
+            // photos uploaded via the Restaurant app never rendered here,
+            // they just silently failed to load.
             if (!item.imageUrl.isNullOrBlank()) {
-                binding.itemImage.load(item.imageUrl)
+                binding.itemImage.load(ApiClient.baseUrlForStaticFiles(binding.root.context) + item.imageUrl)
             } else {
                 binding.itemImage.setImageDrawable(null)
             }

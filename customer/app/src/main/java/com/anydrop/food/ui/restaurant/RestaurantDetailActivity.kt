@@ -109,7 +109,7 @@ class RestaurantDetailActivity : AppCompatActivity() {
         binding.detailRestaurantName.text = name
         val coverUrl = intent.getStringExtra(EXTRA_RESTAURANT_COVER_URL)
         if (!coverUrl.isNullOrBlank()) {
-            binding.coverImage.load(coverUrl) {
+            binding.coverImage.load(ApiClient.baseUrlForStaticFiles(this) + coverUrl) {
                 placeholder(R.drawable.ic_restaurant)
                 error(R.drawable.ic_restaurant)
                 crossfade(true)
@@ -624,7 +624,7 @@ class RestaurantDetailActivity : AppCompatActivity() {
         )
 
         if (!restaurant.coverUrl.isNullOrBlank()) {
-            binding.coverImage.load(restaurant.coverUrl) {
+            binding.coverImage.load(ApiClient.baseUrlForStaticFiles(this) + restaurant.coverUrl) {
                 placeholder(R.drawable.ic_restaurant)
                 error(R.drawable.ic_restaurant)
                 crossfade(true)
@@ -635,6 +635,19 @@ class RestaurantDetailActivity : AppCompatActivity() {
                     }
                 )
             }
+        }
+
+        // Restaurant logo (Account tab logo-upload.php on the Restaurant
+        // app) — small circular avatar next to the name, hidden entirely
+        // when unset (see activity_restaurant_detail.xml's kdoc on
+        // detailLogoCard for why no placeholder is shown here).
+        if (!restaurant.logoUrl.isNullOrBlank()) {
+            binding.detailLogoCard.visibility = android.view.View.VISIBLE
+            binding.detailLogoImage.load(ApiClient.baseUrlForStaticFiles(this) + restaurant.logoUrl) {
+                crossfade(true)
+            }
+        } else {
+            binding.detailLogoCard.visibility = android.view.View.GONE
         }
     }
 

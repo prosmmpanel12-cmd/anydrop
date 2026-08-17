@@ -1,10 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
-<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Category icon slot added alongside the title — restaurant-uploaded
+     category photo (Restaurant app's category-photo-upload, surfaced via
+     restaurants/menu.php's category.image_url). Falls back to a small
+     tinted ic_menu_list glyph when the restaurant hasn't set one, same
+     "tinted placeholder, cleared on real image" pattern used everywhere
+     else image_url is optional in this app. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
     android:paddingHorizontal="16dp"
     android:paddingTop="18dp"
-    android:paddingBottom="6dp"
-    android:textSize="16sp"
-    android:textStyle="bold"
-    android:textColor="@color/text_primary" />
+    android:paddingBottom="6dp">
+
+    <ImageView
+        android:id="@+id/categoryHeaderIcon"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_marginEnd="10dp"
+        android:scaleType="centerCrop"
+        android:background="@drawable/bg_card_rounded"
+        android:contentDescription="@null" />
+
+    <TextView
+        android:id="@+id/categoryHeaderTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:textColor="@color/text_primary" />
+
+</LinearLayout>

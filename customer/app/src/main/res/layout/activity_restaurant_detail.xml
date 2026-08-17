@@ -154,17 +154,50 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content">
 
+                    <!-- Restaurant logo (Restaurant app's Account tab
+                         logo-upload.php) — small circular avatar next to
+                         the name, same rounded-card + tinted-icon-fallback
+                         pattern used for dish/category photos elsewhere in
+                         this app. Hidden entirely when logo_url is unset
+                         (most test restaurants) rather than showing a
+                         placeholder here, since ic_restaurant's the cover
+                         image's own placeholder right above it already
+                         covers that visual gap. -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/detailLogoCard"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        app:cardCornerRadius="20dp"
+                        app:cardElevation="0dp"
+                        app:strokeColor="@color/outline"
+                        app:strokeWidth="1dp"
+                        android:visibility="gone"
+                        tools:visibility="visible"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintBottom_toBottomOf="@id/detailRestaurantName">
+
+                        <ImageView
+                            android:id="@+id/detailLogoImage"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop"
+                            android:contentDescription="@null" />
+                    </com.google.android.material.card.MaterialCardView>
+
                     <TextView
                         android:id="@+id/detailRestaurantName"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
                         android:textSize="20sp"
                         android:textStyle="bold"
                         android:textColor="@color/text_primary"
-                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintStart_toEndOf="@id/detailLogoCard"
                         app:layout_constraintTop_toTopOf="parent"
                         app:layout_constraintEnd_toStartOf="@id/detailRatingPillGroup"
-                        app:layout_constraintHorizontal_bias="0" />
+                        app:layout_constraintHorizontal_bias="0"
+                        app:layout_goneMarginStart="0dp" />
 
                     <!-- Rating pill (★ 4.3) + "By 9.5K+" underneath, stacked -->
                     <LinearLayout
