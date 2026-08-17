@@ -91,17 +91,50 @@ $currentDow = (int) $now->format('N'); // 1 (Mon) - 7 (Sun)
 // batched-then-grouped-in-PHP pattern as the tags query above — avoids
 // N+1 queries. A restaurant with no rows here just gets an empty array;
 // the app falls back to a plain static cover_url image for it.
+//
+// Bug fix (app-owner report, 2026-08-17 — "WhatsApp-status wali dish
+// image purani/galat dikhti hai"): this used to read from the
+// `restaurant_gallery_photos` table, which was only ever populated by a
+// one-time SQL seed (backend/sql/12_seed_gallery_from_menu_items.sql) and
+// is never written to by menu-items-create.php/menu-items-update.php or
+// menu-item-photo-upload.php. So a restaurant owner uploading/changing a
+// dish photo after that seed ran had no effect on the carousel — it kept
+// showing whatever was seeded (which, for freshly-created test
+// restaurants with no seed row at all, could even fall through to a
+// stray/placeholder image). Reading straight from `menu_items` here
+// instead means the carousel always reflects whatever the owner has
+// *currently* uploaded — no separate table to keep in sync, nothing can
+// go stale. `restaurant_gallery_photos` and its seed scripts are no
+// longer used by this endpoint; safe to drop in a future cleanup pass.
+//
+// No SQL window function (per this project's established InfinityFree/
+// older-MySQL constraint — see 12b_seed_gallery_from_menu_items_no_window.sql)
+// — fetch every eligible item per restaurant in one batched query, ordered
+// so the "best" photos sort first, then cap to MAX_GALLERY_PHOTOS per
+// restaurant in PHP below.
+const MAX_GALLERY_PHOTOS = 6;
 $galleryByRestaurant = [];
 if (!empty($all)) {
     $galleryStmt = $db->prepare(
-        "SELECT restaurant_id, image_url, dish_name, price
-         FROM restaurant_gallery_photos
+        "SELECT restaurant_id, image_url, name AS dish_name, price
+         FROM menu_items
          WHERE restaurant_id IN ($placeholders)
-         ORDER BY restaurant_id, sort_order"
+           AND deleted_at IS NULL
+           AND is_available = 1
+           AND image_url IS NOT NULL
+           AND image_url <> ''
+         ORDER BY restaurant_id, is_bestseller DESC, is_recommended DESC, updated_at DESC"
     );
     $galleryStmt->execute($ids);
     foreach ($galleryStmt->fetchAll() as $g) {
-        $galleryByRestaurant[$g['restaurant_id']][] = [
+        $rid = $g['restaurant_id'];
+        if (!isset($galleryByRestaurant[$rid])) {
+            $galleryByRestaurant[$rid] = [];
+        }
+        if (count($galleryByRestaurant[$rid]) >= MAX_GALLERY_PHOTOS) {
+            continue;
+        }
+        $galleryByRestaurant[$rid][] = [
             'image_url' => $g['image_url'],
             'dish_name' => $g['dish_name'],
             'price' => $g['price'] !== null ? (float) $g['price'] : null,

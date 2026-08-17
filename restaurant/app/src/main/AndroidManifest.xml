@@ -85,6 +85,19 @@
             android:name=".ui.account.LocationPickerActivity"
             android:exported="false" />
 
+        <!-- Crop screen (app-owner feedback item #2, 2026-08-17) — shared
+             by the logo, dish-photo, category-photo, and banner pickers. -->
+        <activity
+            android:name=".ui.common.CropActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AnydropRestaurant" />
+
+        <!-- Restaurant Banners manager (app-owner feedback item #3,
+             2026-08-17), launched from AccountFragment's new row. -->
+        <activity
+            android:name=".ui.account.BannerManagerActivity"
+            android:exported="false" />
+
     </application>
 
 </manifest>

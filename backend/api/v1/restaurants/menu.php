@@ -177,6 +177,19 @@ if (!empty($itemsByCategory[0])) {
 // the same restaurant.
 $statusFlags = compute_restaurant_status($restaurant);
 
+// Restaurant banners (app-owner feedback item #3, 2026-08-17) — owner-
+// curated promotional images shown as a carousel at the top of the
+// Customer app's restaurant-detail screen once it's open (i.e. once the
+// detail screen itself is open — see RestaurantBannerCarouselView.kt for
+// the "2+ banners = auto-transition, exactly 1 = static, 0 = falls back
+// to cover_url" display logic; that decision lives entirely client-side
+// so this endpoint just returns whatever's there, ordered).
+$bannerStmt = $db->prepare(
+    'SELECT image_url FROM restaurant_banners WHERE restaurant_id = ? ORDER BY sort_order, id'
+);
+$bannerStmt->execute([$restaurant['id']]);
+$banners = array_map(fn($b) => $b['image_url'], $bannerStmt->fetchAll());
+
 respond_ok([
     'restaurant' => [
         'id' => (int) $restaurant['id'],
@@ -184,6 +197,7 @@ respond_ok([
         'address' => $restaurant['address'],
         'logo_url' => $restaurant['logo_url'],
         'cover_url' => $restaurant['cover_url'],
+        'banners' => $banners,
         'cuisine_tags' => $restaurant['cuisine_tags'],
         'is_veg_only' => (bool) $restaurant['is_veg_only'],
         'is_open_now' => $statusFlags['is_open_now'],

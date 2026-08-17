@@ -76,6 +76,10 @@ class AccountFragment : Fragment() {
         binding.profileSummaryCard.setOnClickListener(openEdit)
         binding.btnEditProfileRow.setOnClickListener(openEdit)
 
+        binding.btnBannersRow.setOnClickListener {
+            startActivity(Intent(requireContext(), BannerManagerActivity::class.java))
+        }
+
         binding.switchTempClosed.setOnCheckedChangeListener { _, isChecked ->
             if (suppressTempClosedListener) return@setOnCheckedChangeListener
             setTempClosed(isChecked)

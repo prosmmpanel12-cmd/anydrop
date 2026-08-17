@@ -14,6 +14,7 @@ import com.anydrop.restaurant.databinding.ActivityEditProfileBinding
 import com.anydrop.restaurant.network.ApiClient
 import com.anydrop.restaurant.network.ProfileUpdateBody
 import com.anydrop.restaurant.network.RestaurantProfileDetail
+import com.anydrop.restaurant.ui.common.CropActivity
 import com.anydrop.restaurant.ui.common.InAppNotifier
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -82,14 +83,28 @@ class EditProfileActivity : AppCompatActivity() {
 
     private val pickLogoLauncher =
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            // Bug/feature (app-owner feedback item #2, 2026-08-17) — used to
+            // stage the raw picked Uri straight as the preview; now routes
+            // through CropActivity first (square-only, since the logo is
+            // always shown as a small circle/square everywhere) so the
+            // owner controls exactly which part of their photo becomes the
+            // logo before it's ever staged/uploaded.
             if (uri != null) {
-                pickedLogoUri = uri
+                CropActivity.start(this, uri, CropActivity.SLOT_SQUARE_ONLY, cropLogoLauncher)
+            }
+        }
+
+    private val cropLogoLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                val croppedUri = CropActivity.getResultUri(result.data) ?: return@registerForActivityResult
+                pickedLogoUri = croppedUri
                 // See populate()'s comment below — activity_edit_profile.xml's
                 // app:tint on logoPreview is meant for the ic_store
                 // placeholder only, and must be cleared once a real image
-                // (here, the freshly-picked local Uri) is showing.
+                // (here, the freshly-cropped local file) is showing.
                 binding.logoPreview.imageTintList = null
-                binding.logoPreview.load(uri) {
+                binding.logoPreview.load(croppedUri) {
                     placeholder(R.drawable.ic_store)
                     error(R.drawable.ic_store)
                     crossfade(true)

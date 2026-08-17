@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Crop screen (app-owner feedback item #2, 2026-08-17 — "crop edit ka
+     option dikhna chahiye, konsa ratio sahi hai kitna hissa crop hoga").
+     Dark full-bleed background (standard cropper convention — makes the
+     dimmed-outside-window contrast read clearly) with a header showing
+     Cancel/title/Done, a ratio-chip row so the user can see and choose
+     which aspect ratio applies, and the CropImageView filling the rest. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#121212">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/btnCancelCrop"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/crop_cancel"
+            android:textColor="@color/white"
+            android:textSize="15sp"
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="@string/crop_title"
+            android:textColor="@color/white"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btnConfirmCrop"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/crop_done"
+            android:textColor="@color/anydrop_primary_container"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless" />
+
+    </LinearLayout>
+
+    <com.anydrop.restaurant.ui.common.CropImageView
+        android:id="@+id/cropImageView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- Ratio chips — visible even when the caller passes a single
+         suggested ratio (e.g. 1:1 for a logo), so the user can always see
+         *which* ratio is currently active and, where more than one makes
+         sense for that upload slot, switch between them. See
+         CropActivity.ALLOWED_RATIOS kdoc for which slots offer what. -->
+    <com.google.android.material.chip.ChipGroup
+        android:id="@+id/ratioChipGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="12dp"
+        app:singleSelection="true"
+        app:chipSpacingHorizontal="8dp" />
+
+    <TextView
+        android:id="@+id/cropHintText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="16dp"
+        android:paddingBottom="16dp"
+        android:gravity="center"
+        android:textColor="#B3FFFFFF"
+        android:textSize="12sp"
+        android:text="@string/crop_hint" />
+
+</LinearLayout>

@@ -95,4 +95,16 @@ interface ApiService {
     @Multipart
     @POST("restaurant/logo-upload.php")
     suspend fun uploadLogo(@Part logo: MultipartBody.Part): Response<ApiResponse<LogoUploadResult>>
+
+    // ---- Restaurant banners (app-owner feedback item #3, 2026-08-17) ----
+
+    @GET("restaurant/banners-list.php")
+    suspend fun getBanners(): Response<ApiResponse<BannersListResult>>
+
+    @Multipart
+    @POST("restaurant/banner-upload.php")
+    suspend fun uploadBanner(@Part banner: MultipartBody.Part): Response<ApiResponse<BannerUploadResult>>
+
+    @POST("restaurant/banner-delete.php")
+    suspend fun deleteBanner(@Body body: BannerDeleteBody): Response<ApiResponse<Map<String, Any>>>
 }

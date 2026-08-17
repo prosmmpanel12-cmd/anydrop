@@ -42,6 +42,11 @@ android {
 
 dependencies {
     implementation 'androidx.core:core-ktx:1.12.0'
+    // Crop screen (app-owner feedback item #2, 2026-08-17) — reads EXIF
+    // orientation on picked photos so a sideways camera photo doesn't
+    // crop sideways. AndroidX artifact, no new Maven repo needed (same
+    // google()/mavenCentral() this project already declares).
+    implementation 'androidx.exifinterface:exifinterface:1.3.7'
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.11.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'

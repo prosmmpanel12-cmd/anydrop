@@ -112,17 +112,38 @@ if (!empty($restaurantIds)) {
 // side" caveat noted in the comment above (RestaurantAdapter/
 // SearchResultsAdapter both call `.orEmpty()` on it, so a missing key just
 // silently falls back to the plain single-image card, no crash).
+//
+// Bug fix (mirrors restaurants/list.php's identical fix, same session,
+// same app-owner report): read straight from `menu_items` instead of the
+// never-synced `restaurant_gallery_photos` seed table, so the carousel
+// always reflects whatever dish photos the owner currently has uploaded.
+// See restaurants/list.php's comment on this same query for the full
+// reasoning (no window function, MAX_GALLERY_PHOTOS cap in PHP, etc).
+if (!defined('MAX_GALLERY_PHOTOS')) {
+    define('MAX_GALLERY_PHOTOS', 6);
+}
 $galleryByRestaurant = [];
 if (!empty($restaurantIds)) {
     $galleryStmt = $db->prepare(
-        "SELECT restaurant_id, image_url, dish_name, price
-         FROM restaurant_gallery_photos
+        "SELECT restaurant_id, image_url, name AS dish_name, price
+         FROM menu_items
          WHERE restaurant_id IN ($placeholders)
-         ORDER BY restaurant_id, sort_order"
+           AND deleted_at IS NULL
+           AND is_available = 1
+           AND image_url IS NOT NULL
+           AND image_url <> ''
+         ORDER BY restaurant_id, is_bestseller DESC, is_recommended DESC, updated_at DESC"
     );
     $galleryStmt->execute(array_values($restaurantIds));
     foreach ($galleryStmt->fetchAll() as $g) {
-        $galleryByRestaurant[$g['restaurant_id']][] = [
+        $rid = $g['restaurant_id'];
+        if (!isset($galleryByRestaurant[$rid])) {
+            $galleryByRestaurant[$rid] = [];
+        }
+        if (count($galleryByRestaurant[$rid]) >= MAX_GALLERY_PHOTOS) {
+            continue;
+        }
+        $galleryByRestaurant[$rid][] = [
             'image_url' => $g['image_url'],
             'dish_name' => $g['dish_name'],
             'price' => $g['price'] !== null ? (float) $g['price'] : null,

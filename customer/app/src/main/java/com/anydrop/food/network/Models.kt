@@ -263,6 +263,14 @@ data class RestaurantDetail(
     val address: String?,
     @SerializedName("logo_url") val logoUrl: String?,
     @SerializedName("cover_url") val coverUrl: String?,
+    // Restaurant banners (app-owner feedback item #3, 2026-08-17) —
+    // owner-curated promotional images from restaurant_banners, ordered
+    // by sort_order server-side. Nullable rather than defaulted to
+    // emptyList() so `.orEmpty()` at the one call site
+    // (RestaurantDetailActivity.populate()) stays the single place that
+    // decides "no banners", consistent with this file's other nullable
+    // list-ish fields.
+    val banners: List<String>? = null,
     @SerializedName("cuisine_tags") val cuisineTags: String?,
     @SerializedName("is_veg_only") val isVegOnly: Boolean,
     // bugs.md §6.3 follow-up — detail page previously had no open/paused

@@ -20,6 +20,7 @@ import coil.load
 import com.anydrop.restaurant.R
 import com.anydrop.restaurant.databinding.DialogAddCategoryBinding
 import com.anydrop.restaurant.databinding.DialogAddMenuItemBinding
+import com.anydrop.restaurant.ui.common.CropActivity
 import com.anydrop.restaurant.databinding.FragmentMenuBinding
 import com.anydrop.restaurant.network.ApiClient
 import com.anydrop.restaurant.network.ApiService
@@ -113,15 +114,29 @@ class MenuFragment : Fragment() {
     private var pickedCategoryPhotoUri: Uri? = null
     private var currentCategoryDialogBinding: DialogAddCategoryBinding? = null
 
+    // Crop screen (app-owner feedback item #2, 2026-08-17) — both pickers
+    // below now route the freshly-picked Uri through CropActivity before
+    // staging it, same "pick → crop → stage locally, upload on Save" flow
+    // as EditProfileActivity's logo picker. Dish photos offer a ratio
+    // choice (SLOT_DISH_PHOTO); category icons stay square-only, same
+    // reasoning as the logo (always shown as a small square/circle).
     private val pickItemPhotoLauncher =
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             if (uri != null) {
-                pickedItemPhotoUri = uri
+                CropActivity.start(requireContext(), uri, CropActivity.SLOT_DISH_PHOTO, cropItemPhotoLauncher)
+            }
+        }
+
+    private val cropItemPhotoLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == android.app.Activity.RESULT_OK) {
+                val croppedUri = CropActivity.getResultUri(result.data) ?: return@registerForActivityResult
+                pickedItemPhotoUri = croppedUri
                 currentItemDialogBinding?.let { b ->
                     b.itemPhotoPreview.imageTintList = null
                     b.itemPhotoPreview.setPadding(0, 0, 0, 0)
                     b.itemPhotoPreview.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
-                    b.itemPhotoPreview.load(uri) {
+                    b.itemPhotoPreview.load(croppedUri) {
                         placeholder(R.drawable.ic_food_placeholder)
                         error(R.drawable.ic_food_placeholder)
                         crossfade(true)
@@ -134,12 +149,20 @@ class MenuFragment : Fragment() {
     private val pickCategoryPhotoLauncher =
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             if (uri != null) {
-                pickedCategoryPhotoUri = uri
+                CropActivity.start(requireContext(), uri, CropActivity.SLOT_SQUARE_ONLY, cropCategoryPhotoLauncher)
+            }
+        }
+
+    private val cropCategoryPhotoLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == android.app.Activity.RESULT_OK) {
+                val croppedUri = CropActivity.getResultUri(result.data) ?: return@registerForActivityResult
+                pickedCategoryPhotoUri = croppedUri
                 currentCategoryDialogBinding?.let { b ->
                     b.categoryPhotoPreview.imageTintList = null
                     b.categoryPhotoPreview.setPadding(0, 0, 0, 0)
                     b.categoryPhotoPreview.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
-                    b.categoryPhotoPreview.load(uri) {
+                    b.categoryPhotoPreview.load(croppedUri) {
                         placeholder(R.drawable.ic_food_placeholder)
                         error(R.drawable.ic_food_placeholder)
                         crossfade(true)

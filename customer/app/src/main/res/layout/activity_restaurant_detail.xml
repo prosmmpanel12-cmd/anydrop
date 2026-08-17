@@ -14,15 +14,10 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <ImageView
-            android:id="@+id/coverImage"
+        <com.anydrop.food.ui.common.RestaurantBannerCarouselView
+            android:id="@+id/bannerCarousel"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="centerCrop"
-            android:background="@color/anydrop_primary_container"
-            android:src="@drawable/ic_restaurant"
-            android:padding="60dp"
-            app:tint="@color/anydrop_primary" />
+            android:layout_height="match_parent" />
 
         <!-- Offer badge, e.g. "50% OFF select items" — top-left over the cover image,
              same pattern as item_restaurant.xml. Hidden when offer_badge_text is null. -->

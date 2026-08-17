@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="6dp">
+
+    <!-- 16:9 via a fixed height off a typical grid-column width; grid is
+         GridLayoutManager(2), so this reads close enough to 16:9 without
+         needing a custom aspect-ratio layout for a 2-item admin list. -->
+    <ImageView
+        android:id="@+id/bannerImage"
+        android:layout_width="match_parent"
+        android:layout_height="90dp"
+        android:scaleType="centerCrop"
+        android:background="@color/outline"
+        android:contentDescription="@null" />
+
+    <ImageView
+        android:id="@+id/btnDeleteBanner"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="4dp"
+        android:padding="5dp"
+        android:src="@drawable/ic_close"
+        app:tint="@color/white"
+        android:background="#99000000"
+        android:contentDescription="@null"
+        android:clickable="true"
+        android:focusable="true" />
+
+</FrameLayout>

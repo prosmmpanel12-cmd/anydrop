@@ -109,17 +109,12 @@ class RestaurantDetailActivity : AppCompatActivity() {
         binding.detailRestaurantName.text = name
         val coverUrl = intent.getStringExtra(EXTRA_RESTAURANT_COVER_URL)
         if (!coverUrl.isNullOrBlank()) {
-            binding.coverImage.load(ApiClient.baseUrlForStaticFiles(this) + coverUrl) {
-                placeholder(R.drawable.ic_restaurant)
-                error(R.drawable.ic_restaurant)
-                crossfade(true)
-                listener(
-                    onSuccess = { _, _ ->
-                        binding.coverImage.imageTintList = null
-                        binding.coverImage.setPadding(0, 0, 0, 0)
-                    }
-                )
-            }
+            // Immediate placeholder from the nav-intent extras, before the
+            // full menu.php response (with the real banners list) has
+            // loaded — same "show something instantly" intent as before
+            // this was a carousel, just routed through setBanners() with
+            // an empty banner list so it falls back to this single image.
+            binding.bannerCarousel.setBanners(emptyList(), coverUrl)
         }
 
         binding.btnBack.setOnClickListener { finish() }
@@ -623,19 +618,14 @@ class RestaurantDetailActivity : AppCompatActivity() {
             if (isSaved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark_outline
         )
 
-        if (!restaurant.coverUrl.isNullOrBlank()) {
-            binding.coverImage.load(ApiClient.baseUrlForStaticFiles(this) + restaurant.coverUrl) {
-                placeholder(R.drawable.ic_restaurant)
-                error(R.drawable.ic_restaurant)
-                crossfade(true)
-                listener(
-                    onSuccess = { _, _ ->
-                        binding.coverImage.imageTintList = null
-                        binding.coverImage.setPadding(0, 0, 0, 0)
-                    }
-                )
-            }
-        }
+        // Restaurant banners (app-owner feedback item #3, 2026-08-17) —
+        // this is the real data (from menu.php, already ordered by
+        // sort_order), superseding the intent-extra placeholder set in
+        // onCreate(). setBanners() itself handles all three cases: 0
+        // banners falls back to restaurant.coverUrl exactly as the old
+        // single-ImageView code above did, 1 banner shows static (no
+        // dots/timer — the app-owner's explicit ask), 2+ auto-advances.
+        binding.bannerCarousel.setBanners(restaurant.banners.orEmpty(), restaurant.coverUrl)
 
         // Restaurant logo (Account tab logo-upload.php on the Restaurant
         // app) — small circular avatar next to the name, hidden entirely

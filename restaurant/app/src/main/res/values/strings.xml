@@ -110,6 +110,28 @@
 
     <!-- Edit Profile screen -->
     <string name="edit_profile_title">Edit Profile</string>
+
+    <!-- Crop screen (app-owner feedback item #2, 2026-08-17). -->
+    <string name="crop_title">Crop photo</string>
+    <string name="crop_cancel">Cancel</string>
+    <string name="crop_done">Done</string>
+    <string name="crop_hint">Drag to reposition · Pinch to zoom</string>
+    <string name="crop_ratio_square">Square 1:1</string>
+    <string name="crop_ratio_landscape">Wide 16:9</string>
+    <string name="crop_ratio_standard">Standard 4:3</string>
+    <string name="crop_ratio_portrait">Tall 4:5</string>
+    <string name="crop_processing_error">Couldn\'t process that photo, please try another</string>
+
+    <!-- Restaurant Banners manager (app-owner feedback item #3, 2026-08-17). -->
+    <string name="banner_manager_title">Restaurant Banners</string>
+    <string name="banner_manager_subtitle">Add photos to show as a rotating banner on your restaurant\'s page. Add just one to keep it fixed, or a few for an auto-rotating carousel.</string>
+    <string name="banner_manager_add">+ Add Banner</string>
+    <string name="banner_upload_failed">Couldn\'t upload banner, please try again</string>
+    <string name="banner_delete_failed">Couldn\'t remove banner, please try again</string>
+    <string name="banner_limit_reached">You\'ve reached the maximum of 10 banners</string>
+    <string name="banner_load_failed">Couldn\'t load your banners</string>
+    <string name="banner_confirm_delete">Remove this banner?</string>
+    <string name="account_row_banners">Restaurant Banners</string>
     <string name="btn_change_logo">Change logo</string>
     <string name="hint_cuisine_tags">Cuisine tags (comma separated)</string>
     <string name="hint_profile_description">Description (optional)</string>

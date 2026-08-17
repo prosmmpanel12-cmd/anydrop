@@ -116,6 +116,22 @@ data class ProfileUpdateBody(
 
 data class LogoUploadResult(@SerializedName("logo_url") val logoUrl: String)
 
+// ---- Restaurant banners (app-owner feedback item #3, 2026-08-17) ----
+
+data class Banner(
+    @SerializedName("id") val id: Int,
+    @SerializedName("image_url") val imageUrl: String
+)
+
+data class BannersListResult(@SerializedName("banners") val banners: List<Banner>)
+
+data class BannerUploadResult(
+    @SerializedName("id") val id: Int,
+    @SerializedName("image_url") val imageUrl: String
+)
+
+data class BannerDeleteBody(@SerializedName("id") val id: Int)
+
 // ---- Orders ----
 
 data class OrderItemLine(

@@ -1,3 +1,185 @@
+## 2026-08-17 (very latest) — Item #3 finished: Customer-app banner carousel built + wired
+
+Completed the piece flagged as "not started" in the previous entry.
+
+- `customer/.../ui/common/RestaurantBannerCarouselView.kt` +
+  `view_restaurant_banner_carousel.xml` — near-copy of
+  `DishPhotoCarouselView`'s "0 = fallback image, 1 = static, 2+ =
+  auto-advance" shape and attach/detach lifecycle, simplified: plain dot
+  indicators (reusing the existing `dot_carousel_selected/unselected`
+  drawables from another carousel already in this app) instead of
+  Stories-style progress segments, no dish-name/price overlay.
+- `activity_restaurant_detail.xml` — the header's static `coverImage`
+  ImageView replaced with `<RestaurantBannerCarouselView
+  android:id="@+id/bannerCarousel">`.
+- `RestaurantDetailActivity.kt` — both places that used to
+  `binding.coverImage.load(...)` (the instant intent-extra placeholder in
+  `onCreate()`, and the real data in `populate()`) now call
+  `binding.bannerCarousel.setBanners(...)`; `onCreate()`'s call passes an
+  empty banner list (so it falls back to the intent-extra `coverUrl`
+  exactly as before), `populate()`'s call passes the real
+  `restaurant.banners.orEmpty()` from the menu.php response.
+- `network/Models.kt` (Customer app) — `RestaurantDetail` gained a
+  `banners: List<String>? = null` field.
+
+**Item #3 (restaurant banners) is now fully built end to end** — owner
+uploads via Restaurant app's Account → Restaurant Banners, customers see
+them auto-carousel (or static, or fall back to cover_url) at the top of
+the restaurant detail page. All 4 of this session's app-owner feedback
+items are now code-complete. What's left is entirely deploy/ops, listed
+below — nothing left to *build* for this round of feedback.
+
+### 🔴 Before this can work on a live device
+1. Run `backend/sql/23_migration_restaurant_banners.sql` — new table,
+   `banner-upload.php`/`banners-list.php` will 500 without it.
+2. Confirm `uploads/restaurant_banners/` exists (or gets auto-created —
+   `banner-upload.php` does `mkdir` itself) on the live server.
+
+### 🟡 Not build-verified
+Same standing sandbox limitation as every entry above.
+
+---
+
+Continuing from app-owner's 4 real-device-feedback items this session
+(#1 dish-carousel bug — fixed and logged separately above; #4 GPS/map
+picker — confirmed already fully built, no changes needed). This entry
+covers #2 and #3.
+
+### ✅ #2 — Crop tool on every photo upload (Restaurant app) — DONE
+Built from scratch with plain Canvas/Matrix, **no new third-party crop
+library** — deliberate, since this sandbox has no network access to
+resolve a new Maven dependency and no way to build-verify one either.
+- `ui/common/CropImageView.kt` — pan (drag) + pinch-zoom a bitmap inside a
+  fixed-aspect-ratio window, rule-of-thirds grid, dimmed outside-window
+  overlay via saveLayer+CLEAR punch-out. `getCroppedBitmap()` maps the
+  window back into full source-resolution bitmap space via the inverted
+  matrix, so crop quality doesn't depend on on-screen window size.
+- `ui/common/CropActivity.kt` — hosts the view, downsamples the source
+  image (max 2048px side, OOM safety), corrects EXIF rotation
+  (`androidx.exifinterface:exifinterface:1.3.7`, newly added to
+  `app/build.gradle`), shows ratio chips per "slot": `SLOT_SQUARE_ONLY`
+  (logo, category icon — always square everywhere they're displayed),
+  `SLOT_DISH_PHOTO` (square/4:3/4:5, owner's choice), `SLOT_BANNER`
+  (16:9/4:3, for #3 below). Returns a cropped JPEG as a plain `file://`
+  Uri (not FileProvider — never leaves this app process) via
+  `CropActivity.start()`/`getResultUri()`.
+- Wired into all three existing pickers: `EditProfileActivity`'s logo
+  picker, `MenuFragment`'s dish-photo and category-photo pickers. Each
+  picker's `GetContent()` callback now launches `CropActivity` instead of
+  staging the raw picked Uri directly; the crop result becomes the staged
+  Uri exactly where the raw pick used to go, so the rest of each upload
+  flow (stage-locally, upload-on-Save) is unchanged.
+- `activity_crop.xml` (dark full-bleed, Cancel/Done header, ratio chip
+  row, hint text) + new strings (`crop_*`).
+
+### 🟡 #3 — Restaurant banners — backend + owner-side UI done, Customer-app display NOT built yet
+Ask: after opening a restaurant's page, show the restaurant's own
+uploaded banner(s) as a carousel — auto-transition if 2+, stay static/
+fixed if exactly 1.
+
+**Done:**
+- `backend/sql/23_migration_restaurant_banners.sql` — new
+  `restaurant_banners` table (id, restaurant_id, image_url, sort_order,
+  created_at). Own table, not a reuse of `restaurant_gallery_photos`
+  (that table was just retired from the dish-carousel this same session
+  for the exact "never synced" reason it should not be reused for
+  banners either — banners are a restaurant-curated upload, not derived
+  from menu_items).
+- Backend endpoints (`backend/api/v1/restaurant/`):
+  `banner-upload.php` (writes straight to DB, unlike logo — no separate
+  Save step for a standalone add/remove list; 5MB cap, 10-banner-per-
+  restaurant soft cap), `banners-list.php` (owner's own banners, for the
+  manager screen), `banner-delete.php` (restaurant-scoped DELETE, same
+  ownership-guard pattern as menu-items-delete.php).
+- `backend/api/v1/restaurants/menu.php` — now also returns
+  `restaurant.banners: string[]` (ordered by sort_order), the same
+  response the Customer app's `RestaurantDetailActivity` already calls.
+  **This is the one piece the Customer-app carousel (not built yet, see
+  below) will consume.**
+- Restaurant app (owner-facing manager, fully wired):
+  `ApiService.kt`/`Models.kt` (`Banner`, `BannersListResult`,
+  `BannerUploadResult`, `BannerDeleteBody`, 3 new endpoint methods),
+  `ui/account/BannerAdapter.kt` (grid adapter), `ui/account/
+  BannerManagerActivity.kt` (list/add-via-crop/delete, each an immediate
+  network call — no form-Save step, see banner-upload.php's kdoc),
+  `activity_banner_manager.xml` + `item_restaurant_banner.xml` layouts,
+  new AccountFragment row ("Restaurant Banners" → opens
+  BannerManagerActivity), manifest registration, new strings
+  (`banner_*`, `account_row_banners`).
+
+**🔴 Not started — next session's first task:**
+1. **Customer app `RestaurantBannerCarouselView`** — the actual "app-
+   owner sees banners on the restaurant page" half of this ask. Nothing
+   has been built here yet; `RestaurantDetailActivity`'s header still
+   shows only the single static `cover_url` image (`binding.coverImage`).
+   Suggested approach (mirrors `DishPhotoCarouselView.kt`, which already
+   solves "2+ = auto-transition, else static" for the *dish* carousel —
+   reuse that same shape, simplified: no per-photo dish-name/price
+   overlay, no Stories-style progress segments needed unless the app
+   owner specifically wants that look for banners too, just a plain
+   crossfade + dot indicators is a reasonable default): read
+   `restaurant.banners` (already in the menu.php response, see above) →
+   0 banners = keep showing `cover_url` as today; 1 banner = static,
+   shown full-width in place of/instead of cover_url; 2+ = auto-advancing
+   crossfade carousel with dot indicators, same `onAttachedToWindow`/
+   `onDetachedFromWindow` start/stop lifecycle pattern.
+2. Add the new `<ImageView>`/custom-view slot to
+   `activity_restaurant_detail.xml`'s header area (replacing or sitting
+   above the existing `coverImage`) and bind it from
+   `RestaurantDetailActivity.kt`'s `populate()` (same method that already
+   binds `restaurant.coverUrl`).
+3. Run `backend/sql/23_migration_restaurant_banners.sql` against the live
+   DB (new table, needed before `banner-upload.php`/`banners-list.php`
+   will work at all — same standing "run new migrations before testing"
+   note every session's had since item 4's `22_migration_category_image.sql`).
+4. Confirm `uploads/restaurant_banners/` gets created on the live server
+   (same standing item as `restaurant_logos/`/`restaurant_dish_photos/`
+   from prior sessions — none of these confirmed to exist on InfinityFree
+   yet).
+
+### 🟡 Not build-verified
+Same standing sandbox limitation as every session — no Android SDK, no
+PHP CLI, no network. Everything above is a static/logical
+implementation (grep-verified id/binding matches between new XML and
+Kotlin, verified against this project's existing patterns for
+upload/crop/list/delete flows), not compiled or run.
+
+---
+
+App owner reported the auto-advancing "WhatsApp Status"-style dish-photo
+carousel on restaurant cards (`DishPhotoCarouselView`, §2.7) was showing
+wrong/old images with the wrong dish name+price, not whatever the owner
+had actually just uploaded through the Menu tab.
+
+**Root cause:** `restaurants/list.php` and `search/search.php` both
+sourced this carousel's photos from `restaurant_gallery_photos` — a
+table that is **only ever populated by a one-time SQL seed**
+(`12_seed_gallery_from_menu_items.sql` / `10_seed_restaurant_gallery_photos.sql`).
+Neither `menu-items-create.php`, `menu-items-update.php`, nor
+`menu-item-photo-upload.php` ever write to that table. So any dish photo
+an owner uploaded or changed after the one-time seed ran had zero effect
+on the carousel — it just kept showing whatever was seeded at that
+moment (including, for a fresh test restaurant, whatever stray image
+happened to be in `menu_items.image_url` at seed time).
+
+**Fix:** both endpoints now build the carousel's photo list by querying
+`menu_items` directly (`image_url`/`name`/`price`, `deleted_at IS NULL`,
+`is_available = 1`, `image_url` non-empty), ordered
+`is_bestseller DESC, is_recommended DESC, updated_at DESC` and capped to
+`MAX_GALLERY_PHOTOS = 6` per restaurant in PHP (no SQL window function,
+same constraint the `_no_window` seed variant was written for). No table
+to keep in sync anymore — the carousel now always reflects whatever the
+owner currently has uploaded. `restaurant_gallery_photos` and its two
+seed scripts are no longer read by anything; safe to drop in a future
+cleanup pass, left in place for now in case anything else references it.
+
+### 🟡 Not build-verified
+Same standing sandbox limitation — logical/grep-verified fix (checked
+`menu_items` schema columns exist, checked both call sites), not run
+against a live DB.
+
+---
+
 ## 2026-08-17 (later still) — Full audit of remaining `.load()` sites: 7 more bugs fixed, 4 confirmed NOT bugs
 
 Followed up on the previous entry's "audit the rest" flag. Checked all
