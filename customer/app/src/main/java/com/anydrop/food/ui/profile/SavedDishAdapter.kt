@@ -8,6 +8,7 @@ import coil.load
 import com.anydrop.food.R
 import com.anydrop.food.data.FavoritesManager
 import com.anydrop.food.databinding.ItemSavedDishBinding
+import com.anydrop.food.network.ApiClient
 import com.anydrop.food.network.FavoriteItem
 
 class SavedDishAdapter(
@@ -46,7 +47,7 @@ class SavedDishAdapter(
             )
 
             if (!item.imageUrl.isNullOrBlank()) {
-                binding.savedDishImage.load(item.imageUrl) {
+                binding.savedDishImage.load(ApiClient.baseUrlForStaticFiles(binding.root.context) + item.imageUrl) {
                     placeholder(R.drawable.ic_restaurant)
                     error(R.drawable.ic_restaurant)
                     crossfade(true)

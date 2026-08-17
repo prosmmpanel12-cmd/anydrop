@@ -240,7 +240,16 @@ class DishPhotoCarouselView @JvmOverloads constructor(
     }
 
     private fun loadImage(url: String?, animate: Boolean) {
-        imageView.load(url) {
+        // Bug fix — url is a relative path from the API (gallery photo or
+        // restaurant cover_url fallback), same root cause as every other
+        // image_url field in this app; needs the static-files base-URL
+        // prefix or it silently fails to load.
+        val fullUrl = if (!url.isNullOrBlank()) {
+            com.anydrop.food.network.ApiClient.baseUrlForStaticFiles(context) + url
+        } else {
+            url
+        }
+        imageView.load(fullUrl) {
             placeholder(R.drawable.ic_restaurant)
             error(R.drawable.ic_restaurant)
             if (animate) crossfade(350) else crossfade(true)

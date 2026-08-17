@@ -16,6 +16,7 @@ import com.anydrop.food.data.CartSyncManager
 import com.anydrop.food.data.FavoritesManager
 import com.anydrop.food.databinding.FragmentItemDetailBinding
 import com.anydrop.food.databinding.ItemAddonRowBinding
+import com.anydrop.food.network.ApiClient
 import com.anydrop.food.network.MenuItem
 import com.anydrop.food.ui.restaurant.RestaurantDetailActivity
 
@@ -171,7 +172,7 @@ class ItemDetailBottomSheetFragment private constructor() : BottomSheetDialogFra
             if (item.isVeg) R.drawable.bg_badge_veg else R.drawable.bg_badge_nonveg
         )
         if (!item.imageUrl.isNullOrBlank()) {
-            binding.itemDetailImage.load(item.imageUrl) {
+            binding.itemDetailImage.load(ApiClient.baseUrlForStaticFiles(requireContext()) + item.imageUrl) {
                 placeholder(R.drawable.ic_restaurant)
                 error(R.drawable.ic_restaurant)
                 crossfade(true)

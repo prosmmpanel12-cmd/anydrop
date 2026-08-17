@@ -83,7 +83,7 @@ class OrderHistoryAdapter(
             )
 
             if (!order.restaurantCoverUrl.isNullOrBlank()) {
-                binding.orderRestaurantImage.load(order.restaurantCoverUrl) {
+                binding.orderRestaurantImage.load(ApiClient.baseUrlForStaticFiles(binding.root.context) + order.restaurantCoverUrl) {
                     placeholder(R.drawable.ic_restaurant)
                     error(R.drawable.ic_restaurant)
                     crossfade(true)

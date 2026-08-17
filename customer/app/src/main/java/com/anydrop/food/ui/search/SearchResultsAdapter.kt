@@ -15,6 +15,7 @@ import com.anydrop.food.ui.common.QtyStepperTransition
 import com.anydrop.food.databinding.ItemRestaurantBinding
 import com.anydrop.food.databinding.ItemSearchDishBinding
 import com.anydrop.food.databinding.ItemSearchSectionHeaderBinding
+import com.anydrop.food.network.ApiClient
 import com.anydrop.food.network.Restaurant
 import com.anydrop.food.network.SearchItem
 import com.anydrop.food.network.toMenuItem
@@ -246,7 +247,7 @@ class SearchResultsAdapter(
             binding.dishRestaurantTag.text =
                 binding.root.context.getString(R.string.from_restaurant, item.restaurantName)
             if (!item.imageUrl.isNullOrBlank()) {
-                binding.dishImage.load(item.imageUrl) {
+                binding.dishImage.load(ApiClient.baseUrlForStaticFiles(binding.root.context) + item.imageUrl) {
                     placeholder(R.drawable.ic_restaurant)
                     error(R.drawable.ic_restaurant)
                     crossfade(true)

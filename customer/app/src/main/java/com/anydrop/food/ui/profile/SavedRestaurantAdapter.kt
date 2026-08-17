@@ -8,6 +8,7 @@ import coil.load
 import com.anydrop.food.R
 import com.anydrop.food.data.FavoritesManager
 import com.anydrop.food.databinding.ItemSavedRestaurantBinding
+import com.anydrop.food.network.ApiClient
 import com.anydrop.food.network.FavoriteRestaurant
 
 /**
@@ -45,7 +46,7 @@ class SavedRestaurantAdapter(
 
             val imageUrl = restaurant.coverUrl ?: restaurant.logoUrl
             if (!imageUrl.isNullOrBlank()) {
-                binding.savedRestaurantImage.load(imageUrl) {
+                binding.savedRestaurantImage.load(ApiClient.baseUrlForStaticFiles(binding.root.context) + imageUrl) {
                     placeholder(R.drawable.ic_restaurant)
                     error(R.drawable.ic_restaurant)
                     crossfade(true)

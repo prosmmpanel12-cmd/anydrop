@@ -12,6 +12,7 @@ import com.anydrop.food.data.FavoritesManager
 import com.anydrop.food.ui.common.CartAddHelper
 import com.anydrop.food.ui.common.QtyStepperTransition
 import com.anydrop.food.databinding.ItemPopularDishBinding
+import com.anydrop.food.network.ApiClient
 import com.anydrop.food.network.PopularItem
 import com.anydrop.food.network.toMenuItem
 
@@ -104,7 +105,7 @@ class PopularItemsAdapter(
             }
 
             if (!item.imageUrl.isNullOrBlank()) {
-                binding.dishImage.load(item.imageUrl) {
+                binding.dishImage.load(ApiClient.baseUrlForStaticFiles(binding.root.context) + item.imageUrl) {
                     placeholder(R.drawable.ic_restaurant)
                     error(R.drawable.ic_restaurant)
                     crossfade(true)

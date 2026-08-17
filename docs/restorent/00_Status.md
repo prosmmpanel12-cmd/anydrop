@@ -1,3 +1,57 @@
+## 2026-08-17 (later still) — Full audit of remaining `.load()` sites: 7 more bugs fixed, 4 confirmed NOT bugs
+
+Followed up on the previous entry's "audit the rest" flag. Checked all
+~12 remaining `.load()` call sites in the Customer app, one by one,
+against their actual backend source column — some are relative upload
+paths (need the prefix), some are admin-curated **absolute** URLs
+(flaticon/Unsplash CDN links seeded directly in SQL) that would actually
+**break** if prefixed. Confirmed each with the backend query/seed data
+before touching anything, per the previous entry's own warning not to
+assume.
+
+### ✅ Fixed — same missing-prefix bug, confirmed relative paths from `menu_items`/`restaurants`
+- `DishPhotoCarouselView.kt` — fixed once in `loadImage()`, which
+  automatically covers both its callers: the Home screen's restaurant
+  card gallery-photo carousel *and* its cover-image fallback
+  (`RestaurantAdapter.kt` didn't need its own change).
+- `SavedDishAdapter.kt`, `SearchResultsAdapter.kt`,
+  `PopularItemsAdapter.kt`, `ItemDetailBottomSheetFragment.kt` — all load
+  `menu_items.image_url`, same as the already-fixed `MenuAdapter`.
+- `OrderHistoryAdapter.kt` — `restaurants.cover_url`.
+- `SavedRestaurantAdapter.kt` — `restaurants.cover_url` / `logo_url`.
+
+### ✔️ Confirmed NOT a bug — already absolute URLs, do not prefix
+- `FoodCategoryAdapter.kt` (`category.iconUrl`) — `food_categories.icon_url`
+  is seeded with full `flaticon.com` CDN links
+  (`05_migration_categories_and_tags.sql`), not restaurant uploads.
+- `PromoBannerAdapter.kt` (`banner.imageUrl`) — `promo_banners.image_url`
+  seeded with full Unsplash URLs (`06_migration_phase36.sql`).
+- `HomeActivity.kt`'s promo banner (`config.homePromoImageUrl`) and
+  `BannerCarousel.kt`'s splash-screen fallback (`fallbackUrl`) — both
+  come from the `home_promo_image_url`/`splash_banner_image_url`
+  `app_settings` keys, also seeded as full Unsplash URLs
+  (`03_migration_splash_login_settings.sql`), with the seed comment
+  itself saying "replace with your own **hosted** image" — i.e. this
+  field is meant to hold whatever absolute URL an admin pastes in, by
+  design, not an upload-server path.
+- `InAppNotifier.kt`'s `imageUrl` param — not a bug either way, just
+  unused: grepped for callers, nothing in the app currently passes
+  `imageUrl` to `InAppNotifier.show()`. Left alone; whoever wires this up
+  first should decide its convention then (relative upload vs. admin-
+  pasted URL) based on where the image is actually meant to come from.
+
+**Every reachable dish-photo, restaurant-logo, restaurant-cover, and
+category-icon image field driven by a restaurant/admin upload now
+resolves through `ApiClient.baseUrlForStaticFiles()` somewhere in the
+chain.** The only fields still holding raw values are the ones that are
+supposed to (admin-curated absolute CDN URLs).
+
+### 🟡 Still not build-verified
+Same standing sandbox limitation. All of the above are static/logical
+fixes and backend-seed-data cross-checks, not compiled or run.
+
+---
+
 ## 2026-08-17 (later) — Customer app: dish photos, category icons, restaurant logo not rendering (bug report + fix)
 
 App owner reported that item 4's photo uploads (dish + category, plus
