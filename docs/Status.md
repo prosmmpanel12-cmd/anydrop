@@ -1,6 +1,41 @@
 # Anydrop — Project Status
 
-**Last Updated:** 2026-08-18 (Admin — Approve/Reject pending restaurants screen built, session-auth per docs/02 §6 — ✅ built, NOT tested/Gradle-or-server-verified yet)
+**Last Updated:** 2026-08-18 (First real GitHub Actions Gradle build run — Customer app: ✅ BUILD SUCCESSFUL. Restaurant app: ❌ 1 compile error, fixed below, not yet re-verified.)
+
+## Session update (2026-08-18, later same day) — First-ever real Gradle build results (from GitHub Actions logs)
+
+This is the first time either app has actually gone through a real Gradle
+build — every prior session's "🟡 not build-verified" caveat only meant
+"never confirmed", not "confirmed working". App owner uploaded the
+Actions run logs (`Build Customer App`, `Build Restaurant App`).
+
+### ✅ Customer app — `BUILD SUCCESSFUL in 3m 38s`, 36 tasks, 0 errors
+Only pre-existing deprecation/unused-variable warnings (`requestSingleUpdate`
+deprecated, a couple unused locals in `RateOrderDialog.kt` /
+`ApiClient.kt`) — none new, none blocking. **First confirmed-working
+build of the Customer app in this project's history.**
+
+### ❌ Restaurant app — `BUILD FAILED in 3m 7s`, 1 Kotlin compile error
+```
+e: OrdersFragment.kt:183:36 Type mismatch: inferred type is Set<Int> but MutableSet<Int>? was expected
+```
+Caused by this same session's earlier "loud sound on new order" addition
+— `knownNewOrderIds` was declared `MutableSet<Int>?` but every write to
+it is a full reassignment (`knownNewOrderIds = currentIds`, where
+`currentIds` comes from `.toSet()`, an immutable `Set`), never an
+in-place mutation. **Fixed** — field retyped to `Set<Int>?` (its actual
+usage never called `.add()`/`.remove()`, so this is a pure type fix, no
+behavior change). This was the *only* error in the whole log — nothing
+else to fix from this run.
+
+### ⏭️ Next
+Re-run the Restaurant app build to confirm this one-line fix is actually
+enough (only checked by reading the log, not by running Gradle myself —
+still no Android SDK in this sandbox). If that comes back green too,
+this is the first time *both* apps will have a real confirmed-working
+build.
+
+---
 
 ## Session update (2026-08-18) — Admin Panel: first real screen, "Approve/Reject pending restaurants"
 

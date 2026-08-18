@@ -1,4 +1,32 @@
-## 2026-08-17 (latest) — Order Management small additions: prep-time select + loud sound on new order
+## 2026-08-18 (latest) — Build fix: `OrdersFragment.kt` compile error from the prep-time/loud-sound session
+
+First-ever real GitHub Actions Gradle build run came back for both apps.
+**Customer app: `BUILD SUCCESSFUL`, 0 errors** (first confirmed-working
+build in the project's history). **Restaurant app: `BUILD FAILED`, 1
+Kotlin compile error**, introduced by the immediately-prior session's
+"loud sound on new order" addition:
+
+```
+e: OrdersFragment.kt:183:36 Type mismatch: inferred type is Set<Int> but MutableSet<Int>? was expected
+```
+
+`knownNewOrderIds` was declared `MutableSet<Int>?` but every write to it
+is a full reassignment (`knownNewOrderIds = currentIds`, where
+`currentIds` is `.toSet()` — an immutable `Set`), never an in-place
+`.add()`/`.remove()` mutation — so `MutableSet` was simply the wrong
+type. **Fixed** by retyping the field to `Set<Int>?`; no behavior change,
+pure type fix. This was the only error in the whole log.
+
+**Not yet re-verified** — only confirmed by reading the failing log, not
+by re-running Gradle (still no Android SDK in this sandbox). Next
+real-device/CI pass should confirm this specific fix is enough before
+trusting the rest of that session's `NewOrderAlertSound`/`PrepTimeDialog`
+work is otherwise fine (the rest of that log had no other errors, so
+there's no reason to suspect more, but it's still unconfirmed).
+
+---
+
+## 2026-08-17 — Order Management small additions: prep-time select + loud sound on new order
 
 Closes the item #2 gap from `docs/18`'s recommended build order (§"Order
 Management") that every session since kept deferring in favor of other

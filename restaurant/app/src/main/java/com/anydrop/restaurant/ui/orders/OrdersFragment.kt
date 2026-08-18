@@ -63,7 +63,13 @@ class OrdersFragment : Fragment() {
     // sees whatever's already pending) never false-fires the alert; only a
     // later poll finding an id that wasn't in the previous snapshot counts
     // as genuinely new.
-    private var knownNewOrderIds: MutableSet<Int>? = null
+    // Bug fix (build error, 2026-08-18) — declared as read-only Set, not
+    // MutableSet: every update below is a full reassignment
+    // (`knownNewOrderIds = currentIds`, itself the result of `.toSet()`),
+    // never an in-place mutation, so MutableSet was the wrong type and
+    // failed to compile ("inferred type is Set<Int> but MutableSet<Int>?
+    // was expected").
+    private var knownNewOrderIds: Set<Int>? = null
 
     private companion object {
         const val POLL_INTERVAL_MS = 10000L
