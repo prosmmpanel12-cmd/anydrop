@@ -1,8 +1,12 @@
 package com.anydrop.restaurant.ui.main
 
+import android.Manifest
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -12,6 +16,7 @@ import com.anydrop.restaurant.data.TokenManager
 import com.anydrop.restaurant.databinding.ActivityMainBinding
 import com.anydrop.restaurant.network.ApiClient
 import com.anydrop.restaurant.network.OperationalStatusUpdateBody
+import com.anydrop.restaurant.service.OrderPollingService
 import com.anydrop.restaurant.ui.account.AccountFragment
 import com.anydrop.restaurant.ui.common.InAppNotifier
 import com.anydrop.restaurant.ui.insights.InsightsFragment
@@ -56,6 +61,18 @@ class MainActivity : AppCompatActivity() {
     private var isOpen = true
     private var togglingInFlight = false
 
+    // "Sound doesn't work once the app is closed" fix — POST_NOTIFICATIONS
+    // is a runtime permission on Android 13+ (API 33); without it,
+    // OrderPollingService's alerts never show at all, silently, no error
+    // anywhere. Requested once right after login/launch, alongside
+    // starting the service itself.
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* Either way, OrderPollingService itself still runs — it just won't
+          be able to show the alert notification if this was denied. Not
+          re-prompting on denial; Account tab is the natural place to
+          explain/re-request later if that becomes worth building. */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -66,6 +83,8 @@ class MainActivity : AppCompatActivity() {
             goToLogin()
             return
         }
+
+        startOrderPollingService()
 
         binding.restaurantNameText.text = tokenManager.getRestaurantName().orEmpty()
 
@@ -99,6 +118,20 @@ class MainActivity : AppCompatActivity() {
         // Covers e.g. coming back from the (not-yet-built) profile screen —
         // cheap enough to just re-fetch rather than pass a result back.
         loadOperationalStatus()
+    }
+
+    private fun startOrderPollingService() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        // Started regardless of whether the permission prompt above was
+        // granted — the polling loop itself (and the persistent
+        // low-priority "monitoring" notification, which pre-dates the
+        // POST_NOTIFICATIONS requirement on some OS versions/OEM skins)
+        // doesn't depend on it; only the new-order alert notification does.
+        OrderPollingService.start(this)
     }
 
     private fun showFragment(fragment: Fragment) {

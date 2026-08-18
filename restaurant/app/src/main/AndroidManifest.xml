@@ -8,9 +8,20 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Order Management small addition, "loud sound on new order"
-         (docs/18, docs/restorent/00_Status.md backlog item 2) — needed by
-         NewOrderAlertSound's vibration alongside the alarm-stream tone. -->
+         (docs/18, docs/restorent/00_Status.md backlog item 2). Superseded
+         2026-08-18 by OrderPollingService + OrderNotificationHelper (real
+         alert-even-when-closed fix — see that class's kdoc) but VIBRATE
+         is still needed, both by the notification channel's own
+         vibration pattern and NotificationCompat.Builder.setVibrate(). -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- OrderPollingService (2026-08-18) — foreground service so order
+         polling survives the app being closed, per its own kdoc. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Runtime-requested on API 33+ (MainActivity.startOrderPollingService)
+         — without this, OrderNotificationHelper's alert notification
+         silently never shows, no error anywhere. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -101,6 +112,16 @@
         <activity
             android:name=".ui.account.BannerManagerActivity"
             android:exported="false" />
+
+        <!-- Real "alert even when app is closed" fix (2026-08-18) — see
+             OrderPollingService's kdoc. foregroundServiceType="dataSync"
+             matches its actual behavior (periodically syncing/polling
+             order data from the backend) — required on API 34+, every
+             foreground service must declare one. -->
+        <service
+            android:name=".service.OrderPollingService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
     </application>
 

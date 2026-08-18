@@ -1,8 +1,72 @@
 # Anydrop — Project Status
 
-**Last Updated:** 2026-08-18 (App-owner reported testing — Customer app: found and fixed a real, previously-invisible root cause for address delete. Restaurant app: no confirmed root cause found for the sound/dialog reports, hardened two risky spots as a precaution — needs retesting.)
+**Last Updated:** 2026-08-18 (Real fix for "sound/vibration inconsistent, nothing when app closed" — replaced the in-app MediaPlayer approach with a foreground Service + proper NotificationChannel. Needs a real-device retest, including with the app fully closed.)
 
-## Session update (2026-08-18, latest) — App-owner testing round: address delete FK bug (found + fixed) + restaurant Accept/sound hardening (unconfirmed root cause)
+## Session update (2026-08-18, latest) — Order alerts now use a foreground Service + NotificationChannel, not `OrdersFragment`'s poll loop
+
+App owner's follow-up after the previous hardening pass: **vibration
+worked sometimes, sound never did, and nothing happened at all once the
+app was closed.** That last part was the real tell — the previous
+approach (`NewOrderAlertSound`, a raw `MediaPlayer` driven by
+`OrdersFragment`'s own poll loop) was architecturally unable to work once
+the app wasn't open: closing the app (or the fragment's view being
+destroyed on some lifecycle timings) stopped the polling coroutine
+entirely, so nothing was left to ever detect a new order. Playing through
+the alarm audio stream also explains the inconsistent sound/vibration —
+that's a separate, muteable-independently volume slider most phones never
+touch, unrelated to the phone's normal ringer/notification volume people
+actually keep audible.
+
+**Replaced with the standard Android mechanism for this:**
+
+- **`service/OrderNotificationHelper.kt`** (new) — creates two
+  `NotificationChannel`s (`IMPORTANCE_HIGH` for the actual new-order alert,
+  with sound + vibration configured on the channel itself — the only way
+  Android 8+ reliably honors either; `IMPORTANCE_LOW`/silent for the
+  persistent "watching for orders" service notification) and builds both
+  notifications.
+- **`service/OrderPollingService.kt`** (new) — a foreground `Service` that
+  polls `getOrders(status="pending")` every 15s **independent of any
+  Activity/Fragment being open**, diffs against a *persisted* (SharedPreferences,
+  survives process death) set of already-seen order ids, and posts the
+  alert notification via the helper above when something new shows up.
+  `START_STICKY` so Android tries to respawn it after being killed.
+  Started from `MainActivity.onCreate()`, stopped from `AccountFragment`'s
+  logout handler.
+- **`OrdersFragment.kt`** — reverted to just displaying data; all
+  alert-detection logic removed (the service is now the single source of
+  truth, avoiding double-alerting while the app happens to be open too).
+- Manifest: added `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC`,
+  `POST_NOTIFICATIONS` permissions + the `<service>` declaration.
+  `POST_NOTIFICATIONS` is requested at runtime from `MainActivity` (a
+  hard requirement on API 33+ — without it the alert notification
+  silently never shows, no error anywhere, which is itself a very
+  plausible contributor to "no sound" if the app owner's test device is
+  Android 13+ and never got prompted before this fix).
+- Deleted the now-superseded `ui/common/NewOrderAlertSound.kt`.
+
+**Known, honest limitation — not fully solvable without FCM push:** a
+foreground service significantly improves survival odds but Android
+still can *not* guarantee it against aggressive OEM battery-management
+skins (MIUI/ColorOS/FunTouch on Xiaomi/Oppo/Vivo devices especially) — a
+user may need to manually exempt the app from battery optimization /
+disable "auto-start management" restrictions for fully reliable delivery
+with the app swiped away. The only way to remove this caveat entirely is
+a real push-notification backend (Firebase Cloud Messaging), which this
+project doesn't have set up — worth a future session if background
+reliability keeps being a problem after this.
+
+### 🟡 Not build-verified
+Standard sandbox caveat — no Android SDK here. Retest should specifically
+check: (1) new-order alert sound/vibration/notification with the app
+**fully closed** (swiped from recents), not just backgrounded, (2) the
+POST_NOTIFICATIONS permission prompt actually appears on first login
+(Android 13+ devices only), (3) tapping the alert notification opens the
+right screen.
+
+---
+
+## Session update (2026-08-18, earlier) — App-owner testing round: address delete FK bug (found + fixed) + restaurant Accept/sound hardening (unconfirmed root cause)
 
 ### ✅ Customer app — real root cause found: address delete FK constraint
 

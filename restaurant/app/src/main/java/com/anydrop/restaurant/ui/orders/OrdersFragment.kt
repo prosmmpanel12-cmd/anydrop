@@ -16,7 +16,6 @@ import com.anydrop.restaurant.network.Order
 import com.anydrop.restaurant.network.RejectBody
 import com.anydrop.restaurant.network.StatusUpdateBody
 import com.anydrop.restaurant.ui.common.InAppNotifier
-import com.anydrop.restaurant.ui.common.NewOrderAlertSound
 import com.anydrop.restaurant.ui.dashboard.OrderAdapter
 import com.anydrop.restaurant.ui.orderdetail.OrderDetailActivity
 import kotlinx.coroutines.delay
@@ -58,19 +57,6 @@ class OrdersFragment : Fragment() {
 
     private var completedExpanded = false
     private var completedLoadedOnce = false
-
-    // Order Management small addition — "loud sound on new order". Null
-    // until the very first successful loadNew() so app-open (which always
-    // sees whatever's already pending) never false-fires the alert; only a
-    // later poll finding an id that wasn't in the previous snapshot counts
-    // as genuinely new.
-    // Bug fix (build error, 2026-08-18) — declared as read-only Set, not
-    // MutableSet: every update below is a full reassignment
-    // (`knownNewOrderIds = currentIds`, itself the result of `.toSet()`),
-    // never an in-place mutation, so MutableSet was the wrong type and
-    // failed to compile ("inferred type is Set<Int> but MutableSet<Int>?
-    // was expected").
-    private var knownNewOrderIds: Set<Int>? = null
 
     private companion object {
         const val POLL_INTERVAL_MS = 10000L
@@ -138,16 +124,8 @@ class OrdersFragment : Fragment() {
         if (_binding != null) loadAll()
     }
 
-    override fun onPause() {
-        super.onPause()
-        // Don't keep ringing/vibrating once the staff has left this screen
-        // — the next poll after they return re-evaluates from scratch.
-        NewOrderAlertSound.stop()
-    }
-
     override fun onDestroyView() {
         super.onDestroyView()
-        NewOrderAlertSound.stop()
         _binding = null
     }
 
@@ -176,28 +154,6 @@ class OrdersFragment : Fragment() {
                 val response = api.getOrders(status = STATUS_NEW)
                 val orders = response.body()?.data?.data ?: emptyList()
                 if (_binding == null) return@launch
-
-                // Order Management small addition — "loud sound on new
-                // order". Compare against the last-seen snapshot, not just
-                // "orders.isNotEmpty()" — otherwise an untouched pending
-                // order would keep re-triggering the alert on every single
-                // 10s poll instead of firing once when it actually arrives.
-                val currentIds = orders.map { it.id }.toSet()
-                val previouslyKnown = knownNewOrderIds
-                if (previouslyKnown != null && currentIds.any { it !in previouslyKnown }) {
-                    NewOrderAlertSound.play(requireContext())
-                    // Bug-hardening (2026-08-18) — sound/vibration alone
-                    // depend on device state entirely outside this app's
-                    // control (alarm-stream volume muted, DND blocking
-                    // vibration, etc.) and can fail completely silently —
-                    // no exception, nothing to catch, just literally
-                    // nothing happens on that specific device. A Toast
-                    // banner has no such failure mode, so it's a
-                    // guaranteed-visible companion signal alongside the
-                    // sound, not a replacement for it.
-                    InAppNotifier.show(activity, "New order received", InAppNotifier.Type.SUCCESS)
-                }
-                knownNewOrderIds = currentIds
 
                 newAdapter.submitList(orders)
                 binding.newEmptyText.visibility = if (orders.isEmpty()) View.VISIBLE else View.GONE
@@ -270,7 +226,6 @@ class OrdersFragment : Fragment() {
     }
 
     private fun acceptOrder(order: Order, prepMinutes: Int) {
-        NewOrderAlertSound.stop()
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val response = api.acceptOrder(order.id, AcceptBody(estimatedPrepMinutes = prepMinutes))
@@ -287,7 +242,6 @@ class OrdersFragment : Fragment() {
     }
 
     private fun rejectOrder(order: Order, reason: String) {
-        NewOrderAlertSound.stop()
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val response = api.rejectOrder(order.id, RejectBody(reason))

@@ -16,6 +16,7 @@ import com.anydrop.restaurant.databinding.FragmentAccountBinding
 import com.anydrop.restaurant.network.ApiClient
 import com.anydrop.restaurant.network.OperationalStatusUpdateBody
 import com.anydrop.restaurant.network.RestaurantProfileDetail
+import com.anydrop.restaurant.service.OrderPollingService
 import com.anydrop.restaurant.ui.common.InAppNotifier
 import com.anydrop.restaurant.ui.login.LoginActivity
 import kotlinx.coroutines.launch
@@ -86,6 +87,9 @@ class AccountFragment : Fragment() {
         }
 
         binding.btnLogout.setOnClickListener {
+            // A logged-out device has no business still polling for
+            // another restaurant's orders in the background.
+            OrderPollingService.stop(requireContext())
             tokenManager.clear()
             startActivity(
                 Intent(requireContext(), LoginActivity::class.java)
