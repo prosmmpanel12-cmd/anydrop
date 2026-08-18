@@ -171,8 +171,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     if (!$addressId) {
         respond_error('validation_error', 422, ['fields' => ['id']]);
     }
-    $del = $db->prepare('DELETE FROM customer_addresses WHERE id = :id AND customer_id = :cid');
-    $del->execute(['id' => $addressId, 'cid' => $customerId]);
+    // Bug fix (migration 26) — this used to be a bare execute() with no
+    // try/catch. `orders.delivery_address_id`'s foreign key used to have
+    // no ON DELETE clause (implicit RESTRICT), so deleting any address
+    // that had ever been used on a real order threw an uncaught
+    // PDOException here — no JSON response at all, which is what made
+    // the Android client's generic `catch (e: Exception)` show a plain
+    // "Network error" with no explanation for what was actually a
+    // perfectly normal, expected case (most real addresses get used on
+    // at least one order eventually). Migration 26 changed that FK to
+    // ON DELETE SET NULL so this no longer happens in practice — this
+    // try/catch stays anyway as defense-in-depth, so if a future
+    // constraint/DB issue ever does hit this again, it returns a clean
+    // JSON error instead of a raw server crash.
+    try {
+        $del = $db->prepare('DELETE FROM customer_addresses WHERE id = :id AND customer_id = :cid');
+        $del->execute(['id' => $addressId, 'cid' => $customerId]);
+    } catch (PDOException $e) {
+        respond_error('address_delete_failed', 500);
+    }
     respond_ok(['deleted' => true]);
 }
 

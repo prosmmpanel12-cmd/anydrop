@@ -16,6 +16,7 @@ import com.anydrop.restaurant.R
 import com.anydrop.restaurant.databinding.ItemOrderCardBinding
 import com.anydrop.restaurant.network.Order
 import com.anydrop.restaurant.ui.common.InAppNotifier
+import com.anydrop.restaurant.ui.common.PrepTimeDialog
 import com.anydrop.restaurant.util.ScheduledTimeFormatter
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -214,7 +215,7 @@ class OrderAdapter(
         }
 
         private fun promptPrepTime(order: Order) {
-            com.anydrop.restaurant.ui.common.PrepTimeDialog.show(context) { prepMinutes ->
+            PrepTimeDialog.show(context) { prepMinutes ->
                 onAccept(order, prepMinutes)
             }
         }

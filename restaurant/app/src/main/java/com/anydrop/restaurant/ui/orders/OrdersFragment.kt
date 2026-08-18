@@ -16,6 +16,7 @@ import com.anydrop.restaurant.network.Order
 import com.anydrop.restaurant.network.RejectBody
 import com.anydrop.restaurant.network.StatusUpdateBody
 import com.anydrop.restaurant.ui.common.InAppNotifier
+import com.anydrop.restaurant.ui.common.NewOrderAlertSound
 import com.anydrop.restaurant.ui.dashboard.OrderAdapter
 import com.anydrop.restaurant.ui.orderdetail.OrderDetailActivity
 import kotlinx.coroutines.delay
@@ -141,12 +142,12 @@ class OrdersFragment : Fragment() {
         super.onPause()
         // Don't keep ringing/vibrating once the staff has left this screen
         // — the next poll after they return re-evaluates from scratch.
-        com.anydrop.restaurant.ui.common.NewOrderAlertSound.stop()
+        NewOrderAlertSound.stop()
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
-        com.anydrop.restaurant.ui.common.NewOrderAlertSound.stop()
+        NewOrderAlertSound.stop()
         _binding = null
     }
 
@@ -184,7 +185,17 @@ class OrdersFragment : Fragment() {
                 val currentIds = orders.map { it.id }.toSet()
                 val previouslyKnown = knownNewOrderIds
                 if (previouslyKnown != null && currentIds.any { it !in previouslyKnown }) {
-                    com.anydrop.restaurant.ui.common.NewOrderAlertSound.play(requireContext())
+                    NewOrderAlertSound.play(requireContext())
+                    // Bug-hardening (2026-08-18) — sound/vibration alone
+                    // depend on device state entirely outside this app's
+                    // control (alarm-stream volume muted, DND blocking
+                    // vibration, etc.) and can fail completely silently —
+                    // no exception, nothing to catch, just literally
+                    // nothing happens on that specific device. A Toast
+                    // banner has no such failure mode, so it's a
+                    // guaranteed-visible companion signal alongside the
+                    // sound, not a replacement for it.
+                    InAppNotifier.show(activity, "New order received", InAppNotifier.Type.SUCCESS)
                 }
                 knownNewOrderIds = currentIds
 
@@ -259,7 +270,7 @@ class OrdersFragment : Fragment() {
     }
 
     private fun acceptOrder(order: Order, prepMinutes: Int) {
-        com.anydrop.restaurant.ui.common.NewOrderAlertSound.stop()
+        NewOrderAlertSound.stop()
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val response = api.acceptOrder(order.id, AcceptBody(estimatedPrepMinutes = prepMinutes))
@@ -276,7 +287,7 @@ class OrdersFragment : Fragment() {
     }
 
     private fun rejectOrder(order: Order, reason: String) {
-        com.anydrop.restaurant.ui.common.NewOrderAlertSound.stop()
+        NewOrderAlertSound.stop()
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val response = api.rejectOrder(order.id, RejectBody(reason))

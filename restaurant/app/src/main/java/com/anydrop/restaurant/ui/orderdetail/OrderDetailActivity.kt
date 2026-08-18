@@ -13,6 +13,7 @@ import com.anydrop.restaurant.network.Order
 import com.anydrop.restaurant.network.RejectBody
 import com.anydrop.restaurant.network.StatusUpdateBody
 import com.anydrop.restaurant.ui.common.InAppNotifier
+import com.anydrop.restaurant.ui.common.PrepTimeDialog
 import com.anydrop.restaurant.util.ScheduledTimeFormatter
 import kotlinx.coroutines.launch
 
@@ -138,7 +139,7 @@ class OrderDetailActivity : AppCompatActivity() {
     }
 
     private fun promptAcceptPrepTime() {
-        com.anydrop.restaurant.ui.common.PrepTimeDialog.show(this) { prepMinutes -> acceptOrder(prepMinutes) }
+        PrepTimeDialog.show(this) { prepMinutes -> acceptOrder(prepMinutes) }
     }
 
     private fun acceptOrder(prepMinutes: Int) {

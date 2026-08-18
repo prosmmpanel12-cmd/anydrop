@@ -1,8 +1,96 @@
 # Anydrop — Project Status
 
-**Last Updated:** 2026-08-18 (First real GitHub Actions Gradle build run — Customer app: ✅ BUILD SUCCESSFUL. Restaurant app: ❌ 1 compile error, fixed below, not yet re-verified.)
+**Last Updated:** 2026-08-18 (App-owner reported testing — Customer app: found and fixed a real, previously-invisible root cause for address delete. Restaurant app: no confirmed root cause found for the sound/dialog reports, hardened two risky spots as a precaution — needs retesting.)
 
-## Session update (2026-08-18, later same day) — First-ever real Gradle build results (from GitHub Actions logs)
+## Session update (2026-08-18, latest) — App-owner testing round: address delete FK bug (found + fixed) + restaurant Accept/sound hardening (unconfirmed root cause)
+
+### ✅ Customer app — real root cause found: address delete FK constraint
+
+App owner reported: newly-added test addresses delete fine, but **any
+older address, or whichever address is left last, fails with "Network
+error."** This wasn't a client bug — every AddressBookActivity code path
+was re-read line by line and was already correct from the earlier
+session's fix. The actual cause was in the schema the whole time:
+
+```sql
+CONSTRAINT fk_order_address FOREIGN KEY (delivery_address_id) REFERENCES customer_addresses(id)
+```
+
+No `ON DELETE` clause on this FK (01_schema.sql) — InnoDB's default is
+RESTRICT, so MySQL refused the DELETE with error 1451 for any address
+ever referenced by a real order. `customer/addresses.php`'s DELETE
+handler had no try/catch, so that PDOException went uncaught — no JSON
+response body at all — which is what made the Android client's own
+generic `catch (e: Exception)` show a plain "Network error" with no real
+explanation. A freshly-added test address has no order referencing it
+yet, so it always deleted fine — which is exactly why this looked like
+it only affected "old" addresses.
+
+**Fixed:**
+- **`backend/sql/26_migration_address_delete_fk_fix.sql`** — drops and
+  recreates `fk_order_address` with `ON DELETE SET NULL` instead of the
+  implicit RESTRICT. Confirmed safe: grepped every backend endpoint for
+  `delivery_address_id` — nothing anywhere currently reads it back out
+  for display (order detail/history, restaurant order screens all render
+  fine without it), so NULLing it out on old orders breaks nothing today.
+  (Worth flagging separately, not fixed here: that also means no screen
+  currently shows a customer's delivery address *to the restaurant* at
+  all — a real, pre-existing gap, different bug.)
+- **`backend/api/v1/customer/addresses.php`** — DELETE handler now wraps
+  its `execute()` in try/catch as defense-in-depth, returning a clean
+  `address_delete_failed` JSON error instead of a raw crash if any other
+  DB issue ever hits this in the future.
+
+**⚠️ Migration 26 must be run against the live DB before this is fixed
+live** — same as every other migration, pushing to GitHub does not run
+it automatically.
+
+### 🟡 Restaurant app — Accept dialog / new-order sound: root cause NOT confirmed, hardened as a precaution
+
+App owner reported: sent a genuine new order in real time, got **no
+sound, no vibration**; tapping **Accept never showed the prep-time
+dialog**. Every line of `OrdersFragment.kt`, `OrderAdapter.kt`,
+`OrderDetailActivity.kt`, `PrepTimeDialog.kt`, `NewOrderAlertSound.kt`,
+`MainActivity.kt`, and the layout XML was re-read — unlike the address
+bug, **no concrete root cause was found this pass**. Two real,
+plausible-but-unconfirmed risk points were hardened defensively instead
+of leaving them as-is:
+
+1. **`PrepTimeDialog`** used `AlertDialog.setSingleChoiceItems()`, which
+   (unlike the app's other existing dialog, `promptRejectReason`'s plain
+   `setView()`) inflates Android's internal single-choice list-item
+   layout — a real, documented pitfall where custom app themes can fail
+   to render/inflate it correctly on some devices, with no clean
+   exception path if the click listener itself isn't wrapped in a
+   try/catch. Switched to `setItems()` — the most basic, theme-agnostic
+   list mode AlertDialog has, tap-one-and-go instead of select-then-
+   confirm (also one less tap).
+2. **`NewOrderAlertSound`** only alerts via the alarm audio stream +
+   vibration — both are entirely device-setting-dependent (alarm volume
+   muted, DND blocking vibration) and can fail **completely silently**,
+   no exception, nothing to catch. Added a Toast banner ("New order
+   received") alongside it in `OrdersFragment.loadNew()` — Toasts have no
+   equivalent silent-failure mode, so this is a guaranteed-visible signal
+   to isolate whether the *detection* logic is firing at all, independent
+   of whether the phone's audio/vibration settings allow sound/vibration
+   through.
+3. Cleaned up sloppy fully-qualified inline class references
+   (`com.anydrop.restaurant.ui.common.NewOrderAlertSound.play(...)` etc.)
+   into proper top-of-file imports across all three files — cosmetic,
+   not a functional fix, but worth doing while in there.
+
+**This is explicitly NOT a confirmed fix** — unlike the address bug,
+there's no smoking gun here yet. Next real-device retest should
+specifically report: does the new Toast banner appear when a new order
+arrives (isolates detection-logic vs. alert-delivery)? Does tapping
+Accept do *anything* now (even just opening the dialog, regardless of
+sound)? If both are still silent after this, the bug is somewhere this
+review hasn't found yet and needs a logcat from the actual device, not
+another round of static code reading.
+
+---
+
+## Session update (2026-08-18, earlier) — First-ever real Gradle build results (from GitHub Actions logs)
 
 This is the first time either app has actually gone through a real Gradle
 build — every prior session's "🟡 not build-verified" caveat only meant

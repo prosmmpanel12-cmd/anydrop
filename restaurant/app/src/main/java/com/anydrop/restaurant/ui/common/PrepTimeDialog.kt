@@ -25,21 +25,25 @@ object PrepTimeDialog {
 
     private val OPTIONS_MINUTES = intArrayOf(10, 15, 20, 30)
 
-    // 20 min — matches orders-accept.php's own fallback when nothing is
-    // sent, so the dialog's default selection agrees with what would have
-    // happened anyway if this dialog didn't exist.
-    private const val DEFAULT_INDEX = 2
-
     fun show(context: Context, onConfirm: (prepMinutes: Int) -> Unit) {
-        var selectedIndex = DEFAULT_INDEX
+        // Bug-hardening (2026-08-18) — was setSingleChoiceItems + a
+        // separate positive-button confirm step. setSingleChoiceItems
+        // inflates Android's internal single-choice list-item layout,
+        // which (unlike plain setItems()/setView()) can be sensitive to
+        // custom app themes not fully defining the attributes that
+        // layout expects — a real, documented AlertDialog pitfall, and
+        // exactly the kind of thing this sandbox has no way to catch
+        // (no Android SDK to render it on). setItems() is the most
+        // basic/robust list mode AlertDialog has — plain list rows, tap
+        // one, dialog closes and fires immediately. Also one tap instead
+        // of two, so this is a straight improvement either way.
         val labels = OPTIONS_MINUTES
             .map { context.getString(R.string.prep_time_option_format, it) }
             .toTypedArray()
 
         AlertDialog.Builder(context)
             .setTitle(R.string.prep_time_dialog_title)
-            .setSingleChoiceItems(labels, selectedIndex) { _, which -> selectedIndex = which }
-            .setPositiveButton(R.string.btn_accept) { _, _ -> onConfirm(OPTIONS_MINUTES[selectedIndex]) }
+            .setItems(labels) { _, which -> onConfirm(OPTIONS_MINUTES[which]) }
             .setNegativeButton(R.string.btn_cancel, null)
             .show()
     }
