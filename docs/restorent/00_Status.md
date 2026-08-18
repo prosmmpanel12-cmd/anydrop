@@ -1,3 +1,229 @@
+## 2026-08-18 (newest) — Coupon system: edit-dialog + usage-limit fields DONE (this session — sandbox still has no Android SDK/network/DB access)
+
+Closes items 1 and 3 from the prior coupon session's "Not done" list.
+Backend and Kotlin models needed **zero changes** — `coupons-update.php`
+already accepted every field, `CouponUpdateBody`/`CouponCreateBody`
+already had `usageLimitTotal`/`usageLimitPerUser` — this was entirely UI
+work.
+
+### ✅ Edit an existing coupon's terms
+- `item_coupon_manage_row.xml`: the code/discount/meta text column
+  (`couponInfoColumn`) is now its own tappable target
+  (`?attr/selectableItemBackground`, same pattern as
+  `fragment_account.xml`'s rows) — deliberately separate from the
+  visibility switch's tap target so "toggle visibility" and "edit terms"
+  can never be confused as the same gesture.
+- `CouponAdapter`: new `onEditClick: (Coupon) -> Unit` constructor param,
+  wired to that column's click.
+- `CouponManagerActivity.showEditCouponDialog()`: reuses
+  `dialog_add_coupon.xml` (same view as add), pre-fills every field from
+  the tapped `Coupon`. `code` and `discount_type` are both create-only
+  server-side (coupons-update.php's own kdoc) — `inputCode` is shown
+  but disabled (so the dialog still confirms *which* coupon), and the
+  discount-type chip picker is swapped for a plain locked-label
+  (`editDiscountTypeLabel`, new TextView in `dialog_add_coupon.xml`,
+  gone in add-mode) rather than showing an editable control for a field
+  that can't actually be changed.
+- `submitCouponEdit()`: sends the full current form state (not a diff)
+  on every save — simpler than dirty-tracking and correct either way,
+  since every value shown is exactly what the dialog displayed.
+
+### ✅ usage_limit_total / usage_limit_per_user in the dialog
+Two more optional numeric `TextInputLayout` fields
+(`inputUsageLimitTotal`/`inputUsageLimitPerUser`) added to
+`dialog_add_coupon.xml`, wired into both `submitNewCoupon()` (create)
+and `submitCouponEdit()` (update). Blank means unlimited, matching the
+backend's existing null-is-unlimited convention.
+
+### Still not done
+- **No coupon delete/archive UI** — same open question flagged last
+  session (soft-disable-only vs. a real archived state) — still needs
+  the app owner's input, not a code question.
+- **No build verification** — same standing sandbox limitation. This
+  session's changes are pure UI (new TextViews/TextInputLayouts, one new
+  adapter constructor param, two new Activity functions) — lower risk
+  than the ChipGroup-listener concern flagged last session, but still
+  entirely unverified by a compiler. Ran an XML well-formedness check
+  and a duplicate-view-id check on the edited layouts (both clean) and a
+  brace-balance check on the edited Kotlin files (balanced) — the
+  furthest this sandbox can verify short of an actual `javac`/`kotlinc`.
+
+### ⏭️ Next
+1. Real Gradle build for both apps — now two sessions of unverified
+   surface stacked (this session's coupon-edit UI + last session's
+   OrderPollingService rewrite), see that entry below for the priority
+   order.
+2. Run migration 26 (and confirm 23/24's status) against the live DB —
+   unchanged ask, still needs human DB access.
+3. Ask the app owner about coupon delete/archive UI.
+4. Resume doc 18's recommended build order: notification bell, reviews
+   reply, settings, payments, analytics, staff, Rider App last.
+
+---
+
+## 2026-08-18 — OrderPollingService/OrdersFragment question RESOLVED: clean replacement, no conflict (this session — sandbox still has no Android SDK/network/DB access)
+
+Read `OrderPollingService.kt`, `OrderNotificationHelper.kt`,
+`OrdersFragment.kt`, `MainActivity.kt`, `AccountFragment.kt`,
+`OrderDetailActivity.kt`, and `AndroidManifest.xml` in full, per the
+prior entry's "first thing next session must do."
+
+**Finding: this is a complete, deliberate, non-conflicting replacement,
+not dead/overlapping code.**
+- `OrdersFragment.kt` has zero references to `knownNewOrderIds` or any
+  sound/alert logic — it only does its own 10s UI-refresh polling
+  (`startPolling()`) to keep the three on-screen order sections current
+  while the fragment is visible. It never alerted on its own; alerting
+  is fully delegated elsewhere now.
+- `OrderPollingService` (15s interval, independent `CoroutineScope`,
+  `START_STICKY` foreground service) is the sole source of new-order
+  detection — persists known IDs in `SharedPreferences` (survives
+  process death/reboot), calls `OrderNotificationHelper.showNewOrderAlert()`
+  on genuinely new pending orders.
+- `OrderNotificationHelper` posts a heads-up notification through a
+  proper `NotificationChannel` (sound+vibration on the channel itself,
+  not a raw `MediaPlayer` off the alarm stream like the old
+  `NewOrderAlertSound` did) plus a separate looping ringtone/vibration
+  that runs until dismissed, plus a full-screen `NewOrderAlarmActivity`
+  intent for the locked-screen case. Kdoc explains this was itself a
+  real-device-tested fix for two specific failures in the old approach
+  (stopped working when the app was backgrounded; alarm-stream sound
+  came out silent on phones with no alarm tone assigned).
+- Cross-checked every piece the kdocs claim: `MainActivity.onCreate()`
+  calls `startOrderPollingService()` → `OrderPollingService.start()`;
+  `AccountFragment`'s logout path calls `OrderPollingService.stop()`;
+  `MainActivity`/`OrderDetailActivity`'s `onResume` call
+  `OrderNotificationHelper.stopRingingLoop()`; manifest declares
+  `FOREGROUND_SERVICE`/`FOREGROUND_SERVICE_DATA_SYNC`/`POST_NOTIFICATIONS`/
+  `VIBRATE`, registers the service (`foregroundServiceType="dataSync"`),
+  `NewOrderAlarmActivity` (`singleTask`, `excludeFromRecents`), and
+  `DismissOrderAlertReceiver` — all present and correct. `res/raw/
+  alarm_tone.wav` (the bundled tone `startRingingLoop()` loads) exists.
+  `NewOrderAlarmActivity.kt` exists. `NewOrderAlertSound.kt` confirmed
+  genuinely absent — fully deleted, not orphaned.
+- The only remaining references to `knownNewOrderIds`/`NewOrderAlertSound`
+  anywhere in the repo are two kdoc comments (in
+  `OrderPollingService.kt`/`OrderNotificationHelper.kt`) explaining what
+  was superseded — not live code.
+
+**Why this wasn't logged as its own Status.md entry when it was built:**
+unknown — genuinely undocumented at the time, as the prior entry
+flagged. No evidence found of *when* in the session it landed relative
+to the `OrdersFragment` type-fix; both are dated 2026-08-18 with no
+finer-grained ordering available in this sandbox (no git log access).
+Doesn't block anything — the code itself is self-consistent — but worth
+a human confirming with the app owner that this was in fact intentional
+scope (a full notification-architecture rewrite) and not, e.g., two
+different sessions independently "fixing" the same complaint without
+coordinating.
+
+**Still unverified — no Gradle available in this sandbox.** This
+resolves the *documentation/conflict* question, not compilation. Real
+build still needed to confirm e.g. the `ChipGroup` listener flagged in
+the coupon entry below, and this notification code generally (uses
+several API-level-gated branches — `VibrationEffect.createWaveform`,
+`canUseFullScreenIntent`, `foregroundServiceType` — that read correctly
+but are unverified by a compiler).
+
+---
+
+## 2026-08-18 — Coupon system backend + owner-side UI, PARTIAL (this session — sandbox still has no Android SDK/network/DB access)
+
+Picked up per `NEXT_SESSION_PROMPT.md`'s "next feature work" queue: doc
+07_Phase_3.7_Bug_Tracker.md §2.1, restaurant-created coupons with an
+on/off visibility toggle.
+
+### ⚠️ Two asks this session could NOT be done, sandbox limitation (not skipped)
+1. **Re-run Gradle to confirm the `OrdersFragment.kt` type-fix from the
+   entry below.** No Android SDK, no `gradlew`/wrapper present in
+   `restaurant/`, and no network to resolve one — same standing
+   limitation flagged in `NEXT_SESSION_PROMPT.md` for 17+ sessions.
+   **What I did instead:** read `OrdersFragment.kt` directly. It no
+   longer contains `knownNewOrderIds` at all — the "loud sound on new
+   order" mechanism the type-fix was patching appears to have been
+   **superseded by a separate, undocumented change**: `service/
+   OrderPollingService.kt` + `service/OrderNotificationHelper.kt` (a
+   foreground-service + full-screen-alarm-notification approach), also
+   dated 2026-08-18 in the manifest's own comments, but with **no
+   Status.md entry of its own**. So there may be two different, partially
+   overlapping fixes for the same underlying problem in this codebase
+   right now. **First thing next real-toolchain session must do:** read
+   `OrderPollingService.kt`/`OrderNotificationHelper.kt` in full, confirm
+   whether they've fully replaced the old `OrdersFragment`-poll +
+   `NewOrderAlertSound` approach (and whether `NewOrderAlertSound.kt`
+   even still exists — it wasn't found this session) or whether both are
+   live and conflicting, *then* run a real Gradle build.
+2. **Run migration 26 against the live DB.** No DB credentials/network in
+   this sandbox. `backend/sql/26_migration_address_delete_fk_fix.sql`
+   read end to end this session — looks correct and idempotent (same
+   CONTINUE-HANDLER pattern as 11c/25). Still needs a human to actually
+   run it via phpMyAdmin/whatever this project normally uses.
+
+### ✅ Done this session — Coupon system, backend + owner-side manager screen
+Per doc 07 §2.1's own scope note: `coupons` table already supports
+`restaurant_id` (01_Database_Schema.md §6) and `/cart/validate` already
+validates a coupon code — what was missing was entirely the Restaurant
+App's own create/list/toggle path.
+- **Backend** (`backend/api/v1/restaurant/`): `coupons-list.php` (GET,
+  scoped to the caller's own `restaurant_id`, live `times_used` count via
+  `coupon_usages`), `coupons-create.php` (POST — validates code
+  uniqueness across ALL coupons since `coupons.code` is globally UNIQUE,
+  always sets `restaurant_id` = caller + `is_public = 0` by default per
+  `18_migration_coupon_is_public.sql`'s own kdoc, `is_active = 1`),
+  `coupons-update.php` (POST `?id=` — partial update, ownership-checked;
+  this is what the on/off visibility toggle calls, flipping `is_active`
+  not `is_public` — see that file's kdoc for the distinction). No hard
+  delete endpoint — same soft-disable-only convention as
+  `categories-delete.php`, avoids ever hitting a `coupon_usages` FK issue
+  like migration 26 just had to fix for a different table.
+- **Kotlin models/network** (`network/Models.kt`, `ApiService.kt`):
+  `Coupon`, `CouponsListResult`, `CouponResult`, `CouponCreateBody`,
+  `CouponUpdateBody`, `getCoupons()`/`createCoupon()`/`updateCoupon()`.
+- **Owner-side UI**: `ui/account/CouponManagerActivity.kt` (list +
+  per-row visibility switch + "New Coupon" AlertDialog form, same
+  keep-it-simple dialog pattern `OrderAdapter`'s inline reject dialog
+  already uses rather than a second screen), `ui/account/
+  CouponAdapter.kt`, `res/layout/activity_coupon_manager.xml`,
+  `item_coupon_manage_row.xml`, `dialog_add_coupon.xml` (discount-type
+  as a 2-chip `ChipGroup`, matching this app's existing chip pattern
+  rather than introducing a Spinner). New "My Coupons" row in
+  `AccountFragment`/`fragment_account.xml`, manifest registration, new
+  `coupon_*` strings.
+
+### 🔴 Not done — next session's first task after the Gradle/build-history question above
+1. **Edit an existing coupon's terms** (discount value, min order, max
+   cap, valid-until) — only the visibility toggle and create-new are
+   wired. `coupons-update.php` already accepts all these fields; only
+   the Kotlin UI (an edit variant of the same add-dialog, prefilled) is
+   missing.
+2. **No coupon delete/archive UI** — matches the deliberate
+   soft-disable-only backend choice above, but worth confirming with the
+   app owner that "toggle off forever" is an acceptable substitute for
+   delete, or whether a distinct archived state is wanted.
+3. **`usage_limit_total`/`usage_limit_per_user`** aren't exposed in the
+   add-coupon dialog yet, even though `coupons-create.php`/`Models.kt`
+   already support them — dialog only collects code/type/value/min-order/
+   max-cap/valid-until. Add two more optional numeric fields when doing
+   the edit-dialog work above, cheap to do in the same pass.
+4. **No build/compile verification at all** — same standing sandbox
+   limitation as every session. This is genuinely new, never-compiled
+   surface: the `ChipGroup` `setOnCheckedStateChangeListener` call in
+   `CouponManagerActivity.showAddCouponDialog()` is a Material Components
+   1.11.0 API this project hasn't used anywhere else (existing chip usage
+   elsewhere in the app is all `addView`-built working-days/ratio chips
+   with no group-level listener) — worth a specific look on first real
+   build.
+
+### ⏭️ Next
+1. Resolve the `OrderPollingService`/`OrdersFragment` documentation gap
+   flagged above, then run a real Gradle build for both apps.
+2. Run migration 26 against the live DB.
+3. Finish the coupon system's edit-dialog + usage-limit fields (above).
+4. Then resume doc 18's recommended build order: notification bell,
+   reviews reply, settings, payments, analytics, staff, Rider App last.
+
+---
+
 ## 2026-08-18 (latest) — Build fix: `OrdersFragment.kt` compile error from the prep-time/loud-sound session
 
 First-ever real GitHub Actions Gradle build run came back for both apps.

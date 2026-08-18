@@ -132,6 +132,54 @@ data class BannerUploadResult(
 
 data class BannerDeleteBody(@SerializedName("id") val id: Int)
 
+// ---- Restaurant coupons (doc 07 §2.1, this session) ----
+
+data class Coupon(
+    @SerializedName("id") val id: Int,
+    @SerializedName("code") val code: String,
+    @SerializedName("discount_type") val discountType: String, // "flat" | "percent"
+    @SerializedName("discount_value") val discountValue: Double,
+    @SerializedName("min_order_amount") val minOrderAmount: Double,
+    @SerializedName("max_discount_amount") val maxDiscountAmount: Double?,
+    @SerializedName("valid_from") val validFrom: String?,
+    @SerializedName("valid_until") val validUntil: String?,
+    @SerializedName("usage_limit_total") val usageLimitTotal: Int?,
+    @SerializedName("usage_limit_per_user") val usageLimitPerUser: Int?,
+    @SerializedName("is_active") val isActive: Boolean,
+    @SerializedName("is_public") val isPublic: Boolean,
+    @SerializedName("times_used") val timesUsed: Int
+)
+
+data class CouponsListResult(@SerializedName("coupons") val coupons: List<Coupon>)
+
+data class CouponResult(@SerializedName("coupon") val coupon: Coupon)
+
+/** discount_type/code are create-only — see coupons-update.php's kdoc for why
+ * they're excluded from CouponUpdateBody below. */
+data class CouponCreateBody(
+    val code: String,
+    @SerializedName("discount_type") val discountType: String,
+    @SerializedName("discount_value") val discountValue: Double,
+    @SerializedName("min_order_amount") val minOrderAmount: Double? = null,
+    @SerializedName("max_discount_amount") val maxDiscountAmount: Double? = null,
+    @SerializedName("valid_until") val validUntil: String? = null,
+    @SerializedName("usage_limit_total") val usageLimitTotal: Int? = null,
+    @SerializedName("usage_limit_per_user") val usageLimitPerUser: Int? = null
+)
+
+/** Partial update — only non-null-in-JSON fields change server-side; used
+ * both for the on/off visibility toggle (isActive alone) and for editing
+ * the rest of an existing coupon's terms. */
+data class CouponUpdateBody(
+    @SerializedName("is_active") val isActive: Boolean? = null,
+    @SerializedName("discount_value") val discountValue: Double? = null,
+    @SerializedName("min_order_amount") val minOrderAmount: Double? = null,
+    @SerializedName("max_discount_amount") val maxDiscountAmount: Double? = null,
+    @SerializedName("valid_until") val validUntil: String? = null,
+    @SerializedName("usage_limit_total") val usageLimitTotal: Int? = null,
+    @SerializedName("usage_limit_per_user") val usageLimitPerUser: Int? = null
+)
+
 // ---- Orders ----
 
 data class OrderItemLine(

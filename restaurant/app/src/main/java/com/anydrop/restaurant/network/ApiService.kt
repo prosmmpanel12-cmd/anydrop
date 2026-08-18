@@ -107,4 +107,15 @@ interface ApiService {
 
     @POST("restaurant/banner-delete.php")
     suspend fun deleteBanner(@Body body: BannerDeleteBody): Response<ApiResponse<Map<String, Any>>>
+
+    // ---- Restaurant coupons (doc 07 §2.1, this session) ----
+
+    @GET("restaurant/coupons-list.php")
+    suspend fun getCoupons(): Response<ApiResponse<CouponsListResult>>
+
+    @POST("restaurant/coupons-create.php")
+    suspend fun createCoupon(@Body body: CouponCreateBody): Response<ApiResponse<CouponResult>>
+
+    @POST("restaurant/coupons-update.php")
+    suspend fun updateCoupon(@Query("id") id: Int, @Body body: CouponUpdateBody): Response<ApiResponse<CouponResult>>
 }

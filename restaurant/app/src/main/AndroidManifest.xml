@@ -122,6 +122,12 @@
             android:name=".ui.account.BannerManagerActivity"
             android:exported="false" />
 
+        <!-- My Coupons manager (doc 07 §2.1, this session), launched from
+             AccountFragment's new row. -->
+        <activity
+            android:name=".ui.account.CouponManagerActivity"
+            android:exported="false" />
+
         <!-- "Ring until acted on" alarm screen (2026-08-18) — launched via
              OrderNotificationHelper's full-screen intent. singleTask +
              excludeFromRecents so a burst of orders can't stack multiple

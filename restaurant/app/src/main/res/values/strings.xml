@@ -132,6 +132,34 @@
     <string name="banner_load_failed">Couldn\'t load your banners</string>
     <string name="banner_confirm_delete">Remove this banner?</string>
     <string name="account_row_banners">Restaurant Banners</string>
+    <string name="account_row_coupons">My Coupons</string>
+
+    <!-- Coupon Manager screen (doc 07 §2.1, this session) -->
+    <string name="coupon_manager_title">My Coupons</string>
+    <string name="coupon_add_title">New Coupon</string>
+    <string name="coupon_hint_code">Coupon code (e.g. SAVE50)</string>
+    <string name="coupon_hint_discount_type">Discount type: flat or percent</string>
+    <string name="coupon_hint_discount_value">Discount value</string>
+    <string name="coupon_hint_min_order">Min order amount (optional)</string>
+    <string name="coupon_hint_max_discount">Max discount cap (optional, percent only)</string>
+    <string name="coupon_hint_valid_until">Valid until, yyyy-MM-dd (optional)</string>
+    <string name="coupon_hint_usage_limit_total">Total uses allowed, all customers (optional)</string>
+    <string name="coupon_hint_usage_limit_per_user">Uses allowed per customer (optional)</string>
+    <string name="coupon_empty_state">No coupons yet — tap + to create one.</string>
+    <string name="coupon_created">Coupon created</string>
+    <string name="coupon_create_failed">Couldn\'t create coupon</string>
+    <string name="coupon_code_taken">That code is already in use — try another</string>
+    <string name="coupon_updated">Coupon updated</string>
+    <string name="coupon_update_failed">Couldn\'t update coupon</string>
+    <string name="coupon_edit_title">Edit Coupon</string>
+    <string name="coupon_edit_type_locked_fmt">Discount type: %1$s (can\'t be changed after creation)</string>
+    <string name="coupon_type_percent">Percent</string>
+    <string name="coupon_type_flat">Flat</string>
+    <string name="coupon_flat_off_fmt">Flat ₹%1$s off</string>
+    <string name="coupon_percent_off_fmt">%1$s%% off</string>
+    <string name="coupon_min_order_fmt">Min order ₹%1$s</string>
+    <string name="coupon_times_used_fmt">Used %1$d times</string>
+    <string name="coupon_visible_label">Visible to customers</string>
     <string name="btn_change_logo">Change logo</string>
     <string name="hint_cuisine_tags">Cuisine tags (comma separated)</string>
     <string name="hint_profile_description">Description (optional)</string>

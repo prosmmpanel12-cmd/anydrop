@@ -81,6 +81,10 @@ class AccountFragment : Fragment() {
             startActivity(Intent(requireContext(), BannerManagerActivity::class.java))
         }
 
+        binding.btnCouponsRow.setOnClickListener {
+            startActivity(Intent(requireContext(), CouponManagerActivity::class.java))
+        }
+
         binding.switchTempClosed.setOnCheckedChangeListener { _, isChecked ->
             if (suppressTempClosedListener) return@setOnCheckedChangeListener
             setTempClosed(isChecked)

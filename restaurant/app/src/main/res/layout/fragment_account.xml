@@ -158,6 +158,24 @@
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground" />
 
+                <!-- My Coupons row (doc 07 §2.1, this session) — opens
+                     CouponManagerActivity. Same row style as the two
+                     rows above. -->
+                <TextView
+                    android:id="@+id/btnCouponsRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_card_rounded"
+                    android:padding="16dp"
+                    android:text="@string/account_row_coupons"
+                    android:textColor="@color/anydrop_primary"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground" />
+
                 <!-- Temporarily closed toggle — sends operational_status:
                      "temp_closed" via the existing updateOperationalStatus()
                      call. Distinct from the top bar's own OPEN/CLOSED pill,
