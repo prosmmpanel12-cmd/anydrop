@@ -16,6 +16,7 @@ import com.anydrop.restaurant.data.TokenManager
 import com.anydrop.restaurant.databinding.ActivityMainBinding
 import com.anydrop.restaurant.network.ApiClient
 import com.anydrop.restaurant.network.OperationalStatusUpdateBody
+import com.anydrop.restaurant.service.OrderNotificationHelper
 import com.anydrop.restaurant.service.OrderPollingService
 import com.anydrop.restaurant.ui.account.AccountFragment
 import com.anydrop.restaurant.ui.common.InAppNotifier
@@ -111,6 +112,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         loadOperationalStatus()
+        promptFullScreenIntentIfNeeded()
     }
 
     override fun onResume() {
@@ -118,6 +120,35 @@ class MainActivity : AppCompatActivity() {
         // Covers e.g. coming back from the (not-yet-built) profile screen —
         // cheap enough to just re-fetch rather than pass a result back.
         loadOperationalStatus()
+    }
+
+    /** "Ringing screen never opens, only the plain notification shows" fix
+     * (app-owner report, 2026-08-18) — on Android 14+ the OS silently
+     * withholds full-screen-intent launches until the user flips a
+     * dedicated toggle in Settings, regardless of the manifest permission.
+     * There's no runtime permission dialog for this one, so the only way
+     * to get the user there is an explanatory prompt + deep link, shown
+     * once per app launch (like the POST_NOTIFICATIONS prompt above,
+     * doesn't nag again this session if dismissed — Account tab is the
+     * natural place to re-offer this later if needed). No-op below
+     * Android 14, where the manifest permission alone is sufficient. */
+    private fun promptFullScreenIntentIfNeeded() {
+        if (OrderNotificationHelper.hasFullScreenIntentPermission(this)) return
+        AlertDialog.Builder(this)
+            .setTitle("Turn on full-screen order alerts")
+            .setMessage(
+                "So a new order rings and vibrates until you open it — even " +
+                    "when the screen is locked — Android needs one more " +
+                    "permission turned on for Anydrop Restaurant.\n\n" +
+                    "Tap Open settings, then turn on \"Allow full screen " +
+                    "notifications\" (or similar wording) for this app."
+            )
+            .setPositiveButton("Open settings") { _, _ ->
+                OrderNotificationHelper.openFullScreenIntentSettings(this)
+            }
+            .setNegativeButton("Not now", null)
+            .setCancelable(true)
+            .show()
     }
 
     private fun startOrderPollingService() {

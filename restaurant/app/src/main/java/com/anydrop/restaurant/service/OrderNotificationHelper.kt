@@ -204,4 +204,33 @@ object OrderNotificationHelper {
 
     const val MONITORING_NOTIFICATION_ID = 1001
     private const val NEW_ORDER_NOTIFICATION_ID = 1002
+
+    /** Whether this app is currently allowed to launch [NewOrderAlarmActivity]
+     * as a full-screen intent. On Android 14+ (API 34) this is `false` by
+     * default for a freshly-installed app even though `USE_FULL_SCREEN_INTENT`
+     * is declared in the manifest — the OS still requires the user to flip
+     * a dedicated toggle in Settings before it'll actually launch the
+     * activity. Below API 34 the manifest permission alone is enough, so
+     * this always returns true there. When this is false, `notify()` still
+     * posts the normal heads-up notification (what the app owner reported
+     * seeing) — it just silently skips opening the ringing screen, with no
+     * error anywhere, which is why this needs an explicit check + prompt
+     * rather than assuming the manifest permission was sufficient. */
+    fun hasFullScreenIntentPermission(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return true
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        return manager.canUseFullScreenIntent()
+    }
+
+    /** Opens the exact Settings screen where the user grants the toggle
+     * checked by [hasFullScreenIntentPermission] — there's no runtime
+     * permission dialog for this one, only this settings page. */
+    fun openFullScreenIntentSettings(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
+        val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+            data = android.net.Uri.parse("package:${context.packageName}")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    }
 }
