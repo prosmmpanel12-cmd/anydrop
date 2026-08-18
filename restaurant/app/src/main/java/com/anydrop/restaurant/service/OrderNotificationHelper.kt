@@ -221,8 +221,6 @@ object OrderNotificationHelper {
     private fun startRingingLoop(appContext: Context) {
         if (ringtoneMediaPlayer != null) return // already ringing for an earlier undismissed order
 
-        val soundUri = RingtoneManager.getActualDefaultRingtoneUri(appContext, RingtoneManager.TYPE_ALARM)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
         ringtoneMediaPlayer = MediaPlayer().apply {
             setAudioAttributes(
                 AudioAttributes.Builder()
@@ -232,12 +230,24 @@ object OrderNotificationHelper {
             )
             isLooping = true
             try {
-                setDataSource(appContext, soundUri)
+                // Bundled tone (res/raw/alarm_tone.wav) rather than the
+                // device's system default ringtone/alarm URI — real-device
+                // testing (2026-08-18) found the system-URI approach came
+                // out vibration-only on at least one phone: if the OEM has
+                // no ringtone assigned for TYPE_ALARM,
+                // getActualDefaultRingtoneUri can return a URI that fails
+                // silently in setDataSource/prepare (swallowed by the
+                // catch below), leaving only the vibration pattern
+                // running. A packaged raw resource always resolves.
+                val afd = appContext.resources.openRawResourceFd(com.anydrop.restaurant.R.raw.alarm_tone)
+                setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                afd.close()
                 prepare()
                 start()
             } catch (e: Exception) {
-                // A missing/unreadable ringtone shouldn't crash anything —
-                // vibration below still fires either way.
+                // Shouldn't happen with a bundled resource, but a failure
+                // here still shouldn't crash anything — vibration below
+                // still fires either way.
             }
         }
 
