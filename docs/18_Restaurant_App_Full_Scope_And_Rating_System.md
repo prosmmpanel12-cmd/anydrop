@@ -42,14 +42,11 @@ piece of scope rather than a small addition.
 - ✅ Accept/Reject, order detail, customer notes, order history — already
   built (`orders-accept.php`, `orders-reject.php`, `orders-detail.php`,
   `OrderDetailActivity.kt`).
-- 🟢 **Loud sound on new order** — dashboard currently polls silently;
-  needs a distinct notification sound (not the default Toast/system tone)
-  fired when `loadOrders()`'s poll finds a new `pending` order.
-- 🟢 Preparation-time select (10/15/20/30 min) — small addition to the
-  accept flow; `estimated_prep_minutes` already exists on `orders`
-  (already used by `track.php`'s ETA calc) but is currently set however
-  `orders-accept.php` defaults it, not restaurant-chosen. Needs a
-  quick-select UI on Accept + the value passed through.
+- ✅ **Loud sound on new order** — done 2026-08-17, see
+  `docs/restorent/00_Status.md`'s latest entry (`NewOrderAlertSound.kt`).
+- ✅ Preparation-time select (10/15/20/30 min) — done 2026-08-17, see
+  `docs/restorent/00_Status.md`'s latest entry (`PrepTimeDialog.kt`,
+  wired into both `OrderAdapter` and `OrderDetailActivity`'s Accept).
 - 🟢 "Ready for Pickup" — already covered by the existing status pipeline
   (`ready` is already a valid `orders.status` value per the schema) —
   just needs to be confirmed reachable as a button in `OrderDetailActivity`
@@ -58,8 +55,10 @@ piece of scope rather than a small addition.
   functionality (the rider enters the OTP, not the restaurant), stays in
   Phase K per the "Rider last" decision. The restaurant app itself has no
   reason to verify delivery OTP.
-- 🟢 Cancel reason — needs a `cancellation_reason` column on `orders`
-  (doesn't exist yet) + a reason-picker UI on reject/cancel.
+- ✅ Cancel reason — already had `cancellation_reason` on `orders` +
+  `orders-reject.php` persisting it; the missing reason-picker UI turned
+  out to already exist too (`OrderAdapter.promptRejectReason`'s free-text
+  prompt) — confirmed 2026-08-17, no code change needed for this one.
 
 ### Restaurant Management
 - 🟢 Name, Address, GPS location, Working hours — `restaurants` table

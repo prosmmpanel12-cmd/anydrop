@@ -1,57 +1,26 @@
 Restaurant app — continue from here.
 
 **Read `docs/restorent/00_Status.md`'s newest entry in full first** —
-"Item #3 finished: Customer-app banner carousel built + wired"
-(2026-08-17, at the very top of the file), and the entry right below it
-for the fuller item #2/#3 build detail.
+"Order Management small additions: prep-time select + loud sound on new
+order" (2026-08-17, at the very top of the file).
 
-## App-owner's 4 real-device-feedback items — ALL CODE-COMPLETE this session
+## Just finished this session — Order Management small additions (doc 18 item #2)
 
-1. **Dish images should always be the owner's actual uploaded photo** —
-   DONE. Fixed the WhatsApp-Status-style dish carousel reading from a
-   never-synced `restaurant_gallery_photos` seed table; now reads live
-   from `menu_items` in both `restaurants/list.php` and `search/search.php`.
+Prep-time select (10/15/20/30 min, `PrepTimeDialog`) wired into both
+Accept paths (`OrderAdapter`, `OrderDetailActivity`); loud alarm-tone +
+vibration alert (`NewOrderAlertSound`) fires from `OrdersFragment`'s
+existing 10s poll when a genuinely new pending order shows up. No backend
+changes needed — `orders-accept.php`/`orders-reject.php` already had the
+fields. New `VIBRATE` permission added to the manifest.
 
-2. **Crop option on photo/logo upload, with a visible ratio** — DONE.
-   `ui/common/CropImageView.kt` + `CropActivity.kt` (Restaurant app),
-   wired into the logo, dish-photo, and category-photo pickers.
+## Next feature work
 
-3. **Restaurant banners — multiple with a transition, single = fixed** —
-   DONE, both halves. Backend (`23_migration_restaurant_banners.sql` +
-   3 endpoints + `menu.php` response field), Restaurant app's
-   `BannerManagerActivity` (owner uploads/deletes, Account tab →
-   "Restaurant Banners"), and now the Customer app's
-   `RestaurantBannerCarouselView` wired into
-   `RestaurantDetailActivity`'s header (0 banners = existing cover_url
-   fallback, 1 = static, 2+ = auto-advancing carousel with dots).
+Admin approve/reject is now done too (see `docs/Status.md`'s newest
+entry, 2026-08-18 — `backend/admin/`, session-auth per doc 02 §6).
+Resume doc 18/19's build order from there: **Coupon system** next, then
+notification bell, reviews reply, settings, payments, analytics, staff,
+then Rider App last.
 
-4. **Live GPS + choose location on map** — Confirmed already fully built
-   in an earlier session (`LocationPickerActivity.kt`). Still needs a
-   real Google Maps API key before it renders anything but a blank/grey
-   map.
-
-**Nothing left to build for this round of feedback.** What's left is
-deploy/ops (below), then resuming the project's normal backlog.
-
-## Before any of this session's new features work on a live device
-
-1. **Run `backend/sql/23_migration_restaurant_banners.sql`** against the
-   live DB — new table, not an ALTER; `banner-upload.php`/
-   `banners-list.php` will 500 without it.
-2. Confirm `uploads/restaurant_banners/` gets created on the live server
-   (banner-upload.php `mkdir`s it itself on first upload, so this should
-   be self-healing, but worth a first-upload sanity check — same
-   unconfirmed-on-InfinityFree caveat prior sessions noted for
-   `restaurant_logos/`/`restaurant_dish_photos/`).
-
-## Next feature work, once the above is confirmed live
-
-Resume doc 18 §"Recommended build order" from where it left off before
-this session's bug-fix/feedback detour: Admin-side "Approve/Reject
-pending restaurants" screen (still overdue — self-signup produces
-`status='pending'` rows with no approval path except a manual DB
-UPDATE), then coupons, notification bell, reviews reply, settings,
-payments, analytics, staff, then Rider App last.
 
 ## Standing risk — build verification
 

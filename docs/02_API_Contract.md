@@ -130,6 +130,11 @@ Standard CRUD, restaurant-scoped (enforced server-side by token owner, never tru
 ## 6. Admin Panel (web, session-auth instead of Bearer token since it's server-rendered)
 
 ### `POST /admin/restaurants/{id}/approve` / `/reject` / `/suspend` / `/activate`
+✅ **approve / reject built 2026-08-17** — `backend/admin/index.php` (plain
+server-rendered PHP page, PHP session auth per this section's own
+heading, not a JSON endpoint — see `backend/admin/_bootstrap.php`'s
+kdoc). `suspend` / `/activate` (for restaurants already past `pending`)
+still not built — different screen, out of scope for this pass.
 ### `PUT /admin/restaurants/{id}/settings` — override commission%, due limit for this restaurant
 ### `GET /admin/restaurants/{id}/due-ledger`
 ### `POST /admin/restaurants/{id}/payments/{payment_id}/verify` — marks payment verified, inserts negative ledger entry, auto-reactivates restaurant if now under due limit

@@ -1,6 +1,78 @@
 # Anydrop — Project Status
 
-**Last Updated:** 2026-08-13 (I4 follow-ups + "pause taking orders" toggle — ✅ built, NOT tested/Gradle-built yet)
+**Last Updated:** 2026-08-18 (Admin — Approve/Reject pending restaurants screen built, session-auth per docs/02 §6 — ✅ built, NOT tested/Gradle-or-server-verified yet)
+
+## Session update (2026-08-18) — Admin Panel: first real screen, "Approve/Reject pending restaurants"
+
+Resumes `docs/19_Admin_Panel_Full_Spec_And_Payment_Email_Architecture_2026-08-14.md`
+— that whole doc was "planning only, nothing built" until now. Picked the
+one item flagged as overdue since 2026-08-14 across multiple session
+handovers (`docs/18` build order, `docs/restorent/NEXT_SESSION_PROMPT.md`):
+self-signup (`auth/restaurant-signup.php`) has been producing
+`restaurants.status = 'pending'` rows this whole time with **no way to
+approve or reject one except a manual DB UPDATE**.
+
+### What was built
+- **`backend/admin/`** — a plain server-rendered PHP admin UI
+  (`_bootstrap.php`, `login.php`, `logout.php`, `index.php`). Deliberately
+  **session-based, not Bearer-token** — this isn't a new architectural
+  choice, it's doc 02 §6's own heading verbatim: *"Admin Panel (web,
+  session-auth instead of Bearer token since it's server-rendered)"*. No
+  JS build step, nothing to install — works by pointing a browser at
+  `/admin/login.php`, logging in with the same `admins` table credentials
+  `scripts/seed-admin.php` already creates.
+- `index.php` lists every `pending` restaurant (oldest first) with owner
+  name/mobile/email/address/GST/FSSAI, an **Approve** button, and a
+  **Reject** button that expands a required-reason textarea inline. Both
+  actions write to `write_audit_log('admin', ...)` — the same audit trail
+  every other sensitive action in the codebase uses.
+- New migration **`backend/sql/25_migration_restaurant_rejection_reason.sql`**
+  — adds `restaurants.rejection_reason TEXT NULL` (didn't exist; `status`
+  already had `'rejected'` as a valid value with nowhere to record why).
+  Idempotent CONTINUE-HANDLER-for-1060 pattern, same as
+  `11c_fix_item_customization_safe.sql` — safe to run any number of times.
+- New `.htaccess` note: none needed for `/admin/*` — these are plain
+  `.php` files accessed directly (`/admin/login.php`, `/admin/index.php`),
+  not routed through the `api/v1/*` rewrite rules.
+
+### Explicitly NOT built this pass (kept in scope, not silently dropped)
+- `suspend` / `/activate` for restaurants already past `pending` — doc
+  02 §6 lists these alongside approve/reject but they're a different
+  screen (acting on an *already-approved* restaurant, not a new
+  applicant) — deferred.
+- Full RBAC (doc 19 §1 — `admin_roles`/`admin_permissions` tables, named
+  roles, per-module permission grid) — still planning-only. This screen
+  only checks "is *some* valid admin logged in" (`admin_require_login()`),
+  same scope as everything else in the codebase today (`admins.role` flat
+  ENUM, unchanged).
+- No JSON `/api/v1/admin/*` endpoints were added — doc 02 explicitly
+  scoped Admin Panel as session-auth web-only; a Bearer-token JSON layer
+  would only matter for a future SPA/native admin app that doesn't exist
+  and isn't being built yet, so adding one now would just be an
+  unused, unmaintained second auth path for the same actions.
+
+### 🟡 Not verified live
+- Migration 25 needs to run against the real DB before `rejection_reason`
+  exists.
+- `seed-admin.php` needs to have actually been run (and then deleted, per
+  its own instructions) on the live server for `/admin/login.php` to have
+  any credentials to check against — can't confirm from here whether
+  that's already been done.
+- Never tested against a real PHP session/cookie flow outside this sandbox
+  (no way to run a PHP server + browser here) — logic was written to
+  match this codebase's existing patterns (`lib/response.php`,
+  `lib/audit.php`) as closely as possible, but a first real-server pass
+  should specifically check: login → cookie persists across pages →
+  approve/reject actually updates the DB → CSRF token doesn't break on a
+  second form submit after one action.
+
+### ⏭️ Next
+Doc 19 §14 / `docs/restorent/NEXT_SESSION_PROMPT.md`'s build order:
+Coupon system → Notification bell → Reviews reply → Settings
+(GST/FSSAI/language/dark mode) → Payments/Settlement → Analytics → Staff
+Management → Rider App last.
+
+---
 
 ## Session update (2026-08-13) — I4 follow-ups + "pause taking orders" toggle. **Built, NOT tested, NOT built with Gradle.**
 

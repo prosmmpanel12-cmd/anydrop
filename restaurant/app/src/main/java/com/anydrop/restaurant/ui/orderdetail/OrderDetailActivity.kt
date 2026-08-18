@@ -113,7 +113,7 @@ class OrderDetailActivity : AppCompatActivity() {
                 binding.btnSecondaryAction.setOnClickListener { binding.rejectGroup.visibility = View.VISIBLE }
                 binding.btnPrimaryAction.visibility = View.VISIBLE
                 binding.btnPrimaryAction.text = getString(R.string.btn_accept)
-                binding.btnPrimaryAction.setOnClickListener { acceptOrder() }
+                binding.btnPrimaryAction.setOnClickListener { promptAcceptPrepTime() }
             }
             "accepted" -> {
                 binding.actionBar.visibility = View.VISIBLE
@@ -137,11 +137,15 @@ class OrderDetailActivity : AppCompatActivity() {
         }
     }
 
-    private fun acceptOrder() {
+    private fun promptAcceptPrepTime() {
+        com.anydrop.restaurant.ui.common.PrepTimeDialog.show(this) { prepMinutes -> acceptOrder(prepMinutes) }
+    }
+
+    private fun acceptOrder(prepMinutes: Int) {
         setActionsEnabled(false)
         lifecycleScope.launch {
             try {
-                val response = api.acceptOrder(orderId, AcceptBody())
+                val response = api.acceptOrder(orderId, AcceptBody(estimatedPrepMinutes = prepMinutes))
                 val order = response.body()?.data?.order
                 if (response.isSuccessful && order != null) {
                     render(order)

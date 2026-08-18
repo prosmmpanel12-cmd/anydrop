@@ -39,7 +39,10 @@ class OrderAdapter(
     private val context: Context,
     private val mode: CardMode,
     private val onClick: (Order) -> Unit,
-    private val onAccept: (Order) -> Unit = {},
+    // Order Management small addition — Accept now carries the
+    // restaurant-chosen prep time (see PrepTimeDialog) instead of always
+    // silently taking orders-accept.php's own 20-min fallback.
+    private val onAccept: (Order, Int) -> Unit = { _, _ -> },
     private val onReject: (Order, String) -> Unit = { _, _ -> },
     private val onMarkNextStep: (Order) -> Unit = {}
 ) : RecyclerView.Adapter<OrderAdapter.OrderViewHolder>() {
@@ -180,7 +183,7 @@ class OrderAdapter(
                     binding.btnReject.visibility = View.VISIBLE
                     binding.btnAccept.visibility = View.VISIBLE
                     binding.btnAccept.text = context.getString(R.string.btn_accept)
-                    binding.btnAccept.setOnClickListener { onAccept(order) }
+                    binding.btnAccept.setOnClickListener { promptPrepTime(order) }
                     binding.btnReject.setOnClickListener { promptRejectReason(order) }
                 }
                 CardMode.IN_PROGRESS -> {
@@ -208,6 +211,12 @@ class OrderAdapter(
             "accepted" -> "preparing"
             "preparing" -> "ready"
             else -> null
+        }
+
+        private fun promptPrepTime(order: Order) {
+            com.anydrop.restaurant.ui.common.PrepTimeDialog.show(context) { prepMinutes ->
+                onAccept(order, prepMinutes)
+            }
         }
 
         private fun promptRejectReason(order: Order) {

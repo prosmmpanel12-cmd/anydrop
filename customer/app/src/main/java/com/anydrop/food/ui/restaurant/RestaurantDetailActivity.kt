@@ -9,9 +9,11 @@ import android.os.Looper
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.children
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import coil.load
+import com.google.android.material.chip.Chip
 import com.anydrop.food.R
 import com.anydrop.food.data.CartManager
 import com.anydrop.food.data.FavoritesManager
@@ -51,11 +53,10 @@ class RestaurantDetailActivity : AppCompatActivity() {
     private lateinit var adapter: MenuAdapter
     private var isSaved: Boolean = false
     // Category name -> its header row's adapter position, built once per
-    // menu load in buildCategoryTabs(); reused by both the horizontal icon
+    // menu load in buildCategoryTabs(); reused by both the horizontal chip
     // tab bar and the floating Menu jump button's popup list (§2.5) so the
     // two "jump to category" entry points always stay in sync.
     private var categoryPositions: List<Pair<String, Int>> = emptyList()
-    private var categoryTabAdapter: MenuCategoryTabAdapter? = null
 
     // features.md §1 — the veg-mode-filtered categories as fetched, kept
     // separately from whatever's currently bound to the adapter so
@@ -373,18 +374,16 @@ class RestaurantDetailActivity : AppCompatActivity() {
     /**
      * Horizontal tab bar (§2.1) built from the categories already in the menu response
      * (restaurant-owner-defined, already ordered by sort_order server-side — no backend
-     * change needed). Tapping a tab jumps the scroll position to that category's header row.
+     * change needed). Tapping a chip jumps the scroll position to that category's header row.
      * Hidden when there's only one non-empty category, since there's nothing to jump between.
-     * Styled to match Home's food-category row (icon + name) instead of plain text chips.
      */
     private fun buildCategoryTabs(categories: List<com.anydrop.food.network.MenuCategory>) {
+        binding.categoryTabsGroup.removeAllViews()
         var rowPosition = 0
         val positions = mutableListOf<Pair<String, Int>>()
-        val nonEmptyCategories = mutableListOf<com.anydrop.food.network.MenuCategory>()
         categories.forEach { category ->
             if (category.items.isNotEmpty()) {
                 positions.add(category.name to rowPosition)
-                nonEmptyCategories.add(category)
                 rowPosition += 1 + category.items.size
             }
         }
@@ -397,26 +396,37 @@ class RestaurantDetailActivity : AppCompatActivity() {
         }
 
         binding.categoryTabsScroll.visibility = android.view.View.VISIBLE
-        binding.categoryTabsScroll.layoutManager =
-            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         binding.btnMenuJump.visibility = android.view.View.VISIBLE
         binding.btnMenuJump.setOnClickListener { showCategoryJumpMenu() }
-
-        val adapter = MenuCategoryTabAdapter(nonEmptyCategories) { position ->
-            categoryTabAdapter?.setSelected(position)
-            jumpToCategory(positions[position].second)
+        positions.forEachIndexed { index, (name, headerPosition) ->
+            val chip = Chip(this).apply {
+                text = name
+                isCheckable = true
+                isChecked = index == 0
+                isClickable = true
+                textSize = 13f
+                setChipBackgroundColorResource(R.color.surface)
+                setTextColor(getColor(R.color.text_primary))
+                chipStrokeWidth = 1.5f
+                setChipStrokeColorResource(R.color.anydrop_primary)
+                setOnClickListener {
+                    binding.categoryTabsGroup.children.forEach { view ->
+                        (view as? Chip)?.isChecked = (view === it)
+                    }
+                    jumpToCategory(headerPosition)
+                }
+            }
+            binding.categoryTabsGroup.addView(chip)
         }
-        categoryTabAdapter = adapter
-        binding.categoryTabsScroll.adapter = adapter
     }
 
     /**
      * Popup list of every menu category, opened from the floating Menu
      * button (§2.5) — lets a customer jump straight to any category
-     * without scrolling through the horizontal icon tab bar first, which
+     * without scrolling through the horizontal chip tab bar first, which
      * is the point of this button on a menu long enough to need it.
-     * Selecting an entry reuses the same jumpToCategory() the tab bar
-     * uses, and keeps the tab bar's selected state in sync so both jump
+     * Selecting an entry reuses the same jumpToCategory() the chip tabs
+     * use, and keeps the chip row's checked state in sync so both jump
      * entry points always agree on which category is "current".
      */
     private fun showCategoryJumpMenu() {
@@ -426,7 +436,9 @@ class RestaurantDetailActivity : AppCompatActivity() {
         }
         popup.setOnMenuItemClickListener { menuItem ->
             val (_, headerPosition) = categoryPositions[menuItem.itemId]
-            categoryTabAdapter?.setSelected(menuItem.itemId)
+            binding.categoryTabsGroup.children.forEachIndexed { index, view ->
+                (view as? Chip)?.isChecked = (index == menuItem.itemId)
+            }
             jumpToCategory(headerPosition)
             true
         }

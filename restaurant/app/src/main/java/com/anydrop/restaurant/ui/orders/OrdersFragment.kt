@@ -58,6 +58,13 @@ class OrdersFragment : Fragment() {
     private var completedExpanded = false
     private var completedLoadedOnce = false
 
+    // Order Management small addition — "loud sound on new order". Null
+    // until the very first successful loadNew() so app-open (which always
+    // sees whatever's already pending) never false-fires the alert; only a
+    // later poll finding an id that wasn't in the previous snapshot counts
+    // as genuinely new.
+    private var knownNewOrderIds: MutableSet<Int>? = null
+
     private companion object {
         const val POLL_INTERVAL_MS = 10000L
         const val STATUS_NEW = "pending"
@@ -87,7 +94,7 @@ class OrdersFragment : Fragment() {
             context = requireContext(),
             mode = OrderAdapter.CardMode.NEW,
             onClick = openDetail,
-            onAccept = { order -> acceptOrder(order) },
+            onAccept = { order, prepMinutes -> acceptOrder(order, prepMinutes) },
             onReject = { order, reason -> rejectOrder(order, reason) }
         )
         inProgressAdapter = OrderAdapter(
@@ -124,8 +131,16 @@ class OrdersFragment : Fragment() {
         if (_binding != null) loadAll()
     }
 
+    override fun onPause() {
+        super.onPause()
+        // Don't keep ringing/vibrating once the staff has left this screen
+        // — the next poll after they return re-evaluates from scratch.
+        com.anydrop.restaurant.ui.common.NewOrderAlertSound.stop()
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
+        com.anydrop.restaurant.ui.common.NewOrderAlertSound.stop()
         _binding = null
     }
 
@@ -154,6 +169,19 @@ class OrdersFragment : Fragment() {
                 val response = api.getOrders(status = STATUS_NEW)
                 val orders = response.body()?.data?.data ?: emptyList()
                 if (_binding == null) return@launch
+
+                // Order Management small addition — "loud sound on new
+                // order". Compare against the last-seen snapshot, not just
+                // "orders.isNotEmpty()" — otherwise an untouched pending
+                // order would keep re-triggering the alert on every single
+                // 10s poll instead of firing once when it actually arrives.
+                val currentIds = orders.map { it.id }.toSet()
+                val previouslyKnown = knownNewOrderIds
+                if (previouslyKnown != null && currentIds.any { it !in previouslyKnown }) {
+                    com.anydrop.restaurant.ui.common.NewOrderAlertSound.play(requireContext())
+                }
+                knownNewOrderIds = currentIds
+
                 newAdapter.submitList(orders)
                 binding.newEmptyText.visibility = if (orders.isEmpty()) View.VISIBLE else View.GONE
             } catch (e: Exception) {
@@ -224,10 +252,11 @@ class OrdersFragment : Fragment() {
         }
     }
 
-    private fun acceptOrder(order: Order) {
+    private fun acceptOrder(order: Order, prepMinutes: Int) {
+        com.anydrop.restaurant.ui.common.NewOrderAlertSound.stop()
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                val response = api.acceptOrder(order.id, AcceptBody())
+                val response = api.acceptOrder(order.id, AcceptBody(estimatedPrepMinutes = prepMinutes))
                 if (response.isSuccessful && response.body()?.data != null) {
                     loadNew()
                     loadInProgress()
@@ -241,6 +270,7 @@ class OrdersFragment : Fragment() {
     }
 
     private fun rejectOrder(order: Order, reason: String) {
+        com.anydrop.restaurant.ui.common.NewOrderAlertSound.stop()
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val response = api.rejectOrder(order.id, RejectBody(reason))

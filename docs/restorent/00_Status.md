@@ -1,4 +1,67 @@
-## 2026-08-17 (newest) — Admin-configurable default radius + "Use current location" split into its own GPS-only row
+## 2026-08-17 (latest) — Order Management small additions: prep-time select + loud sound on new order
+
+Closes the item #2 gap from `docs/18`'s recommended build order (§"Order
+Management") that every session since kept deferring in favor of other
+asks — genuinely un-started until now (only `estimated_prep_minutes`/
+`cancellation_reason` model fields and backend support existed; no UI).
+
+### ✅ Preparation-time select (10/15/20/30 min) on Accept
+- New `ui/common/PrepTimeDialog.kt` — shared single-choice `AlertDialog`
+  (no new layout/ChipGroup, matches this app's existing quick-dialog
+  pattern), defaults to 20 min (matches `orders-accept.php`'s own
+  fallback when nothing is sent).
+- Wired into **both** accept paths so neither one silently skips it:
+  `OrderAdapter`'s inline Accept button (Orders tab → New section) and
+  `OrderDetailActivity`'s full-screen Accept button. `OrderAdapter.onAccept`
+  changed from `(Order) -> Unit` to `(Order, Int) -> Unit` to carry the
+  chosen minutes through to `OrdersFragment.acceptOrder()`, which now
+  sends `AcceptBody(estimatedPrepMinutes = ...)` instead of the old
+  always-empty `AcceptBody()`. No backend changes needed —
+  `orders-accept.php` already accepted and stored this field.
+
+### ✅ Loud sound on new order
+- New `ui/common/NewOrderAlertSound.kt` — plays the device's default
+  **alarm** tone (not notification — alarm tones are conventionally
+  louder/longer and use a stream users don't routinely leave silenced)
+  looped for 8s, plus a vibration pattern, when `OrdersFragment`'s 10s
+  poll (`loadNew()`) sees a pending-order id it hadn't seen on the
+  previous poll. First load never fires it (would false-trigger for
+  every already-pending order the instant the app opens) — only a
+  genuinely *new* id after that baseline counts. No bundled custom audio
+  asset — this sandbox has no network to source one and no Android SDK
+  to confirm one plays correctly; swap in a real branded `res/raw` file
+  later once that's possible.
+- Stops immediately on accept/reject (staff acknowledged it), on
+  `onPause`/`onDestroyView` (don't keep ringing off-screen), and
+  auto-stops after 8s either way.
+- New `VIBRATE` permission added to `AndroidManifest.xml`.
+
+### What's left from doc 18's Order Management section
+- "Ready for Pickup" reachability — already fine, no change needed
+  (`preparing → ready` was already a working button in both
+  `OrderAdapter` and `OrderDetailActivity`).
+- OTP Verification (delivery boy) — intentionally Rider-App/Phase K
+  scope, not restaurant-app scope, per the doc's own note.
+
+### 🟡 Not build-verified
+Same standing sandbox limitation as every entry above (no Android SDK).
+Priority check next real-device pass: (a) the alarm tone actually plays
+and is audible over the notification stream, (b) the prep-time dialog
+shows on both accept paths and the chosen value actually lands in
+`orders.estimated_prep_minutes`, (c) the alert doesn't double-ring when
+two new orders land in the same 10s poll window.
+
+### ⏭️ Next
+Per doc 18 §"Recommended build order" / `NEXT_SESSION_PROMPT.md`:
+Admin-side "Approve/Reject pending restaurants" screen (still overdue,
+self-signup produces `status='pending'` rows with no approval UI), then
+Coupon system, Notification bell, Reviews reply, Settings
+(GST/FSSAI/language/dark mode), Payments/Settlement, Analytics, Staff
+Management, Rider App last.
+
+---
+
+## 2026-08-17 — Admin-configurable default radius + "Use current location" split into its own GPS-only row
 
 Two more app-owner asks, both done:
 

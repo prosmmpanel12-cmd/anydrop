@@ -189,6 +189,12 @@
     <string name="customer_note_label">Delivery instructions</string>
     <string name="bill_total_label">Item total</string>
 
+    <!-- Order Management small addition — prep-time select on Accept
+         (docs/18_Restaurant_App_Full_Scope_And_Rating_System.md, Order
+         Management section). -->
+    <string name="prep_time_dialog_title">How long to prepare this order?</string>
+    <string name="prep_time_option_format">%1$d minutes</string>
+
     <!-- Menu Management -->
     <string name="menu_management_title">Menu Management</string>
     <string name="btn_add_category">+ Category</string>

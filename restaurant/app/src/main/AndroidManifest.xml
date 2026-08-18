@@ -7,6 +7,10 @@
          the Customer app's H6 pin-drop screen. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Order Management small addition, "loud sound on new order"
+         (docs/18, docs/restorent/00_Status.md backlog item 2) — needed by
+         NewOrderAlertSound's vibration alongside the alarm-stream tone. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:allowBackup="true"
