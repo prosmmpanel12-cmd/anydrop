@@ -22,6 +22,15 @@
          — without this, OrderNotificationHelper's alert notification
          silently never shows, no error anywhere. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- "Ring until acted on" alarm screen (2026-08-18, NewOrderAlarmActivity)
+         — required to show that screen via a full-screen intent, including
+         over the lock screen, same mechanism incoming-call apps use.
+         Auto-granted for apps targeting API 33 and below; on API 34+ it's
+         granted by default too but the OS may revoke it for apps it
+         doesn't consider trustworthy for full-screen alerts — see
+         NotificationManager.canUseFullScreenIntent() if that ever needs
+         checking/re-requesting at runtime. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <application
         android:allowBackup="true"
@@ -112,6 +121,20 @@
         <activity
             android:name=".ui.account.BannerManagerActivity"
             android:exported="false" />
+
+        <!-- "Ring until acted on" alarm screen (2026-08-18) — launched via
+             OrderNotificationHelper's full-screen intent. singleTask +
+             excludeFromRecents so a burst of orders can't stack multiple
+             copies of this screen or leave a stray entry in Recents after
+             it's dismissed; taskAffinity left default (main task) so
+             "View order" -> OrderDetailActivity feels like normal in-app
+             navigation rather than a separate task. -->
+        <activity
+            android:name=".ui.orders.NewOrderAlarmActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.AnydropRestaurant" />
 
         <!-- Real "alert even when app is closed" fix (2026-08-18) — see
              OrderPollingService's kdoc. foregroundServiceType="dataSync"

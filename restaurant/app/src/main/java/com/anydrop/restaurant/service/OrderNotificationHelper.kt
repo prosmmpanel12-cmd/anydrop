@@ -13,6 +13,7 @@ import com.anydrop.restaurant.R
 import com.anydrop.restaurant.network.Order
 import com.anydrop.restaurant.ui.main.MainActivity
 import com.anydrop.restaurant.ui.orderdetail.OrderDetailActivity
+import com.anydrop.restaurant.ui.orders.NewOrderAlarmActivity
 
 /**
  * Real fix for "sound sometimes plays, sometimes doesn't, and nothing at
@@ -97,10 +98,25 @@ object OrderNotificationHelper {
         manager.createNotificationChannel(monitoringChannel)
     }
 
-    /** The actual "new order" alert — sound + vibration come from the
-     * channel (see [ensureChannels]), not from anything set here. Tapping
-     * it opens the order directly if there's exactly one new order, or
-     * the Orders tab (via MainActivity) if there's more than one. */
+    /** The "new order" alert. Two things fire together:
+     *
+     * 1. A normal heads-up notification (sound/vibration from the channel,
+     *    [VIBRATION_PATTERN] belt-and-braces on the notification itself) —
+     *    same as before, visible in the shade, tappable any time.
+     * 2. A **full-screen intent** to [NewOrderAlarmActivity] — the
+     *    incoming-call-style screen that rings + vibrates *continuously*
+     *    until the owner explicitly views or dismisses the order, per
+     *    app-owner feedback that a single notification sound is too easy
+     *    to miss in a busy kitchen. The OS shows this screen directly
+     *    (even over the lock screen) when the device is locked/idle; when
+     *    the phone is actively in use it's shown as a heads-up
+     *    notification instead and only opens the ringing screen if tapped
+     *    — that's standard Android full-screen-intent behavior, same as
+     *    incoming calls.
+     *
+     * Tapping the plain notification (not the full-screen ringing screen)
+     * still opens the order directly if there's exactly one, or the
+     * Orders tab (via MainActivity) if there's more than one. */
     fun showNewOrderAlert(context: Context, newOrders: List<Order>) {
         if (newOrders.isEmpty()) return
 
@@ -125,6 +141,24 @@ object OrderNotificationHelper {
             "Tap to view them in the Orders tab"
         }
 
+        val alarmScreenIntent = Intent(context, NewOrderAlarmActivity::class.java).apply {
+            if (newOrders.size == 1) {
+                putExtra(NewOrderAlarmActivity.EXTRA_ORDER_ID, newOrders.first().id)
+                putExtra(NewOrderAlarmActivity.EXTRA_ORDER_CODE, newOrders.first().orderCode)
+                putExtra(
+                    NewOrderAlarmActivity.EXTRA_ORDER_TOTAL_TEXT,
+                    "₹${"%.0f".format(newOrders.first().grandTotal)}"
+                )
+            }
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+        val fullScreenPendingIntent = PendingIntent.getActivity(
+            context,
+            1,
+            alarmScreenIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_NEW_ORDER)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
@@ -133,6 +167,7 @@ object OrderNotificationHelper {
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
+            .setFullScreenIntent(fullScreenPendingIntent, true)
             // Belt-and-braces alongside the channel's own vibration
             // pattern — some OEM skins only honor a pattern set directly
             // on the notification itself pre-Android-13 despite channel
