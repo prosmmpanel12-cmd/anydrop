@@ -12,6 +12,7 @@ import com.anydrop.restaurant.network.ApiClient
 import com.anydrop.restaurant.network.Order
 import com.anydrop.restaurant.network.RejectBody
 import com.anydrop.restaurant.network.StatusUpdateBody
+import com.anydrop.restaurant.service.OrderNotificationHelper
 import com.anydrop.restaurant.ui.common.InAppNotifier
 import com.anydrop.restaurant.ui.common.PrepTimeDialog
 import com.anydrop.restaurant.util.ScheduledTimeFormatter
@@ -35,6 +36,11 @@ class OrderDetailActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Opening any order counts as "went in and did something" — stop
+        // OrderNotificationHelper's ringing loop (see its kdoc) whether
+        // this was opened from the ringing screen, the plain notification,
+        // or just normal in-app navigation.
+        OrderNotificationHelper.stopRingingLoop(applicationContext)
         binding = ActivityOrderDetailBinding.inflate(layoutInflater)
         setContentView(binding.root)
 

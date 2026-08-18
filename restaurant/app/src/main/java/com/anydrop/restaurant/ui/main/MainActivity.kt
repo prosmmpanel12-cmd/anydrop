@@ -120,6 +120,11 @@ class MainActivity : AppCompatActivity() {
         // Covers e.g. coming back from the (not-yet-built) profile screen —
         // cheap enough to just re-fetch rather than pass a result back.
         loadOperationalStatus()
+        // Multiple-new-orders alerts route here (Orders tab) rather than a
+        // specific OrderDetailActivity — opening this screen counts as
+        // "went in and did something" too, so stop the ringing loop the
+        // same way OrderDetailActivity does.
+        OrderNotificationHelper.stopRingingLoop(applicationContext)
     }
 
     /** "Ringing screen never opens, only the plain notification shows" fix

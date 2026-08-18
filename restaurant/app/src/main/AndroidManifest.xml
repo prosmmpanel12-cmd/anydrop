@@ -146,6 +146,13 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <!-- "Dismiss" action on the new-order notification (2026-08-18) —
+             silences OrderNotificationHelper's central ringing loop
+             straight from the notification shade / lock screen. -->
+        <receiver
+            android:name=".service.DismissOrderAlertReceiver"
+            android:exported="false" />
+
     </application>
 
 </manifest>

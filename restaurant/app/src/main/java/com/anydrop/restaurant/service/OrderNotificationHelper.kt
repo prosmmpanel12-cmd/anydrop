@@ -3,11 +3,16 @@ package com.anydrop.restaurant.service
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
+import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
 import com.anydrop.restaurant.R
 import com.anydrop.restaurant.network.Order
@@ -98,27 +103,36 @@ object OrderNotificationHelper {
         manager.createNotificationChannel(monitoringChannel)
     }
 
-    /** The "new order" alert. Two things fire together:
+    /** The "new order" alert. Three things fire together:
      *
-     * 1. A normal heads-up notification (sound/vibration from the channel,
-     *    [VIBRATION_PATTERN] belt-and-braces on the notification itself) —
-     *    same as before, visible in the shade, tappable any time.
-     * 2. A **full-screen intent** to [NewOrderAlarmActivity] — the
-     *    incoming-call-style screen that rings + vibrates *continuously*
-     *    until the owner explicitly views or dismisses the order, per
-     *    app-owner feedback that a single notification sound is too easy
-     *    to miss in a busy kitchen. The OS shows this screen directly
-     *    (even over the lock screen) when the device is locked/idle; when
-     *    the phone is actively in use it's shown as a heads-up
-     *    notification instead and only opens the ringing screen if tapped
-     *    — that's standard Android full-screen-intent behavior, same as
-     *    incoming calls.
+     * 1. A normal heads-up notification (visible in the shade, tappable
+     *    any time) with a "Dismiss" action so the ringing loop below can
+     *    be silenced without opening the app at all.
+     * 2. [startRingingLoop] — a **looping** alarm sound + continuous
+     *    vibration that starts the instant this fires and keeps going
+     *    until [stopRingingLoop] is called, independent of whether any
+     *    activity is on screen. This is the actual "rings until you go in
+     *    and do something" behavior the app owner asked for. It does NOT
+     *    depend on the full-screen intent below — real-device testing
+     *    (2026-08-18) confirmed Android only auto-launches a full-screen
+     *    intent when the device is locked/screen-off; with the phone
+     *    unlocked and another app in the foreground (the common case —
+     *    staff carrying the phone around a kitchen) the OS just shows the
+     *    heads-up notification and nothing else fires, so relying on the
+     *    activity alone left orders silent after one beep in that case.
+     * 3. A full-screen intent to [NewOrderAlarmActivity] — still sent, so
+     *    the incoming-call-style screen *does* pop up automatically when
+     *    the device happens to be locked, same as before. It no longer
+     *    starts its own separate sound/vibration; it just shows the order
+     *    and its buttons stop the same central loop from (2).
      *
-     * Tapping the plain notification (not the full-screen ringing screen)
-     * still opens the order directly if there's exactly one, or the
-     * Orders tab (via MainActivity) if there's more than one. */
+     * Tapping the plain notification opens the order directly if there's
+     * exactly one, or the Orders tab (via MainActivity) if more than one —
+     * either path stops the ringing loop (see `OrderDetailActivity`/
+     * `MainActivity`'s `onResume`). */
     fun showNewOrderAlert(context: Context, newOrders: List<Order>) {
         if (newOrders.isEmpty()) return
+        val appContext = context.applicationContext
 
         val contentIntent = if (newOrders.size == 1) {
             Intent(context, OrderDetailActivity::class.java)
@@ -159,6 +173,13 @@ object OrderNotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val dismissPendingIntent = PendingIntent.getBroadcast(
+            context,
+            2,
+            Intent(context, DismissOrderAlertReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_NEW_ORDER)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
@@ -168,6 +189,7 @@ object OrderNotificationHelper {
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .setFullScreenIntent(fullScreenPendingIntent, true)
+            .addAction(R.drawable.ic_notification, "Dismiss", dismissPendingIntent)
             // Belt-and-braces alongside the channel's own vibration
             // pattern — some OEM skins only honor a pattern set directly
             // on the notification itself pre-Android-13 despite channel
@@ -180,6 +202,82 @@ object OrderNotificationHelper {
         // notification rather than stacking unboundedly, while still
         // being distinct from the foreground service's own notification id.
         manager.notify(NEW_ORDER_NOTIFICATION_ID, notification)
+
+        startRingingLoop(appContext)
+    }
+
+    // --- Central looping ringtone + vibration -------------------------
+    // Lives here (not in NewOrderAlarmActivity) specifically so it starts
+    // the moment a new-order notification is posted, regardless of
+    // whether the OS actually shows the full-screen activity — see the
+    // kdoc on showNewOrderAlert for why that distinction matters. Backed
+    // by application context, so it keeps running independent of any one
+    // Activity's lifecycle; OrderPollingService (which posts the
+    // notification) is itself a long-lived foreground service, so the
+    // process this lives in is the same one already being kept alive.
+    private var ringtoneMediaPlayer: MediaPlayer? = null
+    private var ringtoneVibrator: Vibrator? = null
+
+    private fun startRingingLoop(appContext: Context) {
+        if (ringtoneMediaPlayer != null) return // already ringing for an earlier undismissed order
+
+        val soundUri = RingtoneManager.getActualDefaultRingtoneUri(appContext, RingtoneManager.TYPE_ALARM)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        ringtoneMediaPlayer = MediaPlayer().apply {
+            setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
+            isLooping = true
+            try {
+                setDataSource(appContext, soundUri)
+                prepare()
+                start()
+            } catch (e: Exception) {
+                // A missing/unreadable ringtone shouldn't crash anything —
+                // vibration below still fires either way.
+            }
+        }
+
+        val pattern = longArrayOf(0, 500, 300, 500, 300)
+        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            (appContext.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            appContext.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
+        ringtoneVibrator = vibrator
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(pattern, 0)
+        }
+    }
+
+    /** Stops the looping sound/vibration from [startRingingLoop] and
+     * cancels the still-visible new-order notification. Safe to call any
+     * time, including when nothing is ringing. Called from:
+     * `OrderDetailActivity`/`MainActivity`'s `onResume` (opening any order
+     * counts as "went in and did something"), `NewOrderAlarmActivity`'s
+     * buttons, and [DismissOrderAlertReceiver]. */
+    fun stopRingingLoop(context: Context) {
+        ringtoneMediaPlayer?.apply {
+            try {
+                if (isPlaying) stop()
+            } catch (e: IllegalStateException) {
+                // Already stopped/released — nothing to do.
+            }
+            release()
+        }
+        ringtoneMediaPlayer = null
+        ringtoneVibrator?.cancel()
+        ringtoneVibrator = null
+
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.cancel(NEW_ORDER_NOTIFICATION_ID)
     }
 
     /** The low-priority "Anydrop Restaurant is watching for new orders"
@@ -232,5 +330,15 @@ object OrderNotificationHelper {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)
+    }
+}
+
+/** Backs the "Dismiss" action button on the new-order notification —
+ * exists as its own tiny receiver (rather than reusing an Activity) so the
+ * ringing loop can be silenced straight from the notification shade,
+ * including from the lock screen, without opening the app at all. */
+class DismissOrderAlertReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        OrderNotificationHelper.stopRingingLoop(context.applicationContext)
     }
 }
