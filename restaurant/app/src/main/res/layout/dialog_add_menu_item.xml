@@ -57,9 +57,12 @@
                 android:textSize="13sp" />
         </LinearLayout>
 
+        <!-- doc 22 item 6 — leading icons on fields, using the generic
+             bundled set (no sourcing debate for these, per that item). -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="wrap_content"
+            app:startIconDrawable="@drawable/ic_tag">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/inputItemName"
@@ -74,7 +77,8 @@
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp">
+            android:layout_marginTop="8dp"
+            app:startIconDrawable="@drawable/ic_rupee">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/inputItemPrice"

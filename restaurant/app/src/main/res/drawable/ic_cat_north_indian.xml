@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bundled category icon (doc 22 item 1) — see ic_cat_biryani.xml header
+     for the v1-placeholder-art caveat. Thali plate (single-color
+     silhouette, matching every other icon in this set, since app:tint at
+     the call site recolors a vector's paths uniformly — a second fill
+     color here would just disappear once tinted, so no punched-hole rim
+     detail like a real thali; kept as a plain plate outline instead). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M2,13 A10,9 0 1,1 21.99,13 A10,9 0 1,1 2,13 Z" />
+</vector>

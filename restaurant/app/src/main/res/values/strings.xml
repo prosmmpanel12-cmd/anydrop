@@ -142,7 +142,8 @@
     <string name="coupon_hint_discount_value">Discount value</string>
     <string name="coupon_hint_min_order">Min order amount (optional)</string>
     <string name="coupon_hint_max_discount">Max discount cap (optional, percent only)</string>
-    <string name="coupon_hint_valid_until">Valid until, yyyy-MM-dd (optional)</string>
+    <string name="coupon_hint_valid_until">Valid until (optional) — tap to pick date &amp; time</string>
+    <string name="coupon_valid_until_not_set">No expiry set</string>
     <string name="coupon_hint_usage_limit_total">Total uses allowed, all customers (optional)</string>
     <string name="coupon_hint_usage_limit_per_user">Uses allowed per customer (optional)</string>
     <string name="coupon_empty_state">No coupons yet — tap + to create one.</string>
@@ -160,6 +161,20 @@
     <string name="coupon_min_order_fmt">Min order ₹%1$s</string>
     <string name="coupon_times_used_fmt">Used %1$d times</string>
     <string name="coupon_visible_label">Visible to customers</string>
+    <string name="coupon_toggle_on">ON</string>
+    <string name="coupon_toggle_off">OFF</string>
+    <string name="coupon_archive_action">Archive coupon</string>
+    <string name="coupon_archived_label">Archived</string>
+    <string name="coupon_restore_action">Restore</string>
+    <string name="coupon_archive_confirm_title">Archive this coupon?</string>
+    <string name="coupon_archive_confirm_message">Archived coupons are removed from your active list and can\'t be applied at checkout anymore. Past usage history is kept, and you can restore it anytime.</string>
+    <string name="coupon_archive_confirm_positive">Archive</string>
+    <string name="coupon_archived_success">Coupon archived</string>
+    <string name="coupon_archive_failed">Couldn\'t archive coupon</string>
+    <string name="coupon_unarchived_success">Coupon restored</string>
+    <string name="coupon_unarchive_failed">Couldn\'t restore coupon</string>
+    <string name="coupon_public_toggle_label">Show on coupon screen</string>
+    <string name="coupon_public_toggle_hint">Public coupons are auto-suggested to customers on the offers screen. Private ones only work if the customer types the exact code.</string>
     <string name="btn_change_logo">Change logo</string>
     <string name="hint_cuisine_tags">Cuisine tags (comma separated)</string>
     <string name="hint_profile_description">Description (optional)</string>
@@ -243,6 +258,24 @@
     <string name="btn_delete">Delete</string>
     <string name="confirm_delete_category">Delete this category? Items inside it will stay but the category will be hidden.</string>
     <string name="confirm_delete_item">Delete this item? This can\'t be undone.</string>
+
+    <!-- Bundled category icon picker (doc 22 item 1) -->
+    <string name="btn_choose_icon">Choose icon</string>
+    <string name="category_icon_picker_title">Choose a category icon</string>
+    <string name="category_icon_biryani">Biryani</string>
+    <string name="category_icon_north_indian">North Indian</string>
+    <string name="category_icon_south_indian">South Indian</string>
+    <string name="category_icon_chinese">Chinese</string>
+    <string name="category_icon_pizza">Pizza</string>
+    <string name="category_icon_burger">Burger</string>
+    <string name="category_icon_tandoori">Tandoori</string>
+    <string name="category_icon_momos">Momos</string>
+    <string name="category_icon_breakfast">Breakfast</string>
+    <string name="category_icon_bakery">Bakery</string>
+    <string name="category_icon_desserts">Desserts</string>
+    <string name="category_icon_ice_cream">Ice Cream</string>
+    <string name="category_icon_beverages">Beverages</string>
+    <string name="category_icon_salads">Salads</string>
     <string name="menu_save_failed">Couldn\'t save — check the details and try again</string>
     <string name="menu_load_failed">Couldn\'t load menu — pull to refresh</string>
     <string name="menu_item_saved">Item saved</string>

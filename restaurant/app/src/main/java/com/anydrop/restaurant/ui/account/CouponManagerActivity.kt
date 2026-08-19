@@ -12,7 +12,15 @@ import com.anydrop.restaurant.network.Coupon
 import com.anydrop.restaurant.network.CouponCreateBody
 import com.anydrop.restaurant.network.CouponUpdateBody
 import com.anydrop.restaurant.ui.common.InAppNotifier
+import com.google.android.material.datepicker.MaterialDatePicker
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.timepicker.MaterialTimePicker
+import com.google.android.material.timepicker.TimeFormat
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import java.util.TimeZone
 
 /**
  * "My Coupons" screen (doc 07_Phase_3.7_Bug_Tracker.md §2.1, this
@@ -27,7 +35,11 @@ import kotlinx.coroutines.launch
  * rejected by /cart/validate outright even if someone already knows the
  * exact code).
  *
- * Add/edit-coupon both use a plain AlertDialog + the same custom view
+ * Add/edit-coupon both use a `MaterialAlertDialogBuilder` (doc 22 item 2 —
+ * switched from the plain `android.app.AlertDialog.Builder` this session
+ * as part of the coupon screen's slice of the dialog-modernization ask;
+ * the other dialogs in doc 22's list are still plain `AlertDialog.Builder`
+ * pending that same pass) wrapping the same custom view
  * (dialog_add_coupon.xml), same "keep it simple, no new screen" pattern
  * OrderAdapter's inline reject dialog already uses in this app, rather
  * than a second Activity. `showAddCouponDialog()`/`showEditCouponDialog()`
@@ -35,6 +47,18 @@ import kotlinx.coroutines.launch
  * differently — see `showEditCouponDialog()`'s kdoc for exactly what
  * differs (code locked, discount-type shown as a label instead of chips,
  * every other field pre-filled).
+ *
+ * doc 22 additions this session:
+ * - `is_public` ("show on coupon screen") is now a pill toggle in this
+ *   same dialog, editable at both create and edit time (item 3's
+ *   follow-up answer — "Both create and edit").
+ * - `valid_until` opens a real `MaterialDatePicker` → `MaterialTimePicker`
+ *   pair instead of manual yyyy-MM-dd typing (item 5's follow-up answer —
+ *   a real date **and** time, not date-only).
+ * - Coupon rows now also expose an archive/unarchive action alongside the
+ *   existing is_active toggle (migration 27, follow-up answer — "also
+ *   add off on delete and other possible option"), handled by
+ *   `archiveCoupon()`/`unarchiveCoupon()` below.
  */
 class CouponManagerActivity : AppCompatActivity() {
 
@@ -49,7 +73,9 @@ class CouponManagerActivity : AppCompatActivity() {
 
         adapter = CouponAdapter(
             onToggleActive = { coupon, checked -> toggleActive(coupon, checked) },
-            onEditClick = { coupon -> showEditCouponDialog(coupon) }
+            onEditClick = { coupon -> showEditCouponDialog(coupon) },
+            onArchiveClick = { coupon -> confirmArchive(coupon) },
+            onUnarchiveClick = { coupon -> unarchiveCoupon(coupon) }
         )
         binding.couponList.layoutManager = LinearLayoutManager(this)
         binding.couponList.adapter = adapter
@@ -98,11 +124,66 @@ class CouponManagerActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Archive (migration 27, doc 22 follow-up — "also add off on delete
+     * and other possible option"). Confirmed first, unlike the plain
+     * is_active toggle, since it changes what section of the list the
+     * coupon shows up in rather than just flipping a switch back — same
+     * "confirm anything that moves/removes a row from view" instinct as
+     * other destructive-ish actions in this app.
+     */
+    private fun confirmArchive(coupon: Coupon) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.coupon_archive_confirm_title)
+            .setMessage(R.string.coupon_archive_confirm_message)
+            .setPositiveButton(R.string.coupon_archive_confirm_positive) { _, _ -> archiveCoupon(coupon) }
+            .setNegativeButton(R.string.btn_cancel, null)
+            .show()
+    }
+
+    private fun archiveCoupon(coupon: Coupon) {
+        lifecycleScope.launch {
+            try {
+                val response = api.updateCoupon(coupon.id, CouponUpdateBody(isArchived = true))
+                val updated = response.body()?.data?.coupon
+                if (response.isSuccessful && updated != null) {
+                    InAppNotifier.show(this@CouponManagerActivity, getString(R.string.coupon_archived_success), InAppNotifier.Type.SUCCESS)
+                    adapter.updateOne(updated)
+                } else {
+                    InAppNotifier.show(this@CouponManagerActivity, getString(R.string.coupon_archive_failed), InAppNotifier.Type.ERROR)
+                }
+            } catch (e: Exception) {
+                InAppNotifier.show(this@CouponManagerActivity, getString(R.string.coupon_archive_failed), InAppNotifier.Type.ERROR)
+            }
+        }
+    }
+
+    /** No confirmation needed to restore — unlike archiving, this can't
+     * lose anything; the coupon just goes back to being manageable. */
+    private fun unarchiveCoupon(coupon: Coupon) {
+        lifecycleScope.launch {
+            try {
+                val response = api.updateCoupon(coupon.id, CouponUpdateBody(isArchived = false))
+                val updated = response.body()?.data?.coupon
+                if (response.isSuccessful && updated != null) {
+                    InAppNotifier.show(this@CouponManagerActivity, getString(R.string.coupon_unarchived_success), InAppNotifier.Type.SUCCESS)
+                    adapter.updateOne(updated)
+                } else {
+                    InAppNotifier.show(this@CouponManagerActivity, getString(R.string.coupon_unarchive_failed), InAppNotifier.Type.ERROR)
+                }
+            } catch (e: Exception) {
+                InAppNotifier.show(this@CouponManagerActivity, getString(R.string.coupon_unarchive_failed), InAppNotifier.Type.ERROR)
+            }
+        }
+    }
+
     private fun showAddCouponDialog() {
         val dialogBinding = DialogAddCouponBinding.inflate(layoutInflater)
         setUpDiscountTypeToggle(dialogBinding)
+        setUpValidUntilPicker(dialogBinding)
+        dialogBinding.togglePublicGroup.check(dialogBinding.btnPublicOff.id) // is_public defaults to false, same as server
 
-        android.app.AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(R.string.coupon_add_title)
             .setView(dialogBinding.root)
             .setPositiveButton(R.string.btn_save) { _, _ -> submitNewCoupon(dialogBinding) }
@@ -145,14 +226,26 @@ class CouponManagerActivity : AppCompatActivity() {
             dialogBinding.inputMinOrder.setText(formatEditableAmount(coupon.minOrderAmount))
         }
         coupon.maxDiscountAmount?.let { dialogBinding.inputMaxDiscount.setText(formatEditableAmount(it)) }
-        // valid_until comes back as "yyyy-MM-dd HH:mm:ss" — inputValidUntil
-        // only collects the date part (submitNewCoupon/submitCouponEdit
-        // both append " 23:59:59" themselves), so strip the time here.
-        coupon.validUntil?.let { dialogBinding.inputValidUntil.setText(it.substringBefore(' ')) }
+
+        setUpValidUntilPicker(dialogBinding)
+        // valid_until comes back as "yyyy-MM-dd HH:mm:ss" straight from
+        // the server — that's exactly the wire format setUpValidUntilPicker()
+        // expects in the field's tag, so pre-fill both the tag (source of
+        // truth sent back to the server) and a friendly display string
+        // together via the same helper the picker itself uses.
+        coupon.validUntil?.let { applyValidUntilValue(dialogBinding, it) }
+
         coupon.usageLimitTotal?.let { dialogBinding.inputUsageLimitTotal.setText(it.toString()) }
         coupon.usageLimitPerUser?.let { dialogBinding.inputUsageLimitPerUser.setText(it.toString()) }
 
-        android.app.AlertDialog.Builder(this)
+        // is_public — doc 22 item 3 follow-up: editable here too, not
+        // just at creation time. Pre-filled from the coupon's current
+        // value like every other field in edit mode.
+        dialogBinding.togglePublicGroup.check(
+            if (coupon.isPublic) dialogBinding.btnPublicOn.id else dialogBinding.btnPublicOff.id
+        )
+
+        MaterialAlertDialogBuilder(this)
             .setTitle(R.string.coupon_edit_title)
             .setView(dialogBinding.root)
             .setPositiveButton(R.string.btn_save) { _, _ -> submitCouponEdit(coupon.id, dialogBinding) }
@@ -170,6 +263,90 @@ class CouponManagerActivity : AppCompatActivity() {
         }
     }
 
+    /** yyyy-MM-dd HH:mm:ss — the exact wire format coupons-create.php /
+     * coupons-update.php read valid_until in, and what coupons-list.php
+     * hands back. Kept as one shared format string so the picker's output,
+     * the pre-fill-from-server path, and the submit path can never drift
+     * out of sync with each other. */
+    private val validUntilWireFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+    private val validUntilDisplayFormat = SimpleDateFormat("d MMM yyyy, h:mm a", Locale.getDefault())
+
+    /**
+     * doc 22 item 5 — real date+time picker. `inputValidUntil` is
+     * focusable="false"/clickable="true" (see dialog_add_coupon.xml), so
+     * tapping it opens a `MaterialDatePicker` and, on a date being picked,
+     * chains straight into a `MaterialTimePicker` — the app owner
+     * specifically asked for date **and** time, not date-only (the old
+     * behaviour always forced 23:59:59). The field's tag holds the raw
+     * `yyyy-MM-dd HH:mm:ss` value actually sent to the server; the field's
+     * text is just the friendly display string — submitNewCoupon()/
+     * submitCouponEdit() read the tag, never the display text, so display
+     * formatting changes can never silently corrupt what's sent.
+     *
+     * MaterialDatePicker works in UTC millis internally regardless of the
+     * device's timezone (its own documented behavior) — converted back to
+     * the device's local Calendar here before combining with the picked
+     * time, so what the restaurant sees/picks matches their own clock.
+     */
+    private fun setUpValidUntilPicker(dialogBinding: DialogAddCouponBinding) {
+        // Custom end-icon "×" (app:endIconMode="custom", since the field
+        // is focusable="false"/click-only — the built-in clear_text mode
+        // expects a keyboard-editable field). Only visible once a value
+        // is actually set (empty otherwise, so an unused field doesn't
+        // show a clear button with nothing to clear).
+        dialogBinding.validUntilLayout.setEndIconOnClickListener {
+            dialogBinding.inputValidUntil.tag = null
+            dialogBinding.inputValidUntil.text = null
+            dialogBinding.validUntilLayout.isEndIconVisible = false
+        }
+        dialogBinding.validUntilLayout.isEndIconVisible = dialogBinding.inputValidUntil.tag != null
+
+        dialogBinding.inputValidUntil.setOnClickListener {
+            val datePicker = MaterialDatePicker.Builder.datePicker()
+                .setTitleText(getString(R.string.coupon_hint_valid_until))
+                .build()
+            datePicker.addOnPositiveButtonClickListener { utcMillis ->
+                val utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+                utcCal.timeInMillis = utcMillis
+
+                val timePicker = MaterialTimePicker.Builder()
+                    .setTimeFormat(TimeFormat.CLOCK_12H)
+                    .setHour(23)
+                    .setMinute(59)
+                    .build()
+                timePicker.addOnPositiveButtonClickListener {
+                    val local = Calendar.getInstance()
+                    local.set(
+                        utcCal.get(Calendar.YEAR),
+                        utcCal.get(Calendar.MONTH),
+                        utcCal.get(Calendar.DAY_OF_MONTH),
+                        timePicker.hour,
+                        timePicker.minute,
+                        0
+                    )
+                    applyValidUntilValue(dialogBinding, validUntilWireFormat.format(local.time))
+                }
+                timePicker.show(supportFragmentManager, "valid_until_time_picker")
+            }
+            datePicker.show(supportFragmentManager, "valid_until_date_picker")
+        }
+    }
+
+    /** Sets both the field's displayed text and its tag (the actual value
+     * read at submit time) from a single yyyy-MM-dd HH:mm:ss wire-format
+     * string — shared by the picker's own callback and by
+     * showEditCouponDialog()'s pre-fill from an existing coupon. */
+    private fun applyValidUntilValue(dialogBinding: DialogAddCouponBinding, wireValue: String) {
+        dialogBinding.inputValidUntil.tag = wireValue
+        val display = try {
+            validUntilDisplayFormat.format(validUntilWireFormat.parse(wireValue)!!)
+        } catch (e: Exception) {
+            wireValue // fall back to showing the raw value rather than crashing on an unexpected format
+        }
+        dialogBinding.inputValidUntil.setText(display)
+        dialogBinding.validUntilLayout.isEndIconVisible = true
+    }
+
     private fun formatEditableAmount(value: Double): String {
         return if (value == value.toLong().toDouble()) value.toLong().toString() else value.toString()
     }
@@ -180,10 +357,10 @@ class CouponManagerActivity : AppCompatActivity() {
         val discountValue = dialogBinding.inputDiscountValue.text?.toString()?.trim()?.toDoubleOrNull()
         val minOrder = dialogBinding.inputMinOrder.text?.toString()?.trim()?.toDoubleOrNull()
         val maxDiscount = dialogBinding.inputMaxDiscount.text?.toString()?.trim()?.toDoubleOrNull()
-        val validUntilRaw = dialogBinding.inputValidUntil.text?.toString()?.trim().orEmpty()
-        val validUntil = if (validUntilRaw.isNotEmpty()) "$validUntilRaw 23:59:59" else null
+        val validUntil = dialogBinding.inputValidUntil.tag as? String
         val usageLimitTotal = dialogBinding.inputUsageLimitTotal.text?.toString()?.trim()?.toIntOrNull()
         val usageLimitPerUser = dialogBinding.inputUsageLimitPerUser.text?.toString()?.trim()?.toIntOrNull()
+        val isPublic = dialogBinding.togglePublicGroup.checkedButtonId == dialogBinding.btnPublicOn.id
 
         if (code.isEmpty() || discountValue == null || discountValue <= 0) {
             InAppNotifier.show(this, getString(R.string.coupon_create_failed), InAppNotifier.Type.ERROR)
@@ -201,7 +378,8 @@ class CouponManagerActivity : AppCompatActivity() {
                         maxDiscountAmount = if (discountType == "percent") maxDiscount else null,
                         validUntil = validUntil,
                         usageLimitTotal = usageLimitTotal,
-                        usageLimitPerUser = usageLimitPerUser
+                        usageLimitPerUser = usageLimitPerUser,
+                        isPublic = isPublic
                     )
                 )
                 val created = response.body()?.data?.coupon
@@ -240,10 +418,10 @@ class CouponManagerActivity : AppCompatActivity() {
         }
         val minOrder = dialogBinding.inputMinOrder.text?.toString()?.trim()?.toDoubleOrNull()
         val maxDiscount = dialogBinding.inputMaxDiscount.text?.toString()?.trim()?.toDoubleOrNull()
-        val validUntilRaw = dialogBinding.inputValidUntil.text?.toString()?.trim().orEmpty()
-        val validUntil = if (validUntilRaw.isNotEmpty()) "$validUntilRaw 23:59:59" else null
+        val validUntil = dialogBinding.inputValidUntil.tag as? String
         val usageLimitTotal = dialogBinding.inputUsageLimitTotal.text?.toString()?.trim()?.toIntOrNull()
         val usageLimitPerUser = dialogBinding.inputUsageLimitPerUser.text?.toString()?.trim()?.toIntOrNull()
+        val isPublic = dialogBinding.togglePublicGroup.checkedButtonId == dialogBinding.btnPublicOn.id
 
         lifecycleScope.launch {
             try {
@@ -255,7 +433,8 @@ class CouponManagerActivity : AppCompatActivity() {
                         maxDiscountAmount = maxDiscount,
                         validUntil = validUntil,
                         usageLimitTotal = usageLimitTotal,
-                        usageLimitPerUser = usageLimitPerUser
+                        usageLimitPerUser = usageLimitPerUser,
+                        isPublic = isPublic
                     )
                 )
                 val updated = response.body()?.data?.coupon

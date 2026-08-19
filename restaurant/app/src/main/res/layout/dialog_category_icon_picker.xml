@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shown inside a MaterialAlertDialogBuilder from
+     MenuFragment.showCategoryIconPickerDialog(). 4-column grid, one cell
+     per CategoryIcons.ALL entry via CategoryIconPickerAdapter. -->
+<androidx.recyclerview.widget.RecyclerView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/categoryIconGrid"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingHorizontal="12dp"
+    android:paddingVertical="8dp"
+    android:clipToPadding="false"
+    tools:context="com.anydrop.restaurant.ui.menu.MenuFragment"
+    xmlns:tools="http://schemas.android.com/tools" />

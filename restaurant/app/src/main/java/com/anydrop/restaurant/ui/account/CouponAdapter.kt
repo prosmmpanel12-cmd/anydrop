@@ -13,20 +13,30 @@ import java.util.Locale
  * Same shape as BannerAdapter — plain submitList, no diffing (this
  * screen's list is small and rarely churns mid-session).
  *
- * The switch's `onCheckedChange` listener is detached/reattached around
- * `bind()`'s programmatic `isChecked` set — same guard pattern
- * AccountFragment's `switchTempClosed` already uses — so binding a
- * recycled row never fires a spurious network call for a state the user
- * didn't actually change.
+ * The toggle group's `addOnButtonCheckedListener` is detached/reattached
+ * around `bind()`'s programmatic `check()` call — same guard pattern
+ * AccountFragment's `switchTempClosed` (formerly a SwitchMaterial, same
+ * idea) already uses — so binding a recycled row never fires a spurious
+ * network call for a state the user didn't actually change. (doc 22
+ * item 4 replaced the old SwitchMaterial with this pill
+ * MaterialButtonToggleGroup — same guard-listener reasoning still
+ * applies, just against a different widget's listener API.)
  *
  * `onEditClick` (coupon-system follow-up session) opens the edit-terms
  * dialog — tapping `couponInfoColumn` (code/discount/meta text), kept
- * deliberately separate from the switch's own tap target so toggling
+ * deliberately separate from the toggle's own tap target so toggling
  * visibility and editing terms are never ambiguous gestures.
+ *
+ * `onArchiveClick`/`onUnarchiveClick` (doc 22 follow-up, migration 27) —
+ * archived coupons swap `activeControlsGroup` for `archivedGroup`
+ * entirely (see item_coupon_manage_row.xml) since there's nothing left
+ * to toggle once a coupon is archived, only "bring it back".
  */
 class CouponAdapter(
     private val onToggleActive: (Coupon, Boolean) -> Unit,
-    private val onEditClick: (Coupon) -> Unit
+    private val onEditClick: (Coupon) -> Unit,
+    private val onArchiveClick: (Coupon) -> Unit,
+    private val onUnarchiveClick: (Coupon) -> Unit
 ) : RecyclerView.Adapter<CouponAdapter.CouponViewHolder>() {
 
     private val coupons = mutableListOf<Coupon>()
@@ -76,10 +86,27 @@ class CouponAdapter(
             metaParts.add(ctx.getString(R.string.coupon_times_used_fmt, coupon.timesUsed))
             binding.couponMetaText.text = metaParts.joinToString(" · ")
 
-            binding.switchActive.setOnCheckedChangeListener(null)
-            binding.switchActive.isChecked = coupon.isActive
-            binding.switchActive.setOnCheckedChangeListener { _, checked ->
-                onToggleActive(coupon, checked)
+            // Archived coupons have nothing left to toggle — swap the
+            // whole controls column for the simple "Archived · Restore"
+            // one instead of trying to disable individual controls.
+            if (coupon.isArchived) {
+                binding.activeControlsGroup.visibility = android.view.View.GONE
+                binding.archivedGroup.visibility = android.view.View.VISIBLE
+                binding.root.alpha = 0.6f
+                binding.btnUnarchive.setOnClickListener { onUnarchiveClick(coupon) }
+            } else {
+                binding.activeControlsGroup.visibility = android.view.View.VISIBLE
+                binding.archivedGroup.visibility = android.view.View.GONE
+                binding.root.alpha = 1.0f
+
+                binding.toggleActiveGroup.clearOnButtonCheckedListeners()
+                binding.toggleActiveGroup.check(if (coupon.isActive) binding.btnActiveOn.id else binding.btnActiveOff.id)
+                binding.toggleActiveGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+                    if (!isChecked) return@addOnButtonCheckedListener
+                    onToggleActive(coupon, checkedId == binding.btnActiveOn.id)
+                }
+
+                binding.btnArchive.setOnClickListener { onArchiveClick(coupon) }
             }
 
             binding.couponInfoColumn.setOnClickListener { onEditClick(coupon) }

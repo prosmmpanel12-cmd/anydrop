@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ₹ glyph, same generic-field-icon set as ic_calendar/ic_percent/ic_tag/
+     ic_clock (doc 22 item 6 — "generic ones can just be normal bundled
+     vector drawables, no sourcing debate needed"). Used as the price
+     field's startIconDrawable in dialog_add_menu_item.xml. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?attr/colorControlNormal">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M7,4 L17,4 L17,6 L13.9,6 C14.5,6.6 14.9,7.4 15,8.2 L17,8.2 L17,10.2 L14.9,10.2
+                           C14.4,12.7 12.2,14.4 9.4,14.6 L15.2,20.6 L12.3,20.6 L6.5,14.5 L6.5,12.4 L8.6,12.4
+                           C10.4,12.4 11.9,11.6 12.6,10.2 L7,10.2 L7,8.2 L12.7,8.2 C12.1,6.9 10.6,6 8.9,6 L7,6 Z" />
+</vector>

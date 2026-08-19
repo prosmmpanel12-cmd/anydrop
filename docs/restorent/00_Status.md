@@ -1,4 +1,321 @@
-## 2026-08-18 (newest) — Coupon system: edit-dialog + usage-limit fields DONE (this session — sandbox still has no Android SDK/network/DB access)
+## 2026-08-19 (b, newest) — verification pass + doc 22's two loose ends closed (this session — sandbox still has no Android SDK/network/DB access)
+
+Picked up exactly where the prior 2026-08-19 entry (checkpoint, below)
+left off: NEXT_SESSION_PROMPT.md's "do this first" verification pass,
+then its two loose ends. Nothing else from doc 22 or the standing asks
+started this session — scope was deliberately narrow.
+
+### ✅ Verification pass — clean, plus one real bug found
+Ran the checks the prior session skipped, across every file it touched:
+- `MenuFragment.kt` / `CategoryAdapter.kt`: brace/paren balance OK.
+- All new/edited layouts (`dialog_category_icon_picker.xml`,
+  `item_category_icon_option.xml`, `dialog_add_category.xml`,
+  `dialog_add_menu_item.xml`) and all 14 `ic_cat_*.xml` drawables:
+  well-formed XML, confirmed via `xml.dom.minidom`.
+- No duplicate `android:id`s in any of the above layouts.
+- View-binding class names cross-checked: `dialog_category_icon_picker.
+  xml` → `DialogCategoryIconPickerBinding`, `item_category_icon_option.
+  xml` → `ItemCategoryIconOptionBinding` — both match what
+  `CategoryIconPickerAdapter.kt`/`MenuFragment.kt` actually reference.
+- Every `dialogBinding.*`/`pickerBinding.*` reference in `MenuFragment.
+  kt` and every `binding.*` reference in `CategoryIconPickerAdapter.kt`
+  cross-checked against the IDs that actually exist in their layouts —
+  all present, none stale.
+- `saveCategory()`'s new 4-arg signature (`existing, name, photoUri,
+  iconKey`) has exactly one call site (`showCategoryDialog()`), already
+  updated — no stale 3-arg callers anywhere in the file.
+- All colors (`anydrop_primary`, `text_secondary`,
+  `anydrop_primary_container`, `stat_chip_bg`) and strings
+  (`category_icon_picker_title`, `btn_add_photo`, `btn_change_photo`,
+  `confirm_delete_category`, all 14 `category_icon_*` labels) that
+  `CategoryIcons.kt`/the new dialogs reference actually exist in
+  `strings.xml`/`colors.xml`. All 14 `ic_cat_*` drawables referenced by
+  `CategoryIcons.ALL` confirmed present on disk.
+- **Real bug found, not introduced this session:** `MenuFragment.kt` had
+  **three** unqualified `MaterialAlertDialogBuilder(...)` calls (in
+  `showCategoryDialog()`, `showCategoryIconPickerDialog()`,
+  `showItemDialog()`) with **no import for it** — would have failed to
+  compile. Added `import com.google.android.material.dialog.
+  MaterialAlertDialogBuilder` (confirmed correct path + gradle dependency
+  by checking `CouponManagerActivity.kt`'s existing working usage and
+  `app/build.gradle`'s `material:1.11.0` dependency first). This predates
+  this session — likely introduced whenever `showCategoryDialog()` was
+  first switched off plain `AlertDialog.Builder` — but was never caught
+  because no session since has had a real compiler to catch it.
+
+### ✅ Loose end 1 — `CategoryAdapter.kt` now renders `icon_key`
+Added the missing middle branch in `CategoryViewHolder.bind()`'s
+thumbnail logic: `imageUrl != null -> photo` / `iconKey != null ->
+CategoryIcons.drawableFor(iconKey)` (same tinted/fit-center treatment
+the placeholder branch already used) / `else -> placeholder`. A category
+saved with a bundled icon now shows that icon in the list, not
+`ic_food_placeholder`. Same-package access to `CategoryIcons` (both
+`com.anydrop.restaurant.ui.menu`), no new import needed.
+
+### ✅ Loose end 2 — two delete-confirmation dialogs modernized
+`confirmDeleteCategory()` and `confirmDeleteItem()` in `MenuFragment.kt`
+swapped from plain `AlertDialog.Builder` to `MaterialAlertDialogBuilder`
+— one-line change each, no custom view, just `.setMessage()` confirms.
+Removed the now-unused `import android.app.AlertDialog` (the file's one
+remaining `AlertDialog` reference, `pickerDialog`'s type declaration,
+already used the fully-qualified `androidx.appcompat.app.AlertDialog`
+and was untouched).
+
+**Doc 22 items 1 and 2 are now both fully closed** — see the entry below
+for the rest of item 1/2's detail (icon set, dialog modernization scope
+correction, etc.), this entry only covers what changed since then.
+
+### Not done this session (deliberately out of scope)
+Nothing from "Next feature work" (doc 18's build order — notification
+bell, reviews reply, settings, etc.) or the standing asks (Gradle build,
+DB migrations) was touched — this session was scoped to the checkpoint's
+"do this first" list only, per the handover's own instruction not to
+build on unverified ground. See NEXT_SESSION_PROMPT.md for what's next.
+
+### Not verified this session (still open)
+Still no real compiler — this was a manual/static verification pass
+(brace/paren counting, XML parsing, grep-based ID cross-checks), not a
+Gradle build. The `MaterialAlertDialogBuilder` import bug this session
+caught is exactly the kind of thing a real build would catch instantly;
+treat this session's "clean" result as "clean by manual inspection,"
+not "confirmed compiles."
+
+## 2026-08-19 (a) — doc 22 items 1 & 2 STARTED, NOT FINISHED: bundled category icons + 2 of 7 dialogs modernized (this session — sandbox still has no Android SDK/network/DB access)
+
+**Session ended mid-task, cut off by tool-call budget — this is a
+checkpoint, not a clean handoff.** Picked up items 1 and 2 from doc 22
+(the two items the previous session left not-started). See
+NEXT_SESSION_PROMPT.md for the precise resume point.
+
+### 🟡 Item 1 — bundled category icons — mostly done, unwired in one place
+- New migration `28_migration_category_icon_key.sql` — `menu_categories.
+  icon_key VARCHAR(40) NULL`. `categories-create.php`/`categories-update.
+  php`/`categories-list.php` all read/write/return it. `icon_key` and
+  `image_url` enforced mutually exclusive **server-side**: whichever one
+  is present (non-null) in a given request body clears the other in the
+  DB, so switching between an uploaded photo and a bundled icon can never
+  leave the old value dangling.
+- `MenuCategory`/`CategoryCreateBody`/`CategoryUpdateBody` (Models.kt)
+  gained `iconKey`.
+- New `CategoryIcons.kt` — single source of truth for the 14 valid keys
+  (server doesn't validate `icon_key` against a fixed list, an
+  unrecognized key just falls back to the placeholder icon on render).
+  Set: biryani, north_indian, south_indian, chinese, pizza, burger,
+  tandoori, momos, breakfast, bakery, desserts, ice_cream, beverages,
+  salads — matches doc 22's own examples plus reasonable additions, not
+  reviewed/confirmed by the app owner.
+- 14 new `ic_cat_*.xml` vector drawables — **v1 placeholder art**, simple
+  geometric silhouettes hand-authored without any way to render/preview
+  them in this sandbox. Functional (valid XML, each icon distinguishable
+  by shape) but needs an actual visual/design review once a toolchain
+  exists — flagged in each file's own header comment too.
+- New `item_category_icon_option.xml` (grid cell) + `dialog_category_
+  icon_picker.xml` + `CategoryIconPickerAdapter.kt` — single-select
+  4-column grid, tap-to-pick-and-dismiss (no separate confirm step).
+- Wired into `dialog_add_category.xml` (new "Choose icon" text link below
+  the existing photo-upload row) and `MenuFragment.kt`'s
+  `showCategoryDialog()`/`saveCategory()` — picking an icon clears any
+  staged photo and vice versa, both client-side (immediate preview swap)
+  and server-side (the mutual-exclusion logic above).
+- **NOT done: `CategoryAdapter.kt` (the actual category list row, not the
+  add/edit dialog) still doesn't render `icon_key` at all** — a category
+  saved with a bundled icon will show the plain `ic_food_placeholder` in
+  the list until this is wired. This is the single biggest loose end from
+  this session.
+- "Search more" API (option 2) deliberately still not built, per doc 22's
+  own recommendation to treat it as a later addition — no provider picked.
+
+### 🟡 Item 2 — dialog modernization — 2 of 7 done, 1 correction to doc 22 itself
+- `dialog_add_menu_item.xml` and `dialog_add_category.xml` (Restaurant) —
+  confirmed these really were plain `android.app.AlertDialog.Builder`
+  wrapping `TextInputLayout` forms, matching doc 22's description. Both
+  switched to `MaterialAlertDialogBuilder` in `MenuFragment.kt`
+  (`showItemDialog()`/`showCategoryDialog()`). Added field icons: `ic_tag`
+  on item name, new `ic_rupee.xml` on price, `ic_tag` on category name —
+  same generic-icon set doc 22 item 6 pre-approved (calendar/percent/
+  rupee/tag/clock), no sourcing decision needed for these.
+- **Correction to doc 22's premise, worth flagging explicitly:** the doc
+  described all 7 dialogs as "plain `AlertDialog.Builder`... dated
+  system-dialog chrome." Checked the code before touching anything (per
+  doc 22's own "don't start rewriting these blind" instruction) and found
+  this is **not true for 4 of the 7**:
+  - `dialog_rate_order.xml` (`RateOrderDialog.kt`), `dialog_rate_us.xml`
+    (`RateUsDialog.kt`), `dialog_notification_permission.xml`
+    (`NotificationPermissionDialog.kt`) — all three already use
+    `BottomSheetDialog` with a custom `bg_dialog_rounded_top` background,
+    on-brand buttons, and (notification one) a Lottie animation. Not
+    system-dialog chrome at all.
+  - `dialog_update.xml` (`UpdateDialogFragment.kt`) — already uses
+    `MaterialAlertDialogBuilder`, already has an icon, title, message, and
+    Material buttons.
+  - Doc 22's "current state" section for item 2 was written from a visual
+    impression, not a code check, and was stale — these four were already
+    modernized in earlier sessions. **Genuinely still plain/dated: only
+    the two Restaurant dialogs done this session were actually in that
+    state.**
+- **NOT done:** two more plain `AlertDialog.Builder` calls in
+  `MenuFragment.kt` (delete-category and delete-item confirmations, ~line
+  596/774 pre-this-session) — not in doc 22's original file list (those
+  are simple `.setMessage()` confirms, no custom XML view), but a
+  one-line `MaterialAlertDialogBuilder` swap for consistency, not done.
+
+### Not verified this session
+No brace/paren-balance pass, no XML well-formedness check, no duplicate-
+ID check, no cross-check of view IDs referenced from Kotlin against the
+layouts they bind to — the verification pass this project usually does
+before ending a session (see the 2026-08-18 entry below for what that
+normally covers) **was not run this session**, on top of the usual "no
+real compiler" caveat. Do this first before writing any more code on top.
+
+## 2026-08-18 — doc 22 coupon-screen slice DONE: is_public toggle, real date+time picker, archive/unarchive, pill toggle redesign (sandbox still has no Android SDK/network/DB access)
+
+App owner confirmed the open decisions doc 22 was blocking on (icon
+sourcing: bundled + "search for more"; toggle redesign: Claude's call;
+valid_until: full date **and** time, not date-only; coupon lifecycle:
+keep the toggle AND add a real archive option). Built the coupon-screen
+slice of doc 22 this session — items 3, 4, and 5, plus the delete/
+archive follow-up. Category icons (item 1) and the full 7-dialog
+modernization pass (item 2) are **not started** — see NEXT_SESSION_PROMPT.md.
+
+### ✅ Item 3 — is_public ("show on coupon screen") toggle, create AND edit
+- `coupons-create.php` previously **hardcoded `is_public = 0`** in the
+  INSERT and never read the field from the body at all — confirmed this
+  before assuming it was UI-only, per doc 22's own instruction. Now
+  reads an explicit `is_public` from the request body, still defaulting
+  to `false` (`0`) when omitted so no existing caller's behavior changes.
+- `coupons-update.php` already had the null-skip partial-update pattern
+  for `is_active` — added `is_public` alongside it, same pattern.
+- `dialog_add_coupon.xml`: new pill `MaterialButtonToggleGroup`
+  (`togglePublicGroup`/`btnPublicOn`/`btnPublicOff`) with a hint line
+  explaining public vs. private, shown in both add and edit mode (the
+  app owner's follow-up answer was explicitly "Both create and edit").
+  Add-mode defaults to OFF (matches the server default); edit-mode
+  pre-fills from `coupon.isPublic`.
+
+### ✅ Item 4 — toggle redesign ("make it attractive, your call")
+- Replaced `item_coupon_manage_row.xml`'s plain `SwitchMaterial` with a
+  pill-shaped `MaterialButtonToggleGroup` (ON/OFF), new shared style
+  `ToggleButton.Pill` in `themes.xml`. Reused the exact same style for
+  the new `is_public` toggle in the dialog so the whole coupon screen
+  has one consistent toggle language rather than a different control
+  per flag.
+- `CouponAdapter`'s guard-listener pattern (detach/reattach around the
+  programmatic `check()` call so binding a recycled row never fires a
+  spurious network call) carried over from the old SwitchMaterial code,
+  now against `MaterialButtonToggleGroup.addOnButtonCheckedListener`/
+  `clearOnButtonCheckedListeners()` instead.
+
+### ✅ Item 5 — real date+time picker for valid_until
+- `dialog_add_coupon.xml`'s `inputValidUntil` is now `focusable="false"`/
+  `clickable="true"` (was a raw `inputType="date"` text field that only
+  changed the soft-keyboard hint and never opened any picker UI) with a
+  calendar start-icon and a custom "×" end-icon to clear it.
+- `CouponManagerActivity.setUpValidUntilPicker()`: tapping the field
+  opens a `MaterialDatePicker`, whose positive-button callback chains
+  straight into a `MaterialTimePicker` (12-hour format, defaults to
+  23:59 so a date-only pick without touching the time wheel still lands
+  on the old end-of-day default) — app owner specifically asked for
+  date **and** time, not date-only.
+- The field's displayed text (`"18 Aug 2026, 11:59 PM"` style, via
+  `validUntilDisplayFormat`) is kept deliberately separate from the
+  value actually sent to the server (`"2026-08-18 23:59:00"`, stashed in
+  the field's `tag` via `validUntilWireFormat`) — `submitNewCoupon()`/
+  `submitCouponEdit()` now read the tag, never the display text, so a
+  display-format change can never silently corrupt what's sent.
+  `showEditCouponDialog()`'s pre-fill uses the same shared
+  `applyValidUntilValue()` helper the picker's own callback uses, so
+  there's exactly one place that turns a wire-format string into both
+  the display text and the tag.
+- `MaterialDatePicker` returns UTC millis regardless of device timezone
+  (its own documented behavior) — converted back to a local `Calendar`
+  before combining with the picked time, so what's shown/picked matches
+  the restaurant's own clock, not UTC.
+
+### ✅ Delete/archive follow-up — "also add off on delete and other possible option"
+- New migration `27_migration_coupon_archive.sql`: `coupons.is_archived`
+  (default 0) + `coupons.archived_at`, same idempotent conditional-ALTER
+  pattern as 18/22.
+- `coupons-update.php`: `is_archived` in the request body now flips the
+  column and stamps/clears `archived_at` together (archived_at always
+  reflects the *current* archive state, not a first-ever timestamp).
+- `lib/orders.php`'s `/cart/validate` coupon lookup now also requires
+  `is_archived = 0` alongside the existing `is_active = 1` check — an
+  archived coupon can never be applied at checkout even with the exact
+  code.
+- `coupons-list.php` now selects/returns `is_archived`, sorted so
+  archived rows land at the bottom (`ORDER BY is_archived ASC, id DESC`)
+  — deliberately still *returned*, not filtered out server-side, so the
+  app can show/unarchive them from the same screen rather than needing
+  a second endpoint.
+- `item_coupon_manage_row.xml`: active coupons show the pill toggle +
+  a new archive icon button (`btnArchive`) side by side — archiving is
+  additive to the existing toggle, not a replacement, exactly as asked.
+  Archived coupons swap that whole column for a simple "Archived ·
+  Restore" one (`archivedGroup`/`btnUnarchive`) and the row dims to 60%
+  alpha — nothing left to toggle once archived.
+- `CouponManagerActivity`: archiving asks for confirmation first
+  (`confirmArchive()` → `MaterialAlertDialogBuilder`, explains usage
+  history is kept and it's reversible); unarchiving is one tap, no
+  confirmation, since it can't lose anything.
+
+### Also this session — dialog modernization, started (not finished)
+Doc 22 item 2 asked for a coordinated pass across all 7 dialogs in both
+apps, but flagged it as needing "actual mockup/direction... don't start
+rewriting these blind." Scoped this session to just the two coupon
+dialogs already being touched for items 3/4/5 above:
+`showAddCouponDialog()`/`showEditCouponDialog()` now use
+`MaterialAlertDialogBuilder` instead of the plain
+`android.app.AlertDialog.Builder`, and `dialog_add_coupon.xml` picked up
+icons on three fields (`inputCode` → tag icon, `inputDiscountValue` →
+percent icon, `inputValidUntil` → calendar icon) as a concrete example
+of item 6's "icons on fields" ask. **The other 5 dialogs
+(`dialog_notification_permission.xml`, `dialog_rate_order.xml`,
+`dialog_rate_us.xml`, `dialog_update.xml`, `dialog_add_menu_item.xml`,
+`dialog_add_category.xml`) are untouched** — still needs its own
+coordinated session per doc 22's own recommendation.
+
+### Not started this session
+- **Item 1 — category icons** (bundled set + "search for more" API, per
+  app owner's confirmed answer). Nothing built — needs its own session:
+  bundled icon set has to actually be curated/sourced first (which
+  specific food-category icons ship in the app), then the picker grid UI,
+  then the "search more" API integration (still needs a specific
+  provider chosen — not decided yet, only the "bundled + API" *shape*
+  was confirmed).
+- **Item 2 — the other 5 dialogs.** See above.
+
+### Verification (same standing limitation)
+No Android SDK/Gradle in this sandbox — same as every session so far.
+Ran the furthest checks this sandbox can do:
+- Brace/paren balance on every edited Kotlin file (`CouponManagerActivity.kt`,
+  `CouponAdapter.kt`, `Models.kt`) — all balanced.
+- XML well-formedness on every edited/new layout, `themes.xml`,
+  `strings.xml`, and all 6 new vector drawables — all parse clean.
+- No duplicate `android:id`s within either edited layout file.
+- Cross-checked every view ID referenced from `CouponManagerActivity.kt`/
+  `CouponAdapter.kt` against `dialog_add_coupon.xml`/
+  `item_coupon_manage_row.xml` — every one exists, none missing.
+This is real signal but **not a substitute for `kotlinc`/Gradle** — type
+errors, resource-linking errors, and `MaterialButtonToggleGroup`/
+`MaterialDatePicker`/`MaterialTimePicker` API-usage mistakes are
+specifically the kind of thing none of the above can catch. This is now
+the **third** session's worth of unverified surface stacked up (this
+session's doc-22 coupon slice + the coupon edit-dialog session +
+OrderPollingService/OrderNotificationHelper) — see NEXT_SESSION_PROMPT.md,
+still the single highest-priority ask.
+
+### ⏭️ Next
+1. Real Gradle build — now three sessions deep, unchanged #1 priority.
+2. Run migration 27 (new this session) along with the still-outstanding
+   26, and confirm 23/24's live-DB status — unchanged ask.
+3. Category icons (doc 22 item 1) — needs the icon set actually curated
+   before any code.
+4. The other 5 dialogs (doc 22 item 2).
+5. Resume doc 18's recommended build order after the above.
+
+---
+
+## 2026-08-18 — Coupon system: edit-dialog + usage-limit fields DONE (this session — sandbox still has no Android SDK/network/DB access)
 
 Closes items 1 and 3 from the prior coupon session's "Not done" list.
 Backend and Kotlin models needed **zero changes** — `coupons-update.php`

@@ -16,6 +16,32 @@
         <item name="android:textColorSecondary">@color/text_secondary</item>
     </style>
 
+    <!-- Pill-shaped ON/OFF toggle (doc 22 item 4, app-owner ask
+         2026-08-18: "make the toggle attractive, your call on style").
+         Used as the two children of a MaterialButtonToggleGroup (single
+         selection) — item_coupon_manage_row.xml's is_active toggle and
+         dialog_add_coupon.xml's is_public toggle both reuse this same
+         style so the whole coupon screen has one consistent toggle
+         language rather than a different control per flag. Selected/
+         unselected coloring comes from MaterialButtonToggleGroup's own
+         checked-state handling against colorPrimary — no manual
+         state-list drawable needed. -->
+    <style name="ToggleButton.Pill" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="cornerRadius">20dp</item>
+        <item name="strokeColor">@color/anydrop_primary</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">36dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="iconPadding">4dp</item>
+        <item name="iconSize">16dp</item>
+    </style>
+
     <!-- Single-digit OTP input box (ui/signup/OtpVerifyActivity) — six of these
          in a row, auto-advancing on input, same visual language as
          bg_card_rounded used everywhere else in this app for input fields. -->

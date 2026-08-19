@@ -96,7 +96,12 @@ class CategoryAdapter(
             // Thumbnail (NEXT_SESSION_PROMPT.md item 6) — same
             // placeholder/real-image pattern as MenuItemAdapter's
             // itemThumb, reusing ic_food_placeholder since no distinct
-            // category placeholder icon exists yet.
+            // category placeholder icon exists yet. doc 22 item 1 adds a
+            // middle branch for a bundled icon_key (mutually exclusive
+            // with imageUrl server-side, see CategoryIcons.kt) — same
+            // tinted/fit-center treatment as the no-photo placeholder
+            // below, just with the picked icon's drawable instead of
+            // ic_food_placeholder.
             if (!category.imageUrl.isNullOrBlank()) {
                 binding.categoryThumb.imageTintList = null
                 binding.categoryThumb.setPadding(0, 0, 0, 0)
@@ -106,6 +111,13 @@ class CategoryAdapter(
                     error(R.drawable.ic_food_placeholder)
                     crossfade(true)
                 }
+            } else if (category.iconKey != null) {
+                val secondaryTint = ContextCompat.getColor(context, R.color.text_secondary)
+                val insetPx = (10 * context.resources.displayMetrics.density).toInt()
+                binding.categoryThumb.setPadding(insetPx, insetPx, insetPx, insetPx)
+                binding.categoryThumb.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                binding.categoryThumb.setImageResource(CategoryIcons.drawableFor(category.iconKey))
+                binding.categoryThumb.imageTintList = android.content.res.ColorStateList.valueOf(secondaryTint)
             } else {
                 val secondaryTint = ContextCompat.getColor(context, R.color.text_secondary)
                 val insetPx = (10 * context.resources.displayMetrics.density).toInt()

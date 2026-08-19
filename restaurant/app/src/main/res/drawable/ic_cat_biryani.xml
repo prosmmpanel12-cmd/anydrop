@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bundled category icon set (doc 22 item 1) — v1 placeholder art,
+     simple tintable silhouettes built for CategoryIcons.kt's picker grid.
+     Not visually reviewed on-device (no Android SDK in this sandbox, see
+     00_Status.md) — flag for a design pass once a toolchain exists, same
+     caveat as the rest of this project's unverified changes. Bowl (heaped
+     rice) with two steam wisps. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M4,12 L20,12 L17.5,20 A2,2 0 0,1 15.5,21.5 L8.5,21.5 A2,2 0 0,1 6.5,20 Z
+                           M9,10 L10.2,10 L8,4 L6.8,4 Z
+                           M15.8,10 L17,10 L14.8,4 L13.6,4 Z" />
+</vector>

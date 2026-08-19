@@ -33,7 +33,7 @@ $restaurantId = $owner['owner_id'];
 $db = Database::get();
 
 $stmt = $db->prepare(
-    'SELECT c.id, c.name, c.image_url, c.sort_order, c.is_active,
+    'SELECT c.id, c.name, c.image_url, c.icon_key, c.sort_order, c.is_active,
             (SELECT COUNT(*) FROM menu_items i
              WHERE i.category_id = c.id AND i.deleted_at IS NULL) AS item_count
      FROM menu_categories c
@@ -43,10 +43,14 @@ $stmt = $db->prepare(
 $stmt->execute(['rid' => $restaurantId]);
 $rows = $stmt->fetchAll();
 
+// icon_key added by 28_migration_category_icon_key.sql (doc 22 item 1,
+// bundled category icon picker) — see that migration's kdoc for why it's
+// mutually exclusive with image_url.
 $categories = array_map(fn($c) => [
     'id' => (int) $c['id'],
     'name' => $c['name'],
     'image_url' => $c['image_url'],
+    'icon_key' => $c['icon_key'],
     'sort_order' => (int) $c['sort_order'],
     'is_active' => (bool) $c['is_active'],
     'item_count' => (int) $c['item_count'],

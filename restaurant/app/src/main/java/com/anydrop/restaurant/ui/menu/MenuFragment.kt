@@ -1,6 +1,5 @@
 package com.anydrop.restaurant.ui.menu
 
-import android.app.AlertDialog
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -17,6 +16,7 @@ import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import coil.load
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.anydrop.restaurant.R
 import com.anydrop.restaurant.databinding.DialogAddCategoryBinding
 import com.anydrop.restaurant.databinding.DialogAddMenuItemBinding
@@ -113,6 +113,10 @@ class MenuFragment : Fragment() {
     private var currentItemDialogBinding: DialogAddMenuItemBinding? = null
     private var pickedCategoryPhotoUri: Uri? = null
     private var currentCategoryDialogBinding: DialogAddCategoryBinding? = null
+    // doc 22 item 1 — bundled category icon, mutually exclusive with
+    // pickedCategoryPhotoUri (picking one clears the other, both in this
+    // fragment and server-side, see categories-update.php's kdoc).
+    private var pickedCategoryIconKey: String? = null
 
     // Crop screen (app-owner feedback item #2, 2026-08-17) — both pickers
     // below now route the freshly-picked Uri through CropActivity before
@@ -158,6 +162,7 @@ class MenuFragment : Fragment() {
             if (result.resultCode == android.app.Activity.RESULT_OK) {
                 val croppedUri = CropActivity.getResultUri(result.data) ?: return@registerForActivityResult
                 pickedCategoryPhotoUri = croppedUri
+                pickedCategoryIconKey = null // mutually exclusive — a real photo replaces any bundled icon pick
                 currentCategoryDialogBinding?.let { b ->
                     b.categoryPhotoPreview.imageTintList = null
                     b.categoryPhotoPreview.setPadding(0, 0, 0, 0)
@@ -446,6 +451,13 @@ class MenuFragment : Fragment() {
         dialogBinding.inputCategoryName.setText(existing?.name ?: "")
 
         pickedCategoryPhotoUri = null
+        // Pre-fill from the existing category's bundled icon (if any, and
+        // if it doesn't already have a photo — the two are mutually
+        // exclusive so a category never has both). Left as-is (not
+        // re-sent) if the user never touches this section, same "only
+        // send what changed" convention as pickedCategoryPhotoUri/
+        // imageUrlToSave below.
+        pickedCategoryIconKey = existing?.iconKey
         currentCategoryDialogBinding = dialogBinding
         val existingCategoryImageUrl = existing?.imageUrl
         if (!existingCategoryImageUrl.isNullOrBlank()) {
@@ -458,10 +470,13 @@ class MenuFragment : Fragment() {
                 crossfade(true)
             }
             dialogBinding.categoryPhotoLabel.text = getString(R.string.btn_change_photo)
+        } else if (existing?.iconKey != null) {
+            applyCategoryIconPreview(dialogBinding, existing.iconKey)
         }
         dialogBinding.categoryPhotoPickerRow.setOnClickListener { pickCategoryPhotoLauncher.launch("image/*") }
+        dialogBinding.btnChooseCategoryIcon.setOnClickListener { showCategoryIconPickerDialog(dialogBinding) }
 
-        AlertDialog.Builder(requireContext())
+        MaterialAlertDialogBuilder(requireContext())
             .setTitle(if (existing == null) R.string.dialog_add_category_title else R.string.dialog_edit_category_title)
             .setView(dialogBinding.root)
             .setPositiveButton(R.string.btn_save) { _, _ ->
@@ -470,14 +485,52 @@ class MenuFragment : Fragment() {
                     InAppNotifier.show(activity, getString(R.string.menu_save_failed), InAppNotifier.Type.ERROR)
                     return@setPositiveButton
                 }
-                saveCategory(existing, name, pickedCategoryPhotoUri)
+                saveCategory(existing, name, pickedCategoryPhotoUri, pickedCategoryIconKey)
             }
             .setNegativeButton(R.string.btn_cancel, null)
             .setOnDismissListener { currentCategoryDialogBinding = null }
             .show()
     }
 
-    private fun saveCategory(existing: MenuCategory?, name: String, photoUri: Uri?) {
+    /** doc 22 item 1 — opens the bundled-icon grid; picking one clears any
+     * staged photo and updates the shared preview slot immediately. */
+    private fun showCategoryIconPickerDialog(dialogBinding: DialogAddCategoryBinding) {
+        val pickerBinding = DialogCategoryIconPickerBinding.inflate(layoutInflater)
+        pickerBinding.categoryIconGrid.layoutManager = GridLayoutManager(requireContext(), 4)
+
+        lateinit var pickerDialog: androidx.appcompat.app.AlertDialog
+        pickerBinding.categoryIconGrid.adapter = CategoryIconPickerAdapter(
+            requireContext(),
+            pickedCategoryIconKey
+        ) { option ->
+            pickedCategoryIconKey = option.key
+            pickedCategoryPhotoUri = null // mutually exclusive — an icon pick replaces any staged photo
+            applyCategoryIconPreview(dialogBinding, option.key)
+            pickerDialog.dismiss()
+        }
+
+        pickerDialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.category_icon_picker_title)
+            .setView(pickerBinding.root)
+            .setNegativeButton(R.string.btn_cancel, null)
+            .create()
+        pickerDialog.show()
+    }
+
+    /** Renders a bundled icon into the category dialog's shared preview
+     * slot — same tinted/fit-center treatment CategoryAdapter already uses
+     * for the "no photo" placeholder state, just with the picked icon's
+     * drawable instead of ic_food_placeholder. */
+    private fun applyCategoryIconPreview(dialogBinding: DialogAddCategoryBinding, iconKey: String) {
+        dialogBinding.categoryPhotoPreview.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+        dialogBinding.categoryPhotoPreview.setPadding(20, 20, 20, 20)
+        dialogBinding.categoryPhotoPreview.setImageResource(CategoryIcons.drawableFor(iconKey))
+        dialogBinding.categoryPhotoPreview.imageTintList =
+            android.content.res.ColorStateList.valueOf(requireContext().getColor(R.color.anydrop_primary))
+        dialogBinding.categoryPhotoLabel.text = getString(R.string.btn_add_photo)
+    }
+
+    private fun saveCategory(existing: MenuCategory?, name: String, photoUri: Uri?, iconKey: String?) {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 // Upload the photo first (if a new one was picked), same
@@ -494,9 +547,9 @@ class MenuFragment : Fragment() {
                 }
 
                 val ok = if (existing == null) {
-                    api.createCategory(CategoryCreateBody(name = name, imageUrl = imageUrlToSave)).isSuccessful
+                    api.createCategory(CategoryCreateBody(name = name, imageUrl = imageUrlToSave, iconKey = iconKey)).isSuccessful
                 } else {
-                    api.updateCategory(existing.id, CategoryUpdateBody(name = name, imageUrl = imageUrlToSave)).isSuccessful
+                    api.updateCategory(existing.id, CategoryUpdateBody(name = name, imageUrl = imageUrlToSave, iconKey = iconKey)).isSuccessful
                 }
                 if (ok) {
                     InAppNotifier.show(activity, getString(R.string.menu_category_saved), InAppNotifier.Type.SUCCESS)
@@ -540,7 +593,7 @@ class MenuFragment : Fragment() {
     }
 
     private fun confirmDeleteCategory(category: MenuCategory) {
-        AlertDialog.Builder(requireContext())
+        MaterialAlertDialogBuilder(requireContext())
             .setMessage(R.string.confirm_delete_category)
             .setPositiveButton(R.string.btn_delete) { _, _ -> deleteCategory(category) }
             .setNegativeButton(R.string.btn_cancel, null)
@@ -590,7 +643,7 @@ class MenuFragment : Fragment() {
         }
         dialogBinding.itemPhotoPickerRow.setOnClickListener { pickItemPhotoLauncher.launch("image/*") }
 
-        AlertDialog.Builder(requireContext())
+        MaterialAlertDialogBuilder(requireContext())
             .setTitle(if (existingItem == null) R.string.dialog_add_item_title else R.string.dialog_edit_item_title)
             .setView(dialogBinding.root)
             .setPositiveButton(R.string.btn_save) { _, _ ->
@@ -718,7 +771,7 @@ class MenuFragment : Fragment() {
     }
 
     private fun confirmDeleteItem(item: MenuItem) {
-        AlertDialog.Builder(requireContext())
+        MaterialAlertDialogBuilder(requireContext())
             .setMessage(R.string.confirm_delete_item)
             .setPositiveButton(R.string.btn_delete) { _, _ -> deleteItem(item) }
             .setNegativeButton(R.string.btn_cancel, null)

@@ -250,6 +250,7 @@ function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCod
         do {
             $cStmt = $db->prepare(
                 'SELECT * FROM coupons WHERE code = :code AND is_active = 1
+                 AND is_archived = 0
                  AND (restaurant_id IS NULL OR restaurant_id = :rid)
                  AND (valid_from IS NULL OR valid_from <= NOW())
                  AND (valid_until IS NULL OR valid_until >= NOW()) LIMIT 1'

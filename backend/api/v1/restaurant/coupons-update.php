@@ -2,11 +2,11 @@
 /**
  * POST /api/v1/restaurant/coupons-update.php?id=
  * Auth: Restaurant token
- * Request: partial — any of { "is_active", "discount_value",
- *   "min_order_amount", "max_discount_amount", "valid_until",
- *   "usage_limit_total", "usage_limit_per_user" }. Same null-skip
- *   partial-update convention as menu-items-update.php — only fields
- *   present in the body are touched.
+ * Request: partial — any of { "is_active", "is_public", "is_archived",
+ *   "discount_value", "min_order_amount", "max_discount_amount",
+ *   "valid_until", "usage_limit_total", "usage_limit_per_user" }. Same
+ *   null-skip partial-update convention as menu-items-update.php — only
+ *   fields present in the body are touched.
  * Response: { "coupon": {...} }
  *
  * Ownership-checked (coupon must belong to the calling restaurant), same
@@ -19,6 +19,19 @@
  * changing either could retroactively confuse coupon_usages history tied
  * to the original code/type. Delete-and-recreate is the intended path if
  * either needs to change.
+ *
+ * is_archived (migration 27, doc 22 follow-up — "also add off on delete
+ * and other possible option") is a second, independent lifecycle flag
+ * alongside is_active, not a replacement for it: archiving removes the
+ * coupon from the restaurant's active management list while keeping
+ * coupon_usages history intact (never a hard DELETE, same reasoning as
+ * is_active already documents above). Setting is_archived = true also
+ * stamps archived_at = NOW(); setting it back to false (unarchive)
+ * clears archived_at to NULL again so it always reflects the *current*
+ * archive state, not a first-ever timestamp. lib/orders.php's coupon
+ * lookup for /cart/validate checks is_archived = 0 alongside is_active = 1
+ * — an archived coupon can never be applied at checkout even if someone
+ * still knows the exact code.
  */
 
 require_once __DIR__ . '/../../../config/database.php';
@@ -56,6 +69,18 @@ $params = ['id' => $id];
 if (array_key_exists('is_active', $body)) {
     $fieldsSql[] = 'is_active = :is_active';
     $params['is_active'] = $body['is_active'] ? 1 : 0;
+}
+if (array_key_exists('is_public', $body)) {
+    $fieldsSql[] = 'is_public = :is_public';
+    $params['is_public'] = $body['is_public'] ? 1 : 0;
+}
+if (array_key_exists('is_archived', $body)) {
+    $fieldsSql[] = 'is_archived = :is_archived';
+    $params['is_archived'] = $body['is_archived'] ? 1 : 0;
+    // archived_at always tracks the *current* archive state — stamped on
+    // archive, cleared on unarchive — rather than being a first-ever
+    // "archived once" timestamp.
+    $fieldsSql[] = 'archived_at = ' . ($body['is_archived'] ? 'NOW()' : 'NULL');
 }
 if (array_key_exists('discount_value', $body) && $body['discount_value'] !== null) {
     $fieldsSql[] = 'discount_value = :discount_value';
@@ -108,6 +133,7 @@ respond_ok([
         'usage_limit_per_user' => $r['usage_limit_per_user'] !== null ? (int) $r['usage_limit_per_user'] : null,
         'is_active' => (bool) $r['is_active'],
         'is_public' => (bool) $r['is_public'],
+        'is_archived' => (bool) $r['is_archived'],
         'times_used' => (int) $r['times_used'],
     ],
 ]);

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bundled category icon (doc 22 item 1) — see ic_cat_biryani.xml header
+     for the v1-placeholder-art caveat. Rolled dosa + small chutney bowl. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M2,11 A9,3.2 0 1,1 19.99,11 A9,3.2 0 1,1 2,11 Z
+                           M16,17.5 A3,3 0 1,1 21.99,17.5 A3,3 0 1,1 16,17.5 Z" />
+</vector>

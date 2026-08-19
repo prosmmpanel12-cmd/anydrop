@@ -2,7 +2,7 @@
 /**
  * POST /api/v1/restaurant/categories-create.php
  * Auth: Restaurant token
- * Request: { "name": "...", "sort_order"?: int, "image_url"?: string }
+ * Request: { "name": "...", "sort_order"?: int, "image_url"?: string, "icon_key"?: string }
  * Response: { "category": {...} }
  *
  * sort_order defaults to "append to the end" (current max + 1) when the
@@ -15,6 +15,13 @@
  * didn't exist in the original schema. Same upload-then-save split as
  * menu-items-create.php's image_url: category-photo-upload.php uploads
  * the file and returns this path first.
+ *
+ * icon_key (optional): doc 22 item 1, bundled category-icon picker.
+ * Requires backend/sql/28_migration_category_icon_key.sql. Mutually
+ * exclusive with image_url at the UI level (a category shows either an
+ * uploaded photo or a bundled icon) — enforced here, not in the schema:
+ * if both are present in the request body, image_url wins and icon_key is
+ * dropped, since an explicit photo upload is the stronger signal.
  */
 
 require_once __DIR__ . '/../../../config/database.php';
@@ -47,15 +54,21 @@ if (isset($body['sort_order']) && $body['sort_order'] !== null) {
     $sortOrder = ((int) $maxStmt->fetch()['m']) + 1;
 }
 $imageUrl = isset($body['image_url']) && $body['image_url'] !== '' ? (string) $body['image_url'] : null;
+$iconKey = isset($body['icon_key']) && $body['icon_key'] !== '' ? (string) $body['icon_key'] : null;
+// Mutually exclusive — see kdoc above.
+if ($imageUrl !== null) {
+    $iconKey = null;
+}
 
 $insert = $db->prepare(
-    'INSERT INTO menu_categories (restaurant_id, name, image_url, sort_order, is_active)
-     VALUES (:rid, :name, :image_url, :sort_order, 1)'
+    'INSERT INTO menu_categories (restaurant_id, name, image_url, icon_key, sort_order, is_active)
+     VALUES (:rid, :name, :image_url, :icon_key, :sort_order, 1)'
 );
 $insert->execute([
     'rid' => $restaurantId,
     'name' => $name,
     'image_url' => $imageUrl,
+    'icon_key' => $iconKey,
     'sort_order' => $sortOrder,
 ]);
 $newId = (int) $db->lastInsertId();
@@ -65,6 +78,7 @@ respond_ok([
         'id' => $newId,
         'name' => $name,
         'image_url' => $imageUrl,
+        'icon_key' => $iconKey,
         'sort_order' => $sortOrder,
         'is_active' => true,
         'item_count' => 0,

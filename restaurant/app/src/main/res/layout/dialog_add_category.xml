@@ -8,9 +8,11 @@
 
     <!-- Photo picker (NEXT_SESSION_PROMPT.md item 4) — same staged-upload
          pattern as EditProfileActivity's logoPickerRow / the menu-item
-         dialog's itemPhotoPickerRow above. No distinct category
-         placeholder icon exists yet, reusing ic_food_placeholder is the
-         pragmatic choice (see 00_Status.md item 6). -->
+         dialog's itemPhotoPickerRow above. categoryPhotoPreview now doubles
+         as the bundled-icon preview too (doc 22 item 1) — whichever of a
+         picked photo Uri / picked icon key is most recent wins, they're
+         mutually exclusive (MenuFragment.showCategoryDialog()'s
+         pickedCategoryIconKey / pickedCategoryPhotoUri handling). -->
     <LinearLayout
         android:id="@+id/categoryPhotoPickerRow"
         android:layout_width="match_parent"
@@ -53,9 +55,28 @@
             android:textSize="13sp" />
     </LinearLayout>
 
+    <!-- doc 22 item 1 — "choose from bundled icons" alternative to an
+         upload, sitting right below the photo picker rather than replacing
+         it (upload stays available for restaurants who want a real dish/
+         category photo). Opens showCategoryIconPickerDialog(); tapping an
+         icon there clears any picked photo and vice versa. -->
+    <TextView
+        android:id="@+id/btnChooseCategoryIcon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="16dp"
+        android:padding="6dp"
+        android:text="@string/btn_choose_icon"
+        android:textColor="@color/anydrop_primary_dark"
+        android:textStyle="bold"
+        android:textSize="13sp"
+        android:background="?attr/selectableItemBackground" />
+
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        app:startIconDrawable="@drawable/ic_tag">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/inputCategoryName"

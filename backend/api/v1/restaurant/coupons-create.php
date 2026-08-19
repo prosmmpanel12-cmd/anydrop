@@ -4,20 +4,25 @@
  * Auth: Restaurant token
  * Request: { "code", "discount_type": "flat"|"percent", "discount_value",
  *   "min_order_amount"?, "max_discount_amount"?, "valid_from"?, "valid_until"?,
- *   "usage_limit_total"?, "usage_limit_per_user"? }
+ *   "usage_limit_total"?, "usage_limit_per_user"?, "is_public"? }
  * Response: { "coupon": {...} }
  *
  * Per doc 07 §2.1: a restaurant-created coupon is always scoped to that
  * restaurant (restaurant_id = the caller, never NULL/platform-wide — only
  * an admin tool, not built, could create those) and always starts
- * is_public = 0 (18_migration_coupon_is_public.sql's own kdoc already
- * flags this as the intended write-path default) and is_active = 1 —
- * "visibility toggle" (doc 07's own phrase) is what coupons-update.php's
- * is_active flip is for, not is_public; is_public instead controls
- * whether coupons/list.php auto-suggests it on the customer "view all
- * offers" screen versus needing the exact code typed in. Both together
- * give the restaurant real on/off control without silently exposing a
- * private/targeted code the moment it's created.
+ * is_active = 1 — "visibility toggle" (doc 07's own phrase) is what
+ * coupons-update.php's is_active flip is for, not is_public; is_public
+ * instead controls whether coupons/list.php auto-suggests it on the
+ * customer "view all offers" screen versus needing the exact code typed
+ * in. Both together give the restaurant real on/off control without
+ * silently exposing a private/targeted code the moment it's created.
+ *
+ * is_public itself defaults to 0 (18_migration_coupon_is_public.sql's own
+ * kdoc already flags this as the intended write-path default) but, as of
+ * doc 22's "show on coupon screen" toggle-at-creation-time ask, an
+ * explicit value in the request body now overrides that default — see
+ * $isPublic below. A restaurant that never sends the field still gets
+ * the same private-by-default behaviour as before this change.
  *
  * code is upper-cased and must be unique across ALL coupons (platform-
  * wide + every restaurant) since coupons.code has a UNIQUE index
@@ -63,6 +68,7 @@ $validFrom = isset($body['valid_from']) && $body['valid_from'] !== '' ? (string)
 $validUntil = isset($body['valid_until']) && $body['valid_until'] !== '' ? (string) $body['valid_until'] : null;
 $usageLimitTotal = isset($body['usage_limit_total']) && $body['usage_limit_total'] !== null ? (int) $body['usage_limit_total'] : null;
 $usageLimitPerUser = isset($body['usage_limit_per_user']) && $body['usage_limit_per_user'] !== null ? (int) $body['usage_limit_per_user'] : null;
+$isPublic = isset($body['is_public']) ? (bool) $body['is_public'] : false;
 
 $db = Database::get();
 
@@ -79,7 +85,7 @@ $insert = $db->prepare(
          usage_limit_per_user, is_active, is_public)
      VALUES
         (:code, :rid, :dtype, :dvalue, :minorder, :maxdiscount, :vfrom, :vuntil,
-         :limtotal, :limuser, 1, 0)'
+         :limtotal, :limuser, 1, :ispublic)'
 );
 $insert->execute([
     'code' => $code,
@@ -92,6 +98,7 @@ $insert->execute([
     'vuntil' => $validUntil,
     'limtotal' => $usageLimitTotal,
     'limuser' => $usageLimitPerUser,
+    'ispublic' => $isPublic ? 1 : 0,
 ]);
 $newId = (int) $db->lastInsertId();
 
@@ -108,7 +115,8 @@ respond_ok([
         'usage_limit_total' => $usageLimitTotal,
         'usage_limit_per_user' => $usageLimitPerUser,
         'is_active' => true,
-        'is_public' => false,
+        'is_public' => $isPublic,
+        'is_archived' => false,
         'times_used' => 0,
     ],
 ], 201);

@@ -61,27 +61,91 @@
 
         </LinearLayout>
 
+        <!-- Active state: pill ON/OFF toggle (doc 22 item 4) + a separate
+             archive icon button (doc 22 follow-up: "also add off on
+             delete and other possible option" — archive sits alongside
+             the toggle, not instead of it). Archived state swaps this
+             whole column for archivedGroup below instead — an archived
+             coupon has nothing left to toggle. -->
         <LinearLayout
+            android:id="@+id/activeControlsGroup"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:gravity="center">
 
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/switchActive"
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/toggleActiveGroup"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                app:thumbTint="@color/anydrop_primary"
-                app:trackTint="@color/anydrop_primary_container" />
+                app:singleSelection="true"
+                app:selectionRequired="true">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnActiveOn"
+                    style="@style/ToggleButton.Pill"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/coupon_toggle_on" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnActiveOff"
+                    style="@style/ToggleButton.Pill"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/coupon_toggle_off" />
+
+            </com.google.android.material.button.MaterialButtonToggleGroup>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="4dp"
                 android:text="@string/coupon_visible_label"
                 android:textSize="9sp"
                 android:textColor="@color/text_secondary"
                 android:gravity="center" />
+
+            <ImageButton
+                android:id="@+id/btnArchive"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginTop="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/coupon_archive_action"
+                android:src="@drawable/ic_archive"
+                app:tint="@color/text_secondary" />
+
+        </LinearLayout>
+
+        <!-- Archived state: the toggle/archive column above is hidden and
+             this simple "Archived · Restore" column shown instead — an
+             archived coupon has no is_active/is_public state left to
+             flip from this row, only "bring it back". -->
+        <LinearLayout
+            android:id="@+id/archivedGroup"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/coupon_archived_label"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_secondary" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnUnarchive"
+                style="@style/ToggleButton.Pill"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/coupon_restore_action"
+                app:icon="@drawable/ic_unarchive" />
 
         </LinearLayout>
 

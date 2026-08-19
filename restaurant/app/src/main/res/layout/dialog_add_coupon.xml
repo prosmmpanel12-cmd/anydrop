@@ -28,7 +28,12 @@
 
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="wrap_content"
+            app:startIconDrawable="@drawable/ic_tag"
+            app:boxCornerRadiusTopStart="12dp"
+            app:boxCornerRadiusTopEnd="12dp"
+            app:boxCornerRadiusBottomStart="12dp"
+            app:boxCornerRadiusBottomEnd="12dp">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/inputCode"
@@ -92,7 +97,8 @@
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp">
+            android:layout_marginTop="12dp"
+            app:startIconDrawable="@drawable/ic_percent">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/inputDiscountValue"
@@ -133,19 +139,107 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- doc 22 item 5 — real date+time picker instead of manual
+             yyyy-MM-dd typing. android:focusable="false" +
+             android:clickable="true" turns this into a tap target that
+             opens MaterialDatePicker → MaterialTimePicker (chained,
+             CouponManagerActivity.showValidUntilPicker()) rather than a
+             text field with a soft-keyboard date hint that never opened
+             a picker UI. The field displays a friendly formatted string;
+             the actual "yyyy-MM-dd HH:mm:ss" value sent to the server is
+             stashed in the view's tag (see submitNewCoupon()/
+             submitCouponEdit()) so display formatting never has to be
+             re-parsed back into the wire format. -->
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/validUntilLayout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp">
+            android:layout_marginTop="8dp"
+            app:startIconDrawable="@drawable/ic_calendar"
+            app:endIconMode="custom"
+            app:endIconDrawable="@drawable/ic_close">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/inputValidUntil"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="@string/coupon_hint_valid_until"
-                android:inputType="date" />
+                android:focusable="false"
+                android:clickable="true"
+                android:cursorVisible="false" />
 
         </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- doc 22 item 3 — "show on coupon screen" (is_public) toggle,
+             now at creation time (previously not exposed in any UI at
+             all) AND editable from the edit dialog too, per the
+             follow-up answer ("Both create and edit"). Same pill-toggle
+             style as the row's is_active control (item 4) for visual
+             consistency across the two flags. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginEnd="10dp"
+                android:src="@drawable/ic_visibility"
+                app:tint="@color/text_secondary"
+                android:contentDescription="@null" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/coupon_public_toggle_label"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/coupon_public_toggle_hint"
+                    android:textSize="11sp"
+                    android:textColor="@color/text_secondary" />
+
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/togglePublicGroup"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                app:singleSelection="true"
+                app:selectionRequired="true">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnPublicOn"
+                    style="@style/ToggleButton.Pill"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/coupon_toggle_on" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnPublicOff"
+                    style="@style/ToggleButton.Pill"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/coupon_toggle_off" />
+
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        </LinearLayout>
 
         <!-- usage_limit_total / usage_limit_per_user — coupons-create.php
              and CouponCreateBody/CouponUpdateBody already supported both;

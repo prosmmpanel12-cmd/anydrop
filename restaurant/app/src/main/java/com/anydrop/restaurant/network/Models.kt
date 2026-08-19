@@ -147,6 +147,11 @@ data class Coupon(
     @SerializedName("usage_limit_per_user") val usageLimitPerUser: Int?,
     @SerializedName("is_active") val isActive: Boolean,
     @SerializedName("is_public") val isPublic: Boolean,
+    // Archive state (migration 27, doc 22 follow-up: "also add off on
+    // delete and other possible option") — independent of isActive, see
+    // coupons-update.php's kdoc. Defaulted false so any older cached/
+    // mocked Coupon JSON without this field still deserializes.
+    @SerializedName("is_archived") val isArchived: Boolean = false,
     @SerializedName("times_used") val timesUsed: Int
 )
 
@@ -164,14 +169,22 @@ data class CouponCreateBody(
     @SerializedName("max_discount_amount") val maxDiscountAmount: Double? = null,
     @SerializedName("valid_until") val validUntil: String? = null,
     @SerializedName("usage_limit_total") val usageLimitTotal: Int? = null,
-    @SerializedName("usage_limit_per_user") val usageLimitPerUser: Int? = null
+    @SerializedName("usage_limit_per_user") val usageLimitPerUser: Int? = null,
+    // doc 22 item 3 — "show on coupon screen" toggle at creation time.
+    // Omitted (null) means the server falls back to its own default (0,
+    // private) — see coupons-create.php's kdoc.
+    @SerializedName("is_public") val isPublic: Boolean? = null
 )
 
 /** Partial update — only non-null-in-JSON fields change server-side; used
- * both for the on/off visibility toggle (isActive alone) and for editing
+ * for the on/off visibility toggle (isActive alone), the archive/unarchive
+ * action (isArchived alone), the is_public toggle (now editable from the
+ * edit dialog too, per doc 22 item 3's follow-up answer), and for editing
  * the rest of an existing coupon's terms. */
 data class CouponUpdateBody(
     @SerializedName("is_active") val isActive: Boolean? = null,
+    @SerializedName("is_public") val isPublic: Boolean? = null,
+    @SerializedName("is_archived") val isArchived: Boolean? = null,
     @SerializedName("discount_value") val discountValue: Double? = null,
     @SerializedName("min_order_amount") val minOrderAmount: Double? = null,
     @SerializedName("max_discount_amount") val maxDiscountAmount: Double? = null,
@@ -262,7 +275,14 @@ data class MenuCategory(
     @SerializedName("sort_order") val sortOrder: Int,
     @SerializedName("is_active") val isActive: Boolean,
     @SerializedName("item_count") val itemCount: Int = 0,
-    @SerializedName("image_url") val imageUrl: String? = null
+    @SerializedName("image_url") val imageUrl: String? = null,
+    // doc 22 item 1 — bundled category icon picker. Mutually exclusive
+    // with imageUrl server-side (see 28_migration_category_icon_key.sql /
+    // categories-update.php's kdoc) — a category never has both set at
+    // once, but both fields stay independently nullable here since the
+    // server is what enforces that, not this model. Keys match
+    // CategoryIcons.ALL's [CategoryIconOption.key].
+    @SerializedName("icon_key") val iconKey: String? = null
 )
 
 data class CategoriesListResult(val categories: List<MenuCategory>)
@@ -271,13 +291,15 @@ data class CategoryResult(val category: MenuCategory)
 data class CategoryCreateBody(
     val name: String,
     @SerializedName("sort_order") val sortOrder: Int? = null,
-    @SerializedName("image_url") val imageUrl: String? = null
+    @SerializedName("image_url") val imageUrl: String? = null,
+    @SerializedName("icon_key") val iconKey: String? = null
 )
 data class CategoryUpdateBody(
     val name: String? = null,
     @SerializedName("sort_order") val sortOrder: Int? = null,
     @SerializedName("is_active") val isActive: Boolean? = null,
-    @SerializedName("image_url") val imageUrl: String? = null
+    @SerializedName("image_url") val imageUrl: String? = null,
+    @SerializedName("icon_key") val iconKey: String? = null
 )
 
 /** category-photo-upload.php's response shape, mirrors LogoUploadResult. */
