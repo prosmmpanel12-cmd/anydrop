@@ -1,4 +1,65 @@
-## 2026-08-19 (b, newest) — verification pass + doc 22's two loose ends closed (this session — sandbox still has no Android SDK/network/DB access)
+## 2026-08-19 (c, newest) — FIRST REAL GRADLE BUILD RESULT for the Restaurant app: BUILD FAILED, 2 missing imports, now fixed (from GitHub Actions logs, uploaded by app owner)
+
+**This is the first real compiler feedback the Restaurant app has ever
+had** — 21+ sessions of manual-inspection-only ended here. App owner
+uploaded the Actions log zip (`Build Restaurant App` + `Build Customer
+App` jobs, both from the same workflow run).
+
+**Customer App: `BUILD SUCCESSFUL in 3m 36s`.** Not touched this
+session, included for completeness — no action needed.
+
+**Restaurant App: `BUILD FAILED in 2m 42s`**, `:app:compileDebugKotlin`.
+Four real Kotlin compiler errors, all in `MenuFragment.kt`, all one root
+cause:
+
+```
+MenuFragment.kt:498:29 Unresolved reference: DialogCategoryIconPickerBinding
+MenuFragment.kt:499:40 Variable expected
+MenuFragment.kt:499:56 Unresolved reference: GridLayoutManager
+MenuFragment.kt:502:40 Variable expected
+```
+
+**Root cause — two missing imports**, both introduced in the
+2026-08-19(a) session's `showCategoryIconPickerDialog()` and never
+caught by that session's (skipped) or the 2026-08-19(b) session's
+(manual, not compiler) verification pass:
+- `androidx.recyclerview.widget.GridLayoutManager` — used at line 499,
+  never imported. `MenuFragment.kt` already imported
+  `LinearLayoutManager` from the same package for the category list, so
+  this one's absence is easy to miss by eye.
+- `com.anydrop.restaurant.databinding.DialogCategoryIconPickerBinding` —
+  used at line 498, never imported, despite the file already importing
+  three sibling `databinding.*Binding` classes right above it.
+
+Line 498's unresolved `DialogCategoryIconPickerBinding` reference is
+also *why* line 499 and 502 show "Variable expected" instead of their
+own real errors — once `pickerBinding`'s type can't be inferred, the
+compiler can't resolve `pickerBinding.categoryIconGrid` either. Fixing
+the two missing imports should clear all four.
+
+**Fixed this session:** both imports added to `MenuFragment.kt`. Braces/
+parens re-balanced after the edit (152/152, 416/416 — unchanged, as
+expected for an import-only fix). Cross-checked every other
+`*Binding`-typed reference in the file against its imports — all four
+real binding classes used (`DialogAddCategoryBinding`,
+`DialogAddMenuItemBinding`, `DialogCategoryIconPickerBinding`,
+`FragmentMenuBinding`) now have matching imports, nothing else missing.
+
+**This was NOT caught by the 2026-08-19(b) session's manual verification
+pass**, despite that session explicitly checking "view-binding class
+names match... this wasn't cross-checked against a real build" — it
+checked that the *filename → class name* derivation was correct (it
+was), but not that the class was actually *imported* in the file that
+used it. Worth remembering for future manual passes: filename-to-class
+mapping and import-presence are two different checks.
+
+**Not yet re-verified by a real build** — this fix is by inspection only
+(same sandbox limitation as always, still no Android SDK/network here).
+The next Actions run (whenever the app owner triggers one after pulling
+this zip) will be the first real confirmation. Flag this specifically in
+the next handover so it isn't assumed fixed until that comes back green.
+
+## 2026-08-19 (b) — verification pass + doc 22's two loose ends closed (this session — sandbox still has no Android SDK/network/DB access)
 
 Picked up exactly where the prior 2026-08-19 entry (checkpoint, below)
 left off: NEXT_SESSION_PROMPT.md's "do this first" verification pass,

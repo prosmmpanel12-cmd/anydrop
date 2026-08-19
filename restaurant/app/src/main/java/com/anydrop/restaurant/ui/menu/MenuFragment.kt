@@ -12,6 +12,7 @@ import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -20,6 +21,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.anydrop.restaurant.R
 import com.anydrop.restaurant.databinding.DialogAddCategoryBinding
 import com.anydrop.restaurant.databinding.DialogAddMenuItemBinding
+import com.anydrop.restaurant.databinding.DialogCategoryIconPickerBinding
 import com.anydrop.restaurant.ui.common.CropActivity
 import com.anydrop.restaurant.databinding.FragmentMenuBinding
 import com.anydrop.restaurant.network.ApiClient
