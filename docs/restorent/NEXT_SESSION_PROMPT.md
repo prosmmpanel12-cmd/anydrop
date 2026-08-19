@@ -1,11 +1,12 @@
 Restaurant app — continue from here.
 
-**2026-08-19(d) update:** a 6-phase UI/UX overhaul is now in progress —
-Phase 1 (category icon/photo live search, Iconify + Openverse) is done,
-unverified. See 00_Status.md's newest entry for the full writeup and the
-6-phase list. Waiting on app-owner confirmation before Phase 2
-(navigation icon overhaul). Everything below this point is the
-pre-existing standing queue, still accurate.
+**2026-08-19(e) update:** 6-phase UI/UX overhaul continues — Phase 1
+(category icon/photo live search) and Phase 2 (Restaurant app nav icon
+overhaul + app-wide emoji cleanup) are both done, both unverified. See
+00_Status.md's newest entry for Phase 2's full writeup. Waiting on
+app-owner confirmation before Phase 3 (dialogs UI pass — doc 22 item 2,
+modernize all 7 dialog layouts across both apps). Everything below this
+point is the pre-existing standing queue, still accurate.
 
 **Read `docs/restorent/00_Status.md`'s newest entry in full first** —
 "2026-08-19 (c) — FIRST REAL GRADLE BUILD RESULT for the Restaurant app:

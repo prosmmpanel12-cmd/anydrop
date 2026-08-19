@@ -24,18 +24,34 @@
             android:textColor="@color/text_primary" />
 
         <!-- §10 item 4 follow-up — drag-to-reorder toggle. Label swaps
-             "⇅ Reorder" <-> "Done" (MenuFragment.toggleReorderMode()); see
+             "Reorder" <-> "Done" (MenuFragment.toggleReorderMode()); see
              CategoryAdapter's class doc for why reorder mode shows the full
              stacked list (bypassing the tab strip / search filters below)
-             rather than trying to combine three filter states at once. -->
-        <TextView
+             rather than trying to combine three filter states at once.
+             Phase 2 (UI/UX overhaul, 2026-08-19): converted from a plain
+             TextView (emoji baked into the string, "⇅ Reorder") to a
+             MaterialButton with a real ic_reorder start-icon — the
+             MenuFragment.kt call sites only ever set .text, which
+             MaterialButton (a TextView subclass) still supports, so no
+             Kotlin change was needed beyond the icon itself. -->
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnReorderCategories"
+            style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
             android:text="@string/btn_reorder_categories"
             android:textColor="@color/text_secondary"
             android:textStyle="bold"
-            android:padding="6dp"
+            android:textAllCaps="false"
+            app:icon="@drawable/ic_reorder"
+            app:iconTint="@color/text_secondary"
+            app:iconSize="18dp"
+            app:iconPadding="4dp"
+            android:paddingHorizontal="6dp"
             android:layout_marginEnd="4dp" />
 
         <TextView
@@ -48,9 +64,12 @@
             android:padding="6dp" />
     </LinearLayout>
 
-    <!-- §5 — "Drag ☰ to reorder" hint, shown only while reorder mode is
+    <!-- §5 — "Drag to reorder" hint, shown only while reorder mode is
          active (replaces the search bar + tab strip below for the
-         duration, see MenuFragment.enterReorderMode()). -->
+         duration, see MenuFragment.enterReorderMode()). Phase 2
+         (UI/UX overhaul, 2026-08-19): the drag-handle icon itself
+         (ic_drag_handle) now appears per-row in item_menu_category.xml,
+         this hint text no longer needs the "☰" glyph inline. -->
     <TextView
         android:id="@+id/reorderHintText"
         android:layout_width="match_parent"

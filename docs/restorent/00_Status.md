@@ -1,4 +1,122 @@
-## 2026-08-19 (d, newest) — UI/UX overhaul Phase 1 of 6: category icon/photo LIVE SEARCH, unverified (this session)
+## 2026-08-19 (e, newest) — UI/UX overhaul Phase 2 of 6: nav icon overhaul + emoji cleanup, unverified (this session)
+
+Continues the 6-phase UI/UX overhaul from Phase 1 (below). App owner
+confirmed continue. **This entry is Phase 2 only**: Restaurant app
+navigation icon overhaul + a full emoji audit/cleanup across the whole
+app (not just nav, per app owner's "restorant ke overall icons improve
+karo emoji use mat karo" — read as app-wide, not nav-scoped).
+
+### ✅ Done — 9 new vector icons, replacing placeholders + emoji
+- **Bottom nav (4 icons):** `ic_nav_orders.xml` (was 6 plain black
+  rectangles — now a real receipt/order-list glyph), `ic_nav_menu.xml`
+  (was 2 plain bars — now a fork+knife glyph), `ic_nav_insights.xml`
+  (was 3 plain bars — now a bar-chart-with-trend-line glyph), new
+  `ic_nav_account.xml` (bottom_nav_menu.xml's `nav_account` item now
+  points here instead of reusing the generic `ic_person.xml`, which is
+  still used elsewhere and was left untouched). All four are single-tint
+  vectors using the same `?attr/colorControlNormal` + existing
+  `bottom_nav_item_color.xml` selector pattern the old placeholders
+  already used — zero Kotlin/selector changes needed, just drawable
+  swaps in `bottom_nav_menu.xml`.
+- **Row-action icons (5 icons), replacing real emoji found in a full
+  project-wide scan** (`grep`-based Unicode emoji-range scan across every
+  `.kt`/`.xml` in `restaurant/`, re-run at the end to confirm — final
+  scan shows zero emoji left in any user-facing `android:text` or Kotlin
+  string; the only remaining hits are in code comments documenting the
+  change, e.g. "replaces the ✏️ emoji glyph"):
+  - `ic_edit.xml` / `ic_delete.xml` — replace the "✏️"/"🗑️"
+    `TextView.text` buttons in `item_menu_category.xml`
+    (`btnEditCategory`/`btnDeleteCategory`) and `item_menu_food.xml`
+    (`btnEditItem`/`btnDeleteItem`). Both converted `TextView` → `ImageView`
+    (checked `CategoryAdapter.kt`/`MenuItemAdapter.kt` first — both only
+    ever call `.visibility`/`.setOnClickListener` on these IDs, never
+    `.text`, so the type change needed zero Kotlin edits). Edit tinted
+    `text_secondary`, delete tinted `nonveg_red` (existing token, reused
+    rather than inventing a new red).
+  - `ic_drag_handle.xml` — replaces the "☰" `TextView.text` in
+    `item_menu_category.xml`'s `dragHandle` (also converted `TextView` →
+    `ImageView`; `ItemTouchHelper.startDrag` triggers off this view's
+    `ACTION_DOWN` regardless of view type, so `MenuFragment.kt` needed no
+    change here either).
+  - `ic_reorder.xml` — `fragment_menu.xml`'s `btnReorderCategories`
+    converted from a plain `TextView` (with "⇅ Reorder" baked into the
+    string) to a `MaterialButton` (`Widget.Material3.Button.TextButton`)
+    with `app:icon="@drawable/ic_reorder"` — `MaterialButton` is a
+    `TextView` subclass, so `MenuFragment.kt`'s existing `.text =
+    getString(...)` calls in `enterReorderMode()`/`exitReorderMode()`
+    still work unchanged. `strings.xml`'s `btn_reorder_categories` /
+    `menu_reorder_hint` had their "⇅"/"☰" glyphs removed from the text
+    itself (now plain "Reorder" / "Drag to reorder categories").
+  - `ic_check.xml` — built but **not wired into any layout yet**. The
+    three `EditProfileActivity.kt` location-status strings
+    (`row_location_set`, `row_current_location_set`,
+    `row_map_location_set`) had their inline "✓" character removed from
+    the string text (now e.g. "Location set (tap to change)"), but
+    turning that into an actual leading/trailing icon on the row would
+    need restructuring `activity_edit_profile.xml`'s row layout — out of
+    scope for a nav-icon-focused phase, flagged as a candidate for
+    Phase 3 (dialogs pass) or a dedicated follow-up. For now those rows
+    are just plain text with the emoji removed, not text+icon.
+- **`strings.xml`** — 4 new contentDescription strings
+  (`btn_edit_category`, `btn_delete_category`, `btn_edit_item_desc`,
+  `btn_delete_item_desc`) for the new icon buttons, since a real
+  `ImageView` needs a contentDescription where the old emoji-`TextView`
+  didn't.
+
+### 🟡 Not build-verified (same standing sandbox limitation)
+No Android SDK/network in this sandbox, same as every session. Ran the
+furthest manual checks available: all 9 new drawable XMLs + all 3 edited
+layouts parsed clean (`xml.dom.minidom`), no duplicate `android:id`s in
+any edited layout, every new `@drawable`/`@color`/`@string` reference
+cross-checked against an actual file/token that exists (`nonveg_red` in
+`colors.xml`, all 4 new content-description strings in `strings.xml`,
+all 5 new icon files on disk), brace/paren balance on `CategoryAdapter.kt`
+(comment-only edit, 24/24 braces unchanged) and `MenuFragment.kt`
+(untouched, 199/199 braces / 547/547 parens — same as Phase 1's count,
+confirming this phase made no Kotlin logic changes to that file). Per
+Phase 1's own lesson (missing imports aren't caught by manual review):
+`MaterialButton` (`com.google.android.material.button.MaterialButton`)
+is a new class reference in `fragment_menu.xml`'s XML — layout XML
+doesn't need a Kotlin import the way `.kt` files do, so this isn't the
+same risk class as the Phase 1(c) import bug, but the `Widget.Material3.
+Button.TextButton` style + `app:icon`/`app:iconTint`/`app:iconSize`/
+`app:iconPadding` attribute usage is genuinely new to this project
+(confirmed the theme's parent is `Theme.Material3.DayNight.NoActionBar`
+and `material:1.11.0` is the dependency, so the style should resolve,
+but this specific attribute combination has never been compiled in this
+project before).
+
+### 🔴 Known gaps, not done this phase
+- `ic_check.xml` built but unwired (see above) — needs its own small
+  layout pass on `activity_edit_profile.xml`'s location-status row if
+  wanted as an actual icon rather than just plain text.
+- Did not touch the top bar (`activity_main.xml`'s restaurant-name +
+  Open/Closed pill) — it has no icons currently (a colored dot +
+  text pill only), and the app owner's ask was specifically about
+  *navigation* icons and *emoji removal*, neither of which applies
+  there. Flagging in case the app owner wants an icon added to that
+  bar too as part of a later phase.
+- Customer app not touched this phase — app owner's message referenced
+  "Restorent" (restaurant app) specifically for nav; Customer-app icons
+  weren't part of this ask.
+
+### ⏭️ Next
+App owner asked to confirm before continuing, same as Phase 1. If
+continuing: **Phase 3 — dialogs UI pass** (doc 22 item 2: modernize all
+7 dialog layouts across both apps to `MaterialAlertDialogBuilder`/
+bottom-sheet styling, consistent with the category-icon-picker's
+3-tab `MaterialButtonToggleGroup` pattern from Phase 1). Phases 4–6
+(on/off toggle redesign, update+maintenance check for both apps, final
+consistency pass) unchanged, not started.
+
+Still standing, unchanged from every session above: the real-build
+confirmation for Phase 1 + the 2026-08-19(c) import fix (this phase
+adds a small amount of new unverified surface on top, see above), and
+the DB migrations (26/27/28) ask.
+
+---
+
+## 2026-08-19 (d) — UI/UX overhaul Phase 1 of 6: category icon/photo LIVE SEARCH, unverified (this session)
 
 App owner kicked off a 6-phase UI/UX overhaul (dialogs, nav icons, live
 category icon/photo search, on/off toggle redesign, update/maintenance

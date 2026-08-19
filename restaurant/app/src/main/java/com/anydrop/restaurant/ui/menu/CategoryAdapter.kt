@@ -23,7 +23,7 @@ import com.anydrop.restaurant.network.MenuItem
  * shape the Customer App's own menu screen already groups by.
  *
  * §10 item 4 follow-up (this pass) — drag-to-reorder. `reorderMode` is
- * driven by MenuFragment's "⇅ Reorder" toggle: while active, this adapter
+ * driven by MenuFragment's "Reorder" toggle: while active, this adapter
  * shows every active category (search/tab-strip filtering is bypassed by
  * the fragment for the duration, see MenuFragment.enterReorderMode()) with
  * a drag handle, and collapses each card down to just name + item count —

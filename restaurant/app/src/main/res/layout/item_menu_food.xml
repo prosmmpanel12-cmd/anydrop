@@ -52,18 +52,28 @@
         app:thumbTint="@color/anydrop_primary"
         app:trackTint="@color/anydrop_primary_container" />
 
-    <TextView
+    <!-- Phase 2 (UI/UX overhaul, 2026-08-19): "✏️"/"🗑️" emoji-text buttons
+         replaced with real ic_edit/ic_delete ImageViews. MenuItemAdapter.kt
+         only sets .setOnClickListener on these two IDs (no .text usage
+         anywhere) — confirmed before converting. -->
+    <ImageView
         android:id="@+id/btnEditItem"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="✏️"
-        android:padding="6dp" />
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:padding="6dp"
+        android:src="@drawable/ic_edit"
+        app:tint="@color/text_secondary"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/btn_edit_item_desc" />
 
-    <TextView
+    <ImageView
         android:id="@+id/btnDeleteItem"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="🗑️"
-        android:padding="6dp" />
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:padding="6dp"
+        android:src="@drawable/ic_delete"
+        app:tint="@color/nonveg_red"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/btn_delete_item_desc" />
 
 </LinearLayout>

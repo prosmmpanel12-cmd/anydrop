@@ -197,13 +197,13 @@
     <string name="btn_change_photo">Change photo</string>
     <string name="photo_upload_failed">Couldn\'t upload the photo — try again</string>
     <string name="row_set_location">Set restaurant location on map</string>
-    <string name="row_location_set">Location set ✓ (tap to change)</string>
+    <string name="row_location_set">Location set (tap to change)</string>
 
     <!-- Location split into 2 parts (app-owner ask, 2026-08-17). -->
     <string name="row_use_current_location">Use current location (GPS)</string>
     <string name="row_choose_on_map">Choose on map</string>
-    <string name="row_current_location_set">Current location used ✓ (tap to refresh)</string>
-    <string name="row_map_location_set">Location set on map ✓ (tap to change)</string>
+    <string name="row_current_location_set">Current location used (tap to refresh)</string>
+    <string name="row_map_location_set">Location set on map (tap to change)</string>
     <string name="location_fetching">Fetching your location…</string>
     <string name="location_gps_off">Turn on device location (GPS) and try again</string>
     <string name="location_permission_denied">Location permission denied</string>
@@ -298,9 +298,16 @@
 
     <!-- §10 item 4 follow-up — category tabs strip + drag-to-reorder -->
     <string name="menu_tab_all">All</string>
-    <string name="btn_reorder_categories">⇅ Reorder</string>
+    <string name="btn_reorder_categories">Reorder</string>
     <string name="btn_reorder_done">Done</string>
-    <string name="menu_reorder_hint">Drag ☰ to reorder categories</string>
+    <string name="menu_reorder_hint">Drag to reorder categories</string>
+    <!-- Phase 2 (UI/UX overhaul, 2026-08-19) — contentDescription strings
+         for the new icon-based row-action buttons (replacing emoji-text
+         buttons in item_menu_category.xml / item_menu_food.xml). -->
+    <string name="btn_edit_category">Edit category</string>
+    <string name="btn_delete_category">Delete category</string>
+    <string name="btn_edit_item_desc">Edit item</string>
+    <string name="btn_delete_item_desc">Delete item</string>
     <string name="menu_reorder_saved">Category order saved</string>
     <string name="menu_reorder_failed">Couldn\'t save the new order — pull to refresh and try again</string>
 </resources>

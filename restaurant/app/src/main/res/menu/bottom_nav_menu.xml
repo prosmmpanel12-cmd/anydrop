@@ -14,6 +14,6 @@
         android:title="@string/nav_insights" />
     <item
         android:id="@+id/nav_account"
-        android:icon="@drawable/ic_person"
+        android:icon="@drawable/ic_nav_account"
         android:title="@string/nav_account" />
 </menu>

@@ -1,0 +1,23 @@
+<!-- Phase 2 (UI/UX overhaul, 2026-08-19) — replaces the "⇅" emoji-style
+     glyph used in the btn_reorder_categories string ("⇅ Reorder"), shown
+     as a leading icon on fragment_menu.xml's reorder toggle button
+     instead of baked into the string text. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?attr/colorControlNormal">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M8,2.5 C8.24,2.5 8.46,2.6 8.62,2.78 L11.62,6.03 C11.93,6.36 11.91,6.88 11.58,7.19 C11.25,7.5 10.73,7.48 10.42,7.15 L8.75,5.35 L8.75,18.65 L10.42,16.85 C10.73,16.52 11.25,16.5 11.58,16.81 C11.91,17.12 11.93,17.64 11.62,17.97 L8.62,21.22 C8.46,21.4 8.24,21.5 8,21.5 C7.76,21.5 7.54,21.4 7.38,21.22 L4.38,17.97 C4.07,17.64 4.09,17.12 4.42,16.81 C4.75,16.5 5.27,16.52 5.58,16.85 L7.25,18.65 L7.25,5.35 L5.58,7.15 C5.27,7.48 4.75,7.5 4.42,7.19 C4.09,6.88 4.07,6.36 4.38,6.03 L7.38,2.78 C7.54,2.6 7.76,2.5 8,2.5 Z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M14.5,4.75 L21,4.75 C21.41,4.75 21.75,5.09 21.75,5.5 C21.75,5.91 21.41,6.25 21,6.25 L14.5,6.25 C14.09,6.25 13.75,5.91 13.75,5.5 C13.75,5.09 14.09,4.75 14.5,4.75 Z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M14.5,11.25 L21,11.25 C21.41,11.25 21.75,11.59 21.75,12 C21.75,12.41 21.41,12.75 21,12.75 L14.5,12.75 C14.09,12.75 13.75,12.41 13.75,12 C13.75,11.59 14.09,11.25 14.5,11.25 Z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M14.5,17.75 L21,17.75 C21.41,17.75 21.75,18.09 21.75,18.5 C21.75,18.91 21.41,19.25 21,19.25 L14.5,19.25 C14.09,19.25 13.75,18.91 13.75,18.5 C13.75,18.09 14.09,17.75 14.5,17.75 Z" />
+</vector>
