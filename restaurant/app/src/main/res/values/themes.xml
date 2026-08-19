@@ -1,9 +1,37 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <style name="Theme.AnydropRestaurant" parent="Theme.Material3.DayNight.NoActionBar">
+    <!-- Parent switched from Theme.Material3.DayNight.NoActionBar to the
+         plain (non-DayNight) Light variant — 2026-08-19 dialog-fix pass.
+         Root cause of the "dialogs look broken/invisible" reports (doc 22
+         item 2 fallout, but worse than just "dated styling"): this theme
+         only ever defined LIGHT colors in colors.xml (no values-night/
+         colors.xml exists), but left colorSurface, colorSurfaceVariant,
+         colorOnPrimary-ish container colors, etc. unset — so those fell
+         back to Material3's *built-in* day/night defaults, which DO
+         switch with the system setting. On a phone with system dark mode
+         on, that produced a dark colorSurface (used by every
+         MaterialAlertDialogBuilder dialog, MaterialDatePicker, bottom
+         sheet, etc.) combined with colorOnSurface hardcoded to
+         @color/text_primary (near-black) — dark text on a dark surface,
+         i.e. exactly the "title text I can't read" / "whole dialog looks
+         wrong" screenshots. The rest of the app didn't show this because
+         android:windowBackground is set explicitly to a light color that
+         doesn't have a night-mode counterpart, so activities stayed
+         light; only theme-default-driven surfaces (dialogs, date/time
+         pickers, bottom sheets) flipped dark. Forcing the non-DayNight
+         Light parent (plus colorSurface/colorSurfaceVariant explicitly
+         set below and forceDarkAllowed=false) makes every Material
+         component resolve the same light colors this app actually
+         designs for, regardless of the device's system dark-mode
+         setting, instead of silently diverging. -->
+    <style name="Theme.AnydropRestaurant" parent="Theme.Material3.Light.NoActionBar">
         <item name="colorPrimary">@color/anydrop_primary</item>
         <item name="colorPrimaryVariant">@color/anydrop_primary_dark</item>
         <item name="colorOnPrimary">@color/white</item>
+        <item name="colorPrimaryContainer">@color/anydrop_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/anydrop_primary_dark</item>
         <item name="colorSecondary">@color/anydrop_secondary</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorSurfaceVariant">@color/background</item>
         <item name="colorOnSurface">@color/text_primary</item>
         <item name="colorOnSurfaceVariant">@color/text_secondary</item>
         <item name="colorOutline">@color/outline</item>
@@ -14,6 +42,79 @@
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:textColorPrimary">@color/text_primary</item>
         <item name="android:textColorSecondary">@color/text_secondary</item>
+        <!-- Stops Android 10+'s OS-level "force dark" auto-inversion from
+             re-darkening any view this theme didn't already handle —
+             belt-and-suspenders alongside the Light (non-DayNight) parent
+             above, since forceDark works off heuristics per-view and can
+             still kick in on OEM skins that default it on. -->
+        <item name="android:forceDarkAllowed" tools:targetApi="29">false</item>
+        <!-- Every MaterialAlertDialogBuilder / AlertDialog.Builder dialog
+             in the app now resolves through this themed, rounded-card
+             style instead of the plain system dialog chrome (doc 22 item
+             2's ask) — see ThemeOverlay.AnydropRestaurant.AlertDialog
+             below. -->
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.AnydropRestaurant.AlertDialog</item>
+        <item name="alertDialogTheme">@style/ThemeOverlay.AnydropRestaurant.AlertDialog</item>
+        <!-- Brand-colored MaterialDatePicker (CouponManagerActivity's
+             valid_until picker, doc 22 item 5) instead of Material's
+             default blue/dynamic-color calendar. -->
+        <item name="materialCalendarTheme">@style/ThemeOverlay.AnydropRestaurant.DatePicker</item>
+        <item name="materialCalendarStyle">@style/Widget.AnydropRestaurant.CalendarStyle</item>
+        <!-- MaterialTimePicker chains right after the date picker in
+             CouponManagerActivity.setUpValidUntilPicker() — same
+             dark-surface bug would otherwise hit it too. -->
+        <item name="materialTimePickerTheme">@style/ThemeOverlay.AnydropRestaurant.DatePicker</item>
+    </style>
+
+    <!-- Shared rounded-card look for every AlertDialog/MaterialAlertDialog
+         in the app (dialog_add_category, category icon picker,
+         dialog_add_coupon, the "Stop accepting orders?" confirm, etc.) —
+         fixes both the "looks like a plain 2012 system dialog" feedback
+         (doc 22 item 2) and the dark-surface/dark-text contrast bug this
+         theme change resolves above. Explicitly pins colorSurface/
+         colorOnSurface/colorPrimary rather than relying on inheritance,
+         so this dialog theme is correct even if it's ever launched from a
+         context whose own theme resolution differs. -->
+    <style name="ThemeOverlay.AnydropRestaurant.AlertDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+        <item name="colorPrimary">@color/anydrop_primary</item>
+        <item name="colorOutline">@color/outline</item>
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearance.AnydropRestaurant.Dialog</item>
+        <item name="materialAlertDialogTitleTextStyle">@style/TextAppearance.AnydropRestaurant.DialogTitle</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.AnydropRestaurant.Dialog.Button</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Widget.AnydropRestaurant.Dialog.Button</item>
+        <item name="buttonBarNeutralButtonStyle">@style/Widget.AnydropRestaurant.Dialog.Button</item>
+    </style>
+
+    <style name="ShapeAppearance.AnydropRestaurant.Dialog" parent="ShapeAppearance.Material3.MediumComponent">
+        <item name="cornerSize">16dp</item>
+    </style>
+
+    <style name="TextAppearance.AnydropRestaurant.DialogTitle" parent="MaterialAlertDialog.Material3.Title.Text">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="Widget.AnydropRestaurant.Dialog.Button" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/anydrop_primary</item>
+    </style>
+
+    <!-- MaterialDatePicker theming (doc 22 item 5) — brand orange header/
+         selected-day instead of the Material default, and forces the
+         same light colorSurface as the rest of the app so the calendar
+         doesn't go dark-on-dark like the plain AlertDialogs did. -->
+    <style name="ThemeOverlay.AnydropRestaurant.DatePicker" parent="ThemeOverlay.Material3.MaterialCalendar">
+        <item name="colorPrimary">@color/anydrop_primary</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+    </style>
+
+    <style name="Widget.AnydropRestaurant.CalendarStyle" parent="Widget.Material3.MaterialCalendar">
+        <item name="android:windowFullscreen">false</item>
     </style>
 
     <!-- Pill-shaped ON/OFF toggle (doc 22 item 4, app-owner ask

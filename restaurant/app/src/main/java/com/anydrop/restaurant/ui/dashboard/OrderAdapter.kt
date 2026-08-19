@@ -1,7 +1,6 @@
 package com.anydrop.restaurant.ui.dashboard
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
@@ -13,6 +12,7 @@ import android.widget.EditText
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.anydrop.restaurant.R
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.anydrop.restaurant.databinding.ItemOrderCardBinding
 import com.anydrop.restaurant.network.Order
 import com.anydrop.restaurant.ui.common.InAppNotifier
@@ -227,7 +227,7 @@ class OrderAdapter(
                 val padding = (16 * context.resources.displayMetrics.density).toInt()
                 setPadding(padding, padding / 2, padding, padding / 2)
             }
-            AlertDialog.Builder(context)
+            MaterialAlertDialogBuilder(context)
                 .setTitle(R.string.btn_reject)
                 .setView(input)
                 .setPositiveButton(R.string.btn_confirm_reject) { _, _ ->

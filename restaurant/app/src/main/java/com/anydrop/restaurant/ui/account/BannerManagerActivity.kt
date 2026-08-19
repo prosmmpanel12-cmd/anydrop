@@ -14,6 +14,7 @@ import com.anydrop.restaurant.network.Banner
 import com.anydrop.restaurant.network.BannerDeleteBody
 import com.anydrop.restaurant.ui.common.CropActivity
 import com.anydrop.restaurant.ui.common.InAppNotifier
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -124,7 +125,7 @@ class BannerManagerActivity : AppCompatActivity() {
     }
 
     private fun confirmDelete(banner: Banner) {
-        android.app.AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setMessage(R.string.banner_confirm_delete)
             .setPositiveButton(R.string.btn_delete) { _, _ -> deleteBanner(banner) }
             .setNegativeButton(R.string.btn_cancel, null)
