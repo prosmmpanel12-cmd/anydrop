@@ -224,8 +224,8 @@
                             android:id="@+id/switchTempClosed"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            app:thumbTint="@color/anydrop_primary"
-                            app:trackTint="@color/anydrop_primary_container" />
+                            app:thumbTint="@color/white"
+                            app:trackTint="@color/switch_track_color_inverted" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 

@@ -62,12 +62,12 @@ class MainActivity : AppCompatActivity() {
     private var isOpen = true
     private var togglingInFlight = false
 
-    // Phase 4 toggle redesign: statusToggleGroup.check(...) is called
-    // both by us (renderPill, and reverting the segment back to Open if
-    // the close-confirmation dialog is cancelled) and indirectly by the
-    // user tapping a segment. Without this flag, our own programmatic
-    // check() calls would re-fire addOnButtonCheckedListener and loop /
-    // re-show the confirmation dialog.
+    // Toggle-standardization pass: statusSwitch.isChecked is set both
+    // by us (renderPill, and reverting the switch back to "on" if the
+    // close-confirmation dialog is cancelled) and indirectly by the
+    // user tapping the switch. Without this flag, our own programmatic
+    // sets would re-fire setOnCheckedChangeListener and loop / re-show
+    // the confirmation dialog.
     private var suppressToggleListener = false
 
     // "Sound doesn't work once the app is closed" fix — POST_NOTIFICATIONS
@@ -113,9 +113,9 @@ class MainActivity : AppCompatActivity() {
         // as a constructor callback here — fragment constructor args don't
         // survive system-initiated recreation, so this keeps that path safe.
 
-        binding.statusToggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (suppressToggleListener || !isChecked) return@addOnButtonCheckedListener
-            onStatusSegmentTapped(checkedId)
+        binding.statusSwitch.setOnCheckedChangeListener { _, isChecked ->
+            if (suppressToggleListener) return@setOnCheckedChangeListener
+            onStatusSwitchToggled(isChecked)
         }
 
         if (savedInstanceState == null) {
@@ -201,35 +201,32 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun onStatusSegmentTapped(checkedId: Int) {
+    private fun onStatusSwitchToggled(turningOn: Boolean) {
         if (togglingInFlight) return
-        when (checkedId) {
-            R.id.btnStatusClosed -> {
-                if (!isOpen) return // already closed, nothing to confirm
-                // Tap-to-confirm before closing (§4: "tap to confirm before
-                // closing"), same AlertDialog.Builder pattern MenuFragment
-                // uses for its own confirmation dialogs. The toggle group
-                // already shows "Closed" as checked at this point (that's
-                // how we got this callback) — revert it back to "Open" on
-                // cancel/dismiss, since nothing was actually confirmed yet.
-                AlertDialog.Builder(this)
-                    .setTitle(R.string.dialog_close_restaurant_title)
-                    .setMessage(R.string.dialog_close_restaurant_message)
-                    .setPositiveButton(R.string.btn_confirm_close) { _, _ -> setOperationalStatus(false) }
-                    .setNegativeButton(R.string.btn_cancel) { _, _ -> revertToggleSelection() }
-                    .setOnCancelListener { revertToggleSelection() }
-                    .show()
-            }
-            R.id.btnStatusOpen -> {
-                // Re-opening needs no confirmation — only pausing does.
-                if (!isOpen) setOperationalStatus(true)
-            }
+        if (!turningOn) {
+            if (!isOpen) return // already closed, shouldn't get here, guard anyway
+            // Tap-to-confirm before closing (§4: "tap to confirm before
+            // closing"), same AlertDialog.Builder pattern MenuFragment
+            // uses for its own confirmation dialogs. The switch already
+            // shows "off" at this point (that's how we got this
+            // callback) — revert it back to "on" on cancel/dismiss, since
+            // nothing was actually confirmed yet.
+            AlertDialog.Builder(this)
+                .setTitle(R.string.dialog_close_restaurant_title)
+                .setMessage(R.string.dialog_close_restaurant_message)
+                .setPositiveButton(R.string.btn_confirm_close) { _, _ -> setOperationalStatus(false) }
+                .setNegativeButton(R.string.btn_cancel) { _, _ -> revertSwitchSelection() }
+                .setOnCancelListener { revertSwitchSelection() }
+                .show()
+        } else {
+            // Re-opening needs no confirmation — only pausing does.
+            if (!isOpen) setOperationalStatus(true)
         }
     }
 
-    private fun revertToggleSelection() {
+    private fun revertSwitchSelection() {
         suppressToggleListener = true
-        binding.statusToggleGroup.check(if (isOpen) R.id.btnStatusOpen else R.id.btnStatusClosed)
+        binding.statusSwitch.isChecked = isOpen
         suppressToggleListener = false
     }
 
@@ -254,12 +251,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderPill() {
-        // Colors/icons now come from ToggleButton.Pill.StatusOpen/Closed's
-        // state-list drawables (checked vs. unchecked) — just move the
-        // checked segment, no manual drawable/text/color swapping needed.
         suppressToggleListener = true
-        binding.statusToggleGroup.check(if (isOpen) R.id.btnStatusOpen else R.id.btnStatusClosed)
+        binding.statusSwitch.isChecked = isOpen
         suppressToggleListener = false
+        binding.statusLabelText.text = getString(if (isOpen) R.string.restaurant_open_label else R.string.restaurant_closed_label)
+        binding.statusLabelText.setTextColor(
+            ContextCompat.getColor(this, if (isOpen) R.color.veg_green else R.color.nonveg_red)
+        )
     }
 
     private fun goToLogin() {

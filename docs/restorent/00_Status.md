@@ -1,4 +1,173 @@
-## 2026-08-19 (g, newest) — UI/UX overhaul Phase 4 of 6: top-bar OPEN/CLOSED toggle redesign, unverified (this session)
+## 2026-08-19 (i, newest) — 10 dialog illustration PNGs received and colorized, dropped into res/drawable-xxhdpi, not yet wired into any layout
+
+App owner uploaded 11 images sourced from Flaticon (one was a screenshot
+of their own search results, not a usable asset — excluded). The
+remaining 10 covered every filename from this session's earlier
+shopping list, so nothing is still missing.
+
+### ✅ Done
+- **2 were pure black** (`(0,0,0)` solid fill, confirmed by checking
+  distinct-opaque-colors count in Python/Pillow before touching
+  anything, not assumed from a glance) — the gears icon and the cooking
+  pot icon. Recolored by replacing RGB on every pixel while leaving the
+  original alpha channel untouched (keeps anti-aliased edges smooth,
+  just recolored instead of black):
+  - `illus_maintenance.png` (gears) → `#3B82F6`, a neutral info-blue —
+    deliberately *not* the brand orange, since this is a system-status
+    notice, not a branded action; distinct from the app's existing
+    veg_green/nonveg_red/anydrop_primary semantic colors too, so it
+    reads as its own "informational" category at a glance.
+  - `illus_add_menu_item.png` (cooking pot) → `#E64A19`, which **is**
+    `anydrop_primary` — checked `colors.xml` for the actual hex first
+    rather than guessing; this one matches the warm food-illustration
+    tones already present in the other (already-colorful) icons like
+    the burger/storefront ones.
+- **8 were already colorful** — copied straight to their target
+  filenames, no processing needed: `illus_update_available.png`
+  (rocket), `illus_upload_logo.png` (storefront), `illus_upload_banner.png`
+  (salad/food spread), `illus_item_available.png` (burger+fries+drink),
+  `illus_confirm_delete.png` (trash can, flat red), `illus_coupon.png`
+  (percent/discount badge), `illus_success.png` (green checkmark),
+  `illus_logout.png` (logout arrow).
+- All 10 dropped into **`res/drawable-xxhdpi/`** (single density bucket
+  — these are 512×512 source PNGs, not exported at multiple densities,
+  so one bucket rather than guessing scaled-down variants for
+  mdpi/hdpi/xhdpi that don't actually exist).
+
+### 🔴 Not done — none of these are referenced by any layout yet
+Dropping files into `res/drawable-xxhdpi/` doesn't wire them into
+anything by itself. No dialog XML was touched this entry — Phase 5
+(update/maintenance dialogs) and the illustration-swap on the dialogs
+Phase 3 already touched (success, logout, delete-confirm, coupon,
+add-menu-item, logo/banner upload) are both still open. Deliberately
+stopped here rather than guessing layout/sizing/placement for 6+ dialogs
+in the same pass — asked the app owner what's next instead.
+
+### ⏭️ Next
+Confirm with app owner: wire these into the actual dialogs now (Phase 5
++ retrofitting Phase 3's dialogs), or something else first.
+
+Still standing, unchanged: the real-build confirmation (now covering
+Phases 1–4 plus the toggle-standardization pass), and the DB migrations
+(26/27/28) ask.
+
+---
+
+## 2026-08-19 (h) — Toggle standardization: every on/off switch in the app unified to one classic slide-switch style, unverified
+
+App owner reviewed two reference images and asked for **one standard
+toggle style app-wide** (a classic green-ON/red-OFF `SwitchMaterial`
+slide switch, not the segmented pill-button toggle Phase 3/4 and an
+earlier undocumented session had built) — this supersedes Phase 4's
+top-bar toggle redesign from the previous entry, not an addition to it.
+
+### 🔴 Why this reverses part of Phase 4
+Phase 4 (entry g, directly below) converted the top-bar OPEN/CLOSED
+control from a plain clickable pill to a segmented
+`MaterialButtonToggleGroup`, matching the pattern the coupon screen's
+is_active/is_public toggles already used (from an earlier, undocumented
+session per doc 22 item 4). The app owner's reference images made clear
+that segmented-pill pattern itself wasn't the target — a classic
+slide-switch was. Rather than layering a third toggle style on top,
+**every** on/off toggle in the app was standardized to the same
+`SwitchMaterial` + shared color-selector approach this session, Phase 4
+included.
+
+### ✅ Done — one shared color pair, applied everywhere
+- **`res/color/switch_track_color.xml`** (new) — `state_checked=true` →
+  `veg_green`, else → `nonveg_red`. For any switch where checked/ON is
+  the "positive" state.
+- **`res/color/switch_track_color_inverted.xml`** (new) — same two
+  colors, reversed. For the one switch where checked means a *negative*
+  state instead (see below).
+- Removed Phase 4's now-superseded `ToggleButton.Pill.StatusOpen/
+  StatusClosed` styles and their 6 `toggle_open_*`/`toggle_closed_*`
+  color files — confirmed unused (grepped) before deleting, not just
+  left dead like the Phase 3→4 drawables were.
+- **Six switches now share this exact style** (`app:thumbTint="@color/
+  white"`, `app:trackTint="@color/switch_track_color"` or the inverted
+  variant):
+  1. `activity_main.xml` — top-bar status, back to a plain
+     `statusSwitch` + `statusLabelText` (the switch alone has no text of
+     its own). `MainActivity.kt`'s confirm-before-closing /
+     revert-on-cancel logic ported over unchanged in spirit, adapted
+     from `checkedId`-based to a single `isChecked` boolean.
+  2. `item_coupon_manage_row.xml` — `switchActive` replaces
+     `toggleActiveGroup`. `CouponAdapter.kt`'s detach/reattach-listener
+     guard (to stop recycled-row rebinds from firing spurious network
+     calls) ported to `setOnCheckedChangeListener(null)` /
+     re-set, same idea as before against a different widget API.
+  3. `dialog_add_coupon.xml` — `switchPublic` replaces
+     `togglePublicGroup`. `CouponManagerActivity.kt`'s three call sites
+     (create-dialog default, edit-dialog pre-fill, both submit
+     functions' `isPublic` read) updated to `.isChecked`.
+  4. `item_menu_food.xml`'s `switchAvailable` — recolored only (was
+     already a `SwitchMaterial`, just brand-purple
+     `anydrop_primary`/`anydrop_primary_container` before). Matches the
+     app owner's "Item Availability Toggle" reference card directly.
+  5. `dialog_add_menu_item.xml`'s `switchIsVeg` — recolored only.
+     Checked=veg=green, unchecked=non-veg=red — a natural fit, reuses
+     the same `veg_green`/`nonveg_red` tokens this app already uses for
+     veg/non-veg dots elsewhere, no semantic stretch needed.
+  6. `fragment_account.xml`'s `switchTempClosed` — recolored only, using
+     the **inverted** selector. Checked here means "yes, temporarily
+     closed" (`AccountFragment.kt`: `isChecked = profile.operationalStatus
+     == "temp_closed"`) — the negative state — so plain
+     `switch_track_color` would have shown closed as green. Checked
+     carefully against the Kotlin before choosing which selector to
+     apply, not assumed from the layout alone.
+
+### 🟡 Not build-verified (same standing sandbox limitation)
+No Android SDK/network in this sandbox. Ran the furthest manual checks
+available: all 6 edited/new layout+style+color XMLs parsed clean
+(`xml.dom.minidom`); grepped the whole `app/src/main` tree for every old
+widget ID (`toggleActiveGroup`, `btnActiveOn/Off`, `togglePublicGroup`,
+`btnPublicOn/Off`, `statusToggleGroup`, `btnStatusOpen/Closed`) — zero
+hits left anywhere except one stale code *comment* in `MainActivity.kt`
+(not a real reference), which was also updated; every new `@+id`
+(`statusLabelText`, `statusSwitch`, `switchActive`, `switchPublic`)
+cross-checked against every `binding.*`/`dialogBinding.*` reference in
+the three edited Kotlin files, both directions; brace/paren balance
+checked on all three edited `.kt` files (`MainActivity.kt` 36/36 braces
+117→115 parens after the edits — recount matches the new code exactly,
+`CouponAdapter.kt` 21/21 braces 59/59 parens, `CouponManagerActivity.kt`
+75/75 braces 267/267 parens); confirmed `ContextCompat` (still used for
+`checkSelfPermission` and the new `getColor` call) isn't a now-dead
+import. `coupon_toggle_on`/`coupon_toggle_off` strings are now unused
+(harmless — unused string resources don't fail a build, just a lint
+warning) rather than deleted, since nothing else risky depended on
+removing them.
+
+### 🔴 Known gaps, not done this phase
+- **Dialog illustrations** (rocket for update-available, storefront for
+  logo upload, pizza banner, trash can for delete, checkmark storefront
+  for success, door for logout — from the app owner's second reference
+  image) are a **separate, much larger ask**, not started this session.
+  This sandbox has no network access from the bash tool, so illustration
+  assets can't be downloaded and dropped into `res/drawable`/`res/raw`
+  directly the way the rest of this project's assets are added — needs
+  either the app owner sourcing and uploading the actual image files, or
+  a follow-up session with a different asset pipeline. Flagged to the
+  app owner directly in this session's chat reply, with concrete
+  source/license suggestions, rather than silently skipped.
+- Update-check / maintenance-check dialogs themselves (Phase 5, doc 22's
+  queue) — not started, blocked on the illustration-asset question
+  above plus confirming version-check mechanics (endpoint-driven vs.
+  hardcoded) with the app owner.
+- Phase 6 (final consistency pass) — unchanged, not started.
+
+### ⏭️ Next
+Confirm with the app owner: (1) how to get the illustration assets into
+the project given the no-network sandbox limitation, (2) then Phase 5
+(update/maintenance dialogs) once assets are settled, (3) Phase 6 last.
+
+Still standing, unchanged: the real-build confirmation, now covering
+Phases 1–4 plus this toggle-standardization pass all stacked together
+(see NEXT_SESSION_PROMPT.md), and the DB migrations (26/27/28) ask.
+
+---
+
+## 2026-08-19 (g) — UI/UX overhaul Phase 4 of 6: top-bar OPEN/CLOSED toggle redesign, unverified
 
 App owner confirmed continue after Phase 3. **This entry is Phase 4
 only**: the main restaurant OPEN/CLOSED status control in the shared top

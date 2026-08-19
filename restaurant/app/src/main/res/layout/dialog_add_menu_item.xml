@@ -152,8 +152,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checked="true"
-                app:thumbTint="@color/veg_green"
-                app:trackTint="@color/anydrop_primary_container" />
+                app:thumbTint="@color/white"
+                app:trackTint="@color/switch_track_color" />
         </LinearLayout>
 
         <LinearLayout

@@ -37,36 +37,29 @@
             android:maxLines="1"
             android:ellipsize="end" />
 
-        <!-- Phase 4 redesign (was a single clickable dot+text pill,
-             plain LinearLayout, colored only via manually-swapped
-             drawables in code). Now a two-segment pill toggle matching
-             item_coupon_manage_row.xml's is_active toggle language —
-             tap the other segment to switch; MainActivity keeps the
-             tap-to-confirm-before-closing behavior on top of this. -->
-        <com.google.android.material.button.MaterialButtonToggleGroup
-            android:id="@+id/statusToggleGroup"
+        <!-- Toggle-standardization pass (2026-08-19, supersedes Phase 4's
+             MaterialButtonToggleGroup version): app owner asked for one
+             consistent classic slide-switch style everywhere, matching a
+             green-ON/red-OFF reference image, instead of mixing this
+             segmented pill toggle with the several plain SwitchMaterials
+             already elsewhere in the app. Label text carries the
+             OPEN/CLOSED wording (a bare switch has no text of its own);
+             switch_track_color.xml drives the green/red per checked
+             state, shared with every other on/off switch in the app now. -->
+        <TextView
+            android:id="@+id/statusLabelText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            app:singleSelection="true"
-            app:selectionRequired="true">
+            android:layout_marginEnd="8dp"
+            android:textStyle="bold"
+            android:textSize="13sp" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnStatusOpen"
-                style="@style/ToggleButton.Pill.StatusOpen"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/restaurant_open_label"
-                app:icon="@drawable/ic_check_circle" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnStatusClosed"
-                style="@style/ToggleButton.Pill.StatusClosed"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/restaurant_closed_label"
-                app:icon="@drawable/ic_error" />
-
-        </com.google.android.material.button.MaterialButtonToggleGroup>
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/statusSwitch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:thumbTint="@color/white"
+            app:trackTint="@color/switch_track_color" />
     </LinearLayout>
 
     <androidx.fragment.app.FragmentContainerView

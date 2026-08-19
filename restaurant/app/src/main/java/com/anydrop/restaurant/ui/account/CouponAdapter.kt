@@ -13,14 +13,14 @@ import java.util.Locale
  * Same shape as BannerAdapter — plain submitList, no diffing (this
  * screen's list is small and rarely churns mid-session).
  *
- * The toggle group's `addOnButtonCheckedListener` is detached/reattached
- * around `bind()`'s programmatic `check()` call — same guard pattern
- * AccountFragment's `switchTempClosed` (formerly a SwitchMaterial, same
- * idea) already uses — so binding a recycled row never fires a spurious
- * network call for a state the user didn't actually change. (doc 22
- * item 4 replaced the old SwitchMaterial with this pill
- * MaterialButtonToggleGroup — same guard-listener reasoning still
- * applies, just against a different widget's listener API.)
+ * The switch's `setOnCheckedChangeListener` is detached/reattached
+ * around `bind()`'s programmatic `isChecked` set — same guard pattern
+ * AccountFragment's `switchTempClosed` already uses — so binding a
+ * recycled row never fires a spurious network call for a state the
+ * user didn't actually change. (2026-08-19 toggle-standardization pass:
+ * back to a plain SwitchMaterial, matching the app-wide green/red
+ * switch style — doc 22 item 4's pill MaterialButtonToggleGroup was an
+ * intermediate step, not the final direction.)
  *
  * `onEditClick` (coupon-system follow-up session) opens the edit-terms
  * dialog — tapping `couponInfoColumn` (code/discount/meta text), kept
@@ -99,11 +99,10 @@ class CouponAdapter(
                 binding.archivedGroup.visibility = android.view.View.GONE
                 binding.root.alpha = 1.0f
 
-                binding.toggleActiveGroup.clearOnButtonCheckedListeners()
-                binding.toggleActiveGroup.check(if (coupon.isActive) binding.btnActiveOn.id else binding.btnActiveOff.id)
-                binding.toggleActiveGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
-                    if (!isChecked) return@addOnButtonCheckedListener
-                    onToggleActive(coupon, checkedId == binding.btnActiveOn.id)
+                binding.switchActive.setOnCheckedChangeListener(null)
+                binding.switchActive.isChecked = coupon.isActive
+                binding.switchActive.setOnCheckedChangeListener { _, isChecked ->
+                    onToggleActive(coupon, isChecked)
                 }
 
                 binding.btnArchive.setOnClickListener { onArchiveClick(coupon) }

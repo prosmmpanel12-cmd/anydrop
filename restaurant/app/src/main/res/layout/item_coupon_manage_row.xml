@@ -61,12 +61,12 @@
 
         </LinearLayout>
 
-        <!-- Active state: pill ON/OFF toggle (doc 22 item 4) + a separate
-             archive icon button (doc 22 follow-up: "also add off on
-             delete and other possible option" — archive sits alongside
-             the toggle, not instead of it). Archived state swaps this
-             whole column for archivedGroup below instead — an archived
-             coupon has nothing left to toggle. -->
+        <!-- Toggle-standardization pass (2026-08-19, supersedes doc 22
+             item 4's pill toggle): plain SwitchMaterial now, same
+             switch_track_color.xml green/red style as every other on/off
+             switch in the app (statusSwitch, switchAvailable, etc.)
+             instead of a bespoke MaterialButtonToggleGroup just for this
+             row. Archive icon button unchanged. -->
         <LinearLayout
             android:id="@+id/activeControlsGroup"
             android:layout_width="wrap_content"
@@ -74,28 +74,12 @@
             android:orientation="vertical"
             android:gravity="center">
 
-            <com.google.android.material.button.MaterialButtonToggleGroup
-                android:id="@+id/toggleActiveGroup"
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchActive"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                app:singleSelection="true"
-                app:selectionRequired="true">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnActiveOn"
-                    style="@style/ToggleButton.Pill"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/coupon_toggle_on" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnActiveOff"
-                    style="@style/ToggleButton.Pill"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/coupon_toggle_off" />
-
-            </com.google.android.material.button.MaterialButtonToggleGroup>
+                app:thumbTint="@color/white"
+                app:trackTint="@color/switch_track_color" />
 
             <TextView
                 android:layout_width="wrap_content"

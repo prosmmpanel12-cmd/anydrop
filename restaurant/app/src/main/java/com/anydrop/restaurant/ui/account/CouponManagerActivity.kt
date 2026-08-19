@@ -182,7 +182,7 @@ class CouponManagerActivity : AppCompatActivity() {
         val dialogBinding = DialogAddCouponBinding.inflate(layoutInflater)
         setUpDiscountTypeToggle(dialogBinding)
         setUpValidUntilPicker(dialogBinding)
-        dialogBinding.togglePublicGroup.check(dialogBinding.btnPublicOff.id) // is_public defaults to false, same as server
+        dialogBinding.switchPublic.isChecked = false // is_public defaults to false, same as server
         dialogBinding.couponDialogTitle.text = getString(R.string.coupon_add_title)
 
         // doc 22 item 2 follow-up — bottom sheet, not a centered
@@ -248,9 +248,7 @@ class CouponManagerActivity : AppCompatActivity() {
         // is_public — doc 22 item 3 follow-up: editable here too, not
         // just at creation time. Pre-filled from the coupon's current
         // value like every other field in edit mode.
-        dialogBinding.togglePublicGroup.check(
-            if (coupon.isPublic) dialogBinding.btnPublicOn.id else dialogBinding.btnPublicOff.id
-        )
+        dialogBinding.switchPublic.isChecked = coupon.isPublic
         dialogBinding.couponDialogTitle.text = getString(R.string.coupon_edit_title)
 
         val editDialog = BottomSheetDialog(this)
@@ -378,7 +376,7 @@ class CouponManagerActivity : AppCompatActivity() {
         val validUntil = dialogBinding.inputValidUntil.tag as? String
         val usageLimitTotal = dialogBinding.inputUsageLimitTotal.text?.toString()?.trim()?.toIntOrNull()
         val usageLimitPerUser = dialogBinding.inputUsageLimitPerUser.text?.toString()?.trim()?.toIntOrNull()
-        val isPublic = dialogBinding.togglePublicGroup.checkedButtonId == dialogBinding.btnPublicOn.id
+        val isPublic = dialogBinding.switchPublic.isChecked
 
         if (code.isEmpty() || discountValue == null || discountValue <= 0) {
             InAppNotifier.show(this, getString(R.string.coupon_create_failed), InAppNotifier.Type.ERROR)
@@ -443,7 +441,7 @@ class CouponManagerActivity : AppCompatActivity() {
         val validUntil = dialogBinding.inputValidUntil.tag as? String
         val usageLimitTotal = dialogBinding.inputUsageLimitTotal.text?.toString()?.trim()?.toIntOrNull()
         val usageLimitPerUser = dialogBinding.inputUsageLimitPerUser.text?.toString()?.trim()?.toIntOrNull()
-        val isPublic = dialogBinding.togglePublicGroup.checkedButtonId == dialogBinding.btnPublicOn.id
+        val isPublic = dialogBinding.switchPublic.isChecked
 
         lifecycleScope.launch {
             try {

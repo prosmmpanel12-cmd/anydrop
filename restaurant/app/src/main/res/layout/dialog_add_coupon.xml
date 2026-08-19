@@ -239,29 +239,13 @@
 
             </LinearLayout>
 
-            <com.google.android.material.button.MaterialButtonToggleGroup
-                android:id="@+id/togglePublicGroup"
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchPublic"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="10dp"
-                app:singleSelection="true"
-                app:selectionRequired="true">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnPublicOn"
-                    style="@style/ToggleButton.Pill"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/coupon_toggle_on" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnPublicOff"
-                    style="@style/ToggleButton.Pill"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/coupon_toggle_off" />
-
-            </com.google.android.material.button.MaterialButtonToggleGroup>
+                app:thumbTint="@color/white"
+                app:trackTint="@color/switch_track_color" />
 
         </LinearLayout>
 
