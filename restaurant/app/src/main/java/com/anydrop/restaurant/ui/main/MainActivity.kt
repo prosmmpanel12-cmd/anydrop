@@ -1,7 +1,6 @@
 package com.anydrop.restaurant.ui.main
 
 import android.Manifest
-import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -18,6 +17,7 @@ import com.anydrop.restaurant.network.ApiClient
 import com.anydrop.restaurant.network.OperationalStatusUpdateBody
 import com.anydrop.restaurant.service.OrderNotificationHelper
 import com.anydrop.restaurant.service.OrderPollingService
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.anydrop.restaurant.ui.account.AccountFragment
 import com.anydrop.restaurant.ui.common.InAppNotifier
 import com.anydrop.restaurant.ui.insights.InsightsFragment
@@ -150,7 +150,7 @@ class MainActivity : AppCompatActivity() {
      * Android 14, where the manifest permission alone is sufficient. */
     private fun promptFullScreenIntentIfNeeded() {
         if (OrderNotificationHelper.hasFullScreenIntentPermission(this)) return
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle("Turn on full-screen order alerts")
             .setMessage(
                 "So a new order rings and vibrates until you open it — even " +
@@ -211,7 +211,7 @@ class MainActivity : AppCompatActivity() {
             // shows "off" at this point (that's how we got this
             // callback) — revert it back to "on" on cancel/dismiss, since
             // nothing was actually confirmed yet.
-            AlertDialog.Builder(this)
+            MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.dialog_close_restaurant_title)
                 .setMessage(R.string.dialog_close_restaurant_message)
                 .setPositiveButton(R.string.btn_confirm_close) { _, _ -> setOperationalStatus(false) }

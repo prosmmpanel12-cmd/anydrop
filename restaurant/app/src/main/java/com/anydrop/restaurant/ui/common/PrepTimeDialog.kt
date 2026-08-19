@@ -1,8 +1,8 @@
 package com.anydrop.restaurant.ui.common
 
-import android.app.AlertDialog
 import android.content.Context
 import com.anydrop.restaurant.R
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 /**
  * Order Management small addition — "🟢 Preparation-time select (10/15/20/30
@@ -41,7 +41,7 @@ object PrepTimeDialog {
             .map { context.getString(R.string.prep_time_option_format, it) }
             .toTypedArray()
 
-        AlertDialog.Builder(context)
+        MaterialAlertDialogBuilder(context)
             .setTitle(R.string.prep_time_dialog_title)
             .setItems(labels) { _, which -> onConfirm(OPTIONS_MINUTES[which]) }
             .setNegativeButton(R.string.btn_cancel, null)

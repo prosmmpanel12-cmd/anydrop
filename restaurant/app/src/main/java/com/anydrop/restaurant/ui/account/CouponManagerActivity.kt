@@ -63,11 +63,6 @@ import java.util.TimeZone
  */
 class CouponManagerActivity : AppCompatActivity() {
 
-    companion object {
-        private const val TAG_VALID_UNTIL_DATE_PICKER = "valid_until_date_picker"
-        private const val TAG_VALID_UNTIL_TIME_PICKER = "valid_until_time_picker"
-    }
-
     private lateinit var binding: ActivityCouponManagerBinding
     private val api by lazy { ApiClient.create(this) }
     private lateinit var adapter: CouponAdapter
@@ -314,22 +309,18 @@ class CouponManagerActivity : AppCompatActivity() {
         dialogBinding.validUntilLayout.isEndIconVisible = dialogBinding.inputValidUntil.tag != null
 
         dialogBinding.inputValidUntil.setOnClickListener {
-            // Guard: FragmentManager can't perform transactions once the
-            // Activity's state has already been saved (e.g. user backgrounds
-            // the app or rotates right as this is tapped) — attempting
-            // show() anyway throws IllegalStateException and crashes this
-            // screen. Silently no-op rather than crash; the user can just
-            // tap again once the Activity is back in a valid state.
-            if (supportFragmentManager.isStateSaved) return@setOnClickListener
-
-            // Guard: re-tapping the field before a previous picker instance
-            // for this dialog has been cleaned up throws
-            // "Fragment already added" on show() (same fixed tag reused
-            // every tap). Remove any leftover instance first so this can
-            // never collide.
-            (supportFragmentManager.findFragmentByTag(TAG_VALID_UNTIL_DATE_PICKER) as? androidx.fragment.app.DialogFragment)
-                ?.dismissAllowingStateLoss()
-
+            // Guard against a double-tap opening two overlapping
+            // MaterialDatePicker instances with the same fragment tag —
+            // that raced FragmentManager transaction is the most likely
+            // cause of the reported "picks a date, then crashes" report:
+            // tapping the field again before the first picker's `show()`
+            // transaction has actually committed throws
+            // `IllegalStateException: Fragment already added` the moment
+            // the second one also tries to commit. supportFragmentManager
+            // still having the previous picker attached is the tell.
+            if (supportFragmentManager.findFragmentByTag("valid_until_date_picker") != null) {
+                return@setOnClickListener
+            }
             val datePicker = MaterialDatePicker.Builder.datePicker()
                 .setTitleText(getString(R.string.coupon_hint_valid_until))
                 .build()
@@ -343,30 +334,34 @@ class CouponManagerActivity : AppCompatActivity() {
                     .setMinute(59)
                     .build()
                 timePicker.addOnPositiveButtonClickListener {
-                    // Guard: dialogBinding's views are gone if the sheet was
-                    // dismissed while the date→time picker chain was still
-                    // open (e.g. user backed out mid-pick) — writing into a
-                    // detached view here would crash.
-                    if (dialogBinding.root.isAttachedToWindow) {
-                        val local = Calendar.getInstance()
-                        local.set(
-                            utcCal.get(Calendar.YEAR),
-                            utcCal.get(Calendar.MONTH),
-                            utcCal.get(Calendar.DAY_OF_MONTH),
-                            timePicker.hour,
-                            timePicker.minute,
-                            0
-                        )
-                        applyValidUntilValue(dialogBinding, validUntilWireFormat.format(local.time))
+                    val local = Calendar.getInstance()
+                    local.set(
+                        utcCal.get(Calendar.YEAR),
+                        utcCal.get(Calendar.MONTH),
+                        utcCal.get(Calendar.DAY_OF_MONTH),
+                        timePicker.hour,
+                        timePicker.minute,
+                        0
+                    )
+                    applyValidUntilValue(dialogBinding, validUntilWireFormat.format(local.time))
+                }
+                // Posted rather than shown synchronously here — MaterialDatePicker's
+                // positive-button listener fires *while its own dismiss transaction
+                // is still committing* (it calls the listener, then dismiss()).
+                // Calling timePicker.show(supportFragmentManager, ...) synchronously
+                // in that window can throw
+                // "IllegalStateException: FragmentManager is already executing
+                // transactions" — a known MaterialDatePicker→MaterialTimePicker
+                // chaining pitfall, and the leading suspect for the reported
+                // crash-after-picking-a-date. Posting to the next main-thread
+                // frame lets the date picker's own transaction finish first.
+                dialogBinding.root.post {
+                    if (!isFinishing && !isDestroyed) {
+                        timePicker.show(supportFragmentManager, "valid_until_time_picker")
                     }
                 }
-                if (!supportFragmentManager.isStateSaved) {
-                    (supportFragmentManager.findFragmentByTag(TAG_VALID_UNTIL_TIME_PICKER) as? androidx.fragment.app.DialogFragment)
-                        ?.dismissAllowingStateLoss()
-                    timePicker.show(supportFragmentManager, TAG_VALID_UNTIL_TIME_PICKER)
-                }
             }
-            datePicker.show(supportFragmentManager, TAG_VALID_UNTIL_DATE_PICKER)
+            datePicker.show(supportFragmentManager, "valid_until_date_picker")
         }
     }
 

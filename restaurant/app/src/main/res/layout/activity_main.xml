@@ -56,9 +56,9 @@
 
         <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/statusSwitch"
-            style="@style/ToggleSwitch.Filled"
-            android:layout_width="52dp"
-            android:layout_height="28dp" />
+            style="@style/Widget.AnydropRestaurant.Switch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
     </LinearLayout>
 
     <androidx.fragment.app.FragmentContainerView

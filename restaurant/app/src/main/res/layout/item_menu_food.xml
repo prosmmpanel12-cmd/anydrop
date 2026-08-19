@@ -47,9 +47,9 @@
 
     <com.google.android.material.switchmaterial.SwitchMaterial
         android:id="@+id/switchAvailable"
-        style="@style/ToggleSwitch.Filled"
-        android:layout_width="52dp"
-        android:layout_height="28dp" />
+        style="@style/Widget.AnydropRestaurant.Switch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
 
     <!-- Phase 2 (UI/UX overhaul, 2026-08-19): "✏️"/"🗑️" emoji-text buttons
          replaced with real ic_edit/ic_delete ImageViews. MenuItemAdapter.kt
