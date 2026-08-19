@@ -276,6 +276,17 @@
     <string name="category_icon_ice_cream">Ice Cream</string>
     <string name="category_icon_beverages">Beverages</string>
     <string name="category_icon_salads">Salads</string>
+
+    <!-- Live icon/photo search tabs (Phase 1, 2026-08-19 UI/UX overhaul —
+         the "search more" option 2 doc 22 item 1 deferred at the time) -->
+    <string name="icon_picker_tab_bundled">Bundled</string>
+    <string name="icon_picker_tab_icons">Icons</string>
+    <string name="icon_picker_tab_photos">Photos</string>
+    <string name="icon_picker_search_hint">Search e.g. pizza, biryani, coffee</string>
+    <string name="icon_picker_search_prompt">Type to search online</string>
+    <string name="icon_picker_search_no_results">No results — try another word</string>
+    <string name="icon_picker_search_failed">Search failed — check your connection and try again</string>
+    <string name="icon_picker_applying_result">Adding your pick…</string>
     <string name="menu_save_failed">Couldn\'t save — check the details and try again</string>
     <string name="menu_load_failed">Couldn\'t load menu — pull to refresh</string>
     <string name="menu_item_saved">Item saved</string>

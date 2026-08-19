@@ -69,6 +69,14 @@ dependencies {
     // UI plan. Same version the Customer app already uses.
     implementation 'io.coil-kt:coil:2.6.0'
 
+    // SVG decoding for the category-icon live-search grid (Phase 1,
+    // 2026-08-19 UI/UX overhaul) — Iconify search results are served as
+    // .svg, this lets Coil preview them directly and lets
+    // CategoryIconSearchAdapter rasterize a picked one to a local PNG via
+    // the same ImageLoader. Same major version as the base coil artifact
+    // above, per coil-svg's own compatibility table.
+    implementation 'io.coil-kt:coil-svg:2.6.0'
+
     // Location picker for Edit Profile (app-owner real-device feedback,
     // 2026-08-16, docs/restorent/00_Status.md item 3) — reuses the Customer
     // app's H6 pin-drop pattern/dependency, same version.

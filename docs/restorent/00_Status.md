@@ -1,4 +1,102 @@
-## 2026-08-19 (c, newest) — FIRST REAL GRADLE BUILD RESULT for the Restaurant app: BUILD FAILED, 2 missing imports, now fixed (from GitHub Actions logs, uploaded by app owner)
+## 2026-08-19 (d, newest) — UI/UX overhaul Phase 1 of 6: category icon/photo LIVE SEARCH, unverified (this session)
+
+App owner kicked off a 6-phase UI/UX overhaul (dialogs, nav icons, live
+category icon/photo search, on/off toggle redesign, update/maintenance
+check for both apps, final consistency pass) — asked to be done one
+phase at a time with confirmation before continuing. **This entry is
+Phase 1 only.** Built on top of the 2026-08-19(c) import fix directly
+below — **that fix is still not build-verified**, so this phase's new
+code is stacked on top of an already-unconfirmed base. Flagging this
+explicitly rather than assuming (c)'s fix landed clean.
+
+### ✅ Done — category icon picker: Bundled / Icons / Photos tabs
+The picker dialog (`dialog_category_icon_picker.xml`, opened from
+`MenuFragment.showCategoryIconPickerDialog()`) is now a 3-tab
+`MaterialButtonToggleGroup` (reuses the existing `ToggleButton.Pill`
+style from the coupon screen, per app owner's "UI matching, better than
+this" reference image) instead of a single bundled-icon grid:
+
+1. **Bundled** — unchanged, `CategoryIconPickerAdapter` /
+   `CategoryIcons.ALL`, zero network.
+2. **Icons** — live search against **Iconify**
+   (`api.iconify.design/search`), free, no API key, huge multi-collection
+   icon set. New `CategoryIconSearchAdapter` renders each SVG result via
+   Coil + the new `coil-svg` decoder (added to `app/build.gradle`).
+3. **Photos** — live search against **Openverse**
+   (`api.openverse.org/v1/images`), free/openly-licensed photo search, no
+   API key. New `CategoryPhotoSearchAdapter`.
+
+Both search tabs are 400ms-debounced (reused `MenuFragment`'s existing
+`searchHandler`/`SEARCH_DEBOUNCE_MS` pattern from the menu-item search
+bar, scoped to a local runnable so it can't collide with that other
+search) and show a centered `ProgressBar` while loading / an empty-state
+message when idle, empty, or failed.
+
+**Picking any result, from any tab, converges on the same staged-Uri
+path a gallery photo pick already uses** — a search result (icon SVG or
+photo) is downloaded via the shared Coil `ImageLoader`
+(`downloadRemoteImageToLocalFile()`, new), written to a local cache PNG/
+JPG, and set as `pickedCategoryPhotoUri` — the *existing*
+`saveCategory()`/`uploadCategoryPhoto()` upload-on-Save flow needed zero
+changes. A searched result is never added to the bundled `CategoryIcons`
+set — it becomes an ordinary category photo (`image_url`), same as a
+gallery pick; `CategoryIcons.kt`'s kdoc updated to reflect this. New
+`network/external/` package (`ExternalApiClient.kt`, `ExternalModels.kt`)
+holds the two search APIs' Retrofit interfaces — **deliberately a
+separate Retrofit instance from `ApiClient.kt`**, so these public
+third-party calls never pick up the AnyDrop backend's auth bearer-token
+interceptor.
+
+### 🟡 Not build-verified (same standing sandbox limitation)
+No Android SDK/network in this sandbox, same as every session. Ran the
+furthest manual checks available: brace/paren balance on all 4 new/
+edited Kotlin files (`MenuFragment.kt` 199/199 braces, 547/547 parens;
+all 4 new files individually balanced too), XML well-formedness on all 3
+new/edited layouts, no duplicate `android:id`s, and — specifically
+because this is the exact bug class that broke the 2026-08-19(a)/(b)
+build — cross-checked **every** `pickerBinding.*`/`binding.*` reference
+in the new Kotlin against the actual `android:id`s in its layout, and
+every `*Binding` class name against its source layout's filename
+(`dialog_category_icon_picker.xml` → `DialogCategoryIconPickerBinding`,
+`item_category_icon_search_option.xml` →
+`ItemCategoryIconSearchOptionBinding`, `item_category_photo_search_
+option.xml` → `ItemCategoryPhotoSearchOptionBinding`) — all match, all
+imported where used. This is real signal but **still not a compiler** —
+specifically unverified: the `coil-svg` dependency actually resolving,
+`SvgDecoder` actually producing a `BitmapDrawable` (vs. some other
+`Drawable` subtype) for every Iconify result, and the
+`ImageRequest`/`SuccessResult`/`Coil.imageLoader` API usage in general
+(never used anywhere in this project before this session).
+
+### 🔴 Known product-level caveats, not bugs
+- Openverse/Iconify are both public rate-limited APIs with no key
+  configured — fine for normal restaurant-owner usage (occasional
+  searches while setting up categories), but no retry/backoff beyond the
+  8s OkHttp timeout in `ExternalApiClient.kt` if either service is slow
+  or down. A failed search shows `icon_picker_search_failed` and the tab
+  stays usable (can retry the same query or fall back to Bundled).
+- Rasterizing every picked SVG to a flat 1x-scale PNG (via
+  `Bitmap.CompressFormat.PNG` at whatever resolution the SVG decoder
+  produced) means a picked icon's actual on-disk resolution isn't
+  explicitly controlled — likely fine (Iconify SVGs decode at a
+  reasonable default size) but worth eyeballing a few picked icons at
+  real category-list thumbnail size once a device is available.
+
+### ⏭️ Next
+App owner asked to confirm before continuing. Waiting on that. If
+continuing: **Phase 2 — Restaurant app navigation icon overhaul**
+(bottom nav + top bar, remove any emoji use, consistent professional
+icon set). Phases 3–6 per the plan already shared with the app owner
+(dialogs UI pass, on/off toggle redesign, update+maintenance check for
+both apps, final consistency pass) — unchanged, not started.
+
+Still standing, unchanged from every session above: the real-build
+confirmation for (c)'s import fix, and the DB migrations
+(26/27/28) ask.
+
+---
+
+## 2026-08-19 (c) — FIRST REAL GRADLE BUILD RESULT for the Restaurant app: BUILD FAILED, 2 missing imports, now fixed (from GitHub Actions logs, uploaded by app owner)
 
 **This is the first real compiler feedback the Restaurant app has ever
 had** — 21+ sessions of manual-inspection-only ended here. App owner

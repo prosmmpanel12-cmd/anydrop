@@ -32,6 +32,7 @@ import com.anydrop.restaurant.network.MenuCategory
 import com.anydrop.restaurant.network.MenuItem
 import com.anydrop.restaurant.network.MenuItemCreateBody
 import com.anydrop.restaurant.network.MenuItemUpdateBody
+import com.anydrop.restaurant.network.external.ExternalApiClient
 import com.anydrop.restaurant.ui.common.InAppNotifier
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -165,17 +166,7 @@ class MenuFragment : Fragment() {
                 val croppedUri = CropActivity.getResultUri(result.data) ?: return@registerForActivityResult
                 pickedCategoryPhotoUri = croppedUri
                 pickedCategoryIconKey = null // mutually exclusive — a real photo replaces any bundled icon pick
-                currentCategoryDialogBinding?.let { b ->
-                    b.categoryPhotoPreview.imageTintList = null
-                    b.categoryPhotoPreview.setPadding(0, 0, 0, 0)
-                    b.categoryPhotoPreview.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
-                    b.categoryPhotoPreview.load(croppedUri) {
-                        placeholder(R.drawable.ic_food_placeholder)
-                        error(R.drawable.ic_food_placeholder)
-                        crossfade(true)
-                    }
-                    b.categoryPhotoLabel.text = getString(R.string.btn_change_photo)
-                }
+                currentCategoryDialogBinding?.let { b -> applyCategoryPhotoPreview(b, croppedUri) }
             }
         }
 
@@ -494,29 +485,254 @@ class MenuFragment : Fragment() {
             .show()
     }
 
-    /** doc 22 item 1 — opens the bundled-icon grid; picking one clears any
-     * staged photo and updates the shared preview slot immediately. */
+    /** doc 22 item 1 + Phase 1 of the 2026-08-19 UI/UX overhaul — opens a
+     * 3-tab picker (Bundled / Icons / Photos, the latter two backed by
+     * live search against Iconify/Openverse). Picking any result in any
+     * tab clears the other of icon-key/staged-photo, updates the shared
+     * preview slot in [dialogBinding], and dismisses this dialog — same
+     * end state as before, just three ways to reach it now instead of
+     * one. See [downloadRemoteImageToLocalFile] for how a search result
+     * (a remote URL) becomes the same kind of local staged Uri a gallery
+     * pick already produces. */
     private fun showCategoryIconPickerDialog(dialogBinding: DialogAddCategoryBinding) {
         val pickerBinding = DialogCategoryIconPickerBinding.inflate(layoutInflater)
-        pickerBinding.categoryIconGrid.layoutManager = GridLayoutManager(requireContext(), 4)
+        val gridLayoutManager4 = GridLayoutManager(requireContext(), 4)
+        val gridLayoutManager3 = GridLayoutManager(requireContext(), 3)
+        pickerBinding.categoryIconGrid.layoutManager = gridLayoutManager4
 
         lateinit var pickerDialog: androidx.appcompat.app.AlertDialog
-        pickerBinding.categoryIconGrid.adapter = CategoryIconPickerAdapter(
-            requireContext(),
-            pickedCategoryIconKey
-        ) { option ->
+        var pendingIconSearchRunnable: Runnable? = null
+
+        fun setBusy(busy: Boolean) {
+            pickerBinding.searchProgress.visibility = if (busy) View.VISIBLE else View.GONE
+        }
+
+        fun setEmptyState(text: String?) {
+            pickerBinding.searchEmptyState.visibility = if (text != null) View.VISIBLE else View.GONE
+            pickerBinding.searchEmptyState.text = text ?: ""
+        }
+
+        val bundledAdapter = CategoryIconPickerAdapter(requireContext(), pickedCategoryIconKey) { option ->
             pickedCategoryIconKey = option.key
             pickedCategoryPhotoUri = null // mutually exclusive — an icon pick replaces any staged photo
             applyCategoryIconPreview(dialogBinding, option.key)
             pickerDialog.dismiss()
         }
+        val iconSearchAdapter = CategoryIconSearchAdapter { result ->
+            onIconSearchResultPicked(dialogBinding, pickerBinding, result) { pickerDialog.dismiss() }
+        }
+        val photoSearchAdapter = CategoryPhotoSearchAdapter { image ->
+            onPhotoSearchResultPicked(dialogBinding, pickerBinding, image) { pickerDialog.dismiss() }
+        }
+
+        fun runIconSearch(query: String) {
+            if (query.isBlank()) {
+                iconSearchAdapter.submit(emptyList())
+                setBusy(false)
+                setEmptyState(getString(R.string.icon_picker_search_prompt))
+                return
+            }
+            setBusy(true)
+            setEmptyState(null)
+            viewLifecycleOwner.lifecycleScope.launch {
+                try {
+                    val response = ExternalApiClient.iconify.search(query)
+                    val ids = response.body()?.icons.orEmpty()
+                    iconSearchAdapter.submit(ids.map { com.anydrop.restaurant.network.external.IconifyResult(it) })
+                    setBusy(false)
+                    setEmptyState(if (ids.isEmpty()) getString(R.string.icon_picker_search_no_results) else null)
+                } catch (e: Exception) {
+                    setBusy(false)
+                    setEmptyState(getString(R.string.icon_picker_search_failed))
+                }
+            }
+        }
+
+        fun runPhotoSearch(query: String) {
+            if (query.isBlank()) {
+                photoSearchAdapter.submit(emptyList())
+                setBusy(false)
+                setEmptyState(getString(R.string.icon_picker_search_prompt))
+                return
+            }
+            setBusy(true)
+            setEmptyState(null)
+            viewLifecycleOwner.lifecycleScope.launch {
+                try {
+                    val response = ExternalApiClient.openverse.search(query)
+                    val results = response.body()?.results.orEmpty()
+                    photoSearchAdapter.submit(results)
+                    setBusy(false)
+                    setEmptyState(if (results.isEmpty()) getString(R.string.icon_picker_search_no_results) else null)
+                } catch (e: Exception) {
+                    setBusy(false)
+                    setEmptyState(getString(R.string.icon_picker_search_failed))
+                }
+            }
+        }
+
+        fun selectTab(tab: IconPickerTab) {
+            pendingIconSearchRunnable?.let { searchHandler.removeCallbacks(it) }
+            pickerBinding.iconSearchInput.text?.clear()
+            when (tab) {
+                IconPickerTab.BUNDLED -> {
+                    pickerBinding.searchInputLayout.visibility = View.GONE
+                    pickerBinding.categoryIconGrid.layoutManager = gridLayoutManager4
+                    pickerBinding.categoryIconGrid.adapter = bundledAdapter
+                    setBusy(false)
+                    setEmptyState(null)
+                }
+                IconPickerTab.ICONS -> {
+                    pickerBinding.searchInputLayout.visibility = View.VISIBLE
+                    pickerBinding.categoryIconGrid.layoutManager = gridLayoutManager4
+                    pickerBinding.categoryIconGrid.adapter = iconSearchAdapter
+                    iconSearchAdapter.submit(emptyList())
+                    setEmptyState(getString(R.string.icon_picker_search_prompt))
+                }
+                IconPickerTab.PHOTOS -> {
+                    pickerBinding.searchInputLayout.visibility = View.VISIBLE
+                    pickerBinding.categoryIconGrid.layoutManager = gridLayoutManager3
+                    pickerBinding.categoryIconGrid.adapter = photoSearchAdapter
+                    photoSearchAdapter.submit(emptyList())
+                    setEmptyState(getString(R.string.icon_picker_search_prompt))
+                }
+            }
+        }
+
+        pickerBinding.iconPickerTabGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            selectTab(
+                when (checkedId) {
+                    pickerBinding.tabIcons.id -> IconPickerTab.ICONS
+                    pickerBinding.tabPhotos.id -> IconPickerTab.PHOTOS
+                    else -> IconPickerTab.BUNDLED
+                }
+            )
+        }
+
+        pickerBinding.iconSearchInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                pendingIconSearchRunnable?.let { searchHandler.removeCallbacks(it) }
+                val query = s?.toString()?.trim().orEmpty()
+                val isPhotosTab = pickerBinding.categoryIconGrid.adapter === photoSearchAdapter
+                val runnable = Runnable { if (isPhotosTab) runPhotoSearch(query) else runIconSearch(query) }
+                pendingIconSearchRunnable = runnable
+                searchHandler.postDelayed(runnable, SEARCH_DEBOUNCE_MS)
+            }
+        })
+
+        selectTab(IconPickerTab.BUNDLED)
 
         pickerDialog = MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.category_icon_picker_title)
             .setView(pickerBinding.root)
             .setNegativeButton(R.string.btn_cancel, null)
+            .setOnDismissListener {
+                pendingIconSearchRunnable?.let { searchHandler.removeCallbacks(it) }
+            }
             .create()
         pickerDialog.show()
+    }
+
+    private enum class IconPickerTab { BUNDLED, ICONS, PHOTOS }
+
+    /** A picked Iconify search result — download+rasterize its SVG to a
+     * local PNG (via Coil's own SvgDecoder, so no extra SVG-rendering
+     * dependency is needed beyond the coil-svg artifact already added for
+     * the grid's own thumbnails) and stage it exactly like a gallery
+     * photo pick. [onDone] dismisses the picker dialog once staging
+     * finishes (success or failure — a failed download shouldn't leave
+     * the picker stuck open with no feedback). */
+    private fun onIconSearchResultPicked(
+        dialogBinding: DialogAddCategoryBinding,
+        pickerBinding: com.anydrop.restaurant.databinding.DialogCategoryIconPickerBinding,
+        result: com.anydrop.restaurant.network.external.IconifyResult,
+        onDone: () -> Unit
+    ) {
+        pickerBinding.searchProgress.visibility = View.VISIBLE
+        viewLifecycleOwner.lifecycleScope.launch {
+            val localUri = downloadRemoteImageToLocalFile(result.svgUrl, isSvg = true, fileName = "category_icon_search.png")
+            pickerBinding.searchProgress.visibility = View.GONE
+            if (localUri != null) {
+                pickedCategoryPhotoUri = localUri
+                pickedCategoryIconKey = null // mutually exclusive — same as any other photo pick
+                applyCategoryPhotoPreview(dialogBinding, localUri)
+            } else {
+                InAppNotifier.show(activity, getString(R.string.icon_picker_search_failed), InAppNotifier.Type.ERROR)
+            }
+            onDone()
+        }
+    }
+
+    /** Same shape as [onIconSearchResultPicked], for a picked Openverse
+     * photo result — no SVG decoding needed here, just a plain
+     * network-image download to a local file. */
+    private fun onPhotoSearchResultPicked(
+        dialogBinding: DialogAddCategoryBinding,
+        pickerBinding: com.anydrop.restaurant.databinding.DialogCategoryIconPickerBinding,
+        image: com.anydrop.restaurant.network.external.OpenverseImage,
+        onDone: () -> Unit
+    ) {
+        pickerBinding.searchProgress.visibility = View.VISIBLE
+        viewLifecycleOwner.lifecycleScope.launch {
+            val localUri = downloadRemoteImageToLocalFile(image.url, isSvg = false, fileName = "category_photo_search.jpg")
+            pickerBinding.searchProgress.visibility = View.GONE
+            if (localUri != null) {
+                pickedCategoryPhotoUri = localUri
+                pickedCategoryIconKey = null
+                applyCategoryPhotoPreview(dialogBinding, localUri)
+            } else {
+                InAppNotifier.show(activity, getString(R.string.icon_picker_search_failed), InAppNotifier.Type.ERROR)
+            }
+            onDone()
+        }
+    }
+
+    /** Downloads [url] (optionally decoding it as an SVG first) via the
+     * app's shared Coil [coil.ImageLoader] and writes the resulting
+     * bitmap to a local cache file, returning a `file://` Uri — the same
+     * kind of Uri [pickCategoryPhotoLauncher]'s gallery-pick flow already
+     * produces, so every downstream step (staged-preview, upload-on-Save
+     * via [uploadCategoryPhoto]) is unaware of whether a photo came from
+     * the device gallery or a live search result. Returns null on any
+     * failure (network error, non-2xx, undecodable image) rather than
+     * throwing — callers show one shared error message either way. */
+    private suspend fun downloadRemoteImageToLocalFile(url: String, isSvg: Boolean, fileName: String): Uri? {
+        val context = context ?: return null
+        return try {
+            val requestBuilder = coil.request.ImageRequest.Builder(context)
+                .data(url)
+                .allowHardware(false) // must be a software bitmap to read its pixels below
+            if (isSvg) requestBuilder.decoderFactory(coil.decode.SvgDecoder.Factory())
+            val result = coil.Coil.imageLoader(context).execute(requestBuilder.build())
+            if (result !is coil.request.SuccessResult) return null
+            val bitmap = (result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap ?: return null
+            val file = File(context.cacheDir, fileName)
+            FileOutputStream(file).use { output ->
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, output)
+            }
+            Uri.fromFile(file)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /** Shared "a real photo (from the gallery, or now, a downloaded
+     * search result) is staged" preview treatment — factored out of
+     * [cropCategoryPhotoLauncher]'s callback so both call sites render
+     * identically instead of drifting apart. */
+    private fun applyCategoryPhotoPreview(dialogBinding: DialogAddCategoryBinding, uri: Uri) {
+        dialogBinding.categoryPhotoPreview.imageTintList = null
+        dialogBinding.categoryPhotoPreview.setPadding(0, 0, 0, 0)
+        dialogBinding.categoryPhotoPreview.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+        dialogBinding.categoryPhotoPreview.load(uri) {
+            placeholder(R.drawable.ic_food_placeholder)
+            error(R.drawable.ic_food_placeholder)
+            crossfade(true)
+        }
+        dialogBinding.categoryPhotoLabel.text = getString(R.string.btn_change_photo)
     }
 
     /** Renders a bundled icon into the category dialog's shared preview

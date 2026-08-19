@@ -23,6 +23,17 @@ import com.anydrop.restaurant.R
  * seen by an older client) just falls back to the placeholder icon — see
  * [drawableFor].
  *
+ * "Option 2" from this file's original kdoc (search-more via a stock-
+ * icon/photo API) is no longer deferred — see
+ * [com.anydrop.restaurant.ui.menu.CategoryIconSearchAdapter] /
+ * [com.anydrop.restaurant.ui.menu.CategoryPhotoSearchAdapter] and
+ * MenuFragment.showCategoryIconPickerDialog()'s "Icons"/"Photos" tabs
+ * (Phase 1, 2026-08-19 UI/UX overhaul). Those results never become a
+ * [key] in this object, though — a searched icon/photo is downloaded and
+ * staged as an ordinary category photo (`image_url`), not added to this
+ * bundled set, so this object stays exactly what its name says: the
+ * *bundled* set, curated and shipped with the app.
+ *
  * v1 set — 14 common Indian-restaurant categories, matching doc 22's own
  * examples (biryani, chinese, desserts, beverages, south indian) plus
  * reasonable additions. The vector art itself is placeholder-quality (see
