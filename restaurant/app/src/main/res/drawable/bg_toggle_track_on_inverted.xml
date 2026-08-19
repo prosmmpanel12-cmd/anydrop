@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Inverted filled-pill track, ON state — for switchTempClosed, where
+     checked=true means a negative state (see
+     switch_track_color_inverted.xml's original header comment for why:
+     checked = red here, unchecked = green, same real-world meaning as
+     every other switch just with the boolean direction flipped). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/toggle_track_off" />
+    <corners android:radius="14dp" />
+</shape>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Large white circular thumb w/ soft drop shadow, sized to nearly fill
+     the 28dp-tall track (see style_toggle_switch) — matches the reference
+     mockup's proportions, unlike the default SwitchMaterial thumb which
+     floats small and centered inside a thin line-track. Layered: a
+     slightly-offset semi-transparent black oval underneath for the
+     shadow, solid white oval on top. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:top="1dp" android:left="1dp">
+        <shape android:shape="oval">
+            <solid android:color="#33000000" />
+        </shape>
+    </item>
+    <item android:bottom="1dp" android:right="1dp">
+        <shape android:shape="oval">
+            <solid android:color="@color/white" />
+        </shape>
+    </item>
+</layer-list>

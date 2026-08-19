@@ -49,4 +49,13 @@
     <color name="warning_amber">#F9A825</color>
     <color name="warning_amber_bg">#FFF3D6</color>
     <color name="stat_chip_bg">#F2F2F2</color>
+
+    <!-- Toggle restyle (2026-08-19) — bright filled-pill switch colors
+         matching the app owner's reference mockup, used by
+         bg_toggle_track_on/off.xml. Deliberately brighter/more saturated
+         than veg_green/nonveg_red (which are tuned for small dots/pills
+         elsewhere) since a full-track switch needs to read clearly at a
+         glance the way the reference image does. -->
+    <color name="toggle_track_on">#2ECC71</color>
+    <color name="toggle_track_off">#E74C3C</color>
 </resources>

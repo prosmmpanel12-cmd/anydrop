@@ -259,11 +259,10 @@
 
             <com.google.android.material.switchmaterial.SwitchMaterial
                 android:id="@+id/switchPublic"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                app:thumbTint="@color/white"
-                app:trackTint="@color/switch_track_color" />
+                style="@style/ToggleSwitch.Filled"
+                android:layout_width="52dp"
+                android:layout_height="28dp"
+                android:layout_marginStart="10dp" />
 
         </LinearLayout>
 

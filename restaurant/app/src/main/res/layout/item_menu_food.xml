@@ -47,10 +47,9 @@
 
     <com.google.android.material.switchmaterial.SwitchMaterial
         android:id="@+id/switchAvailable"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        app:thumbTint="@color/white"
-        app:trackTint="@color/switch_track_color" />
+        style="@style/ToggleSwitch.Filled"
+        android:layout_width="52dp"
+        android:layout_height="28dp" />
 
     <!-- Phase 2 (UI/UX overhaul, 2026-08-19): "✏️"/"🗑️" emoji-text buttons
          replaced with real ic_edit/ic_delete ImageViews. MenuItemAdapter.kt

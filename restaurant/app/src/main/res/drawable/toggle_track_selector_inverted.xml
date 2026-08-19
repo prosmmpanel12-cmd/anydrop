@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Inverted counterpart of toggle_track_selector.xml — for
+     switchTempClosed only (see bg_toggle_track_on_inverted.xml). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/bg_toggle_track_on_inverted" android:state_checked="true" />
+    <item android:drawable="@drawable/bg_toggle_track_off_inverted" />
+</selector>
