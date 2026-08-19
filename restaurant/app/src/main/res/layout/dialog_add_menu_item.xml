@@ -29,15 +29,29 @@
             android:layout_marginBottom="16dp"
             android:background="@drawable/bg_sheet_handle" />
 
-        <TextView
-            android:id="@+id/itemDialogTitle"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:textColor="@color/text_primary"
-            tools:text="Add Menu Item" />
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:id="@+id/itemDialogTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                tools:text="Add Menu Item" />
+
+            <ImageView
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/illus_add_menu_item"
+                android:contentDescription="@null" />
+
+        </LinearLayout>
 
         <!-- Photo picker (NEXT_SESSION_PROMPT.md item 4) — same staged-
              upload pattern as EditProfileActivity's logoPickerRow: upload

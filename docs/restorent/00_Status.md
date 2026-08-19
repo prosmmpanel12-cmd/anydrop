@@ -1,4 +1,108 @@
-## 2026-08-19 (i, newest) — 10 dialog illustration PNGs received and colorized, dropped into res/drawable-xxhdpi, not yet wired into any layout
+## 2026-08-19 (j, newest) — Illustrations wired into 4 dialogs; 2 of those were built from scratch (didn't exist before), unverified
+
+App owner got confused why the app still looked unillustrated after
+entry (i) — clarified that the reference mockup they keep sending is a
+*target*, not a screenshot of their app, and that entry (i) only dropped
+files into `res/drawable-xxhdpi/` without wiring any of them in yet.
+This entry does the wiring for 4 of the mockup's 10 panels — the other 6
+turned out to need much bigger changes than "add an ImageView", see
+below.
+
+### ✅ Done — 4 panels
+1. **Create/Edit Coupon dialog** (`dialog_add_coupon.xml`) — added
+   `illus_coupon.png` next to the title, badge-in-corner layout matching
+   the mockup. No Kotlin changes needed (title TextView's id unchanged).
+2. **Add Menu Item dialog** (`dialog_add_menu_item.xml`) — same pattern,
+   `illus_add_menu_item.png` (the recolored cooking-pot icon from entry
+   i).
+3. **Confirm Delete dialog** — **did not exist as an illustrated dialog
+   at all**; `MenuFragment.kt`'s `confirmDeleteItem()`/
+   `confirmDeleteCategory()` were plain
+   `MaterialAlertDialogBuilder(.setMessage(...))` text dialogs. Built a
+   new shared `dialog_confirm_delete.xml` (pink-circle-backdrop
+   `illus_confirm_delete.png`, red title, gray message, Cancel/Delete
+   buttons) and rewired both functions to inflate it via
+   `DialogConfirmDeleteBinding`, with per-call-site title text (new
+   `dialog_delete_item_title`/`dialog_delete_category_title` strings)
+   while reusing the existing `confirm_delete_item`/
+   `confirm_delete_category` strings as the body message.
+4. **Logout confirmation dialog** — **did not exist at all, in any
+   form**. `AccountFragment.kt`'s `btnLogout` previously logged the user
+   out immediately on tap, no confirmation step whatsoever — found this
+   while looking for the dialog to retrofit. Built
+   `dialog_logout_confirm.xml` (`illus_logout.png`, title/message from 3
+   new strings, Cancel/Logout buttons) and moved the actual
+   logout-and-navigate logic (stop `OrderPollingService`, clear
+   `tokenManager`, launch `LoginActivity`) behind the new dialog's
+   confirm button. **This is new user-facing behavior, not just a
+   restyle** — flagging clearly since it changes what happens when
+   someone taps Logout, not just how it looks.
+
+### 🔴 NOT done — 6 panels need bigger changes than illustration-wiring
+Checked the actual code for each before claiming anything was simple —
+none of these are "add an ImageView to an existing dialog":
+- **Success dialog** — doesn't exist as a dialog at all; this app uses
+  `InAppNotifier` (an in-app toast/snackbar) for success feedback
+  everywhere, not a modal. Illustrating it means either building a new
+  modal success dialog and swapping call sites over from the toast
+  pattern (a real UX-flow decision, not styling), or illustrating the
+  toast itself (different, smaller change). Needs a decision from the
+  app owner, not an assumption.
+- **Upload Restaurant Logo / Upload Banner Image dialogs** — neither
+  exists as a dialog. Logo picking is inline in `EditProfileActivity`
+  (tap a preview, system photo picker opens directly via
+  `pickLogoLauncher`, no intermediate dialog). Banner picking in
+  `BannerManagerActivity` looked similar on a quick check. Illustrating
+  these means introducing a new intermediate dialog step into an
+  existing working flow — a bigger, riskier change than adding an icon,
+  and worth confirming the app owner actually wants an extra tap in that
+  flow before building it.
+- **Item Availability Toggle "dialog"** — in the mockup this is a card
+  with Cancel/Save buttons; in the actual app, item availability is a
+  bare inline `SwitchMaterial` on the menu row (`item_menu_food.xml`'s
+  `switchAvailable`, recolored in entry h) that saves immediately on
+  toggle, no separate confirm/save step. Same situation as above —
+  turning this into a dialog changes the interaction model, not just the
+  look.
+- **Update Available / Maintenance dialogs** — Phase 5, never started.
+  Blocked on version-check mechanics (endpoint-driven vs. hardcoded),
+  not just missing illustrations. `illus_update_available.png` and
+  `illus_maintenance.png` are sitting in `res/drawable-xxhdpi/` ready to
+  use whenever that phase starts.
+
+### 🟡 Not build-verified (same standing sandbox limitation)
+All 6 edited/new XML files (`dialog_add_coupon.xml`,
+`dialog_add_menu_item.xml`, `dialog_confirm_delete.xml`,
+`dialog_logout_confirm.xml`, `bg_icon_circle.xml`, `strings.xml`)
+parsed clean; every new drawable/color reference
+(`illus_coupon`/`illus_add_menu_item`/`illus_confirm_delete`/
+`illus_logout`/`bg_icon_circle`) confirmed to exist on disk by path;
+every new `@+id` cross-checked against every `dialogBinding.*` reference
+in both edited Kotlin files, both directions; every new string
+(`dialog_logout_title/message/confirm_action`,
+`dialog_delete_item_title`/`dialog_delete_category_title`) confirmed
+present in `strings.xml`; brace/paren balance checked on both edited
+`.kt` files (`MenuFragment.kt` 202/202 braces 562/562 parens,
+`AccountFragment.kt` 42/42 braces 117/117 parens — both files are large
+and had multiple unrelated functions in them already, balance-checking
+the whole file rather than just the diff catches anything an isolated
+diff-check would miss). No Gradle/Android-Studio build attempted, same
+as every entry above this one.
+
+### ⏭️ Next
+Ask the app owner to prioritize/scope the 6 remaining panels — in
+particular whether Success/Logo-upload/Banner-upload/Item-availability
+should become real dialogs (interaction-model changes) or get
+illustrated in their current inline/toast form instead, before building
+either version blind.
+
+Still standing, unchanged: the real-build confirmation (now covering
+Phases 1–4, the toggle-standardization pass, and this dialog-wiring
+pass all stacked together), and the DB migrations (26/27/28) ask.
+
+---
+
+## 2026-08-19 (i) — 10 dialog illustration PNGs received and colorized, dropped into res/drawable-xxhdpi, not yet wired into any layout
 
 App owner uploaded 11 images sourced from Flaticon (one was a screenshot
 of their own search results, not a usable asset — excluded). The

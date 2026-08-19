@@ -23,6 +23,7 @@ import com.anydrop.restaurant.R
 import com.anydrop.restaurant.databinding.DialogAddCategoryBinding
 import com.anydrop.restaurant.databinding.DialogAddMenuItemBinding
 import com.anydrop.restaurant.databinding.DialogCategoryIconPickerBinding
+import com.anydrop.restaurant.databinding.DialogConfirmDeleteBinding
 import com.anydrop.restaurant.ui.common.CropActivity
 import com.anydrop.restaurant.databinding.FragmentMenuBinding
 import com.anydrop.restaurant.network.ApiClient
@@ -814,11 +815,22 @@ class MenuFragment : Fragment() {
     }
 
     private fun confirmDeleteCategory(category: MenuCategory) {
-        MaterialAlertDialogBuilder(requireContext())
-            .setMessage(R.string.confirm_delete_category)
-            .setPositiveButton(R.string.btn_delete) { _, _ -> deleteCategory(category) }
-            .setNegativeButton(R.string.btn_cancel, null)
-            .show()
+        // Illustration retrofit (2026-08-19): was a plain
+        // MaterialAlertDialogBuilder(.setMessage(...)) text dialog —
+        // dialog_confirm_delete.xml is shared with confirmDeleteItem()
+        // below, title/message set per call site.
+        val dialogBinding = DialogConfirmDeleteBinding.inflate(layoutInflater)
+        dialogBinding.deleteDialogTitle.text = getString(R.string.dialog_delete_category_title)
+        dialogBinding.deleteDialogMessage.text = getString(R.string.confirm_delete_category)
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setView(dialogBinding.root)
+            .create()
+        dialogBinding.btnDeleteDialogCancel.setOnClickListener { dialog.dismiss() }
+        dialogBinding.btnDeleteDialogDelete.setOnClickListener {
+            dialog.dismiss()
+            deleteCategory(category)
+        }
+        dialog.show()
     }
 
     private fun deleteCategory(category: MenuCategory) {
@@ -1003,11 +1015,18 @@ class MenuFragment : Fragment() {
     }
 
     private fun confirmDeleteItem(item: MenuItem) {
-        MaterialAlertDialogBuilder(requireContext())
-            .setMessage(R.string.confirm_delete_item)
-            .setPositiveButton(R.string.btn_delete) { _, _ -> deleteItem(item) }
-            .setNegativeButton(R.string.btn_cancel, null)
-            .show()
+        val dialogBinding = DialogConfirmDeleteBinding.inflate(layoutInflater)
+        dialogBinding.deleteDialogTitle.text = getString(R.string.dialog_delete_item_title)
+        dialogBinding.deleteDialogMessage.text = getString(R.string.confirm_delete_item)
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setView(dialogBinding.root)
+            .create()
+        dialogBinding.btnDeleteDialogCancel.setOnClickListener { dialog.dismiss() }
+        dialogBinding.btnDeleteDialogDelete.setOnClickListener {
+            dialog.dismiss()
+            deleteItem(item)
+        }
+        dialog.show()
     }
 
     private fun deleteItem(item: MenuItem) {

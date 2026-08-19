@@ -13,6 +13,8 @@ import com.google.gson.Gson
 import com.anydrop.restaurant.R
 import com.anydrop.restaurant.data.TokenManager
 import com.anydrop.restaurant.databinding.FragmentAccountBinding
+import com.anydrop.restaurant.databinding.DialogLogoutConfirmBinding
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.anydrop.restaurant.network.ApiClient
 import com.anydrop.restaurant.network.OperationalStatusUpdateBody
 import com.anydrop.restaurant.network.RestaurantProfileDetail
@@ -91,15 +93,30 @@ class AccountFragment : Fragment() {
         }
 
         binding.btnLogout.setOnClickListener {
-            // A logged-out device has no business still polling for
-            // another restaurant's orders in the background.
-            OrderPollingService.stop(requireContext())
-            tokenManager.clear()
-            startActivity(
-                Intent(requireContext(), LoginActivity::class.java)
-                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-            requireActivity().finish()
+            // Illustration retrofit (2026-08-19): this used to log out
+            // immediately on tap with no confirmation step at all —
+            // found while looking for the existing dialog to retrofit
+            // with an illustration and there wasn't one. Added a real
+            // confirmation now, matching the app owner's reference
+            // mockup's Logout Confirmation Dialog.
+            val dialogBinding = DialogLogoutConfirmBinding.inflate(layoutInflater)
+            val dialog = MaterialAlertDialogBuilder(requireContext())
+                .setView(dialogBinding.root)
+                .create()
+            dialogBinding.btnLogoutDialogCancel.setOnClickListener { dialog.dismiss() }
+            dialogBinding.btnLogoutDialogConfirm.setOnClickListener {
+                dialog.dismiss()
+                // A logged-out device has no business still polling for
+                // another restaurant's orders in the background.
+                OrderPollingService.stop(requireContext())
+                tokenManager.clear()
+                startActivity(
+                    Intent(requireContext(), LoginActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+                requireActivity().finish()
+            }
+            dialog.show()
         }
 
         loadProfile()
