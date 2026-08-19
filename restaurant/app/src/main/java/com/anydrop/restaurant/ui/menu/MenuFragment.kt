@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import coil.load
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.anydrop.restaurant.R
 import com.anydrop.restaurant.databinding.DialogAddCategoryBinding
@@ -253,8 +254,10 @@ class MenuFragment : Fragment() {
 
     override fun onDestroyView() {
         pendingSearchRunnable?.let { searchHandler.removeCallbacks(it) }
-        // AlertDialogs aren't tied to the fragment view lifecycle and
-        // would otherwise leak a reference to a detached dialog binding.
+        // Neither the category dialog (AlertDialog) nor the item dialog
+        // (BottomSheetDialog, since doc 22's Phase 3 bottom-sheet split)
+        // is tied to the fragment view lifecycle — both would otherwise
+        // leak a reference to a detached dialog binding.
         currentItemDialogBinding = null
         currentCategoryDialogBinding = null
         super.onDestroyView()
@@ -861,25 +864,36 @@ class MenuFragment : Fragment() {
         }
         dialogBinding.itemPhotoPickerRow.setOnClickListener { pickItemPhotoLauncher.launch("image/*") }
 
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(if (existingItem == null) R.string.dialog_add_item_title else R.string.dialog_edit_item_title)
-            .setView(dialogBinding.root)
-            .setPositiveButton(R.string.btn_save) { _, _ ->
-                val name = dialogBinding.inputItemName.text?.toString()?.trim().orEmpty()
-                val priceText = dialogBinding.inputItemPrice.text?.toString()?.trim().orEmpty()
-                val price = priceText.toDoubleOrNull()
-                val description = dialogBinding.inputItemDescription.text?.toString()?.trim()
-                val isVeg = dialogBinding.switchIsVeg.isChecked
+        dialogBinding.itemDialogTitle.text =
+            getString(if (existingItem == null) R.string.dialog_add_item_title else R.string.dialog_edit_item_title)
 
-                if (name.isEmpty() || price == null || price <= 0.0) {
-                    InAppNotifier.show(activity, getString(R.string.menu_save_failed), InAppNotifier.Type.ERROR)
-                    return@setPositiveButton
-                }
-                saveItem(existingItem, targetCategoryId, name, price, description, isVeg, pickedItemPhotoUri)
+        // doc 22 item 2 follow-up — bottom sheet instead of a centered
+        // MaterialAlertDialogBuilder (app-owner-confirmed split: add-coupon
+        // + add-menu-item are the two "complex" dialogs that get bottom
+        // sheets, everything else stays centered). No built-in positive/
+        // negative buttons on a plain BottomSheetDialog, so the Save/Cancel
+        // MaterialButtons in dialog_add_menu_item.xml do what
+        // setPositiveButton/setNegativeButton used to.
+        val itemDialog = BottomSheetDialog(requireContext())
+        itemDialog.setContentView(dialogBinding.root)
+        itemDialog.setOnDismissListener { currentItemDialogBinding = null }
+
+        dialogBinding.btnItemDialogCancel.setOnClickListener { itemDialog.dismiss() }
+        dialogBinding.btnItemDialogSave.setOnClickListener {
+            val name = dialogBinding.inputItemName.text?.toString()?.trim().orEmpty()
+            val priceText = dialogBinding.inputItemPrice.text?.toString()?.trim().orEmpty()
+            val price = priceText.toDoubleOrNull()
+            val description = dialogBinding.inputItemDescription.text?.toString()?.trim()
+            val isVeg = dialogBinding.switchIsVeg.isChecked
+
+            if (name.isEmpty() || price == null || price <= 0.0) {
+                InAppNotifier.show(activity, getString(R.string.menu_save_failed), InAppNotifier.Type.ERROR)
+                return@setOnClickListener
             }
-            .setNegativeButton(R.string.btn_cancel, null)
-            .setOnDismissListener { currentItemDialogBinding = null }
-            .show()
+            saveItem(existingItem, targetCategoryId, name, price, description, isVeg, pickedItemPhotoUri)
+            itemDialog.dismiss()
+        }
+        itemDialog.show()
     }
 
     private fun saveItem(

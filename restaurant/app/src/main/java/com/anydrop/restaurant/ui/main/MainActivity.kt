@@ -62,6 +62,14 @@ class MainActivity : AppCompatActivity() {
     private var isOpen = true
     private var togglingInFlight = false
 
+    // Phase 4 toggle redesign: statusToggleGroup.check(...) is called
+    // both by us (renderPill, and reverting the segment back to Open if
+    // the close-confirmation dialog is cancelled) and indirectly by the
+    // user tapping a segment. Without this flag, our own programmatic
+    // check() calls would re-fire addOnButtonCheckedListener and loop /
+    // re-show the confirmation dialog.
+    private var suppressToggleListener = false
+
     // "Sound doesn't work once the app is closed" fix — POST_NOTIFICATIONS
     // is a runtime permission on Android 13+ (API 33); without it,
     // OrderPollingService's alerts never show at all, silently, no error
@@ -105,7 +113,10 @@ class MainActivity : AppCompatActivity() {
         // as a constructor callback here — fragment constructor args don't
         // survive system-initiated recreation, so this keeps that path safe.
 
-        binding.openClosedPill.setOnClickListener { onPillTapped() }
+        binding.statusToggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (suppressToggleListener || !isChecked) return@addOnButtonCheckedListener
+            onStatusSegmentTapped(checkedId)
+        }
 
         if (savedInstanceState == null) {
             binding.bottomNav.selectedItemId = R.id.nav_orders
@@ -190,22 +201,36 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun onPillTapped() {
+    private fun onStatusSegmentTapped(checkedId: Int) {
         if (togglingInFlight) return
-        if (isOpen) {
-            // Tap-to-confirm before closing (§4: "tap to confirm before
-            // closing"), same AlertDialog.Builder pattern MenuFragment
-            // uses for its own confirmation dialogs.
-            AlertDialog.Builder(this)
-                .setTitle(R.string.dialog_close_restaurant_title)
-                .setMessage(R.string.dialog_close_restaurant_message)
-                .setPositiveButton(R.string.btn_confirm_close) { _, _ -> setOperationalStatus(false) }
-                .setNegativeButton(R.string.btn_cancel, null)
-                .show()
-        } else {
-            // Re-opening needs no confirmation — only pausing does.
-            setOperationalStatus(true)
+        when (checkedId) {
+            R.id.btnStatusClosed -> {
+                if (!isOpen) return // already closed, nothing to confirm
+                // Tap-to-confirm before closing (§4: "tap to confirm before
+                // closing"), same AlertDialog.Builder pattern MenuFragment
+                // uses for its own confirmation dialogs. The toggle group
+                // already shows "Closed" as checked at this point (that's
+                // how we got this callback) — revert it back to "Open" on
+                // cancel/dismiss, since nothing was actually confirmed yet.
+                AlertDialog.Builder(this)
+                    .setTitle(R.string.dialog_close_restaurant_title)
+                    .setMessage(R.string.dialog_close_restaurant_message)
+                    .setPositiveButton(R.string.btn_confirm_close) { _, _ -> setOperationalStatus(false) }
+                    .setNegativeButton(R.string.btn_cancel) { _, _ -> revertToggleSelection() }
+                    .setOnCancelListener { revertToggleSelection() }
+                    .show()
+            }
+            R.id.btnStatusOpen -> {
+                // Re-opening needs no confirmation — only pausing does.
+                if (!isOpen) setOperationalStatus(true)
+            }
         }
+    }
+
+    private fun revertToggleSelection() {
+        suppressToggleListener = true
+        binding.statusToggleGroup.check(if (isOpen) R.id.btnStatusOpen else R.id.btnStatusClosed)
+        suppressToggleListener = false
     }
 
     private fun setOperationalStatus(turningOn: Boolean) {
@@ -229,17 +254,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderPill() {
-        if (isOpen) {
-            binding.openClosedPill.background = ContextCompat.getDrawable(this, R.drawable.bg_pill_open)
-            binding.openClosedDot.background = ContextCompat.getDrawable(this, R.drawable.bg_dot_green)
-            binding.openClosedText.text = getString(R.string.restaurant_open_label)
-            binding.openClosedText.setTextColor(ContextCompat.getColor(this, R.color.veg_green))
-        } else {
-            binding.openClosedPill.background = ContextCompat.getDrawable(this, R.drawable.bg_pill_closed)
-            binding.openClosedDot.background = ContextCompat.getDrawable(this, R.drawable.bg_dot_red)
-            binding.openClosedText.text = getString(R.string.restaurant_closed_label)
-            binding.openClosedText.setTextColor(ContextCompat.getColor(this, R.color.nonveg_red))
-        }
+        // Colors/icons now come from ToggleButton.Pill.StatusOpen/Closed's
+        // state-list drawables (checked vs. unchecked) — just move the
+        // checked segment, no manual drawable/text/color swapping needed.
+        suppressToggleListener = true
+        binding.statusToggleGroup.check(if (isOpen) R.id.btnStatusOpen else R.id.btnStatusClosed)
+        suppressToggleListener = false
     }
 
     private fun goToLogin() {

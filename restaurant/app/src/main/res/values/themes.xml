@@ -42,6 +42,39 @@
         <item name="iconSize">16dp</item>
     </style>
 
+    <!-- Phase 4 (UI/UX overhaul, on/off toggle redesign, 2026-08-19):
+         top-bar restaurant OPEN/CLOSED status toggle. Extends the same
+         ToggleButton.Pill base the coupon screen's is_active/is_public
+         toggles already use (doc 22 item 4), for one consistent pill-
+         toggle language across the app, rather than the old plain
+         clickable dot+text pill this replaces. Two differences from the
+         base style, on purpose: (1) per-button semantic color (green for
+         Open, red for Closed) instead of the shared brand-orange
+         selected-state color, since this control's whole job is to
+         signal a red/green state at a glance; (2) slightly larger
+         (44dp vs. 36dp min height, 13sp vs. 12sp text) since this is the
+         one always-visible top-bar control every tab shares, not a
+         secondary row action. -->
+    <style name="ToggleButton.Pill.StatusOpen" parent="ToggleButton.Pill">
+        <item name="android:minHeight">44dp</item>
+        <item name="android:textSize">13sp</item>
+        <item name="iconSize">18dp</item>
+        <item name="strokeColor">@color/toggle_open_stroke_color</item>
+        <item name="android:textColor">@color/toggle_open_content_color</item>
+        <item name="iconTint">@color/toggle_open_content_color</item>
+        <item name="backgroundTint">@color/toggle_open_bg_color</item>
+    </style>
+
+    <style name="ToggleButton.Pill.StatusClosed" parent="ToggleButton.Pill">
+        <item name="android:minHeight">44dp</item>
+        <item name="android:textSize">13sp</item>
+        <item name="iconSize">18dp</item>
+        <item name="strokeColor">@color/toggle_closed_stroke_color</item>
+        <item name="android:textColor">@color/toggle_closed_content_color</item>
+        <item name="iconTint">@color/toggle_closed_content_color</item>
+        <item name="backgroundTint">@color/toggle_closed_bg_color</item>
+    </style>
+
     <!-- Single-digit OTP input box (ui/signup/OtpVerifyActivity) — six of these
          in a row, auto-advancing on input, same visual language as
          bg_card_rounded used everywhere else in this app for input fields. -->

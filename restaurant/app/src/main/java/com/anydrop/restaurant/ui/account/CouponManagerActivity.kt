@@ -12,6 +12,7 @@ import com.anydrop.restaurant.network.Coupon
 import com.anydrop.restaurant.network.CouponCreateBody
 import com.anydrop.restaurant.network.CouponUpdateBody
 import com.anydrop.restaurant.ui.common.InAppNotifier
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.datepicker.MaterialDatePicker
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.timepicker.MaterialTimePicker
@@ -182,13 +183,19 @@ class CouponManagerActivity : AppCompatActivity() {
         setUpDiscountTypeToggle(dialogBinding)
         setUpValidUntilPicker(dialogBinding)
         dialogBinding.togglePublicGroup.check(dialogBinding.btnPublicOff.id) // is_public defaults to false, same as server
+        dialogBinding.couponDialogTitle.text = getString(R.string.coupon_add_title)
 
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.coupon_add_title)
-            .setView(dialogBinding.root)
-            .setPositiveButton(R.string.btn_save) { _, _ -> submitNewCoupon(dialogBinding) }
-            .setNegativeButton(R.string.btn_cancel, null)
-            .show()
+        // doc 22 item 2 follow-up — bottom sheet, not a centered
+        // MaterialAlertDialogBuilder (see dialog_add_coupon.xml's header
+        // comment). btnCouponDialogSave/Cancel replace setPositiveButton/
+        // setNegativeButton.
+        val addDialog = BottomSheetDialog(this)
+        addDialog.setContentView(dialogBinding.root)
+        dialogBinding.btnCouponDialogCancel.setOnClickListener { addDialog.dismiss() }
+        dialogBinding.btnCouponDialogSave.setOnClickListener {
+            if (submitNewCoupon(dialogBinding)) addDialog.dismiss()
+        }
+        addDialog.show()
     }
 
     /**
@@ -244,13 +251,15 @@ class CouponManagerActivity : AppCompatActivity() {
         dialogBinding.togglePublicGroup.check(
             if (coupon.isPublic) dialogBinding.btnPublicOn.id else dialogBinding.btnPublicOff.id
         )
+        dialogBinding.couponDialogTitle.text = getString(R.string.coupon_edit_title)
 
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.coupon_edit_title)
-            .setView(dialogBinding.root)
-            .setPositiveButton(R.string.btn_save) { _, _ -> submitCouponEdit(coupon.id, dialogBinding) }
-            .setNegativeButton(R.string.btn_cancel, null)
-            .show()
+        val editDialog = BottomSheetDialog(this)
+        editDialog.setContentView(dialogBinding.root)
+        dialogBinding.btnCouponDialogCancel.setOnClickListener { editDialog.dismiss() }
+        dialogBinding.btnCouponDialogSave.setOnClickListener {
+            if (submitCouponEdit(coupon.id, dialogBinding)) editDialog.dismiss()
+        }
+        editDialog.show()
     }
 
     /** Add-mode only — wires the chip group to show/hide maxDiscountLayout.
@@ -351,7 +360,16 @@ class CouponManagerActivity : AppCompatActivity() {
         return if (value == value.toLong().toDouble()) value.toLong().toString() else value.toString()
     }
 
-    private fun submitNewCoupon(dialogBinding: DialogAddCouponBinding) {
+    /** Returns true once validation passes and the create request has been
+     * kicked off — false on a validation failure, so the bottom sheet
+     * calling this (see showAddCouponDialog()) knows whether to dismiss
+     * itself or stay open for the user to fix their input. Previously,
+     * as a MaterialAlertDialogBuilder positive-button callback, an early
+     * return here still let the dialog auto-dismiss underneath it (Android's
+     * default AlertDialog behavior) — a validation error toast plus a
+     * closed dialog. The bottom-sheet version intentionally fixes that:
+     * invalid input now keeps the sheet open. */
+    private fun submitNewCoupon(dialogBinding: DialogAddCouponBinding): Boolean {
         val code = dialogBinding.inputCode.text?.toString()?.trim().orEmpty()
         val discountType = if (dialogBinding.chipPercent.isChecked) "percent" else "flat"
         val discountValue = dialogBinding.inputDiscountValue.text?.toString()?.trim()?.toDoubleOrNull()
@@ -364,7 +382,7 @@ class CouponManagerActivity : AppCompatActivity() {
 
         if (code.isEmpty() || discountValue == null || discountValue <= 0) {
             InAppNotifier.show(this, getString(R.string.coupon_create_failed), InAppNotifier.Type.ERROR)
-            return
+            return false
         }
 
         lifecycleScope.launch {
@@ -395,6 +413,7 @@ class CouponManagerActivity : AppCompatActivity() {
                 InAppNotifier.show(this@CouponManagerActivity, getString(R.string.coupon_create_failed), InAppNotifier.Type.ERROR)
             }
         }
+        return true
     }
 
     /**
@@ -409,12 +428,15 @@ class CouponManagerActivity : AppCompatActivity() {
      * discount_value must stay positive same as create; min/max/valid-until/
      * usage-limits are all optional and get sent as null when the user
      * clears them, correctly clearing that field server-side.
+     *
+     * Same true/false-on-validation-passed contract as submitNewCoupon()
+     * above — see that function's kdoc for why.
      */
-    private fun submitCouponEdit(couponId: Int, dialogBinding: DialogAddCouponBinding) {
+    private fun submitCouponEdit(couponId: Int, dialogBinding: DialogAddCouponBinding): Boolean {
         val discountValue = dialogBinding.inputDiscountValue.text?.toString()?.trim()?.toDoubleOrNull()
         if (discountValue == null || discountValue <= 0) {
             InAppNotifier.show(this, getString(R.string.coupon_update_failed), InAppNotifier.Type.ERROR)
-            return
+            return false
         }
         val minOrder = dialogBinding.inputMinOrder.text?.toString()?.trim()?.toDoubleOrNull()
         val maxDiscount = dialogBinding.inputMaxDiscount.text?.toString()?.trim()?.toDoubleOrNull()
@@ -448,5 +470,6 @@ class CouponManagerActivity : AppCompatActivity() {
                 InAppNotifier.show(this@CouponManagerActivity, getString(R.string.coupon_update_failed), InAppNotifier.Type.ERROR)
             }
         }
+        return true
     }
 }

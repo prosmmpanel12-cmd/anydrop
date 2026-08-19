@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Phase 4 (UI/UX overhaul, on/off toggle redesign): top-bar status
+     toggle, OPEN button. Checked = filled with the same success_bg green
+     tint the old bg_pill_open.xml used; unchecked = plain surface, same
+     "selected vs. not" visual language as ToggleButton.Pill /
+     item_coupon_manage_row.xml's is_active toggle. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/success_bg" android:state_checked="true" />
+    <item android:color="@color/surface" />
+</selector>

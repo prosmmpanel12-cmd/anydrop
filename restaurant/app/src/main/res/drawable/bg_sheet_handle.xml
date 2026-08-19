@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generic bottom-sheet drag-handle bar (doc 22 Phase 3 bottom-sheet
+     conversion — dialog_add_menu_item.xml / dialog_add_coupon.xml).
+     Deliberately a separate file from bg_pill_closed.xml: that drawable
+     is the semantic restaurant OPEN/CLOSED status pill (red,
+     error_bg/nonveg_red) and would have put a red bar at the top of
+     every bottom sheet if reused here by mistake. This one is neutral
+     gray, no semantic meaning. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/outline" />
+    <corners android:radius="2dp" />
+</shape>

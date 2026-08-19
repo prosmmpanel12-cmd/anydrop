@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Phase 4: top-bar status toggle, CLOSED button. Checked = the same
+     error_bg red tint the old bg_pill_closed.xml used. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/error_bg" android:state_checked="true" />
+    <item android:color="@color/surface" />
+</selector>

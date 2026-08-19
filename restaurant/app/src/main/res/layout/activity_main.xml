@@ -37,33 +37,36 @@
             android:maxLines="1"
             android:ellipsize="end" />
 
-        <LinearLayout
-            android:id="@+id/openClosedPill"
+        <!-- Phase 4 redesign (was a single clickable dot+text pill,
+             plain LinearLayout, colored only via manually-swapped
+             drawables in code). Now a two-segment pill toggle matching
+             item_coupon_manage_row.xml's is_active toggle language —
+             tap the other segment to switch; MainActivity keeps the
+             tap-to-confirm-before-closing behavior on top of this. -->
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/statusToggleGroup"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:background="@drawable/bg_pill_open"
-            android:paddingHorizontal="14dp"
-            android:paddingVertical="8dp"
-            android:clickable="true"
-            android:focusable="true">
+            app:singleSelection="true"
+            app:selectionRequired="true">
 
-            <View
-                android:id="@+id/openClosedDot"
-                android:layout_width="8dp"
-                android:layout_height="8dp"
-                android:layout_marginEnd="6dp"
-                android:background="@drawable/bg_dot_green" />
-
-            <TextView
-                android:id="@+id/openClosedText"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnStatusOpen"
+                style="@style/ToggleButton.Pill.StatusOpen"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textStyle="bold"
-                android:textSize="13sp"
-                android:textColor="@color/veg_green" />
-        </LinearLayout>
+                android:text="@string/restaurant_open_label"
+                app:icon="@drawable/ic_check_circle" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnStatusClosed"
+                style="@style/ToggleButton.Pill.StatusClosed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/restaurant_closed_label"
+                app:icon="@drawable/ic_error" />
+
+        </com.google.android.material.button.MaterialButtonToggleGroup>
     </LinearLayout>
 
     <androidx.fragment.app.FragmentContainerView

@@ -1,14 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Converted to a BottomSheetDialog (doc 22 item 2 follow-up: app-owner-
+     confirmed split puts add-coupon + add-menu-item in the "complex,
+     bottom sheet" bucket, everything else stays a centered
+     MaterialAlertDialogBuilder). Root LinearLayout now carries the
+     rounded-top sheet background directly (same bg_dialog_rounded_top.xml
+     token the customer app's bottom sheets already use) and a title +
+     Save/Cancel button row replace what setPositiveButton/setNegativeButton
+     used to render, since a plain BottomSheetDialog has no built-in
+     action-button chrome the way AlertDialog does. See
+     MenuFragment.showItemDialog() for the click wiring. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content">
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_dialog_rounded_top">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:padding="20dp">
+
+        <View
+            android:layout_width="36dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/bg_sheet_handle" />
+
+        <TextView
+            android:id="@+id/itemDialogTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            tools:text="Add Menu Item" />
 
         <!-- Photo picker (NEXT_SESSION_PROMPT.md item 4) — same staged-
              upload pattern as EditProfileActivity's logoPickerRow: upload
@@ -125,6 +154,30 @@
                 android:checked="true"
                 app:thumbTint="@color/veg_green"
                 app:trackTint="@color/anydrop_primary_container" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="24dp"
+            android:gravity="end">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnItemDialogCancel"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_cancel" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnItemDialogSave"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:backgroundTint="@color/anydrop_primary"
+                android:text="@string/btn_save" />
+
         </LinearLayout>
 
     </LinearLayout>
