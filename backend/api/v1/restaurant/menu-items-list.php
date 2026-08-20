@@ -20,6 +20,7 @@
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
+require_once __DIR__ . '/../../../lib/menu_item_tags.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -53,6 +54,9 @@ $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $rows = $stmt->fetchAll();
 
+// Bulk-fetched (not per-row) — avoids an N+1 tags query on every menu load.
+$tagsByItemId = get_menu_item_tags_bulk(array_map(fn($r) => (int) $r['id'], $rows));
+
 $items = array_map(fn($item) => [
     'id' => (int) $item['id'],
     'category_id' => (int) $item['category_id'],
@@ -66,6 +70,7 @@ $items = array_map(fn($item) => [
     'is_recommended' => (bool) $item['is_recommended'],
     'is_bestseller' => (bool) $item['is_bestseller'],
     'prep_time_minutes' => (int) $item['prep_time_minutes'],
+    'tags' => $tagsByItemId[(int) $item['id']] ?? [],
 ], $rows);
 
 respond_ok(['items' => $items]);

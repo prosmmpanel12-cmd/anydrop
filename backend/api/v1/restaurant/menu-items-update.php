@@ -20,6 +20,7 @@
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
+require_once __DIR__ . '/../../../lib/menu_item_tags.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -105,6 +106,14 @@ if (!empty($fields)) {
     $upd->execute($params);
 }
 
+// tags: only touched when the request body actually includes a `tags`
+// key — the out-of-stock toggle call (just { "is_available": bool })
+// and any other partial update must never wipe existing tags just
+// because they didn't mention them. An explicit [] clears all tags.
+if (array_key_exists('tags', $body) && is_array($body['tags'])) {
+    set_menu_item_tags($itemId, array_map('strval', $body['tags']));
+}
+
 $fetch = $db->prepare('SELECT * FROM menu_items WHERE id = :id LIMIT 1');
 $fetch->execute(['id' => $itemId]);
 $row = $fetch->fetch();
@@ -123,5 +132,6 @@ respond_ok([
         'is_recommended' => (bool) $row['is_recommended'],
         'is_bestseller' => (bool) $row['is_bestseller'],
         'prep_time_minutes' => (int) $row['prep_time_minutes'],
+        'tags' => get_menu_item_tags($itemId),
     ],
 ]);

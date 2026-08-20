@@ -116,6 +116,13 @@ class MenuFragment : Fragment() {
     // next dialog opened.
     private var pickedItemPhotoUri: Uri? = null
     private var currentItemDialogBinding: DialogAddMenuItemBinding? = null
+
+    // Tag picker (Pizza / Onion / Capsicum / ...) — fetched once per
+    // fragment lifetime (list barely changes, same "load once, cache"
+    // reasoning as MainActivity's own reference-data fetches) and reused
+    // across every showItemDialog() call rather than re-hitting the
+    // network on every dialog open.
+    private var cachedFoodTags: List<com.anydrop.restaurant.network.FoodTag>? = null
     private var pickedCategoryPhotoUri: Uri? = null
     private var currentCategoryDialogBinding: DialogAddCategoryBinding? = null
     // doc 22 item 1 — bundled category icon, mutually exclusive with
@@ -905,6 +912,8 @@ class MenuFragment : Fragment() {
         dialogBinding.itemDialogTitle.text =
             getString(if (existingItem == null) R.string.dialog_add_item_title else R.string.dialog_edit_item_title)
 
+        loadFoodTagsIntoDialog(dialogBinding, existingItem?.tags ?: emptyList())
+
         // doc 22 item 2 follow-up — bottom sheet instead of a centered
         // MaterialAlertDialogBuilder (app-owner-confirmed split: add-coupon
         // + add-menu-item are the two "complex" dialogs that get bottom
@@ -928,10 +937,74 @@ class MenuFragment : Fragment() {
                 InAppNotifier.show(activity, getString(R.string.menu_save_failed), InAppNotifier.Type.ERROR)
                 return@setOnClickListener
             }
-            saveItem(existingItem, targetCategoryId, name, price, description, isVeg, pickedItemPhotoUri)
+            val selectedTags = (0 until dialogBinding.itemTagsGroup.childCount)
+                .map { dialogBinding.itemTagsGroup.getChildAt(it) as com.google.android.material.chip.Chip }
+                .filter { it.isChecked }
+                .map { it.tag as String }
+            saveItem(existingItem, targetCategoryId, name, price, description, isVeg, pickedItemPhotoUri, selectedTags)
             itemDialog.dismiss()
         }
         itemDialog.show()
+    }
+
+    /** Populates itemTagsGroup with one checkable Chip per active
+     * food_category (fetched via food-tags-list.php, cached after the
+     * first call), pre-checking whichever ones the item already carries
+     * on an edit. Chip.tag holds the slug (not id) since that's what
+     * the create/update bodies and MenuItem.tags both speak — avoids a
+     * separate id<->slug lookup at save time. */
+    private fun loadFoodTagsIntoDialog(dialogBinding: DialogAddMenuItemBinding, selectedSlugs: List<String>) {
+        val cached = cachedFoodTags
+        if (cached != null) {
+            renderTagChips(dialogBinding, cached, selectedSlugs)
+            return
+        }
+        dialogBinding.itemTagsEmptyLabel.visibility = View.VISIBLE
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val response = api.getFoodTags()
+                val tags = if (response.isSuccessful) response.body()?.data?.tags.orEmpty() else emptyList()
+                cachedFoodTags = tags
+                // The dialog may already be dismissed by the time this
+                // returns — guard against a stale binding the same way
+                // pickItemPhotoLauncher's callback checks currentItemDialogBinding.
+                if (currentItemDialogBinding === dialogBinding) {
+                    renderTagChips(dialogBinding, tags, selectedSlugs)
+                }
+            } catch (e: Exception) {
+                if (currentItemDialogBinding === dialogBinding) {
+                    dialogBinding.itemTagsEmptyLabel.text = getString(R.string.label_item_tags_unavailable)
+                }
+            }
+        }
+    }
+
+    private fun renderTagChips(
+        dialogBinding: DialogAddMenuItemBinding,
+        tags: List<com.anydrop.restaurant.network.FoodTag>,
+        selectedSlugs: List<String>
+    ) {
+        dialogBinding.itemTagsGroup.removeAllViews()
+        if (tags.isEmpty()) {
+            dialogBinding.itemTagsEmptyLabel.text = getString(R.string.label_item_tags_unavailable)
+            dialogBinding.itemTagsEmptyLabel.visibility = View.VISIBLE
+            return
+        }
+        dialogBinding.itemTagsEmptyLabel.visibility = View.GONE
+        val selectedSet = selectedSlugs.toSet()
+        for (tag in tags) {
+            val chip = com.google.android.material.chip.Chip(requireContext())
+            chip.setChipDrawable(
+                com.google.android.material.chip.ChipDrawable.createFromAttributes(
+                    requireContext(), null, 0, com.google.android.material.R.style.Widget_MaterialComponents_Chip_Choice
+                )
+            )
+            chip.text = tag.name
+            chip.tag = tag.slug
+            chip.isCheckable = true
+            chip.isChecked = selectedSet.contains(tag.slug)
+            dialogBinding.itemTagsGroup.addView(chip)
+        }
     }
 
     private fun saveItem(
@@ -941,7 +1014,8 @@ class MenuFragment : Fragment() {
         price: Double,
         description: String?,
         isVeg: Boolean,
-        photoUri: Uri?
+        photoUri: Uri?,
+        tags: List<String>
     ) {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
@@ -965,7 +1039,8 @@ class MenuFragment : Fragment() {
                             price = price,
                             description = description,
                             isVeg = isVeg,
-                            imageUrl = imageUrlToSave
+                            imageUrl = imageUrlToSave,
+                            tags = tags
                         )
                     ).isSuccessful
                 } else {
@@ -977,7 +1052,8 @@ class MenuFragment : Fragment() {
                             price = price,
                             description = description,
                             isVeg = isVeg,
-                            imageUrl = imageUrlToSave
+                            imageUrl = imageUrlToSave,
+                            tags = tags
                         )
                     ).isSuccessful
                 }

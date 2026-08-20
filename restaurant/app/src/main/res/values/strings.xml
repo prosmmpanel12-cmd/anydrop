@@ -262,6 +262,10 @@
     <string name="hint_item_price">Price (₹)</string>
     <string name="hint_item_description">Description (optional)</string>
     <string name="label_veg">Veg</string>
+    <string name="label_item_tags">Tags</string>
+    <string name="label_item_tags_hint">Pick tags so this dish shows up under matching Home categories (Pizza, Onion, Capsicum…)</string>
+    <string name="label_item_tags_loading">Loading tags…</string>
+    <string name="label_item_tags_unavailable">Couldn\'t load tags — item will save without them</string>
     <string name="label_available">Available</string>
     <string name="empty_categories">No categories yet — add one to start building your menu</string>
     <string name="empty_items_in_category">No items in this category yet</string>

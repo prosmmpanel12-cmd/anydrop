@@ -3,6 +3,7 @@ package com.anydrop.restaurant.ui.account
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -175,7 +176,17 @@ class EditProfileActivity : AppCompatActivity() {
         val hasGps = locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)
         val hasNetwork = locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
         if (!hasGps && !hasNetwork) {
+            // App-owner ask (HANDOVER_TAGS_FEATURE.md item 1): don't just
+            // toast-and-stop — take the user straight to the device's
+            // Location Settings screen so they can turn it on immediately,
+            // instead of having to back out and hunt for it themselves.
+            // fetchCurrentLocationForRow() only ever runs off an explicit
+            // tap on rowUseCurrentLocation (via useCurrentLocation()), so
+            // unlike LocationPickerActivity's copy of this same check
+            // (which also fires silently on screen-open) there's no
+            // "don't interrupt an auto-triggered flow" case to guard here.
             InAppNotifier.show(this, getString(R.string.location_gps_off), InAppNotifier.Type.INFO)
+            startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
             return
         }
         InAppNotifier.show(this, getString(R.string.location_fetching), InAppNotifier.Type.INFO)

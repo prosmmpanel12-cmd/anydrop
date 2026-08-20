@@ -80,6 +80,12 @@ interface ApiService {
     @POST("restaurant/menu-item-photo-upload.php")
     suspend fun uploadMenuItemPhoto(@Part photo: MultipartBody.Part): Response<ApiResponse<MenuItemPhotoUploadResult>>
 
+    // Item tag picker (Pizza / Onion / Capsicum / ...) shown in the add/edit
+    // menu item dialog — see MenuFragment.showItemDialog(). Backed by the
+    // same food_categories table the Customer app's Home chip row reads.
+    @GET("restaurant/food-tags-list.php")
+    suspend fun getFoodTags(): Response<ApiResponse<FoodTagsListResult>>
+
     @Multipart
     @POST("restaurant/category-photo-upload.php")
     suspend fun uploadCategoryPhoto(@Part photo: MultipartBody.Part): Response<ApiResponse<CategoryPhotoUploadResult>>

@@ -27,6 +27,7 @@
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
+require_once __DIR__ . '/../../../lib/menu_item_tags.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -49,6 +50,11 @@ $prepTimeMinutes = isset($body['prep_time_minutes']) && $body['prep_time_minutes
     ? (int) $body['prep_time_minutes']
     : 15;
 $imageUrl = isset($body['image_url']) && $body['image_url'] !== '' ? (string) $body['image_url'] : null;
+// tags: food_category slugs (e.g. ["pizza", "onion", "capsicum"]) — same
+// mechanism the Customer app's Home category chips already read from
+// (menu_item_categories, see lib/menu_item_tags.php). Optional; unknown
+// slugs are silently dropped rather than erroring.
+$tags = isset($body['tags']) && is_array($body['tags']) ? array_map('strval', $body['tags']) : [];
 
 if ($name === '' || $price <= 0) {
     respond_error('validation_error', 422, ['fields' => ['name', 'price']]);
@@ -82,6 +88,10 @@ $insert->execute([
 ]);
 $newId = (int) $db->lastInsertId();
 
+if (!empty($tags)) {
+    set_menu_item_tags($newId, $tags);
+}
+
 respond_ok([
     'item' => [
         'id' => $newId,
@@ -96,5 +106,6 @@ respond_ok([
         'is_recommended' => false,
         'is_bestseller' => false,
         'prep_time_minutes' => $prepTimeMinutes,
+        'tags' => get_menu_item_tags($newId),
     ],
 ], 201);

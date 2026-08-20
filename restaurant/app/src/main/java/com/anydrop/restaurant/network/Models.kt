@@ -317,7 +317,11 @@ data class MenuItem(
     @SerializedName("is_available") val isAvailable: Boolean,
     @SerializedName("is_recommended") val isRecommended: Boolean,
     @SerializedName("is_bestseller") val isBestseller: Boolean,
-    @SerializedName("prep_time_minutes") val prepTimeMinutes: Int
+    @SerializedName("prep_time_minutes") val prepTimeMinutes: Int,
+    // Food-category tags (Pizza / Onion / Capsicum / ...) — slugs, same
+    // ones the Customer app's Home chip row filters by. Defaults to empty
+    // list for backward-compat with any cached/older response shape.
+    val tags: List<String> = emptyList()
 )
 
 data class MenuItemsListResult(val items: List<MenuItem>)
@@ -330,7 +334,8 @@ data class MenuItemCreateBody(
     val description: String? = null,
     @SerializedName("is_veg") val isVeg: Boolean = true,
     @SerializedName("prep_time_minutes") val prepTimeMinutes: Int? = null,
-    @SerializedName("image_url") val imageUrl: String? = null
+    @SerializedName("image_url") val imageUrl: String? = null,
+    val tags: List<String>? = null
 )
 
 data class MenuItemUpdateBody(
@@ -341,8 +346,19 @@ data class MenuItemUpdateBody(
     @SerializedName("is_veg") val isVeg: Boolean? = null,
     @SerializedName("is_available") val isAvailable: Boolean? = null,
     @SerializedName("prep_time_minutes") val prepTimeMinutes: Int? = null,
-    @SerializedName("image_url") val imageUrl: String? = null
+    @SerializedName("image_url") val imageUrl: String? = null,
+    val tags: List<String>? = null
 )
+
+/** One selectable tag chip in the add/edit item dialog. */
+data class FoodTag(
+    val id: Int,
+    val name: String,
+    val slug: String,
+    @SerializedName("icon_url") val iconUrl: String?
+)
+
+data class FoodTagsListResult(val tags: List<FoodTag>)
 
 /** menu-item-photo-upload.php's response shape, mirrors LogoUploadResult. */
 data class MenuItemPhotoUploadResult(@SerializedName("image_url") val imageUrl: String)

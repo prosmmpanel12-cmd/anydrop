@@ -169,6 +169,47 @@
                 android:checked="true" />
         </LinearLayout>
 
+        <!-- Item tags (Pizza / Onion / Capsicum / ...) — 2026-08-20 ask.
+             Chips populated at runtime from food-tags-list.php (see
+             MenuFragment.loadFoodTagsIfNeeded()); multi-select, no
+             singleSelection, so a dish can carry more than one tag (e.g.
+             a Pizza that's also tagged Onion + Capsicum). Selected tags
+             are what let this item show up when a customer taps a Home
+             category chip (Customer app, home/category-items.php) — same
+             food_categories/menu_item_categories mechanism, just wired
+             from the restaurant side for the first time. -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/label_item_tags"
+            android:textColor="@color/text_primary"
+            android:textStyle="bold"
+            android:textSize="13sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/label_item_tags_hint"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/itemTagsGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:singleSelection="false" />
+
+        <TextView
+            android:id="@+id/itemTagsEmptyLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/label_item_tags_loading"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

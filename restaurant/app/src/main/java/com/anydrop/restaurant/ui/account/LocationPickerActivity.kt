@@ -8,6 +8,7 @@ import android.location.Location
 import android.location.LocationManager
 import android.os.Bundle
 import android.os.Looper
+import android.provider.Settings
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -74,9 +75,16 @@ class LocationPickerActivity : AppCompatActivity(), OnMapReadyCallback {
     // MapPinDropActivity's geocodeDebounceJob.
     private var geocodeDebounceJob: Job? = null
 
+    // Set by requestCurrentLocation() just before it launches the permission
+    // prompt (or calls fetchCurrentLocation() directly) so the eventual
+    // GPS-off check knows whether this particular request traces back to an
+    // explicit tap on btnUseCurrentLocation vs. the silent auto-call from
+    // onCreate() — see fetchCurrentLocation()'s kdoc for why that matters.
+    private var pendingRequestWasUserInitiated = false
+
     private val locationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) fetchCurrentLocation(recenter = true)
+            if (granted) fetchCurrentLocation(recenter = true, userInitiated = pendingRequestWasUserInitiated)
             else InAppNotifier.show(this, "Location permission denied", InAppNotifier.Type.INFO)
         }
 
@@ -100,7 +108,7 @@ class LocationPickerActivity : AppCompatActivity(), OnMapReadyCallback {
         binding.mapView.getMapAsync(this)
 
         binding.btnBack.setOnClickListener { finish() }
-        binding.btnUseCurrentLocation.setOnClickListener { requestCurrentLocation() }
+        binding.btnUseCurrentLocation.setOnClickListener { requestCurrentLocation(userInitiated = true) }
         binding.btnConfirmLocation.setOnClickListener { confirmLocation() }
 
         // Only auto-resolve device GPS on open if there's no existing
@@ -210,22 +218,40 @@ class LocationPickerActivity : AppCompatActivity(), OnMapReadyCallback {
 
     // ---- Current location ----
 
-    private fun requestCurrentLocation() {
+    /**
+     * @param userInitiated True when this traces back to an explicit tap on
+     *   btnUseCurrentLocation; false for the silent auto-call in onCreate().
+     *   Only the former is allowed to jump the user out to Location
+     *   Settings on a GPS-off check (see fetchCurrentLocation()) — the
+     *   auto-call on screen-open should never yank the user away from a
+     *   screen they didn't ask anything of yet.
+     */
+    private fun requestCurrentLocation(userInitiated: Boolean = false) {
+        pendingRequestWasUserInitiated = userInitiated
         val fineGranted = ContextCompat.checkSelfPermission(
             this, Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
         if (fineGranted) {
-            fetchCurrentLocation(recenter = true)
+            fetchCurrentLocation(recenter = true, userInitiated = userInitiated)
         } else {
             locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
 
-    private fun fetchCurrentLocation(recenter: Boolean) {
+    private fun fetchCurrentLocation(recenter: Boolean, userInitiated: Boolean = false) {
         val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
         val hasGps = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
         val hasNetwork = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
         if (!hasGps && !hasNetwork) {
+            if (userInitiated) {
+                // App-owner ask (HANDOVER_TAGS_FEATURE.md item 1) — take the
+                // user straight to the device's Location Settings screen so
+                // they can turn it on immediately. Only do this for the
+                // explicit-tap path; the silent onCreate() auto-call falls
+                // through to the comment below instead.
+                InAppNotifier.show(this, getString(R.string.location_gps_off), InAppNotifier.Type.INFO)
+                startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+            }
             // GPS off — leave the map on its default/existing center rather
             // than blocking; user can still drag the pin manually.
             return
