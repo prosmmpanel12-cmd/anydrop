@@ -548,9 +548,16 @@ class MenuFragment : Fragment() {
                 // back empty, for whatever reason (down, rate-limited, no
                 // results for this query). Iconify first since it's by
                 // far the largest/most reliable icon source when it's up.
+                // Google Material Icons + Flaticon added in the same
+                // 2026-08-20 pass to widen the chain to 5 sources total
+                // (Flaticon is key-gated like the photo chain's
+                // Pixabay/Pexels/Unsplash — see res/values/api_keys.xml).
+                val iconKeys = ExternalApiClient.readOptionalApiKeys(requireContext())
                 var results = ExternalApiClient.searchIconsIconify(query)
                 if (results.isEmpty()) results = ExternalApiClient.searchIconsOpenclipart(query)
                 if (results.isEmpty()) results = ExternalApiClient.searchIconsWikimedia(query)
+                if (results.isEmpty()) results = ExternalApiClient.searchIconsGoogleMaterial(query)
+                if (results.isEmpty()) results = ExternalApiClient.searchIconsFlaticon(query, iconKeys.flaticon)
                 iconSearchAdapter.submit(results)
                 setBusy(false)
                 setEmptyState(if (results.isEmpty()) getString(R.string.icon_picker_search_no_results) else null)

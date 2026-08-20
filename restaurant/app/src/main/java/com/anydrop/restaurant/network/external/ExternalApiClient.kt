@@ -95,6 +95,25 @@ interface UnsplashApi {
     ): Response<UnsplashSearchResponse>
 }
 
+/** Step 1 of Flaticon's two-step call (see [FlaticonAuthRequest]'s own
+ * kdoc) — exchanges the long-lived personal API key for a short-lived
+ * bearer token. */
+interface FlaticonAuthApi {
+    @retrofit2.http.POST("v3/app/authentication")
+    suspend fun authenticate(@retrofit2.http.Body body: FlaticonAuthRequest): Response<FlaticonLoginResponse>
+}
+
+/** Step 2 of Flaticon's two-step call — the actual icon search, using
+ * the bearer token [FlaticonAuthApi.authenticate] returned. */
+interface FlaticonSearchApi {
+    @GET("v3/search/icons")
+    suspend fun search(
+        @retrofit2.http.Header("Authorization") bearer: String,
+        @Query("q") query: String,
+        @Query("limit") limit: Int = 30
+    ): Response<FlaticonSearchResponse>
+}
+
 object ExternalApiClient {
 
     // Short, generous-but-bounded timeouts — these are best-effort search
@@ -146,6 +165,14 @@ object ExternalApiClient {
         retrofitFor("https://api.unsplash.com/").create(UnsplashApi::class.java)
     }
 
+    private val flaticonAuth: FlaticonAuthApi by lazy {
+        retrofitFor("https://api.flaticon.com/").create(FlaticonAuthApi::class.java)
+    }
+
+    private val flaticonSearch: FlaticonSearchApi by lazy {
+        retrofitFor("https://api.flaticon.com/").create(FlaticonSearchApi::class.java)
+    }
+
     // -------------------------------------------------------------
     // search*() wrappers — one per provider, each normalizing that
     // provider's own response shape into List<SearchResultImage> and
@@ -171,6 +198,103 @@ object ExternalApiClient {
 
     suspend fun searchIconsWikimedia(query: String): List<SearchResultImage> =
         searchWikimediaRaw(query, source = "wikimedia-icon")
+
+    private const val GOOGLE_ICONS_ASSET_FAMILY = "materialicons"
+    private const val GOOGLE_ICONS_ASSET_FILE = "24px.svg"
+
+    /** In-memory cache of the full Google icons catalog — fetched once
+     * (it's the same ~1MB response regardless of search query, there's no
+     * server-side filtering) and reused for every subsequent call in this
+     * process; see [GoogleIconsMetadataResponse]'s own kdoc. Not
+     * thread-safe against a genuine race on the very first concurrent
+     * calls, but worst case that's one duplicate network fetch, not a
+     * correctness bug — not worth a Mutex for a debounced search field. */
+    private var cachedGoogleIcons: List<GoogleIconMetadata>? = null
+
+    private suspend fun fetchGoogleIconsMetadata(): List<GoogleIconMetadata> {
+        cachedGoogleIcons?.let { return it }
+        return try {
+            val request = Request.Builder().url("https://fonts.google.com/metadata/icons").build()
+            val raw = client.newCall(request).execute().use { it.body?.string() } ?: return emptyList()
+            // Response body starts with an XSSI-protection line (")]}'")
+            // before the real JSON — skip to the first '{' rather than
+            // parsing that line.
+            val jsonStart = raw.indexOf('{')
+            if (jsonStart < 0) return emptyList()
+            val parsed = gson.fromJson(raw.substring(jsonStart), GoogleIconsMetadataResponse::class.java)
+            val icons = parsed?.icons.orEmpty()
+            cachedGoogleIcons = icons
+            icons
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    /** Free, no API key — see [GoogleIconsMetadataResponse]'s kdoc for why
+     * this filters a locally-cached catalog instead of calling a
+     * per-query search endpoint (Google's metadata endpoint doesn't have
+     * one). */
+    suspend fun searchIconsGoogleMaterial(query: String): List<SearchResultImage> = try {
+        val q = query.trim().lowercase()
+        fetchGoogleIconsMetadata()
+            .filter { icon ->
+                val name = icon.name?.lowercase().orEmpty()
+                name.contains(q) || icon.tags.orEmpty().any { it.lowercase().contains(q) }
+            }
+            .take(48)
+            .mapNotNull { icon ->
+                val name = icon.name ?: return@mapNotNull null
+                val version = icon.version ?: return@mapNotNull null
+                val svgUrl = "https://fonts.gstatic.com/s/i/$GOOGLE_ICONS_ASSET_FAMILY/$name/v$version/$GOOGLE_ICONS_ASSET_FILE"
+                SearchResultImage(previewUrl = svgUrl, downloadUrl = svgUrl, isSvg = true, source = "google-material-icons")
+            }
+    } catch (e: Exception) {
+        emptyList()
+    }
+
+    /** In-memory bearer-token cache for [searchIconsFlaticon] — Flaticon
+     * tokens expire after about an hour per Flaticon's own docs; refetched
+     * a little before that to stay safe. Keyed by nothing (this app only
+     * ever uses one Flaticon API key at a time) — just a token + the
+     * timestamp it was issued. */
+    private var flaticonToken: String? = null
+    private var flaticonTokenFetchedAt: Long = 0L
+    private val FLATICON_TOKEN_TTL_MS = 50 * 60 * 1000L // refresh a bit before the ~1hr expiry
+
+    private suspend fun getFlaticonToken(apiKey: String): String? {
+        val cached = flaticonToken
+        if (cached != null && System.currentTimeMillis() - flaticonTokenFetchedAt < FLATICON_TOKEN_TTL_MS) {
+            return cached
+        }
+        val token = flaticonAuth.authenticate(FlaticonAuthRequest(apiKey)).body()?.data?.token ?: return null
+        flaticonToken = token
+        flaticonTokenFetchedAt = System.currentTimeMillis()
+        return token
+    }
+
+    /** Only attempted when [apiKey] (res/values/api_keys.xml,
+     * `flaticon_api_key`) is non-blank — same key-gating as
+     * [searchPhotosPixabay]. See [FlaticonAuthRequest]'s kdoc for the
+     * two-step auth-then-search flow this wraps. */
+    suspend fun searchIconsFlaticon(query: String, apiKey: String): List<SearchResultImage> {
+        if (apiKey.isBlank()) return emptyList()
+        return try {
+            val token = getFlaticonToken(apiKey) ?: return emptyList()
+            flaticonSearch.search(bearer = "Bearer $token", query = query).body()?.data.orEmpty()
+                .mapNotNull { icon ->
+                    val images = icon.images ?: return@mapNotNull null
+                    // Prefer a small size for the grid preview and the
+                    // largest available for the actual download.
+                    val preview = images["64"] ?: images.values.minByOrNull { it.length }
+                    val download = images["512"] ?: images["256"] ?: images["128"]
+                        ?: images.values.maxByOrNull { it.length } ?: preview
+                    val url = download ?: preview ?: return@mapNotNull null
+                    SearchResultImage(previewUrl = preview ?: url, downloadUrl = url, source = "flaticon")
+                }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
 
     suspend fun searchPhotosOpenverse(query: String): List<SearchResultImage> = try {
         openverse.search(query).body()?.results.orEmpty().map {
@@ -319,16 +443,22 @@ object ExternalApiClient {
     private const val DUCKDUCKGO_USER_AGENT =
         "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36"
 
-    /** Read the three optional key resources once per call site — small
-     * enough (three string lookups) that there's no need to cache these;
+    /** Read the four optional key resources once per call site — small
+     * enough (four string lookups) that there's no need to cache these;
      * kept as a single helper so MenuFragment doesn't need to know the
-     * three individual resource ids. */
-    data class OptionalApiKeys(val pixabay: String, val pexels: String, val unsplash: String)
+     * four individual resource ids. */
+    data class OptionalApiKeys(
+        val pixabay: String,
+        val pexels: String,
+        val unsplash: String,
+        val flaticon: String
+    )
 
     fun readOptionalApiKeys(context: Context): OptionalApiKeys = OptionalApiKeys(
         pixabay = context.getString(R.string.pixabay_api_key),
         pexels = context.getString(R.string.pexels_api_key),
-        unsplash = context.getString(R.string.unsplash_access_key)
+        unsplash = context.getString(R.string.unsplash_access_key),
+        flaticon = context.getString(R.string.flaticon_api_key)
     )
 }
 

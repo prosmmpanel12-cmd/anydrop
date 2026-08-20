@@ -6,8 +6,9 @@ package com.anydrop.restaurant.network.external
  * [com.anydrop.restaurant.ui.menu.CategoryIconSearchAdapter] /
  * [com.anydrop.restaurant.ui.menu.CategoryPhotoSearchAdapter] and
  * MenuFragment's two search chains only ever deal with one type,
- * regardless of which of the seven providers below a given result
- * actually came from.
+ * regardless of which of the providers below a given result actually
+ * came from (9 as of the 2026-08-20 icon-chain expansion — see the
+ * "icon-chain expansion" section further down this file).
  *
  * [previewUrl] is what the search-results grid loads (small/fast);
  * [downloadUrl] is what gets fetched for real once the restaurant taps a
@@ -200,4 +201,74 @@ data class UnsplashPhoto(
 data class UnsplashPhotoUrls(
     val small: String? = null,
     val thumb: String? = null
+)
+
+// ---------------------------------------------------------------------
+// 2026-08-20 icon-chain expansion — app-owner asked for more icon
+// sources (Icons tab only had 3: Iconify/Openclipart/Wikimedia above).
+// Both providers below plug into the same "empty result -> try next
+// provider" chain in MenuFragment.runIconSearch(); see
+// [ExternalApiClient.searchIconsGoogleMaterial]/[searchIconsFlaticon]'s
+// own kdoc for how each one is actually called.
+// ---------------------------------------------------------------------
+
+/** Google Fonts' own public icon-metadata endpoint
+ * (`https://fonts.google.com/metadata/icons`) — free, no API key, no
+ * search query param at all: it returns the *entire* Material
+ * Symbols/Icons catalog (name + tags per icon) in one response, which
+ * [ExternalApiClient] fetches once and caches, then filters locally by
+ * [GoogleIconMetadata.name]/[GoogleIconMetadata.tags] per search call —
+ * see [ExternalApiClient.fetchGoogleIconsMetadata].
+ *
+ * The raw response body isn't valid JSON on its own: Google prefixes it
+ * with an XSSI-protection line (`)]}'`) before the actual `{...}` starts,
+ * which [ExternalApiClient.fetchGoogleIconsMetadata] strips before
+ * parsing. [asset_url_pattern] is the template
+ * (`/s/i/{family}/{icon}/v{version}/{asset}`) used together with [host]
+ * to build each icon's actual downloadable SVG URL. */
+data class GoogleIconsMetadataResponse(
+    val host: String? = null,
+    val asset_url_pattern: String? = null,
+    val icons: List<GoogleIconMetadata> = emptyList()
+)
+
+data class GoogleIconMetadata(
+    val name: String? = null,
+    /** Per-icon asset version — required to build that icon's URL from
+     * [GoogleIconsMetadataResponse.asset_url_pattern]; every icon can be
+     * on a different version, there's no single catalog-wide version. */
+    val version: Int? = null,
+    val tags: List<String>? = null,
+    val categories: List<String>? = null
+)
+
+/** Flaticon's v3 API — like Pixabay/Pexels/Unsplash above, free to sign
+ * up for but requires a personal key (developer.flaticon.com), so it's
+ * key-gated the same way; see res/values/api_keys.xml. Unlike the photo
+ * providers, Flaticon v3 is a two-step call: exchange the long-lived
+ * [apiKey] for a short-lived bearer token first
+ * ([ExternalApiClient.flaticonAuth]), then use that token on the actual
+ * search call ([ExternalApiClient.flaticonSearch]) — both steps live in
+ * [ExternalApiClient.searchIconsFlaticon], which also caches the token
+ * in memory so a fresh one isn't fetched on every keystroke. */
+data class FlaticonAuthRequest(val apiKey: String)
+
+data class FlaticonLoginResponse(
+    val data: FlaticonLoginData? = null
+)
+
+data class FlaticonLoginData(
+    val token: String? = null
+)
+
+data class FlaticonSearchResponse(
+    val data: List<FlaticonIcon> = emptyList()
+)
+
+data class FlaticonIcon(
+    val id: Long? = null,
+    /** Keyed by pixel size as a string (`"64"`, `"128"`, ...) rather than
+     * fixed field names — Flaticon returns whichever raster sizes exist
+     * for that particular icon, which isn't the same set for every icon. */
+    val images: Map<String, String>? = null
 )
