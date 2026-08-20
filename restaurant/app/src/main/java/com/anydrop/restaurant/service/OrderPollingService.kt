@@ -71,6 +71,7 @@ class OrderPollingService : Service() {
                     return@launch
                 }
                 pollOnce()
+                pollBellNotifications()
                 delay(POLL_INTERVAL_MS)
             }
         }
@@ -111,6 +112,36 @@ class OrderPollingService : Service() {
         }
     }
 
+    /** The "outside the app" counterpart to the in-app notification bell —
+     * see `OrderNotificationHelper.showBellNotification`'s kdoc. Runs every
+     * poll cycle alongside [pollOnce], on its own known-ids baseline
+     * (separate prefs key) and its own try/catch so a failure here can
+     * never affect the pending-order alarm path above. Skips anything
+     * whose title starts "New order" — [pollOnce] already fires the loud
+     * ringing alert for a genuinely new pending order in the same cycle,
+     * and if the backend also raises a bell entry for that same event,
+     * posting a second quiet notification for it would just double up. */
+    private suspend fun pollBellNotifications() {
+        try {
+            val api = ApiClient.create(applicationContext)
+            val result = api.getNotifications(page = 1, perPage = 20, unreadOnly = "1").body()?.data ?: return
+            val items = result.items
+            val currentIds = items.map { it.id }.toSet()
+            val knownIds = prefs.getStringSet(KEY_KNOWN_NOTIFICATION_IDS, null)?.mapNotNull { it.toIntOrNull() }?.toSet()
+
+            if (knownIds != null) {
+                items.filter { it.id !in knownIds && !it.title.startsWith("New order", ignoreCase = true) }
+                    .forEach { OrderNotificationHelper.showBellNotification(applicationContext, it) }
+            }
+            // else: first poll since this service (re)started — establish
+            // baseline without alerting, same reasoning as pollOnce().
+
+            prefs.edit().putStringSet(KEY_KNOWN_NOTIFICATION_IDS, currentIds.map { it.toString() }.toSet()).apply()
+        } catch (e: Exception) {
+            // Transient — next poll cycle retries, same as pollOnce()'s own catch.
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
@@ -122,6 +153,7 @@ class OrderPollingService : Service() {
         private const val POLL_INTERVAL_MS = 15000L
         private const val PREFS_NAME = "anydrop_restaurant_order_polling"
         private const val KEY_KNOWN_IDS = "known_pending_ids"
+        private const val KEY_KNOWN_NOTIFICATION_IDS = "known_bell_notification_ids"
 
         /** Idempotent — safe to call from every `MainActivity.onCreate()`,
          * whether or not the service is already running. */

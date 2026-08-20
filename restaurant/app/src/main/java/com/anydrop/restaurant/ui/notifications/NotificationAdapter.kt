@@ -42,6 +42,17 @@ class NotificationAdapter(
         notifyItemChanged(index)
     }
 
+    /** Opening the list itself counts as "seen" — flips every currently
+     * unread row to read locally, same reasoning as [markRead] but for
+     * all of them at once. Called from NotificationListActivity right
+     * after a fetch completes. */
+    fun markAllRead() {
+        for (i in items.indices) {
+            if (!items[i].isRead) items[i] = items[i].copy(isRead = true)
+        }
+        notifyDataSetChanged()
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val binding = ItemNotificationBinding.inflate(
             LayoutInflater.from(parent.context), parent, false

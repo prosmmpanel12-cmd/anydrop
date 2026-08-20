@@ -1,3 +1,37 @@
+## 2026-08-20 (even later) — Notification bell: 2 real-device bugs fixed — NOT built-verified
+
+App owner tested the bell on-device. Confirmed working, but flagged two
+gaps against expected behavior, both fixed this session:
+
+1. **No system/OS-level notification for bell items when the app is
+   closed** — the bell was pull-only (badge/list only refreshed on
+   `MainActivity` open). Fixed by piggybacking on the existing
+   `OrderPollingService` foreground poll loop: it now also calls
+   `getNotifications(unreadOnly=1)` each cycle and posts a normal
+   (non-alarm) system notification via a new
+   `OrderNotificationHelper.showBellNotification()` + new
+   `general_notifications_v1` channel for anything not seen before.
+   Deliberately skips items whose title starts "New order" to avoid
+   double-alerting alongside the existing loud `showNewOrderAlert()` path
+   for genuinely new pending orders. Tapping it opens
+   `NotificationListActivity` (not a specific order — the list's own
+   per-row deep-link handles that once opened).
+2. **Opening the bell didn't auto-mark everything read** — previously
+   only per-row taps marked read. `NotificationAdapter.markAllRead()`
+   (new) + a call in `NotificationListActivity.loadFirstPage()` now flips
+   every item to read locally the moment the list successfully loads
+   (matching standard notification-center UX), with the server call
+   fired in the background, non-fatal on failure.
+
+**Still not compiler-verified** — stacks on top of the same unconfirmed
+build referenced below. Get a fresh `:app:compileDebugKotlin` log before
+writing more code, same standing instruction as before.
+
+**Also confirmed done and tested on-device by the app owner this round:**
+category icon picker, add-menu/add-coupon bottom sheets, coupon system,
+crop screen/banner system — all five items from the prior pending-test
+list closed out.
+
 ## 2026-08-20 (latest) — Notification bell, Restaurant App Android UI — NOT built-verified, NOT tested
 
 Closes the gap flagged at the top of `NEXT_SESSION_PROMPT.md` — doc 18's

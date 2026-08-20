@@ -56,6 +56,7 @@ object OrderNotificationHelper {
 
     private const val CHANNEL_ID_NEW_ORDER = "new_order_alerts_v1"
     private const val CHANNEL_ID_MONITORING = "order_monitoring_v1"
+    private const val CHANNEL_ID_GENERAL = "general_notifications_v1"
 
     private val VIBRATION_PATTERN = longArrayOf(0, 400, 200, 400, 200, 400)
 
@@ -101,6 +102,75 @@ object OrderNotificationHelper {
             enableVibration(false)
         }
         manager.createNotificationChannel(monitoringChannel)
+
+        // Quiet, normal-priority channel for the notification-bell items
+        // (order accepted/rejected/ready, promo, system, security) — the
+        // "outside the app" counterpart to the in-app bell list. Deliberately
+        // NOT the loud alarm channel above: a fresh *pending* order already
+        // gets the full ringing treatment via showNewOrderAlert; this
+        // channel is for everything else the bell shows, at normal
+        // heads-up/shade behavior with the device's default notification
+        // sound, same as most apps' regular notifications.
+        val generalChannel = NotificationChannel(
+            CHANNEL_ID_GENERAL,
+            "Order & account updates",
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = "Order status changes, promos, and account notifications"
+            enableVibration(true)
+            val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            setSound(
+                soundUri,
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
+        }
+        manager.createNotificationChannel(generalChannel)
+    }
+
+    /** Posts a normal (non-looping, non-alarm) system notification for one
+     * notification-bell item — the "outside the app" counterpart to a row
+     * appearing in [com.anydrop.restaurant.ui.notifications.NotificationListActivity].
+     * Called from `OrderPollingService`'s poll loop for any bell item not
+     * already seen. Skipped for items that look like a brand-new pending
+     * order (title starting "New order") since [showNewOrderAlert] already
+     * covers that case loudly elsewhere in the same poll cycle — posting
+     * both would just double up on the same event.
+     *
+     * Tapping it opens [NotificationListActivity] directly (not a specific
+     * order screen) — the bell list itself handles the deep-link once
+     * opened, same as tapping a row there does, so there's no need to
+     * duplicate that per-type routing logic here. */
+    fun showBellNotification(context: Context, item: com.anydrop.restaurant.network.NotificationItem) {
+        val contentIntent = Intent(
+            context,
+            com.anydrop.restaurant.ui.notifications.NotificationListActivity::class.java
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            BELL_NOTIFICATION_ID_BASE + item.id,
+            contentIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID_GENERAL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(item.title)
+            .setContentText(item.body ?: "")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(item.body ?: ""))
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .build()
+
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        // Distinct id per item (offset well clear of the fixed ids below)
+        // so a burst of several updates stacks as separate notifications
+        // instead of overwriting one another.
+        manager.notify(BELL_NOTIFICATION_ID_BASE + item.id, notification)
     }
 
     /** The "new order" alert. Three things fire together:
@@ -312,6 +382,11 @@ object OrderNotificationHelper {
 
     const val MONITORING_NOTIFICATION_ID = 1001
     private const val NEW_ORDER_NOTIFICATION_ID = 1002
+
+    /** Base id for [showBellNotification] — actual id is this + the bell
+     * item's own id, keeping every bell notification's id well clear of
+     * the two fixed ids above and distinct from one another. */
+    private const val BELL_NOTIFICATION_ID_BASE = 10000
 
     /** Whether this app is currently allowed to launch [NewOrderAlarmActivity]
      * as a full-screen intent. On Android 14+ (API 34) this is `false` by
