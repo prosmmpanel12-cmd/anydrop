@@ -212,7 +212,7 @@ object ExternalApiClient {
         return try {
             pexels.search(apiKey = apiKey, query = query).body()?.photos.orEmpty().mapNotNull { photo ->
                 val url = photo.src?.medium ?: photo.src?.small ?: return@mapNotNull null
-                SearchResultImage(previewUrl = photo.src.small ?: url, downloadUrl = url, source = "pexels")
+                SearchResultImage(previewUrl = photo.src?.small ?: url, downloadUrl = url, source = "pexels")
             }
         } catch (e: Exception) {
             emptyList()
@@ -229,7 +229,7 @@ object ExternalApiClient {
             unsplash.search(clientIdHeader = "Client-ID $apiKey", query = query)
                 .body()?.results.orEmpty().mapNotNull { photo ->
                     val url = photo.urls?.small ?: photo.urls?.thumb ?: return@mapNotNull null
-                    SearchResultImage(previewUrl = photo.urls.thumb ?: url, downloadUrl = url, source = "unsplash")
+                    SearchResultImage(previewUrl = photo.urls?.thumb ?: url, downloadUrl = url, source = "unsplash")
                 }
         } catch (e: Exception) {
             emptyList()
@@ -252,29 +252,31 @@ object ExternalApiClient {
      * "return empty list, let the chain move on" way as the official
      * providers' own try/catch — nothing about this being scraped
      * instead of an official API changes how callers use it. */
-    suspend fun searchPhotosDuckDuckGoScrape(query: String): List<SearchResultImage> = try {
-        val vqd = fetchDuckDuckGoVqd(query) ?: return emptyList()
-        val request = Request.Builder()
-            .url(
-                "https://duckduckgo.com/i.js?l=us-en&o=json&q=" +
-                    java.net.URLEncoder.encode(query, "UTF-8") +
-                    "&vqd=$vqd&f=,,,&p=1"
-            )
-            .header("User-Agent", DUCKDUCKGO_USER_AGENT)
-            .header("Referer", "https://duckduckgo.com/")
-            .build()
-        val body = client.newCall(request).execute().use { it.body?.string() } ?: return emptyList()
-        val parsed = gson.fromJson(body, DuckDuckGoImageResponse::class.java) ?: return emptyList()
-        parsed.results.orEmpty().mapNotNull { result ->
-            val url = result.image ?: return@mapNotNull null
-            SearchResultImage(
-                previewUrl = result.thumbnail ?: url,
-                downloadUrl = url,
-                source = "duckduckgo-scrape"
-            )
+    suspend fun searchPhotosDuckDuckGoScrape(query: String): List<SearchResultImage> {
+        return try {
+            val vqd = fetchDuckDuckGoVqd(query) ?: return emptyList()
+            val request = Request.Builder()
+                .url(
+                    "https://duckduckgo.com/i.js?l=us-en&o=json&q=" +
+                        java.net.URLEncoder.encode(query, "UTF-8") +
+                        "&vqd=$vqd&f=,,,&p=1"
+                )
+                .header("User-Agent", DUCKDUCKGO_USER_AGENT)
+                .header("Referer", "https://duckduckgo.com/")
+                .build()
+            val body = client.newCall(request).execute().use { it.body?.string() } ?: return emptyList()
+            val parsed = gson.fromJson(body, DuckDuckGoImageResponse::class.java) ?: return emptyList()
+            parsed.results.orEmpty().mapNotNull { result ->
+                val url = result.image ?: return@mapNotNull null
+                SearchResultImage(
+                    previewUrl = result.thumbnail ?: url,
+                    downloadUrl = url,
+                    source = "duckduckgo-scrape"
+                )
+            }
+        } catch (e: Exception) {
+            emptyList()
         }
-    } catch (e: Exception) {
-        emptyList()
     }
 
     /** Step 1 of [searchPhotosDuckDuckGoScrape] — the `vqd` token is
@@ -296,7 +298,7 @@ object ExternalApiClient {
     private suspend fun searchOpenclipartRaw(query: String, source: String): List<SearchResultImage> = try {
         openclipart.search(query).body()?.payload.orEmpty().values.mapNotNull { item ->
             val url = item.svg?.png_thumb ?: item.svg?.url ?: return@mapNotNull null
-            SearchResultImage(previewUrl = url, downloadUrl = item.svg.url ?: url, source = source)
+            SearchResultImage(previewUrl = url, downloadUrl = item.svg?.url ?: url, source = source)
         }
     } catch (e: Exception) {
         emptyList()
