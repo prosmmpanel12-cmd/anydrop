@@ -122,7 +122,7 @@
          sets. -->
     <style name="Widget.AnydropRestaurant.Switch" parent="Widget.MaterialComponents.CompoundButton.Switch">
         <item name="track">@drawable/switch_track_pill</item>
-        <item name="thumb">@drawable/switch_thumb_pill</item>
+        <item name="android:thumb">@drawable/switch_thumb_pill</item>
         <item name="trackTint">@null</item>
         <item name="thumbTint">@null</item>
         <item name="showText">false</item>
