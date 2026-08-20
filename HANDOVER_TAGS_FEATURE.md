@@ -59,6 +59,47 @@
   "Pizza" chip ke neeche dikhna shuru ho jayega — koi extra customer-side
   kaam nahi chahiye tha.
 
+## 🐛 Bug fixes (screenshots, 2026-08-20)
+
+Two more app-owner reports, screenshots taken right after the item-tags +
+location-settings work above:
+
+1. **"Restaurant address" field stays blank after picking a location** —
+   real bug, not a migration issue. `EditProfileActivity`'s
+   `pickLocationLauncher` (map-picker result) was only reading
+   `EXTRA_RESULT_LAT` / `EXTRA_RESULT_LNG` off the result `Intent` and
+   silently dropping `EXTRA_RESULT_ADDRESS_LINE`, even though
+   `LocationPickerActivity` already reverse-geocodes the dropped pin and
+   sends that extra back. Fixed: now reads it and fills `inputAddress`
+   (map pick explicitly overwrites, same convention as the Customer app's
+   `MapPinDropActivity` caller). Separately, the "Use current location"
+   GPS row (`fetchCurrentLocationForRow()` / `onCurrentLocationResolved()`)
+   never reverse-geocoded at all — it only ever had lat/lng, no address
+   string to forward. Added a `reverseGeocodeAndFillAddress()` helper
+   (same on-device `Geocoder` call `LocationPickerActivity` uses) that now
+   runs after a GPS fix resolves and fills the same field; on any geocode
+   failure it just leaves the field alone for manual entry.
+   The "Current location used" / "Location set" row labels going green in
+   the screenshot were correct, working as designed — that's what made it
+   look like *only* the address text was broken, since lat/lng really was
+   being saved.
+
+2. **"Couldn't load tags — item will save without them" in Add Menu Item**
+   — checked `food-tags-list.php` and the client call end-to-end, code
+   looks correct on both sides (matches every other working
+   `restaurant/*.php` endpoint's shape/auth). This is almost certainly
+   exactly the risk item 4 (below) already flagged: `food-tags-list.php`
+   queries the `food_categories` table, which only exists once
+   **migration 05** (`backend/sql/05_migration_categories_and_tags.sql`)
+   has actually been run on the *live* DB — if it hasn't, that query
+   500s, the app's catch-block swallows it, and this fallback text is
+   exactly what shows. **Action needed on your end**: run
+   `05_migration_categories_and_tags.sql` against the live database (it's
+   idempotent/safe to re-run). If tags still fail to load after that,
+   send me the actual HTTP response/error from `food-tags-list.php` (or
+   server error log) and I'll dig further — but nothing in the endpoint
+   or client code itself looks broken.
+
 ## ⏳ Abhi baaki hai (agli session me karna hai)
 
 1. ~~**Location ON prompt**~~ — ✅ **is session me ho gaya.**

@@ -1,6 +1,7 @@
 package com.anydrop.restaurant.ui.account
 
 import android.content.Intent
+import android.location.Geocoder
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
@@ -138,6 +139,21 @@ class EditProfileActivity : AppCompatActivity() {
                     pickedLng = lng
                     pickedLocationSource = LocationSource.MAP
                     renderLocationRowState()
+                    // Bug fix (user report, 2026-08-20): LocationPickerActivity
+                    // already reverse-geocodes the dropped pin and returns it
+                    // as EXTRA_RESULT_ADDRESS_LINE, but this callback was only
+                    // ever reading the lat/lng extras — the "Restaurant
+                    // address" field above stayed blank even after a location
+                    // was clearly picked (rows below it correctly flipped to
+                    // "set" state, which is what made it look like only the
+                    // address half was broken). User explicitly placed this
+                    // pin, so overwrite the field outright — same "map
+                    // selection wins" convention the Customer app's own
+                    // MapPinDropActivity caller follows with resolvedAddressLine.
+                    val addressLine = data.getStringExtra(LocationPickerActivity.EXTRA_RESULT_ADDRESS_LINE)
+                    if (!addressLine.isNullOrBlank()) {
+                        binding.inputAddress.setText(addressLine)
+                    }
                 }
             }
         }
@@ -215,6 +231,31 @@ class EditProfileActivity : AppCompatActivity() {
         pickedLocationSource = LocationSource.GPS
         renderLocationRowState()
         InAppNotifier.show(this, getString(R.string.row_current_location_set), InAppNotifier.Type.SUCCESS)
+        reverseGeocodeAndFillAddress(location.latitude, location.longitude)
+    }
+
+    /** Same gap as pickLocationLauncher above (user report, 2026-08-20) —
+     * this GPS path only ever set pickedLat/pickedLng, never touched the
+     * "Restaurant address" field at all (LocationPickerActivity's map flow
+     * at least *had* a resolved address to forward, this one didn't even
+     * geocode). Runs the same on-device Geocoder call LocationPickerActivity
+     * uses; on any failure (no geocoder backend, network hiccup) just leaves
+     * the field as-is for the owner to fill in manually, same fallback
+     * reasoning as elsewhere in this app. */
+    private fun reverseGeocodeAndFillAddress(lat: Double, lng: Double) {
+        lifecycleScope.launch {
+            val addressLine = try {
+                val geocoder = Geocoder(this@EditProfileActivity, Locale.getDefault())
+                @Suppress("DEPRECATION")
+                val results = geocoder.getFromLocation(lat, lng, 1)
+                results?.firstOrNull()?.getAddressLine(0)
+            } catch (e: Exception) {
+                null
+            }
+            if (!addressLine.isNullOrBlank()) {
+                binding.inputAddress.setText(addressLine)
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
