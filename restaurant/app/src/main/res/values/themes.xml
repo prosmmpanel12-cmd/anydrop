@@ -119,7 +119,20 @@
          switchAvailable, switchIsVeg, switchPublic, switchTempClosed) —
          one shared style so all of them move together if this look ever
          changes again, instead of six separate copy-pasted attribute
-         sets. -->
+         sets.
+
+         `android:thumb` — SwitchCompat/SwitchMaterial reuses the
+         *framework* `android:thumb` attribute directly rather than
+         declaring a library attr of its own (that's exactly why the
+         unprefixed `thumb` item name failed to resolve at all: there IS
+         no androidx/material `attr/thumb`, only the framework one). Its
+         *track*, on the other hand, genuinely is the library's own
+         custom attr — `track` (no `android:` prefix) is correct there,
+         unlike thumb. Mixing this up (or prefixing both, or neither) is
+         exactly what broke the real Gradle build the first time this
+         was compiled (`aapt2` error, values.xml:7486 — "style attribute
+         'attr/thumb' not found"), caught from the build log rather than
+         by hand-inspection like everything else in this session. -->
     <style name="Widget.AnydropRestaurant.Switch" parent="Widget.MaterialComponents.CompoundButton.Switch">
         <item name="track">@drawable/switch_track_pill</item>
         <item name="android:thumb">@drawable/switch_thumb_pill</item>
