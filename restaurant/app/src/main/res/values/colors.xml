@@ -55,4 +55,7 @@
          green/red on/off scheme; every switch in the app is now orange
          (ON) / this grey (OFF) instead. -->
     <color name="switch_track_off">#D6D6D6</color>
+    <!-- 2026-08-20 — thumb now solid black (was white) per app-owner
+         reference: a small black-knob-on-orange-track pill. -->
+    <color name="switch_thumb_color">#1A1A1A</color>
 </resources>
