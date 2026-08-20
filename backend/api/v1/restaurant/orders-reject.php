@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/orders.php';
+require_once __DIR__ . '/../../../lib/notifications.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -44,6 +45,15 @@ $upd = $db->prepare(
 );
 $upd->execute(['r' => $reason, 'id' => $orderId]);
 insert_status_history($db, $orderId, 'rejected', 'restaurant', $owner['owner_id'], $reason);
+
+create_notification(
+    'customer',
+    (int) $order['customer_id'],
+    'Order rejected',
+    "Your order {$order['order_code']} was rejected: $reason",
+    'order',
+    ['order_id' => $orderId, 'screen' => 'order_status']
+);
 
 $fetch = $db->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');
 $fetch->execute(['id' => $orderId]);

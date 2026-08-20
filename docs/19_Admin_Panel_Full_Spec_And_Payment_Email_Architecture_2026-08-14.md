@@ -228,6 +228,27 @@ CREATE TABLE restaurant_categories (
 cuisine labels like "North Indian, Chinese" — category is the
 higher-level business-type filter).
 
+**Decision (app owner, 2026-08-20) — a *third*, separate thing from both
+of the above:** the Customer app's Home-screen category chip row
+(Pizza/Rolls/Burger/Biryani/... — `food_categories` table, added in
+`05_migration_categories_and_tags.sql` as part of the item-tags feature,
+see `HANDOVER_TAGS_FEATURE.md`) is **admin-managed only**. Restaurants do
+NOT get any create/edit/delete UI for `food_categories` itself — the
+restaurant app's "Tags" picker (`food-tags-list.php` /
+`dialog_add_menu_item.xml`, already built) only ever *selects from* the
+existing admin-defined list to tag their own menu items into it; it
+never adds a new chip to that list. So this admin panel needs its own
+CRUD screen over `food_categories` (list/add/edit/deactivate — same
+list-plus-form pattern as `backend/admin/index.php`'s restaurant-approval
+screen) — that screen doesn't exist yet, still TODO, and is the actual
+missing piece for "adding a new Home category". Kept as a separate note
+from the `restaurant_categories` table above because the two are easy to
+conflate by name alone: `restaurant_categories` = business type
+(Cafe/Bakery/Pharmacy, filters *which restaurants* show), `food_categories`
+= dish type (Pizza/Biryani, filters *which items* show under a Home chip,
+and is what an item's Tags picker writes into via
+`menu_item_categories`).
+
 ### Wallet
 🟡 new — no wallet system exists anywhere in the current schema.
 ```sql

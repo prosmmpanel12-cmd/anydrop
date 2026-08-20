@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/orders.php';
+require_once __DIR__ . '/../../../lib/notifications.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -54,6 +55,21 @@ $readyAtSql = $newStatus === 'ready' ? ', ready_at = NOW()' : '';
 $upd = $db->prepare("UPDATE orders SET status = :s $readyAtSql WHERE id = :id");
 $upd->execute(['s' => $newStatus, 'id' => $orderId]);
 insert_status_history($db, $orderId, $newStatus, 'restaurant', $owner['owner_id']);
+
+// 'preparing' is a low-signal internal step (the customer already knows
+// their order was accepted) — only 'ready' is worth a separate
+// notification, same "don't spam every micro-transition" instinct as the
+// rest of this project's notification/alert design.
+if ($newStatus === 'ready') {
+    create_notification(
+        'customer',
+        (int) $order['customer_id'],
+        'Order ready',
+        "Your order {$order['order_code']} is ready",
+        'order',
+        ['order_id' => $orderId, 'screen' => 'order_status']
+    );
+}
 
 $fetch = $db->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');
 $fetch->execute(['id' => $orderId]);

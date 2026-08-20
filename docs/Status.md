@@ -1,8 +1,109 @@
 # Anydrop — Project Status
 
-**Last Updated:** 2026-08-18 (Real fix for "sound/vibration inconsistent, nothing when app closed" — replaced the in-app MediaPlayer approach with a foreground Service + proper NotificationChannel. Needs a real-device retest, including with the app fully closed.)
+**Last Updated:** 2026-08-20 (later) — Notification bell, Type 1 (system-generated order events) started: backend built, **not tested yet** — see that entry below. Everything before that entry (both apps build clean, doc 22 fully done, everything tested) is still accurate and superseded-caveat status unchanged.
 
-## Session update (2026-08-18, latest) — Order alerts now use a foreground Service + NotificationChannel, not `OrdersFragment`'s poll loop
+**2026-08-20 (earlier):** 🎉 App owner confirmed a full pass: **both Customer App and Restaurant App now have a real GitHub Actions `BUILD SUCCESSFUL`** (Restaurant App's first-ever compiler-confirmed green build — see `docs/restorent/00_Status.md`'s 2026-08-20 entry for that track's detail), and every feature/fix tested on-device worked correctly, no bugs found. This includes doc 22's UI/UX overhaul (now fully complete, including illustration panels that were still open as of 2026-08-19) and the alert/alarm system, address-delete fix, and restaurant Accept/sound hardening documented below. Every "🟡 not build-verified"/"not yet tested on-device" caveat anywhere in this file, as of 2026-08-18, is now superseded — treat those as resolved unless a specific bug is separately called out. **Not superseded:** doc 20 (restaurant offers system) and doc 21 (production feature gap plan) — both remain planning-only, nothing built.
+
+## 2026-08-20 (later) — Notification bell, Type 1 (system-generated) — backend only, NOT tested yet
+
+Started doc 18's next feature-queue item. Scoped down first — "notification
+bell" turned out to mean two different things once discussed with the app
+owner:
+- **Type 1 (built this session):** system-generated notifications, fired
+  automatically off real events (new order, order accepted/rejected/ready).
+- **Type 2 (explicitly NOT built — separate future item):** admin-sent
+  broadcast notifications — optional image, targeted by area/radius or by
+  specific customer_ids, sent from an Admin Panel screen that doesn't exist
+  yet. Don't conflate the two; this session is Type 1 only.
+
+**What was built (backend only, per this session's own scope call —
+bell UI in both apps is the next piece, not done yet):**
+- **`backend/lib/notifications.php`** (new) — `create_notification()`
+  (mirrors `write_audit_log()`'s pattern; never throws outward, logs and
+  swallows on failure so a notification can't break the real action it's
+  attached to), `fetch_notifications()` (paginated, `unread_only` filter,
+  overfetch-by-one `has_more` convention already used elsewhere in this
+  project), `mark_notification_read()`, `mark_all_notifications_read()`.
+  Writes into the `notifications` table from `01_schema.sql` §7 — that
+  table already existed, fully designed, but nothing had ever written to
+  or read from it before this session.
+- **Wired into 4 existing order-lifecycle endpoints**, each call placed
+  after its DB write/transaction already committed (never inside):
+  - `orders/create.php` → notifies the **restaurant** ("New order
+    received"). Deliberately doesn't replace `OrderPollingService`'s
+    urgent sound/alarm path — this is the persistent look-back-later
+    record the bell list is for, not the urgent alert.
+  - `restaurant/orders-accept.php` → notifies the **customer** ("Order
+    accepted... ready in about N min").
+  - `restaurant/orders-reject.php` → notifies the **customer** ("Order
+    rejected: <reason>").
+  - `restaurant/orders-status.php` → notifies the **customer** only on
+    `ready` (not `preparing` — a low-signal internal step the customer
+    doesn't need a separate alert for, same "don't over-notify"
+    instinct as the rest of this project's alert design).
+- **New endpoints**, both apps, same shape:
+  - `GET /api/v1/customer/notifications` / `GET
+    /api/v1/restaurant/notifications` — paginated list
+    (`?page=&per_page=&unread_only=1`), returns `{items, has_more,
+    unread_count}`.
+  - `POST .../notifications/{id}/read` — mark one read.
+  - `POST .../notifications/read-all` — mark every unread one read (bell
+    list's "Mark all read" action).
+  - `.htaccess` routes added for all 6 new URL shapes (3 per app).
+
+**Deliberately NOT done this session:**
+- **No bell icon/badge/list screen in either app yet** — this was scoped
+  backend-only for this pass. The endpoints exist and are ready to call;
+  next session should build the Android side (bell + unread badge in the
+  top bar, a list screen reusing `activity_simple_list.xml`'s pattern
+  customer-side, tap-to-deep-link via each notification's `data.order_id`
+  + `data.screen`).
+- **No push (FCM)** — these are pull-only (the client has to call `GET
+  .../notifications` to see anything new; nothing pings the device). Same
+  standing gap as everywhere else in this project that could use real
+  push — flagged, not fixed, consistent with prior sessions' notes.
+- **Type 2 (admin broadcast)** — not started, see scope note above.
+  `lib/notifications.php` has a closing comment flagging that its
+  single-recipient shape shouldn't be stretched to fit Type 2 later; build
+  a separate targeting/fan-out layer on top instead.
+
+### 🟡 Not tested at all
+Nothing in this entry has touched a real device or a live DB — same
+standing sandbox caveat as always (no PHP CLI/DB here), plus this is
+brand-new code that's never run once. Brace/paren balance checked on
+every touched file (all balanced). Before anything else: place a real
+test order end to end and confirm a row actually lands in `notifications`
+for the restaurant, then accept/reject/mark-ready it and confirm a
+customer-side row lands each time; then hit the two `GET` endpoints
+directly (e.g. via browser/Postman with a real token) and confirm the
+JSON shape looks right and `unread_count` moves after a `read`/`read-all`
+call.
+
+---
+
+## 🎉 2026-08-20 — Full test pass confirmed on both apps, doc 22 fully done
+
+App owner tested everything pending across the whole project and got a
+real green Actions build for both apps. Result: **both apps build
+successfully via Gradle, and every feature/fix tested worked as
+expected — no bugs found.** Separately confirmed: doc 22 (UI/UX
+overhaul — dialogs modernization, bundled category-icon picker, coupon
+date-time picker, `is_public` toggle, and all illustration panels
+including the 6 that `docs/restorent/00_Status.md` had flagged as still
+open) is **fully built and tested**.
+
+**Not itemized line-by-line here** — confirmed as a whole rather than
+re-derived from a checklist. If any specific feature is later found
+broken, treat that as a regression to investigate fresh, not as evidence
+the confirmation was wrong.
+
+**Explicitly NOT included in this confirmation:** doc 20 (restaurant
+offers system — quantity/bundle deals, buy-X-get-Y, percentage/flat
+discounts, free delivery) and doc 21 (production feature gap plan) are
+still planning-only, nothing built. Don't read "everything tested" as
+covering those two.
+
+---
 
 App owner's follow-up after the previous hardening pass: **vibration
 worked sometimes, sound never did, and nothing happened at all once the

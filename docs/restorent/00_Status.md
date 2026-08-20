@@ -1,4 +1,41 @@
-## 2026-08-19 (j, newest) — Illustrations wired into 4 dialogs; 2 of those were built from scratch (didn't exist before), unverified
+## 2026-08-20 — 🎉 Build CONFIRMED GREEN (first time), doc 22 UI/UX overhaul fully complete, everything tested and working
+
+App owner confirmed: **a real GitHub Actions build succeeded (`BUILD
+SUCCESSFUL`) for the Restaurant App** — this is the first actual
+compiler confirmation this track has had; every prior session's "should
+compile, manually verified" caveat is now closed. Also confirmed: doc 22
+(UI/UX overhaul) is **fully done**, including the 6 illustration panels
+entry (j) below had explicitly left open (Success dialog, Upload
+Logo/Banner dialogs, Item Availability toggle, Update Available/
+Maintenance dialogs) — all built and wired since entry (j), on top of
+everything entry (j) already completed. Everything tested on-device,
+no bugs found.
+
+**Not itemized panel-by-panel here** — confirmed as a whole by the app
+owner rather than re-derived from a checklist. If any specific piece is
+later found broken, treat it as a fresh regression, not evidence this
+confirmation was wrong.
+
+**Doc 20 (restaurant offers system — quantity deals, buy-X-get-Y, etc.)
+is explicitly NOT part of this — still planning-only, nothing built.**
+Don't conflate the two; doc 22 (UI/UX) and doc 20 (offers) are separate
+docs, only doc 22 is done.
+
+**What's still genuinely open after this:**
+- Migrations still needing to be run against the live DB (per the old
+  NEXT_SESSION_PROMPT.md, worth reconfirming these actually ran):
+  `26_migration_address_delete_fk_fix.sql`,
+  `27_migration_coupon_archive.sql`, `28_migration_category_icon_key.sql`,
+  and confirm `23_migration_restaurant_banners.sql`/
+  `24_migration_default_radius_setting.sql` too.
+- Doc 18's feature queue, next up: Notification bell → Reviews reply →
+  Settings (GST/FSSAI/language/dark mode) → Payments/settlement →
+  Analytics → Staff management → Rider App last.
+- Doc 20 (restaurant offers system) — not started, planning-only.
+
+---
+
+
 
 App owner got confused why the app still looked unillustrated after
 entry (i) — clarified that the reference mockup they keep sending is a

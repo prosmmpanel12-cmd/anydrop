@@ -22,6 +22,7 @@ require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/orders.php';
+require_once __DIR__ . '/../../../lib/notifications.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -272,6 +273,20 @@ try {
 $fetch = $db->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');
 $fetch->execute(['id' => $orderId]);
 $order = $fetch->fetch();
+
+// Notify the restaurant of the new order — after commit, never inside it,
+// so a notification-write failure can never roll back a real order (see
+// lib/notifications.php's kdoc). OrderPollingService already covers the
+// urgent sound/alarm path on the restaurant app; this is the persistent
+// "you can look back at this later" record the bell list is for.
+create_notification(
+    'restaurant',
+    $restaurantId,
+    'New order received',
+    "Order $orderCode — ₹" . number_format((float) $order['grand_total'], 0),
+    'order',
+    ['order_id' => $orderId, 'screen' => 'order_detail']
+);
 
 respond_ok([
     'order' => format_order($db, $order),

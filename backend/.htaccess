@@ -23,6 +23,14 @@ RewriteRule ^api/v1/restaurant/orders/([0-9]+)/?$ api/v1/restaurant/orders-detai
 RewriteRule ^api/v1/restaurant/orders/([0-9]+)/accept/?$ api/v1/restaurant/orders-accept.php?id=$1 [L,QSA]
 RewriteRule ^api/v1/restaurant/orders/([0-9]+)/reject/?$ api/v1/restaurant/orders-reject.php?id=$1 [L,QSA]
 RewriteRule ^api/v1/restaurant/orders/([0-9]+)/status/?$ api/v1/restaurant/orders-status.php?id=$1 [L,QSA]
+
+# Notification bell (Type 1 — system-generated only, see lib/notifications.php)
+RewriteRule ^api/v1/restaurant/notifications/read-all/?$ api/v1/restaurant/notifications.php?action=read-all [L,QSA]
+RewriteRule ^api/v1/restaurant/notifications/([0-9]+)/read/?$ api/v1/restaurant/notifications.php?action=read&id=$1 [L,QSA]
+RewriteRule ^api/v1/restaurant/notifications/?$ api/v1/restaurant/notifications.php [L,QSA]
+RewriteRule ^api/v1/customer/notifications/read-all/?$ api/v1/customer/notifications.php?action=read-all [L,QSA]
+RewriteRule ^api/v1/customer/notifications/([0-9]+)/read/?$ api/v1/customer/notifications.php?action=read&id=$1 [L,QSA]
+RewriteRule ^api/v1/customer/notifications/?$ api/v1/customer/notifications.php [L,QSA]
 RewriteRule ^api/v1/restaurant/dashboard/?$ api/v1/restaurant/dashboard.php [L,QSA]
 RewriteRule ^api/v1/restaurant/status-update/?$ api/v1/restaurant/status-update.php [L,QSA]
 RewriteRule ^api/v1/customer/addresses/?$ api/v1/customer/addresses.php [L,QSA]

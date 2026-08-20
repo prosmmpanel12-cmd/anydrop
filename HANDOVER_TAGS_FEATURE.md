@@ -100,7 +100,21 @@ location-settings work above:
    server error log) and I'll dig further — but nothing in the endpoint
    or client code itself looks broken.
 
-## ⏳ Abhi baaki hai (agli session me karna hai)
+## 📌 Decision — Home category ownership (app owner, 2026-08-20)
+
+Confirmed scope boundary for the item-tags feature above: restaurants
+only ever **select from** the existing `food_categories` list to tag
+their own items (the Tags picker built above) — they never create a
+*new* Home-screen category. Adding/editing/deactivating a `food_categories`
+row (e.g. adding a "Momos" chip) is **admin-panel-only**, via a CRUD
+screen that doesn't exist yet (still just seeded via
+`05_migration_categories_and_tags.sql`). Full note + the
+`food_categories` vs `restaurant_categories` naming clarification is in
+`docs/19_Admin_Panel_Full_Spec_And_Payment_Email_Architecture_2026-08-14.md`
+under "Category Management" — that's where this CRUD screen should get
+built whenever the admin panel work picks up.
+
+
 
 1. ~~**Location ON prompt**~~ — ✅ **is session me ho gaya.**
    `EditProfileActivity.fetchCurrentLocationForRow()` aur
