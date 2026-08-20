@@ -539,16 +539,21 @@ class MenuFragment : Fragment() {
             setBusy(true)
             setEmptyState(null)
             viewLifecycleOwner.lifecycleScope.launch {
-                try {
-                    val response = ExternalApiClient.iconify.search(query)
-                    val ids = response.body()?.icons.orEmpty()
-                    iconSearchAdapter.submit(ids.map { com.anydrop.restaurant.network.external.IconifyResult(it) })
-                    setBusy(false)
-                    setEmptyState(if (ids.isEmpty()) getString(R.string.icon_picker_search_no_results) else null)
-                } catch (e: Exception) {
-                    setBusy(false)
-                    setEmptyState(getString(R.string.icon_picker_search_failed))
-                }
+                // Fallback chain (2026-08-20 — app-owner asked for more
+                // icon sources here too, alongside the Photos tab fix
+                // below). Each provider already swallows its own
+                // exceptions and returns an empty list on failure/timeout
+                // (see ExternalApiClient's search*() wrappers) — this
+                // just tries the next one whenever the current one comes
+                // back empty, for whatever reason (down, rate-limited, no
+                // results for this query). Iconify first since it's by
+                // far the largest/most reliable icon source when it's up.
+                var results = ExternalApiClient.searchIconsIconify(query)
+                if (results.isEmpty()) results = ExternalApiClient.searchIconsOpenclipart(query)
+                if (results.isEmpty()) results = ExternalApiClient.searchIconsWikimedia(query)
+                iconSearchAdapter.submit(results)
+                setBusy(false)
+                setEmptyState(if (results.isEmpty()) getString(R.string.icon_picker_search_no_results) else null)
             }
         }
 
@@ -562,16 +567,25 @@ class MenuFragment : Fragment() {
             setBusy(true)
             setEmptyState(null)
             viewLifecycleOwner.lifecycleScope.launch {
-                try {
-                    val response = ExternalApiClient.openverse.search(query)
-                    val results = response.body()?.results.orEmpty()
-                    photoSearchAdapter.submit(results)
-                    setBusy(false)
-                    setEmptyState(if (results.isEmpty()) getString(R.string.icon_picker_search_no_results) else null)
-                } catch (e: Exception) {
-                    setBusy(false)
-                    setEmptyState(getString(R.string.icon_picker_search_failed))
-                }
+                // Same fallback-chain reasoning as runIconSearch() above,
+                // just a longer chain (this is the tab that was actually
+                // reported broken) — Openverse first (real photos, best
+                // match for "search photos" when it's up), then two more
+                // official no-key sources, then the three key-gated ones
+                // (each a genuine no-op until a free key is filled in —
+                // see res/values/api_keys.xml), then the DuckDuckGo
+                // scrape as an absolute last resort.
+                val keys = ExternalApiClient.readOptionalApiKeys(requireContext())
+                var results = ExternalApiClient.searchPhotosOpenverse(query)
+                if (results.isEmpty()) results = ExternalApiClient.searchPhotosWikimedia(query)
+                if (results.isEmpty()) results = ExternalApiClient.searchPhotosOpenclipart(query)
+                if (results.isEmpty()) results = ExternalApiClient.searchPhotosPixabay(query, keys.pixabay)
+                if (results.isEmpty()) results = ExternalApiClient.searchPhotosPexels(query, keys.pexels)
+                if (results.isEmpty()) results = ExternalApiClient.searchPhotosUnsplash(query, keys.unsplash)
+                if (results.isEmpty()) results = ExternalApiClient.searchPhotosDuckDuckGoScrape(query)
+                photoSearchAdapter.submit(results)
+                setBusy(false)
+                setEmptyState(if (results.isEmpty()) getString(R.string.icon_picker_search_no_results) else null)
             }
         }
 
@@ -642,22 +656,25 @@ class MenuFragment : Fragment() {
 
     private enum class IconPickerTab { BUNDLED, ICONS, PHOTOS }
 
-    /** A picked Iconify search result — download+rasterize its SVG to a
-     * local PNG (via Coil's own SvgDecoder, so no extra SVG-rendering
-     * dependency is needed beyond the coil-svg artifact already added for
-     * the grid's own thumbnails) and stage it exactly like a gallery
-     * photo pick. [onDone] dismisses the picker dialog once staging
-     * finishes (success or failure — a failed download shouldn't leave
-     * the picker stuck open with no feedback). */
+    /** A picked icon-search result (Iconify/Openclipart/Wikimedia,
+     * whichever provider actually served it — see runIconSearch()'s
+     * fallback chain) — download it (rasterizing via Coil's SvgDecoder
+     * first when [com.anydrop.restaurant.network.external.SearchResultImage.isSvg]
+     * says the source is Iconify's SVG; every other provider's result is
+     * already a plain raster preview, no SVG step needed) to a local PNG
+     * and stage it exactly like a gallery photo pick. [onDone] dismisses
+     * the picker dialog once staging finishes (success or failure — a
+     * failed download shouldn't leave the picker stuck open with no
+     * feedback). */
     private fun onIconSearchResultPicked(
         dialogBinding: DialogAddCategoryBinding,
         pickerBinding: com.anydrop.restaurant.databinding.DialogCategoryIconPickerBinding,
-        result: com.anydrop.restaurant.network.external.IconifyResult,
+        result: com.anydrop.restaurant.network.external.SearchResultImage,
         onDone: () -> Unit
     ) {
         pickerBinding.searchProgress.visibility = View.VISIBLE
         viewLifecycleOwner.lifecycleScope.launch {
-            val localUri = downloadRemoteImageToLocalFile(result.svgUrl, isSvg = true, fileName = "category_icon_search.png")
+            val localUri = downloadRemoteImageToLocalFile(result.downloadUrl, isSvg = result.isSvg, fileName = "category_icon_search.png")
             pickerBinding.searchProgress.visibility = View.GONE
             if (localUri != null) {
                 pickedCategoryPhotoUri = localUri
@@ -670,18 +687,20 @@ class MenuFragment : Fragment() {
         }
     }
 
-    /** Same shape as [onIconSearchResultPicked], for a picked Openverse
-     * photo result — no SVG decoding needed here, just a plain
-     * network-image download to a local file. */
+    /** Same shape as [onIconSearchResultPicked], for a picked photo-search
+     * result (any of up to six providers plus the DuckDuckGo scrape
+     * fallback — see runPhotoSearch()'s chain) — none of the photo-chain
+     * providers return SVG content, so this never needs the SvgDecoder
+     * step, just a plain network-image download to a local file. */
     private fun onPhotoSearchResultPicked(
         dialogBinding: DialogAddCategoryBinding,
         pickerBinding: com.anydrop.restaurant.databinding.DialogCategoryIconPickerBinding,
-        image: com.anydrop.restaurant.network.external.OpenverseImage,
+        image: com.anydrop.restaurant.network.external.SearchResultImage,
         onDone: () -> Unit
     ) {
         pickerBinding.searchProgress.visibility = View.VISIBLE
         viewLifecycleOwner.lifecycleScope.launch {
-            val localUri = downloadRemoteImageToLocalFile(image.url, isSvg = false, fileName = "category_photo_search.jpg")
+            val localUri = downloadRemoteImageToLocalFile(image.downloadUrl, isSvg = false, fileName = "category_photo_search.jpg")
             pickerBinding.searchProgress.visibility = View.GONE
             if (localUri != null) {
                 pickedCategoryPhotoUri = localUri
