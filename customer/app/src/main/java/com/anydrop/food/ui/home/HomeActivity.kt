@@ -251,6 +251,11 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
             startActivity(Intent(this, com.anydrop.food.ui.profile.ProfileActivity::class.java))
         }
 
+        // Notification bell (Type 1, docs/Status.md 2026-08-20).
+        binding.btnNotifications.setOnClickListener {
+            startActivity(Intent(this, com.anydrop.food.ui.notifications.NotificationListActivity::class.java))
+        }
+
         // §1.6 stop-gap superseded by H6 — location bar now opens the
         // Location Picker screen (saved addresses list + tap-to-activate +
         // current-location + add) instead of jumping straight to the
@@ -279,6 +284,7 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
         loadPopularItems()
         updateCartBadge()
         loadPromoBanners()
+        updateNotificationBadge()
 
         // Custom animated bell popup first (screenshot reference), which
         // itself triggers the real POST_NOTIFICATIONS request on "Yes".
@@ -297,6 +303,7 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
     override fun onResume() {
         super.onResume()
         updateCartBadge()
+        updateNotificationBadge()
         // Bug fix (2026-08-10, H2) — a restaurant bookmarked on another
         // screen (e.g. RestaurantDetailActivity reached from a cart card)
         // used to only show as saved here after Home's data fully reloaded.
@@ -520,6 +527,36 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
             }
         } else {
             binding.cartBadge.visibility = android.view.View.GONE
+        }
+    }
+
+    /** Notification bell (Type 1, docs/Status.md 2026-08-20). Cart's badge
+     * is local-only (CartManager); this one needs a network round-trip
+     * since unread state lives server-side — fire-and-forget on every
+     * onCreate/onResume, same cadence updateCartBadge() already runs at.
+     * unread_only=1 + per_page=1 keeps the call cheap: only unread_count
+     * from the response envelope is used, not the single item it returns. */
+    private fun updateNotificationBadge() {
+        lifecycleScope.launch {
+            try {
+                val result = api.getNotifications(page = 1, perPage = 1, unreadOnly = "1").body()?.data
+                val count = result?.unreadCount ?: 0
+                if (count > 0) {
+                    binding.notificationBadge.text = if (count > 99) "99+" else count.toString()
+                    if (binding.notificationBadge.visibility != android.view.View.VISIBLE) {
+                        binding.notificationBadge.visibility = android.view.View.VISIBLE
+                        binding.notificationBadge.scaleX = 0f
+                        binding.notificationBadge.scaleY = 0f
+                        binding.notificationBadge.animate().scaleX(1f).scaleY(1f).setDuration(200).start()
+                    }
+                } else {
+                    binding.notificationBadge.visibility = android.view.View.GONE
+                }
+            } catch (e: Exception) {
+                // Silent — same "don't interrupt Home load over a badge
+                // count" reasoning as the rest of this screen's soft-fail
+                // network calls (loadPromoBanners, etc.). Next resume retries.
+            }
         }
     }
 

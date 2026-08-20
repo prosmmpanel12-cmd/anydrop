@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Notification bell count badge (docs/Status.md 2026-08-20, Restaurant
+    App mirror of the Customer App's bg_cart_badge). Small solid red oval
+    sitting on the bell icon's top-right corner in activity_main.xml's
+    top bar.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@color/nonveg_red" />
+</shape>

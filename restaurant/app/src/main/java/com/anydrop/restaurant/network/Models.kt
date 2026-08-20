@@ -362,3 +362,30 @@ data class FoodTagsListResult(val tags: List<FoodTag>)
 
 /** menu-item-photo-upload.php's response shape, mirrors LogoUploadResult. */
 data class MenuItemPhotoUploadResult(@SerializedName("image_url") val imageUrl: String)
+
+// ---- Notification bell (Type 1 — system-generated, docs/Status.md
+// 2026-08-20). Mirrors the Customer App's network/Models.kt entry of the
+// same name field-for-field — same backend lib (backend/lib/notifications.php)
+// serves both apps, just scoped to actor_type='restaurant' here. `data`
+// deserializes as a raw Map<String, Any?>? via Gson's default behavior,
+// same as the Customer App — read-only keyed access, no custom adapter
+// needed (e.g. data?.get("order_id")). ----
+
+data class NotificationItem(
+    val id: Int,
+    val title: String,
+    val body: String?,
+    val type: String, // "order" | "promo" | "system" | "security" — matches schema ENUM
+    @SerializedName("is_read") val isRead: Boolean,
+    val data: Map<String, Any?>?, // deep-link payload, e.g. {order_id, screen}
+    @SerializedName("created_at") val createdAt: String
+)
+
+data class NotificationsResult(
+    val items: List<NotificationItem>,
+    @SerializedName("has_more") val hasMore: Boolean,
+    @SerializedName("unread_count") val unreadCount: Int
+)
+
+data class MarkReadResult(val id: Int, @SerializedName("is_read") val isRead: Boolean)
+data class MarkAllReadResult(@SerializedName("marked_read") val markedRead: Int)

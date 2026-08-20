@@ -715,3 +715,25 @@ data class FaqsResult(val faqs: List<FaqEntry>)
 
 data class SubmitFeedbackBody(val message: String, val rating: Int? = null)
 data class SubmitFeedbackResult(val id: Int)
+
+// ---- Notification bell (docs/Status.md 2026-08-20 "Notification bell",
+// Type 1 — system-generated only; see backend/lib/notifications.php) ----
+
+data class NotificationItem(
+    val id: Int,
+    val title: String,
+    val body: String?,
+    val type: String, // "order" | "promo" | "system" | "security" — matches schema ENUM
+    @SerializedName("is_read") val isRead: Boolean,
+    val data: Map<String, Any?>?, // deep-link payload, e.g. {order_id, screen}
+    @SerializedName("created_at") val createdAt: String
+)
+
+data class NotificationsResult(
+    val items: List<NotificationItem>,
+    @SerializedName("has_more") val hasMore: Boolean,
+    @SerializedName("unread_count") val unreadCount: Int
+)
+
+data class MarkReadResult(val id: Int, @SerializedName("is_read") val isRead: Boolean)
+data class MarkAllReadResult(@SerializedName("marked_read") val markedRead: Int)

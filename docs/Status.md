@@ -1,6 +1,103 @@
 # Anydrop — Project Status
 
-**Last Updated:** 2026-08-20 (later) — Notification bell, Type 1 (system-generated order events) started: backend built, **not tested yet** — see that entry below. Everything before that entry (both apps build clean, doc 22 fully done, everything tested) is still accurate and superseded-caveat status unchanged.
+**Last Updated:** 2026-08-20 (even later) — Notification bell, Customer App Android UI built (bell icon + badge in Home top bar, notification list screen, mark-read/mark-all-read wiring) — **not build-verified, not tested on-device.** See that entry below. Everything before it is unchanged.
+
+## 2026-08-20 (even later) — Notification bell, Customer App Android UI — NOT tested, NOT build-verified
+
+Continues the "2026-08-20 (later)" entry directly below — that session built
+the Type 1 backend only and explicitly scoped out the Android side. This
+session did the Customer App half of that Android side. **Restaurant App
+Android side (bell + badge + list screen) is still not started** — same
+backend endpoints already support it, nothing app-side built yet.
+
+**What was built:**
+- `network/Models.kt` — `NotificationItem`, `NotificationsResult`,
+  `MarkReadResult`, `MarkAllReadResult`, matching `fetch_notifications()`'s
+  response shape exactly (`items`, `has_more`, `unread_count`; each item's
+  `data` deserializes as a raw `Map<String, Any?>?` via Gson's default
+  behavior — no custom type adapter needed since it's read-only, keyed
+  access, e.g. `data?.get("order_id")`).
+- `network/ApiService.kt` — `getNotifications()` (paginated,
+  `unread_only` query param), `markNotificationRead(id)`,
+  `markAllNotificationsRead()`. Calls `customer/notifications.php`
+  directly with `action`/`id` query params (same convention every other
+  endpoint in this file uses) rather than the `.htaccess` pretty-route
+  paths, which exist for direct-hit completeness but aren't what the app
+  itself calls.
+- `res/layout/item_notification.xml` (new) + `drawable/bg_notification_icon.xml`,
+  `drawable/bg_unread_dot.xml` (new) — card row: circular tinted icon
+  (type-mapped: order→`ic_restaurant`, promo→`ic_offer_tag`,
+  security→`ic_lock`, system/default→`ic_notification`), small red dot on
+  the icon corner when unread, title/body/timestamp. Timestamp reuses
+  `OrderHistoryAdapter.formatOrderDate()`'s exact "d MMM, h:mm a" pattern
+  (copy-pasted, not factored out yet — same as that function's own
+  history of being copy-pasted before `ScheduledTimeFormatter` existed;
+  a future session could fold this one in too if it recurs a third time).
+- `ui/notifications/NotificationAdapter.kt` (new) — same
+  `submit()`/`appendPage()`/single-item-patch shape as
+  `OrderHistoryAdapter` (`markRead(id)` here instead of `markRated(id)`).
+- `ui/notifications/NotificationListActivity.kt` (new) — reuses
+  `activity_simple_list.xml` exactly like `OrderHistoryActivity` does
+  (infinite scroll, swipe-refresh, empty state). `btnAction` (normally
+  "add" elsewhere) is repurposed here as "mark all read"
+  (`ic_check_circle`). Tapping a row: patches the adapter to read
+  locally + fires `markNotificationRead` (fire-and-forget, non-fatal on
+  failure — local state already shows read, next list fetch
+  self-corrects), then deep-links via the notification's own `data`
+  payload — currently only `{screen: "order_status", order_id}` is
+  handled (the only shape any Type 1 call site sends today, per
+  `orders/create.php` + the three `restaurant/orders-*.php` files) into
+  `OrderStatusActivity`. Unrecognized `screen` values just mark-read,
+  don't navigate — no crash on a missing/unexpected extra.
+- `AndroidManifest.xml` — registered `NotificationListActivity`.
+- `res/layout/activity_home.xml` — bell icon + count badge added to the
+  top bar between the cart icon and profile icon, same
+  `FrameLayout`-with-overlaid-`TextView` badge shape `btnCart`/`cartBadge`
+  already use (reused `bg_cart_badge` drawable for the badge itself, for
+  visual consistency with the existing cart badge in the same bar).
+- `ui/home/HomeActivity.kt` — `btnNotifications` click → launches
+  `NotificationListActivity`. `updateNotificationBadge()` (new) fetches
+  `unread_count` via `getNotifications(unread_only="1", per_page=1)` —
+  deliberately cheap (only the envelope's `unread_count` is used, not the
+  one item the call returns) — called from both `onCreate` and
+  `onResume`, same cadence `updateCartBadge()` already runs at. Network
+  failure is silent/non-fatal (same reasoning as this screen's other
+  soft-fail calls like `loadPromoBanners()`) — badge just doesn't update
+  until the next resume.
+
+**Manual verification done this session** (same standing sandbox
+limitation as everywhere else in this project — no Kotlin/Gradle compiler
+here): grepped every new/touched file's own `import` list against every
+type it references (`ItemNotificationBinding`, `NotificationItem`,
+`ActivitySimpleListBinding`, `ApiClient`, `InAppNotifier`,
+`OrderStatusActivity`, etc. — all present where used, none missing).
+Brace/paren balance checked on all 5 touched/new Kotlin files (all
+balanced). Confirmed `ic_check_circle.xml` and the three type-icon
+drawables referenced by `NotificationAdapter` already exist. Confirmed
+`R.string.notifications_title` / `empty_notifications` / `mark_all_read`
+were actually added to `strings.xml` and match what the activity calls.
+
+**🟡 Not tested at all / not build-verified** — same caveat as the Type 1
+backend entry below: nothing here has touched a real device, a live DB,
+or a Kotlin/Gradle compiler. Before anything else: confirm a Customer App
+build (Gradle/Actions), then on-device — place a test order, accept/
+reject/mark-ready it from the Restaurant App side (once that side can
+trigger it), confirm the bell badge appears on Home with the right count,
+open the list, confirm rows render with the right icon/read-state
+styling, tap a row and confirm it marks read + deep-links into
+`OrderStatusActivity` for the right order, tap "mark all read" and
+confirm the badge clears.
+
+**Deliberately NOT done this session:**
+- **Restaurant App Android side** — bell icon/badge in `MainActivity`'s
+  top bar + a list screen there, mirroring everything above. Backend
+  (`restaurant/notifications.php`) already supports it identically; only
+  the Android UI is missing. This is the natural next step.
+- **No push (FCM)** — still pull-only, same standing gap noted in the
+  backend entry below; the badge only updates on Home's own
+  onCreate/onResume, not live while the app sits open.
+- **No per-category notification-settings toggle** — doc 18 flags this
+  as a small follow-up once the bell exists at all; not started.
 
 **2026-08-20 (earlier):** 🎉 App owner confirmed a full pass: **both Customer App and Restaurant App now have a real GitHub Actions `BUILD SUCCESSFUL`** (Restaurant App's first-ever compiler-confirmed green build — see `docs/restorent/00_Status.md`'s 2026-08-20 entry for that track's detail), and every feature/fix tested on-device worked correctly, no bugs found. This includes doc 22's UI/UX overhaul (now fully complete, including illustration panels that were still open as of 2026-08-19) and the alert/alarm system, address-delete fix, and restaurant Accept/sound hardening documented below. Every "🟡 not build-verified"/"not yet tested on-device" caveat anywhere in this file, as of 2026-08-18, is now superseded — treat those as resolved unless a specific bug is separately called out. **Not superseded:** doc 20 (restaurant offers system) and doc 21 (production feature gap plan) — both remain planning-only, nothing built.
 

@@ -124,4 +124,29 @@ interface ApiService {
 
     @POST("restaurant/coupons-update.php")
     suspend fun updateCoupon(@Query("id") id: Int, @Body body: CouponUpdateBody): Response<ApiResponse<CouponResult>>
+
+    // ---- Notification bell (Type 1 — system-generated, docs/Status.md
+    // 2026-08-20). Mirrors the Customer App's ApiService entry of the same
+    // name — called against notifications.php directly with the action/id
+    // query params it expects, same convention as every other endpoint in
+    // this file (the .htaccess pretty routes exist for direct-hit
+    // completeness but the app talks to the .php file itself). ----
+
+    @GET("restaurant/notifications.php")
+    suspend fun getNotifications(
+        @Query("page") page: Int = 1,
+        @Query("per_page") perPage: Int = 20,
+        @Query("unread_only") unreadOnly: String? = null
+    ): Response<ApiResponse<NotificationsResult>>
+
+    @POST("restaurant/notifications.php")
+    suspend fun markNotificationRead(
+        @Query("action") action: String = "read",
+        @Query("id") id: Int
+    ): Response<ApiResponse<MarkReadResult>>
+
+    @POST("restaurant/notifications.php")
+    suspend fun markAllNotificationsRead(
+        @Query("action") action: String = "read-all"
+    ): Response<ApiResponse<MarkAllReadResult>>
 }

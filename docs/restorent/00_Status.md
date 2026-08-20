@@ -1,4 +1,119 @@
-## 2026-08-20 — 🎉 Build CONFIRMED GREEN (first time), doc 22 UI/UX overhaul fully complete, everything tested and working
+## 2026-08-20 (latest) — Notification bell, Restaurant App Android UI — NOT built-verified, NOT tested
+
+Closes the gap flagged at the top of `NEXT_SESSION_PROMPT.md` — doc 18's
+next feature-queue item was "Notification bell → Restaurant App side,"
+since the Customer App side (see `docs/Status.md`'s 2026-08-20 "even
+later" entry) was already done and the backend
+(`backend/api/v1/restaurant/notifications.php`,
+`backend/lib/notifications.php`) already supports this app identically.
+This session built the Restaurant App's Android UI to match — mirrors
+the Customer App's implementation file-for-file, adapted to this app's
+different screen structure (bottom-nav + fragments instead of
+activity-per-screen, one shared top bar instead of a per-screen bell).
+
+**What was built:**
+- **`network/Models.kt`** — added `NotificationItem`, `NotificationsResult`,
+  `MarkReadResult`, `MarkAllReadResult`, field-for-field identical to the
+  Customer App's models of the same name (same backend lib serves both,
+  scoped to `actor_type='restaurant'` server-side).
+- **`network/ApiService.kt`** — added `getNotifications()`,
+  `markNotificationRead(id)`, `markAllNotificationsRead()`, hit directly
+  against `restaurant/notifications.php` with `action`/`id` query params,
+  same convention every other endpoint in this file already uses.
+- **`res/drawable/bg_notification_badge.xml`, `bg_notification_icon.xml`,
+  `bg_unread_dot.xml`** (all new) — this app had no badge/icon-background
+  drawables to reuse the way the Customer App's `bg_cart_badge` was
+  reused for its own notification badge; built fresh, same visual idea.
+- **`res/layout/item_notification.xml`** (new) — same structure/IDs as
+  the Customer App's layout of the same name, so
+  `NotificationAdapter.kt`'s binding code is a straight port.
+- **`res/layout/activity_notification_list.xml`** (new) — this app had
+  no reusable "simple list" screen shell the way the Customer App's
+  `activity_simple_list.xml` is shared across several screens there, so
+  this one is purpose-built for `NotificationListActivity` specifically.
+  Same IDs as the Customer App equivalent regardless — could be
+  generalized into a shared shell later if a second screen wants the
+  same shape.
+- **`ui/notifications/NotificationAdapter.kt`** (new) — same
+  `submit()`/`appendPage()`/single-item-`markRead()` shape as the
+  Customer App's adapter. **Icon mapping differs**, since this app has
+  no `ic_restaurant`/`ic_offer_tag` drawables: order→`ic_store`,
+  promo→`ic_percent`, security→`ic_lock`, default→`ic_notification`
+  (itself bell-shaped, also reused for the top-bar button below).
+- **`ui/notifications/NotificationListActivity.kt`** (new) — same
+  infinite-scroll/swipe-refresh/mark-all-read shape as the Customer App's
+  activity. Deep-links via the notification's `data` payload
+  (`{screen: "order_status", order_id}`, the only shape any Type 1 call
+  site sends) into **`OrderDetailActivity`** — this app's equivalent of
+  the Customer App's `OrderStatusActivity`. Unrecognized `screen` values
+  just mark-read, no crash.
+- **`AndroidManifest.xml`** — registered `NotificationListActivity`.
+- **`res/values/strings.xml`** — added `notifications_title`,
+  `mark_all_read`, `empty_notifications` (none existed before).
+- **`res/layout/activity_main.xml`** — bell icon + count badge added to
+  the shared top bar (the one place common to all four bottom-nav tabs,
+  per `MainActivity`'s own kdoc reasoning for why the OPEN/CLOSED switch
+  lives there too), between the restaurant name and the switch. Same
+  FrameLayout-with-overlaid-TextView badge shape the Customer App's Home
+  top bar uses. **Also added a missing `xmlns:tools` namespace** this
+  file didn't have before — needed for the new badge's
+  `tools:visibility="visible"` preview attribute; caught before it could
+  become a build error.
+- **`ui/main/MainActivity.kt`** — `btnNotifications` click → launches
+  `NotificationListActivity`. `updateNotificationBadge()` (new) fetches
+  `unread_count` via `getNotifications(unreadOnly="1", perPage=1)`, same
+  cheap-envelope-only pattern as the Customer App's version — called
+  from both `onCreate` and `onResume`, alongside the existing
+  `loadOperationalStatus()` call at the same cadence. Network failure is
+  silent/non-fatal, same reasoning as that function's other soft-fail
+  calls.
+
+**Verification done this session** (same standing sandbox limitation as
+everywhere else — no Android SDK/Gradle here): brace/paren balance
+checked across every `.kt` file in the Restaurant App module (clean —
+two pre-existing mismatches in untouched `network/external/*.kt` files
+turned out to be false positives from braces inside doc-comment example
+strings, not real code). Every `binding.X` reference in
+`NotificationAdapter.kt`, `NotificationListActivity.kt`, and
+`MainActivity.kt` cross-checked against its layout's actual
+`android:id` values — all match exactly, nothing orphaned in either
+direction. Confirmed View Binding is enabled in this module's
+`build.gradle` and that the new layout filenames generate the exact
+binding class names imported (`activity_notification_list.xml` →
+`ActivityNotificationListBinding`, `item_notification.xml` →
+`ItemNotificationBinding`). Confirmed `SwipeRefreshLayout`, `CardView`,
+and `RecyclerView` dependencies were already declared in `build.gradle`
+— no new Gradle dependency needed. All new/touched XML files
+(3 layouts, 3 drawables, strings.xml, AndroidManifest.xml) parsed as
+well-formed XML. `InAppNotifier.show()` and `ApiClient.create()`
+signatures confirmed to match every call site. `OrderDetailActivity
+.EXTRA_ORDER_ID` confirmed to exist and match the Customer App's
+`OrderStatusActivity.EXTRA_ORDER_ID` naming.
+
+**🟡 Not tested at all / not build-verified** — nothing here has
+touched a real device, a live DB, or a Kotlin/Gradle compiler. Same
+caveat as literally everything else in this project. Before anything
+else next session: **confirm a Restaurant App build** (this was already
+`NEXT_SESSION_PROMPT.md`'s top priority before this session even
+started, now with this session's new surface stacked on top too), then
+on-device — place a test order, confirm the bell badge appears with the
+right count, open the list, confirm rows render with correct
+icon/read-state styling, tap a row and confirm it marks read + opens
+`OrderDetailActivity` for the right order, tap "mark all read" and
+confirm the badge clears.
+
+**Deliberately NOT done this session:**
+- **No push (FCM)** — still pull-only, same standing gap as the Customer
+  App side; badge only updates on `MainActivity`'s own
+  `onCreate`/`onResume`, not live while the app sits open.
+- **No per-category notification-settings toggle** — same as the
+  Customer App side, not started.
+- Nothing else from doc 18's feature queue (Reviews reply, Settings,
+  Payments/settlement, Analytics, Staff management, Rider App) touched.
+
+---
+
+
 
 App owner confirmed: **a real GitHub Actions build succeeded (`BUILD
 SUCCESSFUL`) for the Restaurant App** — this is the first actual

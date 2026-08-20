@@ -96,6 +96,11 @@
             android:name=".ui.orderdetail.OrderDetailActivity"
             android:exported="false" />
 
+        <!-- Notification bell (Type 1, docs/Status.md 2026-08-20). -->
+        <activity
+            android:name=".ui.notifications.NotificationListActivity"
+            android:exported="false" />
+
         <!-- Account tab / Edit Profile (docs/restorent/19 §7, §10 item 5,
              NEXT_SESSION_PROMPT.md item 1). -->
         <activity

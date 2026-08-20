@@ -173,4 +173,28 @@ interface ApiService {
 
     @POST("customer/reviews.php")
     suspend fun submitReview(@Body body: SubmitReviewBody): Response<ApiResponse<SubmitReviewResult>>
+
+    // ---- Notification bell (Type 1 — system-generated, docs/Status.md
+    // 2026-08-20). Called against notifications.php directly with the
+    // action/id query params it expects, same convention as every other
+    // endpoint here (the .htaccess pretty routes exist for direct-hit
+    // completeness but the app talks to the .php file itself). ----
+
+    @GET("customer/notifications.php")
+    suspend fun getNotifications(
+        @Query("page") page: Int = 1,
+        @Query("per_page") perPage: Int = 20,
+        @Query("unread_only") unreadOnly: String? = null
+    ): Response<ApiResponse<NotificationsResult>>
+
+    @POST("customer/notifications.php")
+    suspend fun markNotificationRead(
+        @Query("action") action: String = "read",
+        @Query("id") id: Int
+    ): Response<ApiResponse<MarkReadResult>>
+
+    @POST("customer/notifications.php")
+    suspend fun markAllNotificationsRead(
+        @Query("action") action: String = "read-all"
+    ): Response<ApiResponse<MarkAllReadResult>>
 }

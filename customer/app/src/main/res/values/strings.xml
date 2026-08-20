@@ -162,6 +162,11 @@
     <string name="hint_feedback_message">Tell us what\'s on your mind</string>
     <string name="empty_addresses">No saved addresses yet</string>
     <string name="empty_orders">No orders yet</string>
+
+    <!-- Notification bell (Type 1, docs/Status.md 2026-08-20) -->
+    <string name="notifications_title">Notifications</string>
+    <string name="empty_notifications">No notifications yet</string>
+    <string name="mark_all_read">Mark all read</string>
     <string name="empty_saved_restaurants">No saved restaurants yet</string>
     <string name="empty_saved_dishes">No saved dishes yet</string>
     <string name="empty_faqs">No FAQs available right now</string>

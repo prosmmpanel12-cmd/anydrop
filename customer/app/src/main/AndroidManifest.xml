@@ -111,6 +111,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".ui.notifications.NotificationListActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".ui.profile.SavedActivity"
             android:exported="false" />
 

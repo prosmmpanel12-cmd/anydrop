@@ -23,6 +23,7 @@ import com.anydrop.restaurant.ui.common.InAppNotifier
 import com.anydrop.restaurant.ui.insights.InsightsFragment
 import com.anydrop.restaurant.ui.login.LoginActivity
 import com.anydrop.restaurant.ui.menu.MenuFragment
+import com.anydrop.restaurant.ui.notifications.NotificationListActivity
 import com.anydrop.restaurant.ui.orders.OrdersFragment
 import kotlinx.coroutines.launch
 
@@ -118,11 +119,18 @@ class MainActivity : AppCompatActivity() {
             onStatusSwitchToggled(isChecked)
         }
 
+        // Notification bell (Type 1, docs/Status.md 2026-08-20) — mirrors
+        // the Customer App's HomeActivity wiring of the same feature.
+        binding.btnNotifications.setOnClickListener {
+            startActivity(Intent(this, NotificationListActivity::class.java))
+        }
+
         if (savedInstanceState == null) {
             binding.bottomNav.selectedItemId = R.id.nav_orders
         }
 
         loadOperationalStatus()
+        updateNotificationBadge()
         promptFullScreenIntentIfNeeded()
     }
 
@@ -131,11 +139,43 @@ class MainActivity : AppCompatActivity() {
         // Covers e.g. coming back from the (not-yet-built) profile screen —
         // cheap enough to just re-fetch rather than pass a result back.
         loadOperationalStatus()
+        updateNotificationBadge()
         // Multiple-new-orders alerts route here (Orders tab) rather than a
         // specific OrderDetailActivity — opening this screen counts as
         // "went in and did something" too, so stop the ringing loop the
         // same way OrderDetailActivity does.
         OrderNotificationHelper.stopRingingLoop(applicationContext)
+    }
+
+    /** Cheap unread-count refresh for the top-bar bell badge — no push
+     * channel yet, so this is pull-only, same cadence/reasoning as
+     * loadOperationalStatus() above: called from both onCreate and
+     * onResume since unread state lives server-side. unread_only=1 +
+     * per_page=1 keeps the call cheap: only unread_count from the
+     * response envelope is used, not the single item it returns. Mirrors
+     * the Customer App's HomeActivity.updateNotificationBadge(). */
+    private fun updateNotificationBadge() {
+        lifecycleScope.launch {
+            try {
+                val result = api.getNotifications(page = 1, perPage = 1, unreadOnly = "1").body()?.data
+                val count = result?.unreadCount ?: 0
+                if (count > 0) {
+                    binding.notificationBadge.text = if (count > 99) "99+" else count.toString()
+                    if (binding.notificationBadge.visibility != android.view.View.VISIBLE) {
+                        binding.notificationBadge.visibility = android.view.View.VISIBLE
+                        binding.notificationBadge.scaleX = 0f
+                        binding.notificationBadge.scaleY = 0f
+                        binding.notificationBadge.animate().scaleX(1f).scaleY(1f).setDuration(200).start()
+                    }
+                } else {
+                    binding.notificationBadge.visibility = android.view.View.GONE
+                }
+            } catch (e: Exception) {
+                // Silent — same "don't interrupt Home load over a badge
+                // count" reasoning as loadOperationalStatus() above. Next
+                // resume retries.
+            }
+        }
     }
 
     /** "Ringing screen never opens, only the plain notification shows" fix

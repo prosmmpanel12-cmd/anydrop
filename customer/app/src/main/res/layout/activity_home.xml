@@ -71,6 +71,44 @@
 
         </FrameLayout>
 
+        <!-- Notification bell (Type 1, docs/Status.md 2026-08-20). Same
+             FrameLayout+badge shape as btnCart above, one slot to its
+             left so cart/profile positions don't shift. -->
+        <FrameLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="14dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:padding="8dp">
+
+            <ImageView
+                android:id="@+id/btnNotifications"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:padding="2dp"
+                android:src="@drawable/ic_notification"
+                app:tint="@color/white" />
+
+            <TextView
+                android:id="@+id/notificationBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|end"
+                android:minWidth="17dp"
+                android:minHeight="17dp"
+                android:gravity="center"
+                android:paddingHorizontal="3dp"
+                android:background="@drawable/bg_cart_badge"
+                android:text="0"
+                android:textColor="@color/white"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                android:elevation="4dp" />
+
+        </FrameLayout>
+
         <ImageView
             android:id="@+id/btnProfile"
             android:layout_width="24dp"
