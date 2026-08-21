@@ -120,6 +120,24 @@ class NotificationListActivity : AppCompatActivity() {
                 adapter.submit(items)
                 binding.emptyState.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
                 binding.contentList.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
+
+                // Auto-mark-as-read: opening the bell is itself the "seen"
+                // signal — matches standard notification-center UX, and
+                // the same behavior the Restaurant App's bell already has.
+                // 2026-08-21 — this was missing here, which is why the
+                // Customer App bell wasn't auto-clearing on open.
+                if ((result?.unreadCount ?: 0) > 0) {
+                    adapter.markAllRead()
+                    lifecycleScope.launch {
+                        try {
+                            api.markAllNotificationsRead()
+                        } catch (e: Exception) {
+                            // Non-fatal — local state already shows read; a
+                            // stale server-side unread flag self-corrects
+                            // next list fetch.
+                        }
+                    }
+                }
             } catch (e: Exception) {
                 InAppNotifier.show(this@NotificationListActivity, "Couldn't load notifications", InAppNotifier.Type.ERROR)
             } finally {

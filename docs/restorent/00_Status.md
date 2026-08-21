@@ -1,3 +1,42 @@
+## 2026-08-21 (later) — Full round of confirmations from app owner + Customer App auto-mark-read bug fixed
+
+App owner confirmed, on-device:
+- **Gradle build passes for both apps** — first real compiler confirmation
+  covering all four stacked Restaurant App layers (Phase 3, Phase 4
+  toggle redesign + revert, MenuFragment.kt import fix, notification
+  bell) and the new Customer App `OrderUpdatePollingService` surface.
+- **5 pending DB migrations (23–24, 26–28) — confirmed run** against the
+  live DB.
+- **Restaurant App bell, full end-to-end** — badge count, row icon/read-
+  state, tap→correct order, mark-all-read→badge clears. All working.
+- **Customer-side order-status notifications** ("Order accepted",
+  "Preparing your order", "Order ready") — working, both in-app and as
+  system notifications outside the app.
+- **Category icon picker, add-menu/add-coupon bottom sheets, coupon
+  system, crop screen/banner system** — re-confirmed working (see prior
+  entry same day).
+- **Coupon-sheet-stays-open-on-validation-error** — app owner signed off,
+  this is the intended behavior, no longer needs a nod.
+- **Edit Profile, Location picker, Menu tab drag-reorder + photo upload**
+  — all confirmed working.
+
+**Bug found and fixed:** Customer App bell wasn't auto-marking read on
+open — the fix built for the Restaurant App's `NotificationAdapter`/
+`NotificationListActivity` earlier this session was never mirrored onto
+the Customer App's copy of those same two files. Added the identical
+`markAllRead()` (adapter) + auto-call-on-load (activity) to
+`customer/.../ui/notifications/NotificationAdapter.kt` and
+`NotificationListActivity.kt`. **Not yet built/device-verified** — same
+standing instruction, confirm compile before further work, then re-test
+this specific flow on the Customer App.
+
+**Remaining pending, everything else now closed out:**
+- Reviews reply, Settings, Payments, Analytics, Staff management, Rider
+  App — still queued, not started
+- Phases 4–6 of the UI/UX overhaul (beyond the already-done toggle
+  redesign) — still open, priority vs. doc 18's feature queue unconfirmed
+  with app owner
+
 ## 2026-08-21 — Customer-side order notifications ("Order accepted", "Preparing your order", etc.) — NOT built-verified
 
 App owner request: send customers the same kind of update notifications
