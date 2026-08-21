@@ -101,6 +101,12 @@
             android:name=".ui.notifications.NotificationListActivity"
             android:exported="false" />
 
+        <!-- Reviews reply (docs/restorent/00_Status.md, this session). -->
+        <activity
+            android:name=".ui.reviews.ReviewListActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- Account tab / Edit Profile (docs/restorent/19 §7, §10 item 5,
              NEXT_SESSION_PROMPT.md item 1). -->
         <activity

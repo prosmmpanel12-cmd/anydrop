@@ -176,6 +176,24 @@
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground" />
 
+                <!-- Reviews row (docs/restorent/00_Status.md, this
+                     session) — opens ReviewListActivity. Same row style
+                     as the rows above. -->
+                <TextView
+                    android:id="@+id/btnReviewsRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_card_rounded"
+                    android:padding="16dp"
+                    android:text="@string/account_row_reviews"
+                    android:textColor="@color/anydrop_primary"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground" />
+
                 <!-- Temporarily closed toggle — sends operational_status:
                      "temp_closed" via the existing updateOperationalStatus()
                      call. Distinct from the top bar's own OPEN/CLOSED pill,

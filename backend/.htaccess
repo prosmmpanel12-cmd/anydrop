@@ -46,5 +46,9 @@ RewriteRule ^api/v1/customer/feedback/?$ api/v1/customer/feedback.php [L,QSA]
 # Part 13 — Rating system
 RewriteRule ^api/v1/customer/reviews/?$ api/v1/customer/reviews.php [L,QSA]
 
+# Reviews reply — restaurant reads its reviews and replies
+RewriteRule ^api/v1/restaurant/reviews/?$ api/v1/restaurant/reviews.php [L,QSA]
+RewriteRule ^api/v1/restaurant/reviews/([0-9]+)/reply/?$ api/v1/restaurant/reviews.php?id=$1 [L,QSA]
+
 # H5 — Checkout "View all offers & coupons" page
 RewriteRule ^api/v1/coupons/?$ api/v1/coupons/list.php [L,QSA]

@@ -12,19 +12,31 @@
  * trail every other sensitive action in this codebase uses
  * (lib/audit.php) — same actor_type as restaurant/customer logins, so
  * `audit_logs` stays one consistent table across the whole platform.
+ *
+ * Gated on `restaurants_view` (not `dashboard_view`) since this page's
+ * actual content is the restaurant list/approval queue — `dashboard_
+ * view` is reserved for a future general stats dashboard (recall.md
+ * Phase A item 3), a different, not-yet-built page. A Restaurant
+ * Manager role (restaurants_view/edit/approve only, no dashboard_view)
+ * must be able to reach this page.
  */
 
 require_once __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../lib/audit.php';
 
 $admin = admin_require_login();
+admin_require_permission($admin, 'restaurants_view');
 $db = Database::get();
 
 $flash = null;
 $flashType = 'success';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!admin_verify_csrf($_POST['csrf_token'] ?? '')) {
+    if (!admin_has_permission($admin['id'], 'restaurants_approve')) {
+        http_response_code(403);
+        $flash = 'Your role doesn\'t have the restaurants_approve permission.';
+        $flashType = 'error';
+    } elseif (!admin_verify_csrf($_POST['csrf_token'] ?? '')) {
         $flash = 'Session expired — please try again.';
         $flashType = 'error';
     } else {
@@ -70,64 +82,21 @@ $pending = $db->query(
 )->fetchAll();
 
 $csrf = admin_csrf_token();
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Anydrop Admin — Pending Restaurants</title>
-<style>
-    :root { color-scheme: light; }
-    body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: #f4f5f7; margin: 0; color: #1a1a1a; }
-    header { background: #fff; border-bottom: 1px solid #eaeaea; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
-    header h1 { font-size: 17px; margin: 0; }
-    header a { color: #888; font-size: 13px; text-decoration: none; }
-    header a:hover { text-decoration: underline; }
-    main { max-width: 900px; margin: 24px auto; padding: 0 16px; }
-    .flash { padding: 12px 16px; border-radius: 8px; margin-bottom: 18px; font-size: 14px; }
-    .flash.success { background: #e6f4ea; color: #1e7e34; }
-    .flash.error { background: #fdecea; color: #b3261e; }
-    .empty { background: #fff; border-radius: 10px; padding: 40px 24px; text-align: center; color: #888; }
-    .card { background: #fff; border-radius: 10px; padding: 18px 20px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
-    .card h2 { font-size: 16px; margin: 0 0 4px; }
-    .meta { font-size: 13px; color: #666; line-height: 1.6; margin: 10px 0; }
-    .meta strong { color: #333; }
-    .actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
-    .btn { padding: 8px 16px; border: none; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; }
-    .btn-approve { background: #1e7e34; color: #fff; }
-    .btn-approve:hover { background: #17672a; }
-    .btn-reject { background: #fff; color: #b3261e; border: 1px solid #b3261e; }
-    .btn-reject:hover { background: #fdecea; }
-    .reject-box { display: none; margin-top: 10px; }
-    .reject-box.open { display: block; }
-    .reject-box textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #ddd; border-radius: 7px; font-size: 13px; font-family: inherit; min-height: 60px; resize: vertical; }
-    .reject-box .btn { margin-top: 8px; }
-    .waiting { font-size: 12px; color: #999; }
-</style>
-</head>
-<body>
-<header>
-    <h1>Anydrop Admin — Pending Restaurants (<?= count($pending) ?>)</h1>
-    <div>
-        <span style="font-size:13px; color:#888; margin-right:14px;"><?= admin_escape($admin['username']) ?></span>
-        <a href="logout.php">Log out</a>
-    </div>
-</header>
-<main>
-    <?php if ($flash): ?>
-        <div class="flash <?= $flashType ?>"><?= $flash ?></div>
-    <?php endif; ?>
+$canApprove = admin_has_permission($admin['id'], 'restaurants_approve');
 
+$pageTitle = 'Pending Restaurants (' . count($pending) . ')';
+$activeNav = 'approvals';
+require __DIR__ . '/_layout_head.php';
+?>
     <?php if (empty($pending)): ?>
         <div class="empty">No restaurants waiting for approval right now.</div>
     <?php endif; ?>
 
     <?php foreach ($pending as $r): ?>
-        <div class="card">
+        <div class="card" style="margin-bottom:14px;">
             <h2><?= admin_escape($r['name']) ?></h2>
-            <span class="waiting">Applied <?= admin_escape($r['created_at']) ?></span>
-            <div class="meta">
+            <span class="muted">Applied <?= admin_escape($r['created_at']) ?></span>
+            <div class="muted" style="font-size:13px; line-height:1.7; margin:10px 0; color:var(--text);">
                 <strong>Owner:</strong> <?= admin_escape($r['owner_name'] ?: '—') ?><br>
                 <strong>Mobile:</strong> <?= admin_escape($r['owner_mobile'] ?: '—') ?> &nbsp;·&nbsp;
                 <strong>Email:</strong> <?= admin_escape($r['owner_email']) ?><br>
@@ -136,26 +105,38 @@ $csrf = admin_csrf_token();
                 <strong>GST:</strong> <?= admin_escape($r['gst_number'] ?: '—') ?> &nbsp;·&nbsp;
                 <strong>FSSAI:</strong> <?= admin_escape($r['fssai_number'] ?: '—') ?>
             </div>
-            <div class="actions">
+            <?php if ($canApprove): ?>
+            <div class="row-actions">
                 <form method="post" style="display:inline;">
                     <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
                     <input type="hidden" name="restaurant_id" value="<?= (int) $r['id'] ?>">
                     <input type="hidden" name="action" value="approve">
-                    <button type="submit" class="btn btn-approve" onclick="return confirm('Approve <?= admin_escape(addslashes($r['name'])) ?>?');">Approve</button>
+                    <button type="submit" class="btn btn-approve"
+                        data-confirm-title="Approve <?= admin_escape($r['name']) ?>?"
+                        data-confirm-text="They'll be able to go live and start receiving orders."
+                        data-confirm-ok-label="Approve">Approve</button>
                 </form>
-                <button type="button" class="btn btn-reject" onclick="document.getElementById('reject-<?= (int) $r['id'] ?>').classList.toggle('open');">Reject</button>
+                <button type="button" class="btn btn-outline danger" data-open-dialog="reject-<?= (int) $r['id'] ?>">Reject</button>
             </div>
-            <div class="reject-box" id="reject-<?= (int) $r['id'] ?>">
-                <form method="post">
-                    <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
-                    <input type="hidden" name="restaurant_id" value="<?= (int) $r['id'] ?>">
-                    <input type="hidden" name="action" value="reject">
-                    <textarea name="reason" placeholder="Reason for rejecting (shown to the restaurant)" required></textarea>
-                    <button type="submit" class="btn btn-reject">Confirm Reject</button>
-                </form>
-            </div>
+            <dialog class="modal" id="reject-<?= (int) $r['id'] ?>">
+                <div class="modal-body">
+                    <h3 class="modal-title">Reject <?= admin_escape($r['name']) ?></h3>
+                    <form method="post">
+                        <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
+                        <input type="hidden" name="restaurant_id" value="<?= (int) $r['id'] ?>">
+                        <input type="hidden" name="action" value="reject">
+                        <label class="field-label">Reason (shown to the restaurant)</label>
+                        <textarea name="reason" style="width:100%; min-height:80px;" required></textarea>
+                        <div class="modal-actions" style="margin-top:14px;">
+                            <button type="button" class="btn btn-outline" data-close-dialog>Cancel</button>
+                            <button type="submit" class="btn btn-outline danger">Confirm Reject</button>
+                        </div>
+                    </form>
+                </div>
+            </dialog>
+            <?php else: ?>
+            <div class="muted">View only — your role doesn't include restaurant approval.</div>
+            <?php endif; ?>
         </div>
     <?php endforeach; ?>
-</main>
-</body>
-</html>
+<?php require __DIR__ . '/_layout_foot.php'; ?>

@@ -1,0 +1,12 @@
+<!-- Reviews reply (docs/restorent/00_Status.md, this session) — send/
+     paper-plane icon for the reply submit button in item_review.xml. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?attr/colorControlNormal">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M2,21 L23,12 L2,3 L2,10 L17,12 L2,14 Z"/>
+</vector>

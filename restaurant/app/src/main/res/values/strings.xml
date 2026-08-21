@@ -334,4 +334,15 @@
     <string name="notifications_title">Notifications</string>
     <string name="mark_all_read">Mark all as read</string>
     <string name="empty_notifications">No notifications yet</string>
+
+    <!-- Reviews reply (docs/restorent/00_Status.md, this session) -->
+    <string name="reviews_title">Reviews</string>
+    <string name="empty_reviews">No reviews yet</string>
+    <string name="review_your_reply_label">Your reply</string>
+    <string name="review_edit_reply">Edit reply</string>
+    <string name="review_reply_hint">Write a reply…</string>
+    <string name="review_reply_sent">Reply sent</string>
+    <string name="review_reply_failed">Couldn\'t send reply</string>
+    <string name="review_reply_empty">Write something before sending</string>
+    <string name="account_row_reviews">Reviews</string>
 </resources>

@@ -149,4 +149,22 @@ interface ApiService {
     suspend fun markAllNotificationsRead(
         @Query("action") action: String = "read-all"
     ): Response<ApiResponse<MarkAllReadResult>>
+
+    // ---- Reviews reply (docs/restorent/00_Status.md, this session).
+    // Calls reviews.php directly with the id/reply query+body params it
+    // expects — same "app talks to the .php file, pretty route exists
+    // for completeness" convention as notifications above. ----
+
+    @GET("restaurant/reviews.php")
+    suspend fun getReviews(
+        @Query("page") page: Int = 1,
+        @Query("per_page") perPage: Int = 20,
+        @Query("unreplied_only") unrepliedOnly: String? = null
+    ): Response<ApiResponse<ReviewsResult>>
+
+    @POST("restaurant/reviews.php")
+    suspend fun replyToReview(
+        @Query("id") id: Int,
+        @Body body: ReviewReplyBody
+    ): Response<ApiResponse<ReviewReplyResult>>
 }

@@ -389,3 +389,33 @@ data class NotificationsResult(
 
 data class MarkReadResult(val id: Int, @SerializedName("is_read") val isRead: Boolean)
 data class MarkAllReadResult(@SerializedName("marked_read") val markedRead: Int)
+
+// ---- Reviews reply (docs/restorent/00_Status.md, this session).
+// backend/api/v1/restaurant/reviews.php's response shape. `restaurantReply`
+// is null until the restaurant has replied — that's the signal the UI
+// uses to switch a row between "reply" input and "your reply" display,
+// same null-as-state-flag convention `rejectionReason`/etc. use elsewhere
+// in this codebase rather than a separate has-replied boolean. ----
+
+data class Review(
+    val id: Int,
+    @SerializedName("order_id") val orderId: Int,
+    @SerializedName("customer_name") val customerName: String?,
+    @SerializedName("restaurant_rating") val restaurantRating: Int?,
+    @SerializedName("food_rating") val foodRating: Int?,
+    @SerializedName("delivery_rating") val deliveryRating: Int?,
+    val comment: String?,
+    @SerializedName("restaurant_reply") val restaurantReply: String?,
+    @SerializedName("created_at") val createdAt: String
+)
+
+data class ReviewsResult(
+    val items: List<Review>,
+    val page: Int,
+    @SerializedName("per_page") val perPage: Int,
+    val total: Int,
+    @SerializedName("has_more") val hasMore: Boolean
+)
+
+data class ReviewReplyBody(val reply: String)
+data class ReviewReplyResult(val review: Review)

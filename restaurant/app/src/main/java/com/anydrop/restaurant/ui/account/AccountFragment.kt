@@ -87,6 +87,12 @@ class AccountFragment : Fragment() {
             startActivity(Intent(requireContext(), CouponManagerActivity::class.java))
         }
 
+        // Reviews reply (docs/restorent/00_Status.md, this session) —
+        // same row style/placement as Banners/Coupons above.
+        binding.btnReviewsRow.setOnClickListener {
+            startActivity(Intent(requireContext(), com.anydrop.restaurant.ui.reviews.ReviewListActivity::class.java))
+        }
+
         binding.switchTempClosed.setOnCheckedChangeListener { _, isChecked ->
             if (suppressTempClosedListener) return@setOnCheckedChangeListener
             setTempClosed(isChecked)

@@ -1,3 +1,71 @@
+## 2026-08-21 (even later) — Reviews reply: backend + Restaurant App UI built — NOT DB/build-verified
+
+Starting the next queued feature (doc 18's queue, item after notification
+bell): restaurant-side reply to customer reviews. `reviews.restaurant_reply`
+already existed in 01_schema.sql (designed early, unused) — this session
+wires it up, backend only.
+
+**New:** `backend/api/v1/restaurant/reviews.php`
+- `GET /api/v1/restaurant/reviews` — paginated, newest first, optional
+  `?unreplied_only=1`. Joins `customers` for `customer_name`.
+- `POST /api/v1/restaurant/reviews/{id}/reply` — sets/updates
+  `restaurant_reply`, ownership-checked against the caller's restaurant_id
+  (403 if the review belongs to a different restaurant, 404 if it doesn't
+  exist), 2000-char cap. Editing an existing reply is allowed (no
+  one-shot lock) — but `create_notification()` only fires on the *first*
+  reply per review (`$wasUnreplied` check) so an edit doesn't re-notify a
+  customer who already saw it.
+
+**Migration:** `31_migration_notification_type_review.sql` — widens
+`notifications.type` ENUM to add `'review'` (only had order/promo/system/
+security). Plain `MODIFY COLUMN`, no CONTINUE-HANDLER guard needed —
+unlike an `ADD COLUMN`, re-running an ENUM `MODIFY` with the same target
+list doesn't error, so it's naturally idempotent.
+
+**Routing:** two new rules in `backend/.htaccess`, same
+`{id}/reply` pattern as `orders/{id}/status`.
+
+**Not verified — same standing sandbox limitation as every other entry
+here:** no PHP CLI and no DB access in this environment, so this is
+manual-review-only (checked: brace balance, every `respond_error()` call
+confirmed to `exit` via `response.php` so no fallthrough, `customers.name`
+column confirmed nullable-but-present in schema, ENUM widening syntax).
+Needs an actual request against the live DB before trusting it.
+
+**Also done this session:** `customer/reviews.php`'s GET now includes
+`restaurant_reply` in its response (was missing — the review row existed
+but the field wasn't selected/returned), so the Customer App can show it
+once that UI exists.
+
+**Restaurant App (Android) UI — built this session too:**
+- `ui/reviews/ReviewListActivity.kt` + `ReviewAdapter.kt` — reuses
+  `activity_notification_list.xml` as the generic list shell that
+  file's own comment already flagged as generalizable, instead of a new
+  duplicate layout. Same infinite-scroll pagination shape as
+  `NotificationListActivity`.
+- `item_review.xml` — star row (5 fixed ImageViews, tinted filled/
+  outline in code, no rating-bar library), comment, and a reply
+  input-or-display block (`replyGroup` vs. `repliedGroup`, mutually
+  exclusive per row based on whether `restaurant_reply` is null).
+  Editing an existing reply re-opens the input pre-filled, tracked via
+  `ReviewAdapter`'s `editingIds` set so it survives RecyclerView recycle.
+- New `network/Models.kt` entries (`Review`, `ReviewsResult`,
+  `ReviewReplyBody`, `ReviewReplyResult`) and two new `ApiService.kt`
+  calls (`getReviews`, `replyToReview`) — same "call the .php file
+  directly with its query params" convention as every other endpoint in
+  that interface.
+- Two new drawables this app didn't have before: `ic_star.xml` (was
+  never needed restaurant-side until now), `ic_send.xml` (reply submit
+  button).
+- Entry point: new "Reviews" row in `fragment_account.xml` /
+  `AccountFragment.kt`, same style/placement as the existing Banners/
+  Coupons rows.
+
+**Not built yet:** the Customer App UI to display `restaurant_reply`
+where it shows a submitted review (backend field is ready, see above).
+That + this feature's own build/device verification are the natural
+next steps.
+
 ## 2026-08-21 (later) — Full round of confirmations from app owner + Customer App auto-mark-read bug fixed
 
 App owner confirmed, on-device:

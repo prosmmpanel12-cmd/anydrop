@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     }
 
     $stmt = $db->prepare(
-        'SELECT id, order_id, restaurant_rating, food_rating, delivery_rating, comment, created_at
+        'SELECT id, order_id, restaurant_rating, food_rating, delivery_rating, comment, restaurant_reply, created_at
          FROM reviews WHERE order_id = :oid AND customer_id = :cid LIMIT 1'
     );
     $stmt->execute(['oid' => $orderId, 'cid' => $owner['owner_id']]);
@@ -55,6 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         'food_rating' => $review['food_rating'] !== null ? (int) $review['food_rating'] : null,
         'delivery_rating' => $review['delivery_rating'] !== null ? (int) $review['delivery_rating'] : null,
         'comment' => $review['comment'],
+        'restaurant_reply' => $review['restaurant_reply'],
         'created_at' => $review['created_at'],
     ]]);
 }
