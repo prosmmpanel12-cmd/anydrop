@@ -1,3 +1,30 @@
+## 2026-08-21 — Customer-side order notifications ("Order accepted", "Preparing your order", etc.) — NOT built-verified
+
+App owner request: send customers the same kind of update notifications
+the restaurant bell now gets, both in the bell and as a real system
+notification outside the app.
+
+**Backend:** `create_notification()` for 'customer' already existed for
+accept/reject (unchanged). Added the missing 'preparing' step to
+`orders-status.php` — previously skipped as "low-signal"; app owner wants
+it as its own step, not just silence between accepted and ready.
+
+**Customer App (Android):** had no equivalent of the restaurant app's
+`OrderPollingService` — added `OrderUpdatePollingService`, deliberately
+scoped differently: restaurant polls constantly while logged in (business
+tool), this one only runs while ≥1 order is active and stops itself the
+moment none are (no persistent "checking for updates" icon for a rare
+event). New `anydrop_order_updates` channel (`IMPORTANCE_HIGH`) +
+`NotificationHelper.showOrderUpdateNotification()`. Started from
+`CheckoutActivity` (right after placing an order) and
+`OrderStatusActivity.onCreate()` (covers reopening into an already-active
+order), both idempotent/additive. Manifest updated with
+`FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_DATA_SYNC` permissions and the
+service declaration (`foregroundServiceType="dataSync"`, required API 34+).
+
+**Still not compiler-verified**, same standing instruction — get a fresh
+`:app:compileDebugKotlin` (both apps now) before writing more code.
+
 ## 2026-08-20 (even later) — Notification bell: 2 real-device bugs fixed — NOT built-verified
 
 App owner tested the bell on-device. Confirmed working, but flagged two

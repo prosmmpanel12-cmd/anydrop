@@ -53,6 +53,11 @@ class OrderStatusActivity : AppCompatActivity() {
         binding.btnBackHome.setOnClickListener { goHome() }
         binding.btnCancelOrder.setOnClickListener { cancelOrder() }
 
+        // Covers reopening the app straight into an already-active order
+        // (process was killed, or the poller was never started this
+        // session) — idempotent/additive, see the service's kdoc.
+        com.anydrop.food.notifications.OrderUpdatePollingService.start(this, orderId)
+
         loadScheduledFor()
         startPolling()
     }

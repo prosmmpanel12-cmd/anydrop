@@ -56,16 +56,20 @@ $upd = $db->prepare("UPDATE orders SET status = :s $readyAtSql WHERE id = :id");
 $upd->execute(['s' => $newStatus, 'id' => $orderId]);
 insert_status_history($db, $orderId, $newStatus, 'restaurant', $owner['owner_id']);
 
-// 'preparing' is a low-signal internal step (the customer already knows
-// their order was accepted) — only 'ready' is worth a separate
-// notification, same "don't spam every micro-transition" instinct as the
-// rest of this project's notification/alert design.
-if ($newStatus === 'ready') {
+// Every restaurant-driven status step gets its own notification —
+// 'preparing' included, per app owner request (2026-08-21): customers
+// want to see "Preparing your order" as its own step, not just silence
+// between "accepted" and "ready".
+$statusNotifications = [
+    'preparing' => ['title' => 'Preparing your order', 'body' => "Your order {$order['order_code']} is being prepared"],
+    'ready' => ['title' => 'Order ready', 'body' => "Your order {$order['order_code']} is ready"],
+];
+if (isset($statusNotifications[$newStatus])) {
     create_notification(
         'customer',
         (int) $order['customer_id'],
-        'Order ready',
-        "Your order {$order['order_code']} is ready",
+        $statusNotifications[$newStatus]['title'],
+        $statusNotifications[$newStatus]['body'],
         'order',
         ['order_id' => $orderId, 'screen' => 'order_status']
     );

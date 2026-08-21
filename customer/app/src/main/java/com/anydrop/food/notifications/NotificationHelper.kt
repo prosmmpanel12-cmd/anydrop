@@ -35,9 +35,20 @@ object NotificationHelper {
     // generic "come order something") — letting the user mute one without
     // muting the other.
     const val CHANNEL_CART_ABANDONMENT = "anydrop_cart_abandonment"
+    // 2026-08-21 — order status updates (accepted/preparing/ready/etc.),
+    // the "outside the app" counterpart to the notification bell. Separate
+    // channel from offers/reminders/cart so a user can't accidentally mute
+    // "is my food ready" alerts while muting promotional ones.
+    const val CHANNEL_ORDER_UPDATES = "anydrop_order_updates"
     private const val NOTIF_ID_OFFER = 1001
     const val NOTIF_ID_REMINDER = 2001
     const val NOTIF_ID_CART_ABANDONMENT = 3001
+    /** Base id for [showOrderUpdateNotification] — actual id is this + the
+     * bell item's own id, same reasoning as the restaurant app's
+     * equivalent: keeps every order-update notification's id distinct so a
+     * burst of several stacks instead of overwriting one another, and well
+     * clear of the other fixed ids in this file. */
+    private const val NOTIF_ID_ORDER_UPDATE_BASE = 4100
 
     private const val REQUEST_CODE_NOTIF_PERMISSION = 5001
 
@@ -67,6 +78,14 @@ object NotificationHelper {
                 "Cart reminders",
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply { description = "Nudges when you've left items in your cart" }
+        )
+
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_ORDER_UPDATES,
+                "Order updates",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply { description = "Order accepted, preparing, ready, and delivery status changes" }
         )
     }
 
@@ -181,6 +200,44 @@ object NotificationHelper {
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
 
         NotificationManagerCompat.from(context).notify(NOTIF_ID_CART_ABANDONMENT, builder.build())
+    }
+
+    /** Posts a system notification for one notification-bell item — the
+     * "outside the app" counterpart to a row appearing in
+     * [com.anydrop.food.ui.notifications.NotificationListActivity]. Called
+     * from [OrderUpdatePollingService] for any bell item not already seen
+     * while an order is active. Tapping opens [OrderStatusActivity] for
+     * the specific order when the payload's `order_id` is present (which
+     * it is for every order-status notification the backend writes —
+     * see `notifications.php`'s create_notification() call sites), falling
+     * back to Home otherwise. */
+    fun showOrderUpdateNotification(context: Context, item: com.anydrop.food.network.NotificationItem) {
+        if (!hasPermission(context)) return
+        ensureChannels(context)
+
+        val orderId = (item.data?.get("order_id") as? Double)?.toInt()
+        val contentIntent = if (orderId != null) {
+            Intent(context, com.anydrop.food.ui.orderstatus.OrderStatusActivity::class.java)
+                .putExtra(com.anydrop.food.ui.orderstatus.OrderStatusActivity.EXTRA_ORDER_ID, orderId)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        } else {
+            Intent(context, HomeActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+            (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
+        val pendingIntent = PendingIntent.getActivity(context, NOTIF_ID_ORDER_UPDATE_BASE + item.id, contentIntent, flags)
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_ORDER_UPDATES)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(item.title)
+            .setContentText(item.body ?: "")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(item.body ?: ""))
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+
+        NotificationManagerCompat.from(context).notify(NOTIF_ID_ORDER_UPDATE_BASE + item.id, builder.build())
     }
 
     private fun safeDownloadBitmap(urlString: String): Bitmap? {

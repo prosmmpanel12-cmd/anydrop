@@ -563,6 +563,14 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
                     val intent = Intent(this@CheckoutActivity, OrderStatusActivity::class.java)
                     intent.putExtra(OrderStatusActivity.EXTRA_ORDER_ID, result.order.id)
                     startActivity(intent)
+                    // 2026-08-21 — starts the background poller that fires
+                    // system notifications for "Order accepted", "Preparing
+                    // your order", etc. even once this Activity (and the
+                    // OrderStatusActivity it's about to open) are gone.
+                    // See OrderUpdatePollingService's kdoc for why this is
+                    // scoped differently from the restaurant app's
+                    // always-on version.
+                    com.anydrop.food.notifications.OrderUpdatePollingService.start(this@CheckoutActivity, result.order.id)
                     finish()
                 } else {
                     // Bug fix (2026-08-10, alongside H4) — response.body() is
