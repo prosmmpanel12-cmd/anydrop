@@ -523,19 +523,29 @@ class EditProfileActivity : AppCompatActivity() {
     }
 
     /** recall.md Phase B item 13 — pulls `data.area_floor` out of a
-     * `min_order_below_area_floor` error body, ad hoc with a fresh
-     * Gson/JsonParser same as readProfileExtra() below, since
-     * ApiResponse<T>'s `data` is only typed for the success shape and
-     * this is the one error whose body carries information worth
-     * showing the owner. Returns null for any other error (including
-     * a body that fails to parse at all) so the caller falls back to
-     * the generic failure message. */
+     * `min_order_below_area_floor` error body, the same
+     * Gson-into-Map<String,Any?> pattern as the Customer App's
+     * ApiErrorParser.kt, since `ApiResponse<T>`'s `data` is only typed
+     * for the success shape and this is the one error whose body
+     * carries information worth showing the owner. Returns null for
+     * any other error (including a body that fails to parse at all) so
+     * the caller falls back to the generic failure message.
+     *
+     * (Previously used `com.google.gson.JsonParser.parseString(...)` —
+     * that static overload isn't resolvable against the Gson version
+     * this module's Retrofit converter actually pulls in, which broke
+     * the build with "Unresolved reference: parseString". Gson's
+     * `fromJson` into a `Map` has no such version sensitivity and is
+     * already the established pattern elsewhere in this codebase.) */
     private fun parseAreaFloorError(errorBodyRaw: String?): String? {
         if (errorBodyRaw.isNullOrBlank()) return null
         return try {
-            val obj = com.google.gson.JsonParser.parseString(errorBodyRaw).asJsonObject
-            if (obj.get("error")?.asString != "min_order_below_area_floor") return null
-            val floor = obj.getAsJsonObject("data")?.get("area_floor")?.asDouble ?: return null
+            val mapType = object : com.google.gson.reflect.TypeToken<Map<String, Any?>>() {}.type
+            val envelope: Map<String, Any?> = com.google.gson.Gson().fromJson(errorBodyRaw, mapType) ?: return null
+            if (envelope["error"] as? String != "min_order_below_area_floor") return null
+            @Suppress("UNCHECKED_CAST")
+            val data = envelope["data"] as? Map<String, Any?> ?: return null
+            val floor = data["area_floor"] as? Double ?: return null
             getString(R.string.min_order_below_area_floor, formatAmountForInput(floor))
         } catch (e: Exception) {
             null
