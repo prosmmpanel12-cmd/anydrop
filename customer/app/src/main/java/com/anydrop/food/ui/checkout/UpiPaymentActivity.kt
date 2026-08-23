@@ -307,7 +307,17 @@ class UpiPaymentActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Reached only after a real "success" from the status poll (or a
+     * successful switch-to-COD) — see class kdoc's spoof-safety note.
+     * This is deliberately where OrderUpdatePollingService gets started
+     * for a UPI order now (moved here from CheckoutActivity 2026-08-23,
+     * app owner report) — before this point the order isn't confirmed
+     * yet, so there's nothing legitimate to "track" and no notification
+     * should be firing.
+     */
     private fun goToOrderStatus() {
+        com.anydrop.food.notifications.OrderUpdatePollingService.start(this, orderId)
         val intent = Intent(this, OrderStatusActivity::class.java)
         intent.putExtra(OrderStatusActivity.EXTRA_ORDER_ID, orderId)
         startActivity(intent)

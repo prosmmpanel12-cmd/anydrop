@@ -56,12 +56,18 @@ $upd = $db->prepare("UPDATE orders SET status = :s $readyAtSql WHERE id = :id");
 $upd->execute(['s' => $newStatus, 'id' => $orderId]);
 insert_status_history($db, $orderId, $newStatus, 'restaurant', $owner['owner_id']);
 
-// Every restaurant-driven status step gets its own notification —
-// 'preparing' included, per app owner request (2026-08-21): customers
-// want to see "Preparing your order" as its own step, not just silence
-// between "accepted" and "ready".
+// UPDATED (2026-08-23, app owner request): trimmed back down to only
+// "Order accepted" / "Order ready" / (future) "Out for delivery" —
+// 'preparing' no longer gets its own customer notification. (The
+// 2026-08-21 request that added 'preparing' here is superseded by
+// this one.) The order.status transition itself is untouched — the
+// restaurant app still moves the order through 'preparing' as a
+// normal step, it just doesn't push a notification for it anymore.
+// "Out for delivery" isn't in this map because that status transition
+// (rider assignment) isn't built yet — Phase 4, see track.php's own
+// kdoc — there's nothing to notify on until that ships; add it here
+// the same shape as 'ready' once rider-assignment lands.
 $statusNotifications = [
-    'preparing' => ['title' => 'Preparing your order', 'body' => "Your order {$order['order_code']} is being prepared"],
     'ready' => ['title' => 'Order ready', 'body' => "Your order {$order['order_code']} is ready"],
 ];
 if (isset($statusNotifications[$newStatus])) {

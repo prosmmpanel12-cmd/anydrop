@@ -30,6 +30,18 @@ $db = Database::get();
 $where = ['restaurant_id = :rid'];
 $params = ['rid' => $restaurantId];
 
+// A UPI order's `status` is already 'pending' the instant it's created
+// (before the customer has even paid) — the same row payment-upi-verify
+// / admin approval later flips payment_status on. If we don't also
+// filter on payment_status here, this endpoint (which both OrdersFragment
+// and OrderPollingService's alarm poll call with status=pending) surfaces
+// a not-yet-paid UPI order to the restaurant immediately on QR generation,
+// firing the new-order alert before any money has moved. Exclude those
+// rows until payment_status flips to 'paid' (matches the same guard
+// orders/create.php already applies to the notification, and the one
+// orders-accept.php applies before allowing Accept).
+$where[] = "NOT (payment_method = 'upi' AND payment_status != 'paid')";
+
 if (!empty($_GET['status'])) {
     $statuses = array_filter(array_map('trim', explode(',', $_GET['status'])));
     $placeholders = [];

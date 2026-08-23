@@ -702,11 +702,25 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
                     // UpiPaymentActivity observes an admin-approved
                     // transaction). COD orders skip straight to
                     // OrderStatusActivity exactly as before.
+                    //
+                    // BUG FIX (2026-08-23, app owner report): this branch
+                    // used to also call OrderUpdatePollingService.start()
+                    // right here — which meant the "Tracking your order"
+                    // notification (and its 15s bell poll, which is what
+                    // surfaces order-status notifications) started the
+                    // instant the QR was shown, before any payment had
+                    // happened. Deliberately NOT started here anymore —
+                    // UpiPaymentActivity.goToOrderStatus() is the one
+                    // place that starts it now, and that function is only
+                    // ever reached after the poll against
+                    // GET .../payment/upi/status has actually observed
+                    // "success" (or the customer explicitly switches to
+                    // COD, which is its own real payment-method change) —
+                    // never from a client-side guess.
                     if (paymentMethod == "upi") {
                         val intent = Intent(this@CheckoutActivity, com.anydrop.food.ui.checkout.UpiPaymentActivity::class.java)
                         intent.putExtra(com.anydrop.food.ui.checkout.UpiPaymentActivity.EXTRA_ORDER_ID, result.order.id)
                         startActivity(intent)
-                        com.anydrop.food.notifications.OrderUpdatePollingService.start(this@CheckoutActivity, result.order.id)
                         finish()
                         return@launch
                     }
