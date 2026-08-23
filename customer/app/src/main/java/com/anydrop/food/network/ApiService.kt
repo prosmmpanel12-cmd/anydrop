@@ -98,6 +98,30 @@ interface ApiService {
     @POST("orders/cancel.php")
     suspend fun cancelOrder(@Query("id") orderId: Int): Response<ApiResponse<OrderDetailResult>>
 
+    // ---- Native UPI Payment Gateway (doc 23, 2026-08-23) ----
+    // Hits the .php files directly, same convention as every other
+    // endpoint in this interface (see the notification-bell comment
+    // above) — the .htaccess clean-URL rewrites exist too, but the app
+    // always talks to the .php file with its id/params as query args.
+
+    @POST("orders/payment-upi-create.php")
+    suspend fun createUpiPayment(@Query("id") orderId: Int): Response<ApiResponse<UpiPaymentInitResult>>
+
+    @GET("orders/payment-upi-verify.php")
+    suspend fun getUpiPaymentStatus(@Query("id") orderId: Int): Response<ApiResponse<UpiPaymentStatusResult>>
+
+    @POST("orders/payment-upi-submit-utr.php")
+    suspend fun submitUpiUtr(
+        @Query("id") orderId: Int,
+        @Body body: SubmitUtrBody
+    ): Response<ApiResponse<SubmitUtrResult>>
+
+    // Real backend for UpiPaymentActivity's "Cancel and pay by Cash on
+    // Delivery instead" button — see payment-switch-cod.php's own
+    // doc-comment for the full eligibility chain this runs server-side.
+    @POST("orders/payment-switch-cod.php")
+    suspend fun switchOrderToCod(@Query("id") orderId: Int): Response<ApiResponse<OrderDetailResult>>
+
     // ---- Cart server-persistence ----
 
     @GET("customer/cart-sync.php")
@@ -208,4 +232,11 @@ interface ApiService {
     suspend fun markAllNotificationsRead(
         @Query("action") action: String = "read-all"
     ): Response<ApiResponse<MarkAllReadResult>>
+
+    // ---- item 26 §D.15 — Customer Wallet screen (Profile → Wallet).
+    // Read-only, mirrors wallet.php's own kdoc: no top-up/withdraw POST
+    // exists yet, v1 credits are all system/admin-triggered. ----
+
+    @GET("customer/wallet.php")
+    suspend fun getWallet(): Response<ApiResponse<WalletResult>>
 }

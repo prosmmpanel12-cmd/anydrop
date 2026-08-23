@@ -1,3 +1,15 @@
+NOTE (2026-08-23): This handover is superseded. Items 15/16/17 it
+refers to were already resolved as of recall.md section 0's
+2026-08-22 note (re-verified again 2026-08-23, still correctly not
+reopened). Work has since moved through Phase C (Money) — see
+recall.md section 0's dated notes and the "NEXT SESSION PROMPT —
+Native UPI Payment Gateway" section at the very bottom of recall.md,
+which is the current handover. Start there instead of here.
+
+Original content below, kept for history only:
+
+---
+
 Anydrop project zip attached. Unzip it, read recall.md fully (start
 with section 0, then jump to section 4b — "AREA-WISE PAYMENT
 RESTRICTIONS (GENERAL)" — for the item this session is continuing).

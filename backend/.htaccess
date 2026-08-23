@@ -18,6 +18,12 @@ RewriteRule ^api/v1/orders/([0-9]+)/?$ api/v1/orders/detail.php?id=$1 [L,QSA]
 RewriteRule ^api/v1/orders/([0-9]+)/track/?$ api/v1/orders/track.php?id=$1 [L,QSA]
 RewriteRule ^api/v1/orders/([0-9]+)/cancel/?$ api/v1/orders/cancel.php?id=$1 [L,QSA]
 
+# Native UPI Payment Gateway (doc 23, 2026-08-23)
+RewriteRule ^api/v1/orders/([0-9]+)/payment/upi/create/?$ api/v1/orders/payment-upi-create.php?id=$1 [L,QSA]
+RewriteRule ^api/v1/orders/([0-9]+)/payment/upi/status/?$ api/v1/orders/payment-upi-verify.php?id=$1 [L,QSA]
+RewriteRule ^api/v1/orders/([0-9]+)/payment/upi/utr/?$ api/v1/orders/payment-upi-submit-utr.php?id=$1 [L,QSA]
+RewriteRule ^api/v1/orders/([0-9]+)/payment/switch-to-cod/?$ api/v1/orders/payment-switch-cod.php?id=$1 [L,QSA]
+
 RewriteRule ^api/v1/restaurant/orders/?$ api/v1/restaurant/orders-list.php [L,QSA]
 RewriteRule ^api/v1/restaurant/orders/([0-9]+)/?$ api/v1/restaurant/orders-detail.php?id=$1 [L,QSA]
 RewriteRule ^api/v1/restaurant/orders/([0-9]+)/accept/?$ api/v1/restaurant/orders-accept.php?id=$1 [L,QSA]
@@ -42,6 +48,9 @@ RewriteRule ^api/v1/home/popular-items/?$ api/v1/home/popular-items.php [L,QSA]
 RewriteRule ^api/v1/customer/favorites/?$ api/v1/customer/favorites.php [L,QSA]
 RewriteRule ^api/v1/customer/faqs/?$ api/v1/customer/faqs.php [L,QSA]
 RewriteRule ^api/v1/customer/feedback/?$ api/v1/customer/feedback.php [L,QSA]
+
+# Item 26 — Customer Wallet (recall.md section 18)
+RewriteRule ^api/v1/customer/wallet/?$ api/v1/customer/wallet.php [L,QSA]
 
 # Part 13 — Rating system
 RewriteRule ^api/v1/customer/reviews/?$ api/v1/customer/reviews.php [L,QSA]

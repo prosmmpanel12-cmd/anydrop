@@ -25,6 +25,8 @@ require_once __DIR__ . '/../../../lib/orders.php';
 require_once __DIR__ . '/../../../lib/notifications.php';
 require_once __DIR__ . '/../../../lib/cod_rules.php';
 require_once __DIR__ . '/../../../lib/payment_restrictions.php';
+require_once __DIR__ . '/../../../lib/wallet.php';
+require_once __DIR__ . '/../../../lib/ledger.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -58,7 +60,12 @@ if ($idempotencyKey === '') {
     $idempotencyKey = null;
 }
 
-if (!in_array($paymentMethod, ['upi', 'cod'], true)) {
+// recall.md item 26 §D — Wallet checkout integration. 'wallet' joins
+// 'upi'/'cod' as a full payment method (orders.payment_method ENUM
+// already widened in migration 43); no split/partial-wallet model,
+// same "whole order or refused" constraint lib/wallet.php's
+// debit_wallet_for_order() already documents.
+if (!in_array($paymentMethod, ['upi', 'cod', 'wallet'], true)) {
     respond_error('validation_error', 422, ['fields' => ['payment_method']]);
 }
 
@@ -107,6 +114,15 @@ if ($addressId !== null) {
 // never reaches evaluate_cod_eligibility() at all, since there's no
 // point evaluating COD sub-rules for a customer who can't use COD here
 // under any circumstance.
+//
+// 'wallet' is intentionally NOT gated by this area-wide rule —
+// is_payment_method_allowed_in_area() only ever restricts 'upi'/'cod'
+// (migration 37's area_payment_restrictions has no wallet column), so
+// this call returns allowed=true for 'wallet' by default. That's
+// correct, not an oversight: this gate exists to control which
+// payment RAILS a launch area trusts (prepaid-only, no-COD-fraud-risk
+// areas, etc) — a wallet debit is the customer spending their own
+// already-verified balance, not a new rail the area needs to vet.
 $paymentRestriction = get_effective_payment_restrictions($db, $addressLat, $addressLng);
 $methodAllowed = is_payment_method_allowed_in_area($paymentRestriction, $paymentMethod);
 if (!$methodAllowed['allowed']) {
@@ -156,6 +172,26 @@ if ($paymentMethod === 'cod') {
     $codCheck = evaluate_cod_eligibility($db, $codRule, $customerId, (float) $priced['grand_total']);
     if (!$codCheck['eligible']) {
         respond_error('cod_not_eligible', 422, ['reason' => $codCheck['reason']]);
+    }
+}
+
+// recall.md item 26 §D.12 — wallet balance pre-check, same "fail fast
+// before opening the insert transaction" shape as the COD checks
+// above. This is a courtesy check only (fast, no lock held) — the
+// authoritative check is debit_wallet_for_order()'s own row-locked
+// read inside the transaction below, which is what actually prevents
+// two concurrent wallet orders from both passing this cheap check
+// against the same stale balance and then both succeeding. No partial-
+// wallet model (migration 43's header) — a balance that doesn't cover
+// the whole grand_total fails outright rather than falling back to
+// another method silently.
+if ($paymentMethod === 'wallet') {
+    $walletBalance = get_wallet_balance($db, $customerId);
+    if ($walletBalance < (float) $priced['grand_total']) {
+        respond_error('wallet_insufficient_balance', 422, [
+            'wallet_balance' => $walletBalance,
+            'required' => (float) $priced['grand_total'],
+        ]);
     }
 }
 
@@ -244,6 +280,50 @@ try {
 
     insert_status_history($db, $orderId, 'pending', 'customer', $customerId, 'Order placed');
 
+    // recall.md item 26 §D.12 — wallet debit happens INSIDE this same
+    // transaction as the order insert (per the follow-up prompt's own
+    // framing): a debit can never succeed against an order that then
+    // fails to insert (it wouldn't — we're already past the insert by
+    // here), or vice versa (a debit failure below throws, which rolls
+    // back the order insert too, same as any other failure in this
+    // transaction). The pre-check above already covers the common
+    // case; this is the authoritative, row-locked check
+    // (debit_wallet_for_order() -> debit_wallet()'s SELECT ... FOR
+    // UPDATE) that actually prevents a race between two concurrent
+    // wallet orders both passing the cheap pre-check against the same
+    // stale balance.
+    if ($paymentMethod === 'wallet') {
+        $debitResult = debit_wallet_for_order($db, $customerId, $orderId, (float) $priced['grand_total']);
+        if (!$debitResult['ok']) {
+            // Insufficient balance surfaced only now (race lost against
+            // another concurrent order/debit since the pre-check above) —
+            // throw to trigger this transaction's own rollback, then
+            // hand back the same error shape the pre-check uses so the
+            // app doesn't need a second error code to handle.
+            throw new RuntimeException('wallet_insufficient_balance_race');
+        }
+
+        // A wallet order is paid the instant the debit succeeds — there's
+        // no separate confirmation step the way UPI needs an admin to
+        // verify a UTR (PaymentService::promoteOrderIfNeeded() is that
+        // flow's equivalent of this same "flip to paid + ledger + notify"
+        // moment). COD stays 'pending' until cash is actually collected
+        // (no 'delivered' transition exists yet — recall.md's own
+        // "NOT WIRED" note), which doesn't apply here since the money
+        // already left the wallet balance for real, synchronously.
+        $db->prepare("UPDATE orders SET payment_status = 'paid' WHERE id = :id")
+            ->execute(['id' => $orderId]);
+        insert_status_history($db, $orderId, 'pending', 'system', null, 'Paid via Anydrop Wallet');
+        record_paid_order_ledger_entries($db, [
+            'id' => $orderId,
+            'order_code' => $orderCode,
+            'restaurant_id' => $restaurantId,
+            'grand_total' => $priced['grand_total'],
+            'commission_amount' => $priced['commission_amount'],
+            'platform_fee' => $priced['platform_fee'],
+        ]);
+    }
+
     if ($priced['coupon_id'] !== null) {
         // bugs.md #1.3 fix — price_cart()'s usage_limit_per_user /
         // usage_limit_total check runs before this transaction opens, so
@@ -294,6 +374,17 @@ try {
     $db->rollBack();
     if ($e->getMessage() === 'coupon_usage_limit_reached') {
         respond_error('coupon_usage_limit_reached', 422);
+    }
+    // recall.md item 26 §D.12 — the rare race the pre-check above can't
+    // catch (balance drained by another concurrent order between the
+    // pre-check and this transaction's own locked debit). No
+    // wallet_balance/required payload here the way the pre-check's
+    // 422 has one — the balance has moved since the client last saw
+    // it, so re-fetching would just be another round-trip; the app's
+    // existing generic "insufficient balance" handling (same string as
+    // the pre-check's error code) covers both call sites identically.
+    if ($e->getMessage() === 'wallet_insufficient_balance_race') {
+        respond_error('wallet_insufficient_balance', 422);
     }
     // bugs.md #2.4 — the early idempotency-key lookup above has its own
     // race: two near-simultaneous requests with the same key can both

@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/orders.php';
 require_once __DIR__ . '/../../../lib/notifications.php';
+require_once __DIR__ . '/../../../lib/refunds.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -40,11 +41,21 @@ if ($order['status'] !== 'pending') {
 
 $reason = trim((string) $body['reason']);
 
+$db->beginTransaction();
 $upd = $db->prepare(
     "UPDATE orders SET status = 'rejected', cancelled_at = NOW(), cancellation_reason = :r WHERE id = :id"
 );
 $upd->execute(['r' => $reason, 'id' => $orderId]);
 insert_status_history($db, $orderId, 'rejected', 'restaurant', $owner['owner_id'], $reason);
+
+// Same gap as orders/cancel.php: a restaurant can only reject a
+// 'pending' order, but a customer can pay by UPI and have that
+// payment confirmed before the restaurant acts — so a paid order CAN
+// still reach here. Previously nothing checked payment_status at all.
+if ($order['payment_status'] === 'paid') {
+    create_refund_request($db, $order, 'Order rejected by restaurant: ' . $reason, 'restaurant');
+}
+$db->commit();
 
 create_notification(
     'customer',

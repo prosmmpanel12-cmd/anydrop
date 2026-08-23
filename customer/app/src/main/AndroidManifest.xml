@@ -101,6 +101,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".ui.checkout.UpiPaymentActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".ui.address.LocationPickerActivity"
             android:exported="false" />
 
@@ -114,6 +118,11 @@
 
         <activity
             android:name=".ui.profile.OrderHistoryActivity"
+            android:exported="false" />
+
+        <!-- item 26 §D.15 — Profile → Wallet -->
+        <activity
+            android:name=".ui.profile.WalletActivity"
             android:exported="false" />
 
         <activity

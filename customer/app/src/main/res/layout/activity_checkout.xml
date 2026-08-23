@@ -150,6 +150,22 @@
                     android:layout_height="wrap_content"
                     android:text="@string/pay_upi"
                     android:textColor="@color/text_primary" />
+
+                <!-- item 26 §D.14 — wallet is hide-when-unavailable, not
+                     disable-with-reason like Cod/Upi above (see §D.13's
+                     payment-methods.php comment: wallet_allowed means "has
+                     a positive balance", not "rail enabled here" — showing
+                     a permanently-disabled "Wallet — no balance" row isn't
+                     useful the way a temporary area restriction is). Starts
+                     gone; CheckoutActivity's applyPaymentMethodRestrictions()
+                     unhides it only when paymentMethods.walletAllowed. -->
+                <RadioButton
+                    android:id="@+id/radioWallet"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/pay_wallet"
+                    android:textColor="@color/text_primary"
+                    android:visibility="gone" />
             </RadioGroup>
 
             <!-- Delivery instructions -->

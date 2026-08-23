@@ -146,6 +146,7 @@
     <string name="menu_address_book">Address Book</string>
     <string name="menu_order_history">Order History</string>
     <string name="menu_saved">Saved</string>
+    <string name="menu_wallet">Wallet</string>
     <string name="menu_faqs">FAQs</string>
     <string name="menu_rate_us">Rate Us</string>
     <string name="menu_feedback">Feedback</string>
@@ -252,7 +253,19 @@
     <string name="payment_method">Payment method</string>
     <string name="pay_cod">Cash on Delivery</string>
     <string name="pay_upi">UPI</string>
+    <string name="pay_wallet">Anydrop Wallet</string>
+    <string name="pay_wallet_with_balance_format">Anydrop Wallet — ₹%1$s available</string>
     <string name="payment_method_unavailable_here">Not available for this address</string>
+    <string name="wallet_insufficient_balance_error">Not enough wallet balance for this order</string>
+    <string name="wallet_title">Anydrop Wallet</string>
+    <string name="wallet_balance_label">Available balance</string>
+    <string name="wallet_history_label">Transaction history</string>
+    <string name="wallet_empty_history">No wallet transactions yet</string>
+    <string name="wallet_load_failed">Couldn\'t load your wallet</string>
+    <string name="wallet_reason_refund">Refund</string>
+    <string name="wallet_reason_admin_adjustment">Adjustment</string>
+    <string name="wallet_reason_cashback">Cashback</string>
+    <string name="wallet_reason_order_payment">Order payment</string>
     <string name="hint_delivery_instructions">Delivery instructions (optional)</string>
     <string name="bill_details">Bill details</string>
     <string name="lbl_item_total">Item total</string>
@@ -279,6 +292,24 @@
     <string name="restaurant_temporarily_unavailable">Temporarily unavailable</string>
     <string name="btn_cancel_order">Cancel Order</string>
     <string name="btn_back_to_home">Back to Home</string>
+
+    <!-- Item 25 — Refund System card (recall.md section 19: Amount, Reason,
+         Method, Expected date, Reference, Timeline). refund_status_* mirror
+         refunds.status ENUM (migration 42) exactly. -->
+    <string name="refund_card_title">Refund</string>
+    <string name="refund_status_requested">Refund requested</string>
+    <string name="refund_status_under_review">Under review</string>
+    <string name="refund_status_approved">Refund approved</string>
+    <string name="refund_status_processing">Refund processing</string>
+    <string name="refund_status_refunded">Refund completed</string>
+    <string name="refund_status_rejected">Refund rejected</string>
+    <string name="refund_amount_format">Amount: ₹%1$s</string>
+    <string name="refund_reason_format">Reason: %1$s</string>
+    <string name="refund_method_manual_upi_bank_transfer">Bank/UPI transfer</string>
+    <string name="refund_method_wallet">Anydrop Wallet</string>
+    <string name="refund_expected_by_format">Expected by %1$s</string>
+    <string name="refund_reference_format">Reference: %1$s</string>
+    <string name="refund_reject_reason_format">Reason: %1$s</string>
 
     <!-- I2 — Order tracking status timeline (visual stepper), docs/features.md
          Phase I. 5 stepper labels the 9 backend statuses collapse into. -->
@@ -373,5 +404,36 @@
          outside_open_hours / invalid), same call CheckoutActivity already
          makes for other Place Order failures rather than a message per code. -->
     <string name="schedule_time_unavailable">That delivery time isn\'t available anymore. Pick another.</string>
+
+    <!-- Native UPI Payment Gateway (doc 23, 2026-08-23) -->
+    <string name="upi_payment_title">Scan &amp; pay to confirm your order</string>
+    <string name="upi_test_mode_banner">TEST MODE — this is not a real payment</string>
+    <string name="upi_qr_content_description">UPI payment QR code</string>
+    <string name="upi_instructions_title">How to pay</string>
+    <string name="upi_status_checking">Checking payment status…</string>
+    <string name="upi_status_utr_pending_window">You can also enter your UTR in %1$d sec if this doesn\'t confirm automatically</string>
+    <string name="upi_status_utr_available">Already paid but not confirmed yet? Enter your UTR below.</string>
+    <string name="upi_status_utr_submitted">Thanks — your payment is being verified. This can take a little while.</string>
+    <string name="upi_status_success">Payment confirmed!</string>
+    <string name="upi_status_failed">This payment couldn\'t be confirmed.</string>
+    <string name="upi_status_failed_with_reason">This payment couldn\'t be confirmed: %1$s</string>
+    <string name="upi_status_expired">This QR has expired.</string>
+    <string name="upi_status_too_many_attempts">Too many UTR attempts on this order. Please contact support.</string>
+    <string name="upi_utr_hint">Already paid? Enter the 12-digit UTR / UPI reference number from your payment app so we can verify it manually.</string>
+    <string name="upi_utr_input_hint">12-digit UTR</string>
+    <string name="upi_submit_utr">Submit UTR</string>
+    <string name="upi_switch_to_cod">Cancel and pay by Cash on Delivery instead</string>
+    <string name="upi_expiry_format">QR expires in %1$s</string>
+    <string name="upi_qr_generation_failed">Couldn\'t generate the payment QR. Please try again.</string>
+    <string name="upi_utr_invalid">Enter a valid 12-digit UTR</string>
+    <string name="upi_unavailable">Online payment isn\'t available right now — please choose Cash on Delivery.</string>
+    <!-- Real switch-to-COD flow (payment-switch-cod.php) -->
+    <string name="upi_switch_to_cod_confirm_title">Switch to Cash on Delivery?</string>
+    <string name="upi_switch_to_cod_confirm_message">You\'ll pay the delivery rider in cash instead of by UPI. This can\'t be undone from here.</string>
+    <string name="upi_switch_to_cod_confirm_yes">Switch to COD</string>
+    <string name="upi_switch_to_cod_confirm_no">Keep UPI</string>
+    <string name="upi_switch_to_cod_success">Switched to Cash on Delivery.</string>
+    <string name="upi_switch_to_cod_not_eligible">Cash on Delivery isn\'t available for this order: %1$s</string>
+    <string name="upi_switch_to_cod_failed">Couldn\'t switch to Cash on Delivery. Please try again.</string>
 
 </resources>

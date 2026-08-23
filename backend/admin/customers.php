@@ -7,26 +7,39 @@
  * orders), suspend/reactivate (customers.is_active — same column the
  * customer-app login already checks), and soft delete.
  *
- * No wallet-adjustment action here yet — recall.md item 18 (Customer
- * Wallet) is a separate, still-fully-pending ledger feature; nothing to
- * adjust until that table exists.
+ * Item 26 (Customer Wallet, recall.md section 18; migration 43) —
+ * added 2026-08-23: each customer's detail modal now also shows their
+ * wallet balance + last 5 transactions, and (gated on the separate
+ * `wallets_manage` permission) an admin credit/debit adjustment form
+ * (recall.md section 18's "Admin adjustment" feature). See
+ * lib/wallet.php for the actual balance-changing logic — this file
+ * only calls credit_wallet()/debit_wallet(), never touches
+ * customer_wallets directly.
  *
  * Gated: `customers_view` to see this page; `customers_suspend` for the
- * activate/deactivate toggle; `customers_delete` for soft delete. (No
- * separate edit action exists yet — there's no admin-editable customer
- * field beyond active-state and delete, so `customers_edit` isn't
- * wired to anything in this session; it stays reserved for when one
- * shows up, same as `dashboard_view` was reserved before dashboard.php
- * existed.)
+ * activate/deactivate toggle; `customers_delete` for soft delete;
+ * `wallets_view`/`wallets_manage` for the wallet section above. (No
+ * separate customer-field edit action exists yet — there's no admin-
+ * editable customer field beyond active-state and delete, so
+ * `customers_edit` isn't wired to anything in this session; it stays
+ * reserved for when one shows up, same as `dashboard_view` was
+ * reserved before dashboard.php existed.)
  */
 
 require_once __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../lib/audit.php';
+require_once __DIR__ . '/../lib/wallet.php';
 
 $admin = admin_require_login();
 admin_require_permission($admin, 'customers_view');
 $canSuspend = admin_has_permission($admin['id'], 'customers_suspend');
 $canDelete = admin_has_permission($admin['id'], 'customers_delete');
+// Item 26 — Customer Wallet (recall.md section 18; migration 43).
+// Deliberately separate permission pair from customers_view/suspend —
+// a wallet adjustment moves real money into a customer's balance,
+// a distinct blast radius from suspend/delete.
+$canViewWallet = admin_has_permission($admin['id'], 'wallets_view');
+$canManageWallet = admin_has_permission($admin['id'], 'wallets_manage');
 $db = Database::get();
 
 // Full service_areas node map (id => row), for rendering each saved
@@ -75,6 +88,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $db->prepare('UPDATE customers SET deleted_at = NOW(), is_active = 0 WHERE id = :id')->execute(['id' => $customerId]);
                 write_audit_log('admin', $admin['id'], 'customer_deleted', ['customer_id' => $customerId]);
                 $flash = admin_escape($customer['name'] ?: $customer['email']) . ' removed.';
+            }
+        } elseif ($formAction === 'wallet_adjust') {
+            // Item 26 — recall.md section 18's "Admin adjustment"
+            // feature. direction picks credit vs debit; amount/note
+            // both required (a note-less adjustment is an audit gap —
+            // this is real money moving with no order/refund behind
+            // it, so the reason has to be on record).
+            if (!$canManageWallet) {
+                $flash = 'Your role doesn\'t have the wallets_manage permission.';
+                $flashType = 'error';
+            } else {
+                $direction = $_POST['wallet_direction'] ?? '';
+                $amount = (float) ($_POST['wallet_amount'] ?? 0);
+                $note = trim($_POST['wallet_note'] ?? '');
+
+                if (!in_array($direction, ['credit', 'debit'], true) || $amount <= 0 || $note === '') {
+                    $flash = 'Wallet adjustment needs a direction, a positive amount, and a note.';
+                    $flashType = 'error';
+                } else {
+                    try {
+                        $result = $direction === 'credit'
+                            ? credit_wallet($db, $customerId, $amount, 'admin_adjustment', null, $note, 'admin', (int) $admin['id'])
+                            : debit_wallet($db, $customerId, $amount, 'admin_adjustment', null, $note, 'admin', (int) $admin['id']);
+
+                        if ($result['ok']) {
+                            $flash = 'Wallet ' . $direction . 'ed ₹' . number_format($amount, 2)
+                                . ' — new balance ₹' . number_format($result['balance'], 2) . '.';
+                        } else {
+                            $flash = $result['error'] === 'insufficient_balance'
+                                ? 'Could not debit — customer\'s balance (₹' . number_format($result['balance'], 2) . ') is less than ₹' . number_format($amount, 2) . '.'
+                                : 'Could not adjust wallet: ' . ($result['error'] ?? 'unknown');
+                            $flashType = 'error';
+                        }
+                    } catch (Throwable $e) {
+                        $flash = 'Wallet adjustment failed.';
+                        $flashType = 'error';
+                    }
+                }
             }
         }
     }
@@ -142,6 +193,21 @@ if (!empty($customers)) {
         if (count($recentOrdersByCustomer[$o['customer_id']]) < 5) {
             $recentOrdersByCustomer[$o['customer_id']][] = $o;
         }
+    }
+}
+
+// Item 26 — wallet balance + last 5 transactions per customer on this
+// page, same up-front-fetch-for-the-whole-page approach as addresses/
+// orders above (page capped at 20 rows, so 20 extra small queries is
+// cheap — no N+1 concern at this scale). Only fetched at all if the
+// admin can even see wallets, to skip the extra queries entirely for
+// a role that doesn't have wallets_view.
+$walletByCustomer = [];
+$walletTxnsByCustomer = [];
+if ($canViewWallet && !empty($customers)) {
+    foreach ($customers as $c) {
+        $walletByCustomer[$c['id']] = get_wallet_balance($db, (int) $c['id']);
+        $walletTxnsByCustomer[$c['id']] = list_wallet_transactions($db, (int) $c['id'], 5);
     }
 }
 
@@ -249,6 +315,34 @@ require __DIR__ . '/_layout_head.php';
                             (<?= admin_escape(substr($o['created_at'], 0, 10)) ?>)<br>
                         <?php endforeach; ?>
                     </div>
+                <?php endif; ?>
+
+                <?php if ($canViewWallet): ?>
+                <div class="section-title" style="margin-top:14px;">Wallet</div>
+                <p class="muted">Balance: <strong>₹<?= number_format($walletByCustomer[$c['id']] ?? 0.0, 2) ?></strong></p>
+                <?php if (!empty($walletTxnsByCustomer[$c['id']])): ?>
+                    <div class="muted" style="line-height:1.7;">
+                        <?php foreach ($walletTxnsByCustomer[$c['id']] as $t): ?>
+                            <?= $t['type'] === 'credit' ? '+' : '−' ?>₹<?= number_format((float) $t['amount'], 2) ?>
+                            — <?= admin_escape(str_replace('_', ' ', $t['reason'])) ?><?= $t['note'] ? ' (' . admin_escape($t['note']) . ')' : '' ?>
+                            (<?= admin_escape(substr($t['created_at'], 0, 10)) ?>)<br>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+                <?php if ($canManageWallet): ?>
+                    <form method="post" style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                        <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
+                        <input type="hidden" name="customer_id" value="<?= (int) $c['id'] ?>">
+                        <input type="hidden" name="form_action" value="wallet_adjust">
+                        <select name="wallet_direction" style="width:auto;">
+                            <option value="credit">Credit</option>
+                            <option value="debit">Debit</option>
+                        </select>
+                        <input type="number" name="wallet_amount" step="0.01" min="0.01" placeholder="Amount" style="width:110px;" required>
+                        <input type="text" name="wallet_note" placeholder="Reason (required)" style="flex:1; min-width:140px;" required>
+                        <button type="submit" class="btn btn-outline">Apply</button>
+                    </form>
+                <?php endif; ?>
                 <?php endif; ?>
 
                 <?php if ($canSuspend): ?>

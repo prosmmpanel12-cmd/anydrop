@@ -116,6 +116,78 @@
             android:textColor="@color/veg_green" />
     </LinearLayout>
 
+    <!-- Item 25 — Refund card. Populated from GET /orders/{id}'s `refund`
+         object (backend/lib/orders.php format_order(), migration 42). Only
+         visible when the order actually has a refund row (e.g. it was
+         cancelled/rejected after a UPI payment) — hidden entirely otherwise,
+         same show/hide convention as riderCard/otpCard above. -->
+    <LinearLayout
+        android:id="@+id/refundCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="14dp"
+        android:background="@drawable/bg_card_rounded"
+        android:padding="14dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/refundStatusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/refundAmountText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textColor="@color/text_primary" />
+
+        <TextView
+            android:id="@+id/refundReasonText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="@color/text_secondary" />
+
+        <TextView
+            android:id="@+id/refundMethodText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="@color/text_secondary" />
+
+        <TextView
+            android:id="@+id/refundExpectedText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="@color/text_secondary"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/refundReferenceText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="@color/text_secondary"
+            android:visibility="gone" />
+
+        <!-- Simple vertical timeline list — one line per stage the refund
+             has actually passed through (timeline entries only exist for
+             stages that happened, per format_order()'s array_filter). No
+             custom stepper view needed; RecyclerView would be overkill for
+             a max-5-row list that changes rarely. -->
+        <LinearLayout
+            android:id="@+id/refundTimelineContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="10dp" />
+    </LinearLayout>
+
     <View
         android:layout_width="0dp"
         android:layout_height="0dp"

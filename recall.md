@@ -63,16 +63,14 @@ identical numbers to before, so this is additive, not a behaviour
 change for anyone not using the new rules.
 
 **Deliberately NOT wired** (see section 13's "NOT WIRED" list, and
-each function's own kdoc in `lib/ledger.php`): automatic ledger entries
-on COD-order-delivery and on UPI-payment-confirmation. Both are
-genuinely blocked on other unbuilt pieces — there is no 'delivered'
-order-status transition anywhere in the codebase yet (Rider App, Phase
-G, items 43-48) and no payment-confirmation endpoint exists yet (item
-24, still a UPIPE stub). The functions exist, ready to be called the
-moment those two land — do NOT wire them to order-creation time
-instead as a workaround, since a placed order can still be
-cancelled/rejected before any cash actually moves. Manual "Pay Now"
-settlement is fully live today, independent of both gaps.
+each function's own kdoc in `lib/ledger.php`): automatic ledger entry
+on COD-order-delivery. Genuinely blocked on another unbuilt piece —
+there is no 'delivered' order-status transition anywhere in the
+codebase yet (Rider App, Phase G, items 43-48). The UPI side (the
+other half of this "NOT WIRED" note as of 2026-08-22) is wired as of
+2026-08-23 — see item 24's update and `docs/23_Native_UPI_Payment_
+Gateway_Architecture_2026-08-23.md`. Manual "Pay Now" settlement is
+fully live today, independent of the remaining COD gap.
 
 Next session: either device/build-verify everything 🟡 across Phase B
 + Phase C once a PHP CLI/DB/Android environment exists, or continue
@@ -81,6 +79,146 @@ system) are the next genuinely-buildable Phase C items; 21/23's
 "NOT WIRED" gap will resolve naturally once Phase G (Rider) or item 24
 lands and someone remembers to call `record_cod_order_ledger_entry()`
 / `record_paid_order_ledger_entries()` from those new trigger points.
+
+**2026-08-23 (follow-up session, picking up the item-15 handover) —
+re-check pass + one real fix.** The old `NEXT_SESSION_PROMPT_item15.md`
+handover was stale: items 15/16/17 were already resolved per this
+section's own 2026-08-22 notes above, so per the file's own rule that
+was left untouched rather than reopened. Followed recall.md's own
+current next-session prompt (bottom of this file) instead, which
+pointed at item 24's follow-up list. Did the one genuinely
+Claude-actionable item on that list that doesn't need a live DB/build
+env: item 24's follow-up #4, the fake "Cancel and pay by COD" button
+in `UpiPaymentActivity.kt` (it only showed a toast and never touched
+the backend). Built a real endpoint,
+`backend/api/v1/orders/payment-switch-cod.php`, reusing
+`orders/create.php`'s exact payment-restriction + COD-eligibility
+function pair, and wired the Android button to call it with a real
+confirm dialog. Full detail in doc 23 §A4b and item 24's update in
+section 33 below. Everything else on that follow-up list (migrations
+40/41 on real MySQL, Android Studio/ZXing compile check, full live
+click-through) still needs the same PHP CLI/live-DB/Android-build
+environment every session here has lacked — genuinely not buildable
+further in this sandbox.
+
+**2026-08-23 (same day, follow-up session #2) — item 25, Refund
+System, built.** Re-verified the previous session's file claims
+against actual `ls`/timestamps first (rule 34) before trusting them —
+all confirmed genuine, nothing stale to correct. Confirmed the
+sandbox's standing limitation is unchanged (still no `php`/`mysql`/
+Android SDK, network still disabled) before doing anything further.
+Owner chose to build item 25 (Refund System) in parallel rather than
+wait on device/build verification for item 24. Built: migration 42
+(`refunds` table, admin-configurable `refund_expected_days` setting,
+`refunds_view`/`refunds_manage` RBAC keys), `lib/refunds.php` (single
+write-path, mirrors `lib/ledger.php`'s pattern — `create_refund_
+request()` / `approve_refund()` / `mark_refund_processing()` /
+`complete_refund()` / `reject_refund()`), `admin/refunds.php` (review
+queue, same "admin does the manual transfer, this system tracks and
+reconciles it" model as `payment-pending.php` — no gateway refund API
+exists). Found and closed a real gap while wiring this in: neither
+`orders/cancel.php` nor `restaurant/orders-reject.php` ever checked
+`payment_status` before flipping an order to cancelled/rejected — a
+UPI-paid order's money could get cancelled with zero record anything
+was owed back. Both now auto-create a `requested` refund when
+`payment_status === 'paid'`. `format_order()` now returns a `refund`
+object inline on every order (recall.md section 19's required
+Amount/Reason/Method/Expected date/Reference/Timeline fields) so no
+new customer-facing endpoint was needed. Full detail in section 19
+(updated above) and the NEXT SESSION PROMPT at the bottom. Caught one
+real bug during a static self-review before finishing: `admin/refunds.php`
+first draft assumed `admin_require_login()` returns a `'permissions'`
+array — it doesn't (`admin_auth.php`'s actual pattern is
+`admin_has_permission($adminId, $key)`, checked directly) — fixed
+before ending the session. **Not device/build-verified** — same
+standing sandbox limitation. Android/customer-app UI for viewing
+refund status was NOT touched this session (backend-only, per the
+owner's "build in parallel" framing) — flagged as the one remaining
+customer-facing gap in the NEXT SESSION PROMPT.
+
+**2026-08-23 (follow-up session #3) — item 25's flagged customer-app
+gap closed: refund status now shows on OrderStatusActivity.** Re-ran
+the standing environment check first — still no `php`/`mysql`/Android
+SDK, network still disabled (confirmed with a live `curl` this time,
+not just an assumption) — so A.1–A.4 (UPI gateway) and B.5–B.7
+(Refund) verification checklists remain undoable in this sandbox, per
+the NEXT SESSION PROMPT's own framing. Owner chose to build the
+refund-status UI screen instead (the one remaining gap section 19 and
+the NEXT SESSION PROMPT both flagged) rather than wait on device/build
+verification. Verified the previous two sessions' file claims against
+actual `ls`/timestamps and `format_order()`'s real `refund` shape in
+`lib/orders.php` before writing any Kotlin — all confirmed genuine.
+Built: `RefundInfo`/`RefundTimelineEntry` data classes in
+`network/Models.kt` (mirrors `format_order()`'s `refund` object field-
+for-field) + a `refund: RefundInfo?` field added to `Order`; a new
+`refundCard` section in `activity_order_status.xml` (same
+show/hide-on-null convention as `riderCard`/`otpCard`); render logic
+in `OrderStatusActivity.kt` — `loadScheduledFor()` renamed
+`loadOrderDetail()` and now also populates the refund card in the same
+one-shot `GET /orders/{id}` call (no new endpoint, per doc 23/section
+19's design), with status-colored label (info/success/error via
+existing `info_fg`/`success_fg`/`error_fg` colors), amount, reason
+(swaps to `reject_reason` when status is `rejected`), method, a
+conditionally-shown expected-by date (SQL DATE format, hidden once
+`refunded`/`rejected`), a conditionally-shown reference, and a
+programmatic-TextView timeline list (server already trims it to only
+passed stages via `array_filter`, so no placeholder rows needed).
+Also wired `cancelOrder()`'s success path to re-fetch and re-render
+the refund card immediately, since cancelling a paid order
+auto-creates a `requested` refund server-side
+(`orders/cancel.php`) — without this the card would only have
+appeared on the *next* time the screen opens, not the same session.
+New strings added to `strings.xml` (`refund_*` keys). **Not
+device/build-verified** — same standing sandbox limitation; view-
+binding IDs were hand-matched between the new XML and the Kotlin file
+the same way UpiPaymentActivity's were (doc 23 §11 admits this same
+gap), never compiler-checked. No live-DB/live-app data was available
+to sanity-check real render output against, so this is a static
+read-the-code-carefully build like every other session here, not a
+click-through-tested one. Next session (once tooling exists, or if
+the owner wants to keep building forward): add this file's Kotlin/XML
+changes to A.2/A.4's "confirm it actually compiles" checklist item,
+and B.6's live click-through should include *seeing this card render
+correctly* at each refund lifecycle stage as an explicit new
+sub-step.
+
+**2026-08-23 (follow-up session #4) — item 26, Customer Wallet,
+backend + admin built (checkout integration deliberately deferred).**
+Re-checked the standing environment first (still no `php`/`mysql`/
+Android SDK, live `curl` still failing) before starting. Owner chose
+Wallet over Offers Engine / real-gateway prep. Read doc 19 §3's schema
+sketch (`customer_wallets`/`wallet_transactions`) and §12's explicitly-
+flagged-open "split payment vs wallet-only" question before designing
+anything — resolved it the same way doc 23 §A5 and migration 42 both
+already resolved their own "no partial" questions: wallet-only, no
+split, consistent with the rest of this codebase's payment model.
+Built: migration 43, `lib/wallet.php` (mirrors `lib/refunds.php`'s
+"one write-path" shape, `SELECT ... FOR UPDATE` row-locking so
+concurrent credits/debits on the same wallet can't race off a stale
+balance read), `api/v1/customer/wallet.php` (read-only balance +
+history), and a wallet section added into the *existing*
+`admin/customers.php` customer-detail modal (balance, last 5
+transactions, admin credit/debit adjustment form) rather than a new
+standalone admin page — that file's own header comment had already
+flagged exactly this as the reason no wallet action existed there yet.
+Caught and fixed one real gap during a self-review before finishing:
+`admin/customers.php`'s header kdoc still said "No wallet-adjustment
+action here yet" after the section was added — corrected to describe
+what's actually there now. **Explicitly NOT built this session, each
+a real remaining gap, not an oversight:** checkout integration
+(`orders/create.php` doesn't accept `payment_method='wallet'` yet,
+`debit_wallet_for_order()` exists in `lib/wallet.php` but has no
+caller); `CheckoutActivity`'s wallet radio option / `PaymentMethodsResult
+.walletAllowed`; the customer-app Wallet balance/history screen
+(Profile menu row) — no Android/Kotlin touched this session, backend +
+admin only; `lib/refunds.php`'s reserved `method='wallet'` refund-to-
+wallet path (`complete_refund()` still only handles the manual-bank-
+transfer method); and cashback granting/expiry (the
+`wallet_cashback_expiry_days` setting is stored but nothing computes,
+grants, or expires a cashback credit — no trigger point or scheduler
+exists anywhere in this codebase to hook into yet). Full detail in
+section 18 (updated above) and the NEXT SESSION PROMPT at the bottom.
+**Not device/build-verified** — same standing sandbox limitation.
 
 ---
 
@@ -1149,10 +1287,13 @@ pieces, not on anything in this section):**
    items 43-48, not built) — writing a `commission_cod` entry at
    ORDER CREATION instead would be wrong (a placed COD order can still
    be rejected/cancelled before any cash changes hands).
-2. `lib/ledger.php::record_paid_order_ledger_entries()` — ready, not
-   called anywhere. No code path in the whole project ever sets
-   `orders.payment_status = 'paid'` yet — Payment Provider Architecture
-   (item 27) is still a UPIPE stub, no webhook/verify endpoint exists.
+2. `lib/ledger.php::record_paid_order_ledger_entries()` — 🟢 now wired,
+   2026-08-23. Called from `PaymentService::promoteOrderIfNeeded()`
+   (`lib/payment/PaymentService.php`) the moment an admin approves a
+   UPI payment on `admin/payment-pending.php` (or a customer's next
+   10-second poll observes an already-approved transaction) — see
+   `docs/23_Native_UPI_Payment_Gateway_Architecture_2026-08-23.md`.
+   Not device-verified yet (no PHP CLI/live DB in this sandbox).
 
 Until those two land, every restaurant's ledger will show nothing
 except manually-recorded Pay Now settlements — that part IS fully
@@ -1453,20 +1594,65 @@ upload.
 
 # 18. CUSTOMER WALLET
 
-**Status: 🔴 PENDING**
+**Status: 🟡 BACKEND + ADMIN BUILT 2026-08-23, NOT device/build-
+verified. Checkout/wallet-payment integration deliberately NOT
+built — see below.** Migration 43 (`customer_wallets` +
+`wallet_transactions` append-only ledger — same pattern as
+`restaurant_due_ledger`/`refunds`, `balance_after` snapshotted per row
+so the balance is always reconstructable, not just trusted), RBAC keys
+(`wallets_view`/`wallets_manage`), `orders.payment_method` widened to
+accept `'wallet'`, `notifications.type` widened to accept `'wallet'`.
+`backend/lib/wallet.php` — single write-path (`credit_wallet()`,
+`debit_wallet()`, both row-locking via `SELECT ... FOR UPDATE` so two
+concurrent balance changes on the same wallet serialize instead of
+racing off a stale read, same race class as bugs.md #1.3's coupon fix)
++ `get_wallet_balance()`/`list_wallet_transactions()` reads +
+`debit_wallet_for_order()` — that last one is written but has **no
+caller yet**, see below. `backend/api/v1/customer/wallet.php` — read-
+only `GET` (balance + last 50 transactions), no customer-initiated
+top-up in v1 (nothing in this section's own feature list asks for
+one). `backend/admin/customers.php` — each customer's existing detail
+modal now shows their wallet balance + last 5 transactions, and (gated
+on `wallets_manage`) a credit/debit adjustment form (the "Admin
+adjustment" feature) — reused that file's existing modal-per-row UI
+rather than building a separate wallet-lookup screen from scratch,
+since it already anticipated this ("nothing to adjust until that
+table exists" — now it does).
 
-Need ledger-based wallet, not just a mutable balance.
+**v1 scope decision, made explicit since doc 19 §12 flagged it as an
+open, unresolved question:** wallet-as-full-payment-method only, no
+split/hybrid payment — mirrors the same "doesn't model partial
+payments" constraint this codebase already applies twice (doc 23 §A5
+for UPI, migration 42 for refunds). A wallet order would need to be
+covered entirely by wallet balance or not placed at all.
 
-Features:
+**Deliberately NOT built this session — checkout integration:**
+`debit_wallet_for_order()` exists in `lib/wallet.php` but nothing
+calls it. To actually let a customer pay with wallet at checkout, a
+follow-up session needs: `orders/create.php` accepting `'wallet'` as
+`$paymentMethod` and calling `debit_wallet_for_order()` inside the
+same insert transaction (refusing the order on insufficient balance,
+same shape as the existing COD-eligibility check); `PaymentMethodsResult`
+gaining a `walletAllowed`/balance-check field so `CheckoutActivity`
+can show/hide a wallet radio option; and a customer-app Wallet
+balance/history screen (Profile → menu row, same data-driven list
+`ProfileActivity.kt` already uses) that also doesn't exist yet — no
+Android/Kotlin was touched this session, backend + admin only, same
+"build in parallel, flag the UI gap" framing as item 25's first
+session. **Also not built:** `lib/refunds.php`'s reserved
+`method='wallet'` path (refund straight to wallet instead of manual
+bank transfer) — `credit_wallet()` now exists and is what that hookup
+would call, but `complete_refund()` still only handles
+`manual_upi_bank_transfer`; wiring that is a small, well-scoped
+follow-up once wallet is otherwise verified. **Cashback**: the
+`wallet_cashback_expiry_days` setting is stored (migration 43) but
+nothing computes or grants cashback yet, and nothing expires a credit
+— no cashback-granting trigger point or expiry job exists anywhere in
+this codebase to hook into.
 
-- Wallet balance
-- Refund to wallet
-- Cashback
-- Admin adjustment
-- Wallet history
-- Wallet payment
-- Optional wallet + UPI
-- Cashback expiry if required
+**Not device/build-verified** — same standing sandbox limitation (no
+PHP CLI/live MySQL here). See the NEXT SESSION PROMPT at the bottom of
+this file for the verification checklist.
 
 **Deep reference:** `docs/19_Admin_Panel_Full_Spec_And_Payment_Email_Architecture_2026-08-14.md` — Wallet; `docs/21_Production_Feature_Gap_Plan.md` — Customer Wallet.
 
@@ -1474,7 +1660,34 @@ Features:
 
 # 19. REFUND SYSTEM
 
-**Status: 🔴 PENDING**
+**Status: 🟡 BUILT 2026-08-23, NOT device/build-verified.** Migration
+42 (`refunds` table + `refunds_view`/`refunds_manage` RBAC keys),
+`backend/lib/refunds.php` (single write-path: `create_refund_request()`,
+`approve_refund()`, `mark_refund_processing()`, `complete_refund()`,
+`reject_refund()`), `backend/admin/refunds.php` (the review queue,
+same "admin does the manual transfer, this system tracks it" model as
+`admin/payment-pending.php` — there is no gateway refund API;
+`UpipeProvider::refund()` already documents that). Wired into the two
+real trigger points that previously left a UPI-paid order's money
+unaccounted for on cancellation: `orders/cancel.php` and
+`restaurant/orders-reject.php` now auto-create a `requested` refund
+whenever `payment_status === 'paid'` at cancel/reject time.
+`format_order()` (`lib/orders.php`) now returns a `refund` object
+(amount/reason/status/method/reference/expected date/timeline) inline
+on every order so the customer app doesn't need a separate endpoint.
+**v1 scope decision, made explicit since nothing upstream pinned it
+down:** full-refund-only (one `refunds` row per order,
+`UNIQUE(order_id)`) — mirrors doc 23 §A5's "this design doesn't model
+partial payments" on the payment side. `method` only ever writes
+`manual_upi_bank_transfer` today; `wallet` is reserved in the ENUM for
+when item 26 (Customer Wallet) lands, nothing writes it yet.
+**Not wired:** a customer-initiated "request a refund" self-service
+button — that needs Support/Ticket System (item 20, still 🔴) as a
+guard against abuse first; v1 only auto-creates a refund from the two
+trigger points above. **Not device/build-verified** — same standing
+sandbox limitation (no PHP CLI/live MySQL here) as everything else in
+this repo's recent sessions. See the NEXT SESSION PROMPT at the bottom
+of this file for the exact verification checklist.
 
 Required lifecycle:
 
@@ -1905,8 +2118,8 @@ Do NOT randomly pick features.
 21. Restaurant due ledger completion — 🟡 built 2026-08-22, not device-verified (section 13 — `write_due_ledger_entry()`, Pay Now flow live; the two order-triggered auto-writers exist but aren't called anywhere yet, see section 13's "NOT WIRED" list)
 22. Restaurant bank details — 🟡 built 2026-08-22, not device-verified (section 13 — `restaurant_bank_details` table + admin-editable UI on `settlements.php`; restaurant App self-submission not built)
 23. Settlement/payout UI — 🟡 built 2026-08-22, not device-verified (section 13 — `admin/settlements.php`: ledger statement + Pay Now + settlement history; the Total Orders/Cash Collected/GST analytics columns doc 19 §6 describes are NOT built yet)
-24. Payment transaction architecture — 🔴 pending (still a UPIPE stub, no webhook/verify endpoint — this is what blocks items 21/23's automatic ledger writers and the whole "payment_status ever becomes 'paid'" question)
-25. Refund system — 🔴 pending
+24. Payment transaction architecture — 🟡 built 2026-08-23, not device-verified (`docs/23_Native_UPI_Payment_Gateway_Architecture_2026-08-23.md` — migration 40, `lib/payment/PaymentService.php` + rewritten `UpipeProvider.php` (native UPI-QR, manual-admin verification, no external gateway call), 3 customer APIs under `api/v1/orders/payment-upi-*.php`, `admin/payment-gateways.php` + `admin/payment-pending.php`. `record_paid_order_ledger_entries()` is now actually called — see the item-21 update below.) **Update (same day, follow-up session):** the Android payment screen (`UpiPaymentActivity.kt`) and its "Cancel and pay by COD" button turned out to already be written (contradicting the doc's own §A4 note that customer-app UI wasn't built yet — doc corrected). That button was found to be fake (toast only, never touched the backend) and is now real: new `backend/api/v1/orders/payment-switch-cod.php` (`POST /orders/{id}/payment/switch-to-cod`), reusing `orders/create.php`'s exact payment-restriction + COD-eligibility function pair so the same rules apply. See doc 23's new §A4b for the full detail. Still 🟡 not device/build-verified.
+25. Refund system — 🟡 built 2026-08-23, not device-verified (section 19 — migration 42, `lib/refunds.php`, `admin/refunds.php`; wired into `orders/cancel.php` + `restaurant/orders-reject.php`'s payment_status='paid' gap)
 26. Wallet — 🔴 pending
 27. Reconciliation — 🟡 partially built 2026-08-22 — `platform-ledger.php`'s reconciliation check (Net Balance Held vs `-1×SUM(current_due<0)`) is live per doc 19 §6b, but there's no periodic automated check yet (doc calls for one flagging Super Admin on drift) — only the on-page manual check exists.
 
@@ -1993,6 +2206,149 @@ Before starting any new task:
 | Location picker / map pin-drop | `docs/features.md` + `docs/12_Handover_H6_Map_PinDrop_Photo.md` |
 | Restaurant known issues | `docs/restorent/20_Known_Issues_And_UX_Fixes.md` |
 | Current restaurant status history | `docs/restorent/00_Status.md` |
+| Native UPI Payment Gateway | `docs/23_Native_UPI_Payment_Gateway_Architecture_2026-08-23.md` (incl. Addendum + §A5 anti-fraud hardening) |
+
+---
+
+## NEXT SESSION PROMPT — Native UPI Payment Gateway + Refund System + Customer Wallet (2026-08-23, updated same day → next)
+
+Paste this at the start of the next session to pick up exactly where
+this one left off:
+
+> Three Phase C features are now built and all are 🟡 **NOT
+> device/build-verified** — no PHP CLI, live MySQL, or Android
+> Studio/emulator exists in this sandbox, same standing limitation
+> every session here has had. Read
+> `docs/23_Native_UPI_Payment_Gateway_Architecture_2026-08-23.md`
+> (Addendum, §A4b, §A5) + recall.md item 24 for the UPI gateway,
+> recall.md section 19 (item 25) for the Refund System, and recall.md
+> section 18 (item 26) for the Customer Wallet, before touching any
+> of them.
+>
+> **A. Native UPI Payment Gateway (item 24) — unchanged from last
+> session, still needs:**
+> 1. Run migrations 40 and 41 on a real DB, fix any SQL errors that
+>    surface (ENUM widening + the two ALTER TABLEs haven't been
+>    executed against real MySQL yet).
+> 2. Open the project in real Android Studio, resolve the ZXing
+>    Gradle dependency, and confirm `UpiPaymentActivity` actually
+>    compiles against the generated `ActivityUpiPaymentBinding` (view
+>    IDs were hand-matched between the XML and the Kotlin file but
+>    never compiler-checked).
+> 3. Full live click-through per doc 23 §11 / the Addendum: place a
+>    UPI order → confirm the QR that renders is genuinely scannable
+>    by a real UPI app → submit a UTR after the window opens → approve
+>    it from `admin/payment-pending.php` (including a deliberate
+>    amount-mismatch attempt, to confirm §A5's block actually fires)
+>    → confirm the order flips to paid, the ledger entries land, and
+>    the customer's poll reaches `success` and navigates to
+>    `OrderStatusActivity`.
+> 4. Live click-through the switch-to-COD flow too (doc 23 §A4b):
+>    place a UPI order, tap "Cancel and pay by Cash on Delivery
+>    instead," confirm the dialog, confirm the order flips to
+>    `payment_method='cod'` and any outstanding `payment_transactions`
+>    row is voided out of `admin/payment-pending.php`'s queue — then
+>    separately confirm the rejection path by testing it against an
+>    area/customer that fails the COD gate (area COD disabled, or a
+>    new-customer COD block) and confirming the on-screen reason
+>    matches `cod_rules.php`'s reason codes.
+>
+> **B. Refund System (item 25) — new this session, needs:**
+> 5. Run migration 42 on a real DB (after 40/41 — it doesn't depend on
+>    them, but keep migrations in numeric order), fix any SQL errors
+>    that surface. Confirm the `refunds_view`/`refunds_manage` grant
+>    to Super Admin actually landed (`admin_role_permissions` join in
+>    the migration's last statement — the only part of this migration
+>    with a join instead of a plain insert, worth eyeballing first).
+> 6. Live click-through: place + pay a UPI order (needs A.3 done
+>    first, or manually flip `payment_status='paid'` on a test row to
+>    unblock this independently) → cancel it as the customer within
+>    the cancel window → confirm a `requested` row appears in
+>    `admin/refunds.php` → Approve → Mark Processing (enter a test
+>    UTR) → Mark Refunded → confirm `orders.payment_status` flips to
+>    `'refunded'`, `payment_transactions.status` flips to `'refunded'`,
+>    and a `platform_ledger` `refund_out` row lands with the right
+>    sign. Also test: Reject from the `requested` state, Reject from
+>    the `approved` state, and the restaurant-reject trigger path
+>    (`restaurant/orders-reject.php` on a pending-but-already-paid
+>    order) separately from the customer-cancel trigger path.
+> 7. Confirm `format_order()`'s new `refund` object actually appears
+>    correctly in the order-status API response at each lifecycle
+>    stage, AND — updated 2026-08-23 follow-up #3 — confirm
+>    `OrderStatusActivity`'s new `refundCard` (see `renderRefund()`/
+>    `renderRefundTimeline()`) actually renders it correctly on-device
+>    at each stage: label+color (requested/under_review/approved/
+>    processing all info-blue, refunded green, rejected red), amount,
+>    reason vs. `reject_reason` swap, expected-by date hiding once
+>    refunded/rejected, reference showing only once set, and the
+>    timeline list growing one row at a time. Also confirm it appears
+>    live (not just on next screen open) right after cancelling a paid
+>    order — `cancelOrder()`'s success path now re-fetches and
+>    re-renders it inline. This Kotlin/XML was never compiler-checked
+>    (view-binding IDs hand-matched, same gap as `UpiPaymentActivity`)
+>    — fold into A.2's Android Studio compile-check step.
+>
+> **C. Customer Wallet (item 26) — new this session, needs:**
+> 8. Run migration 43 on a real DB (after 40/41/42 — doesn't depend on
+>    them, keep numeric order), fix any SQL errors. Confirm the
+>    `wallets_view`/`wallets_manage` grant to Super Admin landed (same
+>    `admin_role_permissions` join pattern as migration 42's grant —
+>    this migration's is keyed off `refunds_manage` instead of
+>    `payment_providers_manage`, worth eyeballing that join condition
+>    specifically). Confirm the `orders.payment_method` and
+>    `notifications.type` ENUM widenings applied cleanly against a DB
+>    that already has real rows in both tables (pure ALTER, should be
+>    safe, but this is the first migration in this repo widening an
+>    ENUM on a table this central — worth extra care).
+> 9. Live click-through on `admin/customers.php`'s new wallet section:
+>    open a customer's detail modal → confirm balance shows ₹0.00 for
+>    a fresh customer → submit a Credit adjustment (amount + required
+>    note) → confirm the balance updates in the modal and a new
+>    transaction row appears → submit a Debit larger than the current
+>    balance → confirm it's refused with the insufficient-balance
+>    message and the balance is unchanged (this is `debit_wallet()`'s
+>    own guard, not a UI-side check — confirm the guard actually
+>    fires against a real DB, not just that the PHP reads correctly).
+> 10. Hit `GET /api/v1/customer/wallet` as an authenticated customer
+>     (curl/Postman is enough, no Android app needed for this one) and
+>     confirm the response balance matches what step 9 set, and the
+>     transactions array matches admin/customers.php's view of the
+>     same history.
+> 11. Confirm `credit_wallet()`'s notification actually lands in
+>     `notifications` with `type='wallet'` (the ENUM widening from
+>     step 8) and shows up via the existing notification-bell endpoint
+>     — first real test of a notification type added specifically for
+>     this feature, not reused from an existing type.
+>
+> **D. Wallet checkout integration — NOT built this session, real
+> follow-up work, not just verification:**
+> 12. `orders/create.php` needs a `'wallet'` branch: validate balance
+>     via `get_wallet_balance()` covers `$priced['grand_total']`
+>     *before* opening the insert transaction (fail fast, same shape
+>     as the existing COD-eligibility pre-check), then call
+>     `debit_wallet_for_order()` (already written, unused) *inside*
+>     the same transaction as the order insert so a debit can never
+>     succeed against an order that then fails to insert, or vice
+>     versa.
+> 13. `PaymentMethodsResult` (customer app) needs a `walletAllowed`/
+>     balance field so `CheckoutActivity` can show a wallet radio
+>     option only when there's enough balance — mirrors how
+>     `codAllowed`/`upiAllowed` already gate the existing two options.
+> 14. A customer-app Wallet screen (Profile → menu row, `ProfileActivity
+>     .kt`'s existing data-driven `MenuRow` list is the natural spot)
+>     reading `GET /customer/wallet` — balance + history, no write
+>     actions needed since there's still no customer-initiated top-up.
+> 15. Once 12-14 are live: wire `lib/refunds.php`'s reserved
+>     `method='wallet'` path — `complete_refund()` should offer a
+>     "refund to wallet instead of bank transfer" option that calls
+>     `credit_wallet()` (reason='refund', order_id set) instead of
+>     writing a `platform_ledger` `refund_out` row, since money moving
+>     into the customer's own wallet balance isn't leaving the
+>     platform's account the way a real bank transfer does.
+>
+> **E. Only after A, B, C above (D is a separate, larger follow-up):**
+> decide whether to build real-gateway support (Razorpay/Cashfree, doc
+> 23 §9), Phase D's Offers Engine, or continue D above.
 
 ---
 
@@ -2003,3 +2359,344 @@ Before starting any new task:
 The owner has already tested the current core builds. The actual remaining
 product work should now be tracked from this file and the deep reference docs,
 with Admin + Area Control as the central next phase.
+
+**2026-08-23 (follow-up session #5, in progress) — item 26 §D, Wallet
+checkout integration, PARTIALLY built: D.12 (orders/create.php wallet
+branch) done, D.13/D.14/D.15 NOT done yet.** Re-confirmed the standing
+sandbox limitation first (no php/mysql/Android SDK, network egress
+403 on both live curl and apt-get install — confirmed fresh this
+session, not assumed from prior notes). Owner explicitly chose to
+continue Section D over verification or other Phase C/D work.
+
+Built: `backend/api/v1/orders/create.php` now accepts
+`payment_method: "wallet"` end to end —
+- `in_array` validation widened to include 'wallet'.
+- Area-wide payment-restriction gate (migration 37) deliberately left
+  NOT gating wallet — commented in place explaining why (a wallet
+  debit is the customer's own already-verified balance, not a new
+  payment rail the area needs to vet; `area_payment_restrictions` has
+  no wallet column so `is_payment_method_allowed_in_area()` already
+  returns allowed=true for it by default — verified this is real
+  behavior, not an assumption, by reading that function's body).
+- New fail-fast pre-check after `price_cart()` succeeds, before the
+  insert transaction opens: `get_wallet_balance()` vs
+  `grand_total`, `wallet_insufficient_balance` 422 (with balance +
+  required amounts) on failure — same shape/placement as the existing
+  COD checks.
+- Inside the same transaction as the order+items insert:
+  `debit_wallet_for_order()` (already existed, unused until now) is
+  called right after `insert_status_history('pending', ...)`. This is
+  the authoritative row-locked check (its `SELECT ... FOR UPDATE`)
+  that actually prevents two concurrent wallet orders from both
+  passing the cheap pre-check off the same stale balance — the
+  pre-check only avoids the common-case round trip. A debit failure
+  here throws `RuntimeException('wallet_insufficient_balance_race')`,
+  caught below and mapped to the same `wallet_insufficient_balance`
+  422 code the pre-check uses (no second error code for the app to
+  learn).
+- On successful debit: `orders.payment_status` flipped straight to
+  `'paid'` (a wallet order is paid the instant the debit succeeds —
+  no separate admin-confirmation step the way UPI needs one), a
+  second status-history row ("Paid via Anydrop Wallet"), and
+  `record_paid_order_ledger_entries($db, [...])` called inline with a
+  hand-built minimal order array (id/order_code/restaurant_id/
+  grand_total/commission_amount/platform_fee — the only fields that
+  function actually reads, confirmed by reading its body first rather
+  than assumed) — same ledger call `PaymentService::
+  promoteOrderIfNeeded()` already makes for a confirmed UPI payment,
+  now reused for the wallet path so commission/settlement accounting
+  doesn't silently skip wallet orders.
+- `require_once` added for `lib/wallet.php` and `lib/ledger.php` at
+  the top of the file (ledger.php wasn't previously required here —
+  `record_paid_order_ledger_entries()` lives there).
+
+**Read but NOT yet touched this session** (needed for D.13-D.15,
+next up): `backend/api/v1/customer/payment-methods.php` +
+`PaymentMethodsResult` (Models.kt) — need `wallet_allowed`/
+`wallet_balance` fields; `CheckoutActivity.kt` +
+`activity_checkout.xml` — need a third `radioWallet` option wired
+into `applyPaymentMethodRestrictions()`/`placeOrder()`'s existing
+cod/upi pattern; `ProfileActivity.kt`'s `MenuRow` list — natural spot
+for a new Wallet screen entry (no `WalletActivity.kt` exists yet);
+`backend/lib/refunds.php`'s `complete_refund()` / `admin/refunds.php`
+— the reserved `method='wallet'` refund-to-wallet path (recall.md
+item 15 in the NEXT SESSION PROMPT) still needs its own
+`complete_refund_to_wallet()`-shaped function and an admin-UI button,
+neither written yet. `OrderStatusActivity.kt`'s existing
+`renderRefund()` already handles a `method === "wallet"` label
+correctly (built in follow-up session #3, before this refund-to-
+wallet backend path exists) — confirmed by re-reading it this
+session, nothing further needed there once the backend path is wired.
+
+**Not device/build-verified** — same standing sandbox limitation.
+`orders/create.php`'s new wallet branch has not been run against a
+real DB; the debit/insert/ledger-write ordering was checked by
+careful static reading of `lib/wallet.php` and `lib/ledger.php`'s
+actual function bodies (not assumed from their names), same
+read-the-code-carefully discipline every other session here has used,
+but a live click-through (place a wallet order against a real
+`customer_wallets` balance, confirm the debit lands, confirm
+`platform_ledger`/`restaurant_due_ledger` rows appear with the right
+signs) still needs the same PHP CLI/live-DB environment noted in
+every prior session's handover.
+
+**NEXT SESSION should continue with D.13, D.14, D.15 in that order**
+(payment-methods.php + PaymentMethodsResult wallet fields first, since
+CheckoutActivity's radio option depends on knowing wallet_allowed/
+wallet_balance before it can gate anything) — then fold in the item 15
+refund-to-wallet wiring (E's admonition to finish D fully before E
+still applies) once D itself is complete.
+
+**2026-08-23 (follow-up session #6) — item 26 §D.13 done.** Re-ran the
+standing environment check first (no `php`/`mysql`/Android SDK; live
+`curl` to an external host returned `403 host_not_allowed` — confirmed
+fresh, not assumed). Verified follow-up session #5's D.12 claim
+against the actual file before trusting it (`grep` for
+`debit_wallet_for_order`/`wallet_insufficient_balance` in
+`orders/create.php` — all present exactly as described) before
+building on top of it.
+
+Built: `backend/api/v1/customer/payment-methods.php` now also returns
+`wallet_allowed` + `wallet_balance` (calls `get_wallet_balance()` from
+`lib/wallet.php`, newly `require_once`d there). Documented in-file why
+`wallet_allowed` means something different from `upi_allowed`/
+`cod_allowed` — wallet has no area-restriction concept
+(`orders/create.php`'s own §D.12 comment already established this), so
+the flag is really "does this customer have a positive balance worth
+showing a radio for," not "is this rail enabled here." A zero-balance
+wallet still exists (`get_or_create_wallet()` creates it lazily on
+first touch) but `wallet_allowed` stays false until there's something
+to spend. `customer/app/.../network/Models.kt`'s `PaymentMethodsResult`
+now has matching `walletAllowed: Boolean = false` /
+`walletBalance: Double = 0.0` fields (defaults false/0.0 so a stale
+cached response or a bare `PaymentMethodsResult()` never shows a
+wallet option it can't back up) — mirrors the existing
+`upiAllowed`/`codAllowed` `@SerializedName` pattern exactly, ready for
+`CheckoutActivity`'s `applyPaymentMethodRestrictions()` to consume in
+D.14.
+
+Also fixed one stale doc comment found while in `lib/wallet.php`:
+`debit_wallet_for_order()`'s kdoc still said "NOT WIRED — no caller
+yet" even though D.12 (previous session) already wired it into
+`orders/create.php` — corrected to describe the real current caller
+and confirm which check (this function's row-locked one, not
+`orders/create.php`'s pre-check) is authoritative.
+
+**Not device/build-verified** — same standing sandbox limitation; the
+new PHP was read-checked against `lib/wallet.php`'s actual function
+signature (not assumed), and the new Kotlin fields follow the
+project's established Gson `@SerializedName` convention exactly, but
+neither has been run/compiled.
+
+**NEXT SESSION should continue with D.14** — wire `CheckoutActivity`'s
+third `radioWallet` option into `applyPaymentMethodRestrictions()`/
+`placeOrder()`'s existing cod/upi pattern (see that file's lines ~379–
+398 and ~578 for the two spots the wallet branch needs to mirror), now
+that `walletAllowed`/`walletBalance` exist on `PaymentMethodsResult`
+for it to read. Then D.15 (Profile → Wallet screen), then fold in the
+item 15 refund-to-wallet wiring once D is fully complete.
+
+**2026-08-23 (follow-up session #7) — item 26 §D.14 done.** Re-ran the
+standing environment check first — unchanged (no `php`/`mysql`/Android
+SDK, network egress `403 host_not_allowed`). Owner said they'd test
+later rather than requesting verification this session, so continued
+straight to the next item per the file's own queue.
+
+Built: `activity_checkout.xml` gets a third `radioWallet` RadioButton
+in the existing `paymentGroup`, starting `visibility="gone"` (XML
+comment explains why wallet is hide-when-unavailable rather than
+disabled-with-reason like Cod/Upi — a zero-balance wallet isn't a
+temporary area restriction the way cod/upi unavailability is, it's "no
+balance to show"). `CheckoutActivity.kt`:
+- `applyPaymentMethodRestrictions()` now also toggles `radioWallet`'s
+  visibility off `paymentMethods.walletAllowed` and, when visible,
+  sets its label to a new `pay_wallet_with_balance_format` string
+  showing the live balance. If the radio was checked but the balance
+  has since dropped to zero (e.g. address switch re-resolved a fresher
+  `PaymentMethodsResult`), falls back to Cod-then-Upi rather than
+  leaving a hidden radio checked with no fallback.
+- New `lastKnownGrandTotal` field, captured in `renderBill()` — same
+  "captured from renderBill(), otherwise discarded" shape as the
+  existing `lastKnownItemTotal` (H5) — so `placeOrder()`'s wallet
+  pre-check can compare the live grand total against
+  `paymentMethods.walletBalance` without an extra round trip. Null
+  (bill not loaded yet) just skips the amount comparison.
+- `placeOrder()`'s `paymentMethod` resolution now checks `radioWallet`
+  first (`when` block: wallet → upi → cod). Its defensive re-check
+  (recall.md Phase B item 15's existing pattern) grew a wallet branch
+  that's amount-aware, not just an allowed-flag check — `walletAllowed`
+  alone only means "balance > 0", not "balance covers this order", so
+  a mismatched grand total also blocks locally with the new
+  `wallet_insufficient_balance_error` string. This stays a fast local
+  rejection only — `orders/create.php`'s pre-check + row-locked
+  `debit_wallet_for_order()` (§D.12) remain the real guard.
+- New `"wallet_insufficient_balance"` branch added to the server-error
+  `when` block in the failure path, mapped to the same
+  `wallet_insufficient_balance_error` string, for the case where the
+  local pre-check was stale (e.g. a second wallet debit landed
+  elsewhere between `loadPaymentMethods()` resolving and the tap).
+- Post-success navigation needed no change — the existing
+  `if (paymentMethod == "upi") { ...UpiPaymentActivity... }` branch
+  already falls through to `OrderStatusActivity` for any other
+  `paymentMethod` value, which is correct for wallet: per §D.12 a
+  wallet order is paid instantly on debit success, no polling/QR step
+  needed the way UPI has.
+- New strings: `pay_wallet`, `pay_wallet_with_balance_format`,
+  `wallet_insufficient_balance_error` in `strings.xml`, next to the
+  existing `pay_cod`/`pay_upi`/`payment_method_unavailable_here`.
+
+**Not device/build-verified** — same standing sandbox limitation. XML
+view-binding IDs (`radioWallet`) were hand-matched the same way
+`UpiPaymentActivity`'s and `OrderStatusActivity`'s were in prior
+sessions (doc 23 §11's admitted gap), never compiler-checked. No
+live-DB data to sanity-check a real balance render against.
+
+**NEXT SESSION should continue with D.15** — the customer-app Wallet
+screen itself (Profile → menu row, per the NEXT SESSION PROMPT's own
+D.14 line: `ProfileActivity.kt`'s existing data-driven `MenuRow` list
+is the natural spot), reading `GET /customer/wallet` for balance +
+history, no write actions needed. After D.15, D is complete and the
+item 15 refund-to-wallet wiring (`complete_refund()` /
+`admin/refunds.php`'s reserved `method='wallet'` path) is next, per
+section E's existing note.
+
+**2026-08-23 (follow-up session #8) — item 26 §D.15 done. Section D
+(Wallet checkout integration) is now fully complete.** Re-confirmed
+the standing sandbox limitation first (no `php`/`mysql`/Android SDK).
+Owner said they'd test everything later rather than requesting
+verification, so continued straight through the queue.
+
+Built the customer-app Wallet screen:
+- `ApiService.kt` — new `getWallet()` GET against
+  `customer/wallet.php`, same convention as every other endpoint here.
+- `Models.kt` — new `WalletTransaction`/`WalletResult` data classes,
+  field-for-field mirror of `wallet.php`'s actual response shape
+  (confirmed by reading that file first, not assumed) — same
+  discipline as `RefundInfo`/`RefundTimelineEntry`'s prior mirroring
+  of `format_order()`'s refund object. `type`/`reason` kept as raw
+  String rather than a Kotlin enum since both ENUMs could grow
+  server-side.
+- `activity_wallet.xml` — new dedicated layout (not the shared
+  `activity_simple_list.xml` `OrderHistoryActivity`/`FaqsActivity`
+  reuse, since this screen needs a balance card above the list that
+  the generic layout has no room for); header row + swipe-refresh +
+  RecyclerView + empty-state below are otherwise the same shape as
+  the shared layout, kept consistent on purpose.
+- `item_wallet_transaction.xml` — one row per transaction, same
+  CardView-row shape as `item_notification.xml`. Credit rows render
+  success_fg/+prefix/up-arrow, debit rows error_fg/-prefix/down-arrow
+  (`ic_arrow_up` rotated 180° — no separate down-arrow drawable exists
+  in this project).
+- `WalletTransactionAdapter.kt` — plain read-only list adapter, no
+  click action (a transaction row has nowhere to drill into yet).
+  Reason ENUM mapped to display strings with a defensive raw-string
+  fallback; date reformatted with the same
+  "YYYY-MM-DD HH:MM:SS" → "12 Jul, 8:42 PM" logic
+  `OrderHistoryAdapter.formatOrderDate()` already uses (duplicated,
+  not shared — that one's private to its own file).
+- `WalletActivity.kt` — loads balance + transactions in one call, no
+  pagination (the backend endpoint itself caps at 50 rows and has no
+  `page` param yet, per `wallet.php`'s own kdoc — flagged in this
+  file's kdoc as something to revisit if that ever changes).
+- `ProfileActivity.kt` — new Wallet row inserted between Saved and
+  FAQs, `ic_bolt` reused as the icon (no purpose-built wallet icon
+  exists; `ic_star` was ruled out since it's already used two rows
+  down for Rate Us). Header kdoc's icon-reuse list updated to match.
+- `AndroidManifest.xml` — `WalletActivity` registered
+  (`exported="false"`, same as every other internal screen).
+- New strings: `wallet_title`, `wallet_balance_label`,
+  `wallet_history_label`, `wallet_empty_history`,
+  `wallet_load_failed`, `wallet_reason_*` (4 reason labels),
+  `menu_wallet`.
+
+**Not device/build-verified** — same standing sandbox limitation. All
+view-binding IDs were hand-matched between each new XML file and its
+Kotlin counterpart and cross-checked with `grep` this session (both
+`activity_wallet.xml`↔`WalletActivity.kt` and
+`item_wallet_transaction.xml`↔`WalletTransactionAdapter.kt` — every ID
+referenced in Kotlin has a matching `android:id` in the XML, and vice
+versa) but never compiler-checked, same gap as every prior session's
+new screens.
+
+**Section D (Wallet checkout integration, item 26) is now fully
+built** — D.12 (orders/create.php wallet branch), D.13
+(payment-methods.php + PaymentMethodsResult wallet fields), D.14
+(CheckoutActivity radioWallet option), and D.15 (Wallet screen) are
+all done. **NEXT SESSION should move to either:**
+(a) device/build verification of everything in sections A–D once a
+PHP CLI/live-MySQL/Android Studio environment exists — the full
+checklist accumulated across this file's last several sessions is
+long at this point and worth doing as one pass rather than piecemeal, or
+(b) if the owner wants to keep building forward: item 15's
+refund-to-wallet wiring (`lib/refunds.php`'s reserved `method='wallet'`
+path — `complete_refund()` needs a `complete_refund_to_wallet()`-shaped
+function calling `credit_wallet()` instead of writing a manual-transfer
+`platform_ledger` row, plus an admin-UI button in `admin/refunds.php`;
+`OrderStatusActivity.kt`'s `renderRefund()` already handles a
+`method === "wallet"` label correctly, confirmed again this session,
+nothing further needed there), per section E's original note — or
+Phase D's Offers Engine / real-gateway support (Razorpay/Cashfree, doc
+23 §9) as separate, larger next choices.
+
+**2026-08-23 (follow-up session #9) — item 15's refund-to-wallet
+wiring built. This closes out the entire Wallet + Refund cross-over
+work list.** Re-confirmed the standing sandbox limitation first (no
+`php`/`mysql`/Android SDK). Owner chose to keep building forward
+rather than pause for verification.
+
+Built:
+- `lib/refunds.php` — new `complete_refund_to_wallet()`, mirroring
+  `complete_refund()`'s shape but for the `method='wallet'` path:
+  callable only from `status='approved'` (skips `processing` entirely
+  — a wallet credit is instant, unlike an external bank/UPI transfer
+  that needs a reference captured first while "in flight"). Calls
+  `credit_wallet()` (reason='refund', order_id set) instead of
+  `write_platform_ledger_entry()` — documented in the function's own
+  kdoc why no ledger entry is correct here: the money never leaves the
+  platform's account, it just moves from "owed to the customer in
+  cash" to "sitting in their wallet balance," and `credit_wallet()`'s
+  own `wallet_transactions` row is the complete record of that.
+  `refund_reference` gets a synthetic `WALLET-CREDIT-{txn_id}` marker
+  so the admin UI's existing reference column stays meaningful.
+  Deliberately sends no notification of its own (`credit_wallet()`
+  already sends "Wallet credited" — a second "Refund completed"
+  message for the same money movement would be redundant).
+- `approve_refund()` extended with an optional `$method` param (null
+  = leave the row's existing method column untouched, so every
+  existing caller keeps working unchanged) — approve time is the
+  natural point for an admin to choose wallet vs. manual transfer,
+  same moment they're already setting the expected-by date.
+- `admin/refunds.php` — new Method column in the table; the Approve
+  button's `promptApprove()` JS now also asks for a method choice
+  (blank = default manual transfer); a new "Credit to Wallet" button
+  appears only for `approved` rows where `method === 'wallet'`,
+  calling the new `complete_to_wallet` form action ->
+  `complete_refund_to_wallet()`. Header kdoc, intro paragraph, and the
+  STATUS verification checklist all updated to describe both paths.
+- Confirmed (re-read, not assumed) that `OrderStatusActivity.kt`'s
+  `renderRefund()` already maps `method === "wallet"` to the
+  `refund_method_wallet` string correctly — built two sessions ago,
+  before this backend path existed, still correct now that it does.
+  Nothing further needed on the customer-app side.
+
+**Not device/build-verified** — same standing sandbox limitation.
+`complete_refund_to_wallet()`'s transaction/locking behavior was
+checked by carefully re-reading `credit_wallet()`'s actual body
+(confirmed it acquires its own row lock and participates correctly in
+an already-open transaction via `$db->inTransaction()`), same
+read-the-code-carefully discipline as every other session here, but
+never run against a real DB.
+
+**This closes recall.md's item 15/item 25/item 26 cross-over list —
+every follow-up flagged across sessions #4 through #9 for the
+Wallet/Refund/UPI trio is now either built or explicitly listed as a
+separate future item (real-gateway support, cashback granting/expiry,
+Offers Engine).** NEXT SESSION should be either (a) the first full
+device/build verification pass across sections A–D of the NEXT SESSION
+PROMPT plus this session's wallet-refund path, now that the backlog of
+buildable-without-tooling work here is genuinely exhausted, or (b) a
+fresh forward-progress choice: Phase D's Offers Engine, real-gateway
+prep (Razorpay/Cashfree, doc 23 §9), or cashback granting/expiry
+(needs a scheduler/cron entry point that doesn't exist anywhere in
+this codebase yet — flagged in `lib/wallet.php`'s own header comment
+as blocked on that, not on wallet logic itself).

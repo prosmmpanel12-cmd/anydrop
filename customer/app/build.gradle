@@ -89,4 +89,13 @@ dependencies {
     // security," before shipping a real key here. Version pinned to what
     // was current stable on Maven Central as of this migration.
     implementation 'com.google.android.gms:play-services-maps:19.1.0'
+
+    // Native UPI Payment Gateway (doc 23, 2026-08-23) — renders the
+    // actual scannable QR client-side from the `upi_link` string the
+    // backend returns. Deliberately NOT a server-generated QR image —
+    // see backend/lib/payment/UpipeProvider.php's doc-comment for why
+    // (the UPIPE reference source's own QR "generator" turned out to
+    // be fake/unscannable). ZXing is offline, no network call, and is
+    // what most production UPI-collection apps already use for this.
+    implementation 'com.google.zxing:core:3.5.3'
 }

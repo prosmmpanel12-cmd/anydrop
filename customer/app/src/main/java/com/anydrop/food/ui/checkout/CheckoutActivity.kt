@@ -85,6 +85,16 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
     // but sending it enables the "add ₹X more to unlock" messaging.
     private var lastKnownItemTotal: Double? = null
 
+    // item 26 §D.14 — same "captured from renderBill(), otherwise
+    // discarded" pattern as lastKnownItemTotal above, so placeOrder()'s
+    // wallet pre-check can compare the live grand total against
+    // paymentMethods.walletBalance without a redundant network call.
+    // Null (bill not loaded yet) skips the amount comparison — the
+    // walletAllowed flag alone still gates the option, and
+    // orders/create.php's own pre-check + row-locked debit remain the
+    // real guard regardless.
+    private var lastKnownGrandTotal: Double? = null
+
     // Set while a location fix is being resolved on behalf of an open
     // AddressEditorBottomSheet — cleared once the fix is delivered back to it.
     private var pendingSheetForLocation: AddressEditorBottomSheet? = null
@@ -376,6 +386,17 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
     // pattern as the min-order Place Order button) whichever radio the
     // resolved area doesn't allow, and hops the selection to the other
     // one if the currently-checked method just became unavailable.
+    //
+    // Wallet (item 26 §D.14) is handled differently on purpose — see
+    // radioWallet's own XML comment: hidden entirely when
+    // !walletAllowed rather than shown disabled, since a zero-balance
+    // wallet isn't a temporary area restriction the way cod/upi
+    // unavailability is. When walletAllowed, its label shows the live
+    // balance so the customer doesn't have to guess if it covers the
+    // order (CreateOrderBody itself is not gated by amount here —
+    // orders/create.php's own pre-check + row-locked debit are the
+    // real guard against a stale/insufficient balance, same
+    // "convenience pre-check only" caveat as cod/upi).
     private fun applyPaymentMethodRestrictions() {
         binding.radioCod.isEnabled = paymentMethods.codAllowed
         binding.radioUpi.isEnabled = paymentMethods.upiAllowed
@@ -397,6 +418,26 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
             binding.radioUpi.text = getString(R.string.pay_upi) + " — " + getString(R.string.payment_method_unavailable_here)
         } else {
             binding.radioUpi.text = getString(R.string.pay_upi)
+        }
+
+        binding.radioWallet.visibility = if (paymentMethods.walletAllowed) View.VISIBLE else View.GONE
+        if (paymentMethods.walletAllowed) {
+            binding.radioWallet.text = getString(
+                R.string.pay_wallet_with_balance_format,
+                String.format(java.util.Locale.US, "%.2f", paymentMethods.walletBalance)
+            )
+        } else if (binding.radioWallet.isChecked) {
+            // Balance dropped to zero (or below) since this radio was
+            // checked — e.g. address switched to loadPaymentMethods()
+            // re-resolving a stale/refreshed balance. Can't leave a
+            // hidden radio checked with no fallback the way cod/upi
+            // hop to each other above, so fall back to whichever of
+            // cod/upi is currently allowed, preferring Cod.
+            if (paymentMethods.codAllowed) {
+                binding.radioCod.isChecked = true
+            } else if (paymentMethods.upiAllowed) {
+                binding.radioUpi.isChecked = true
+            }
         }
     }
 
@@ -512,6 +553,7 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
 
     private fun renderBill(totals: CartTotals) {
         lastKnownItemTotal = totals.itemTotal
+        lastKnownGrandTotal = totals.grandTotal
         setRow(binding.rowItemTotal.root, getString(R.string.lbl_item_total), totals.itemTotal)
         setRow(binding.rowDiscount.root, getString(R.string.lbl_discount), -totals.discountAmount, hideIfZero = true)
         setRow(binding.rowDelivery.root, getString(R.string.lbl_delivery_charge), totals.deliveryCharge)
@@ -568,17 +610,36 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
             return
         }
 
-        val paymentMethod = if (binding.radioUpi.isChecked) "upi" else "cod"
+        val paymentMethod = when {
+            binding.radioWallet.isChecked -> "wallet"
+            binding.radioUpi.isChecked -> "upi"
+            else -> "cod"
+        }
 
         // recall.md Phase B item 15 — defensive re-check against the
         // last-loaded restriction, in case the selection changed after
         // loadPaymentMethods() resolved but before the tap (e.g. a very
         // fast double-tap). orders/create.php enforces this regardless;
         // this only avoids an avoidable round-trip + 422.
+        //
+        // item 26 §D.14 — wallet's re-check is amount-aware (unlike
+        // cod/upi's simple allowed flag) because walletAllowed only
+        // means "balance > 0", not "balance covers this order"; the
+        // authoritative amount check is still orders/create.php's own
+        // pre-check + row-locked debit_wallet_for_order(), this is only
+        // a fast local rejection for the common case.
+        val cartTotal = lastKnownGrandTotal
         if ((paymentMethod == "cod" && !paymentMethods.codAllowed) ||
-            (paymentMethod == "upi" && !paymentMethods.upiAllowed)
+            (paymentMethod == "upi" && !paymentMethods.upiAllowed) ||
+            (paymentMethod == "wallet" && (!paymentMethods.walletAllowed ||
+                (cartTotal != null && paymentMethods.walletBalance < cartTotal)))
         ) {
-            InAppNotifier.show(this, getString(R.string.payment_method_unavailable_here), InAppNotifier.Type.INFO)
+            val message = if (paymentMethod == "wallet") {
+                getString(R.string.wallet_insufficient_balance_error)
+            } else {
+                getString(R.string.payment_method_unavailable_here)
+            }
+            InAppNotifier.show(this, message, InAppNotifier.Type.INFO)
             return
         }
 
@@ -635,6 +696,20 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
                     // exit point, no guarantee this Activity survives long
                     // enough for a 1s-debounced sync to fire.
                     com.anydrop.food.data.CartSyncManager.syncNow(this@CheckoutActivity)
+                    // Native UPI Payment Gateway (doc 23, 2026-08-23) —
+                    // a UPI order isn't actually paid yet at this point
+                    // (payment_status stays "pending" until a poll on
+                    // UpiPaymentActivity observes an admin-approved
+                    // transaction). COD orders skip straight to
+                    // OrderStatusActivity exactly as before.
+                    if (paymentMethod == "upi") {
+                        val intent = Intent(this@CheckoutActivity, com.anydrop.food.ui.checkout.UpiPaymentActivity::class.java)
+                        intent.putExtra(com.anydrop.food.ui.checkout.UpiPaymentActivity.EXTRA_ORDER_ID, result.order.id)
+                        startActivity(intent)
+                        com.anydrop.food.notifications.OrderUpdatePollingService.start(this@CheckoutActivity, result.order.id)
+                        finish()
+                        return@launch
+                    }
                     val intent = Intent(this@CheckoutActivity, OrderStatusActivity::class.java)
                     intent.putExtra(OrderStatusActivity.EXTRA_ORDER_ID, result.order.id)
                     startActivity(intent)
@@ -674,6 +749,13 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
                         // already tries to prevent client-side; this is the
                         // fallback message if that pre-check was stale/skipped.
                         "payment_method_not_allowed" -> getString(R.string.payment_method_unavailable_here)
+                        // item 26 §D.14 — orders/create.php's authoritative
+                        // guard (both the pre-check and debit_wallet_for_order()'s
+                        // row-locked recheck map to this same code) if the
+                        // client-side balance comparison above was stale —
+                        // e.g. a second wallet debit landed elsewhere between
+                        // loadPaymentMethods() resolving and this tap.
+                        "wallet_insufficient_balance" -> getString(R.string.wallet_insufficient_balance_error)
                         // I4 — one generic message covering all four
                         // scheduled_time_* codes from validate_scheduled_for()
                         // rather than a message per code (design decision left

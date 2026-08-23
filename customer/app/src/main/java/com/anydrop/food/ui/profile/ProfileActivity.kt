@@ -26,8 +26,9 @@ import com.anydrop.food.ui.login.LoginActivity
  *
  * Icon reuse (no purpose-built icons exist for these rows yet, per
  * Status.md's part 6 note): Address Book → ic_location, Order History →
- * ic_restaurant, Saved → ic_bookmark_filled, FAQs → ic_error, Rate Us →
- * ic_star, Feedback → ic_mail, Logout → ic_logout.
+ * ic_restaurant, Saved → ic_bookmark_filled, Wallet → ic_bolt (item 26
+ * §D.15), FAQs → ic_error, Rate Us → ic_star, Feedback → ic_mail,
+ * Logout → ic_logout.
  */
 class ProfileActivity : AppCompatActivity() {
 
@@ -58,6 +59,15 @@ class ProfileActivity : AppCompatActivity() {
             },
             MenuRow(R.drawable.ic_bookmark_filled, R.string.menu_saved) {
                 startActivity(Intent(this, SavedActivity::class.java))
+            },
+            // item 26 §D.15 — no purpose-built wallet icon exists yet
+            // (same gap this file's own header comment already flags for
+            // every other row); ic_bolt reused as a "quick pay" stand-in
+            // since ic_star is already used two rows down for Rate Us and
+            // reusing it here too would read as the same action twice.
+            // Revisit if a dedicated ic_wallet drawable ever gets added.
+            MenuRow(R.drawable.ic_bolt, R.string.menu_wallet) {
+                startActivity(Intent(this, WalletActivity::class.java))
             },
             MenuRow(R.drawable.ic_error, R.string.menu_faqs) {
                 startActivity(Intent(this, FaqsActivity::class.java))

@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/orders.php';
+require_once __DIR__ . '/../../../lib/refunds.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -50,6 +51,19 @@ $upd = $db->prepare(
 );
 $upd->execute(['r' => $reason, 'id' => $orderId]);
 insert_status_history($db, $orderId, 'cancelled', 'customer', $owner['owner_id'], $reason);
+
+// This order already has real money sitting with admin (a UPI payment
+// that was confirmed BEFORE the cancel window closed) — cancelling
+// the order must not silently leave that unresolved. Previously this
+// endpoint didn't check payment_status at all: a paid order could be
+// cancelled and the customer's money just... stayed with admin, with
+// no record anywhere that anything was owed back. Auto-creates a
+// 'requested' refund (recall.md item 25 / migration 42) so it lands
+// in admin/refunds.php's queue instead of getting lost.
+if ($order['payment_status'] === 'paid') {
+    create_refund_request($db, $order, 'Order cancelled by customer: ' . $reason, 'customer');
+}
+
 $db->commit();
 
 $fetch = $db->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');

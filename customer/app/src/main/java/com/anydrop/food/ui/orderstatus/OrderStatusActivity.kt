@@ -3,17 +3,21 @@ package com.anydrop.food.ui.orderstatus
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.anydrop.food.R
 import com.anydrop.food.databinding.ActivityOrderStatusBinding
 import com.anydrop.food.network.ApiClient
 import com.anydrop.food.network.OrderTrackResult
+import com.anydrop.food.network.RefundInfo
 import com.anydrop.food.ui.common.InAppNotifier
 import com.anydrop.food.ui.home.HomeActivity
 import com.anydrop.food.ui.orders.RateOrderDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 /**
  * Phase 3 — Order status/tracking. Polls GET /orders/{id}/track every 5s
@@ -24,6 +28,12 @@ import kotlinx.coroutines.launch
  * I2 (docs/features.md Phase I) adds the visual stepper — see
  * [OrderStatusStepperView] for the 9-status-to-5-step mapping and how
  * cancelled/rejected orders are handled.
+ *
+ * Item 25 (Refund System) — the `refund` object lives on the full Order
+ * (GET /orders/{id}), not the lightweight 5s /track poll, same reasoning
+ * as `scheduled_for` above: it never changes on a timescale the 5s poll
+ * needs to catch, so it's fetched once alongside scheduledFor in
+ * loadOrderDetail() rather than every poll cycle. See renderRefund().
  */
 class OrderStatusActivity : AppCompatActivity() {
 
@@ -58,7 +68,7 @@ class OrderStatusActivity : AppCompatActivity() {
         // session) — idempotent/additive, see the service's kdoc.
         com.anydrop.food.notifications.OrderUpdatePollingService.start(this, orderId)
 
-        loadScheduledFor()
+        loadOrderDetail()
         startPolling()
     }
 
@@ -72,27 +82,148 @@ class OrderStatusActivity : AppCompatActivity() {
         finish()
     }
 
-    /** I4 follow-up — `scheduled_for` lives on the full Order (GET
-     * /orders/{id}), not on the lightweight OrderTrackResult the 5s poll
-     * uses, and it never changes once an order is placed. So this is a
-     * one-shot fetch on load rather than something render() needs to
-     * re-check every poll cycle. Silent failure — same reasoning as
-     * maybePromptRating(), this is a nice-to-have label, not core to the
-     * screen. */
-    private fun loadScheduledFor() {
+    /** I4 / Item 25 — `scheduled_for` and `refund` both live on the full
+     * Order (GET /orders/{id}), not on the lightweight OrderTrackResult
+     * the 5s poll uses, and neither changes on a timescale that poll
+     * needs to catch (an order is scheduled once at placement; a refund's
+     * own status changes happen admin-side, at human speed, not within a
+     * single session in practice). So this is a one-shot fetch on load
+     * rather than something render() needs to re-check every poll cycle.
+     * Silent failure on the whole call — same reasoning as
+     * maybePromptRating(), these are supplementary, not core to the
+     * screen; a refund that hasn't loaded yet just means the card stays
+     * hidden until the next screen open. */
+    private fun loadOrderDetail() {
         lifecycleScope.launch {
             try {
-                val scheduledFor = api.getOrder(orderId).body()?.data?.order?.scheduledFor
-                val timeText = com.anydrop.food.util.ScheduledTimeFormatter.formatTime(scheduledFor)
+                val order = api.getOrder(orderId).body()?.data?.order
+
+                val timeText = com.anydrop.food.util.ScheduledTimeFormatter.formatTime(order?.scheduledFor)
                 if (timeText != null) {
                     binding.scheduledForText.visibility = View.VISIBLE
                     binding.scheduledForText.text = getString(R.string.order_scheduled_for_format, timeText)
                 }
+
+                renderRefund(order?.refund)
             } catch (e: Exception) {
                 // Silent — see kdoc above.
             }
         }
     }
+
+    /** Item 25 — populates refundCard from the order's `refund` object
+     * (null when the order has no refund row, the normal case — card
+     * stays hidden). Mirrors backend/lib/orders.php format_order()'s
+     * shape exactly: amount/reason/status/method/reference/
+     * expected_by_date/timeline (recall.md section 19's required fields). */
+    private fun renderRefund(refund: RefundInfo?) {
+        if (refund == null) {
+            binding.refundCard.visibility = View.GONE
+            return
+        }
+        binding.refundCard.visibility = View.VISIBLE
+
+        val (statusLabel, statusColor) = when (refund.status) {
+            "requested" -> getString(R.string.refund_status_requested) to R.color.info_fg
+            "under_review" -> getString(R.string.refund_status_under_review) to R.color.info_fg
+            "approved" -> getString(R.string.refund_status_approved) to R.color.info_fg
+            "processing" -> getString(R.string.refund_status_processing) to R.color.info_fg
+            "refunded" -> getString(R.string.refund_status_refunded) to R.color.success_fg
+            "rejected" -> getString(R.string.refund_status_rejected) to R.color.error_fg
+            else -> refund.status to R.color.text_primary
+        }
+        binding.refundStatusText.text = statusLabel
+        binding.refundStatusText.setTextColor(getColorCompat(statusColor))
+
+        binding.refundAmountText.text = getString(R.string.refund_amount_format, formatAmount(refund.amount))
+
+        // Rejected orders show *why it was rejected*, not the original
+        // request reason — that's the actionable info at that point.
+        if (refund.status == "rejected" && !refund.rejectReason.isNullOrBlank()) {
+            binding.refundReasonText.text = getString(R.string.refund_reject_reason_format, refund.rejectReason)
+        } else {
+            binding.refundReasonText.text = getString(R.string.refund_reason_format, refund.reason)
+        }
+
+        binding.refundMethodText.text = when (refund.method) {
+            "wallet" -> getString(R.string.refund_method_wallet)
+            else -> getString(R.string.refund_method_manual_upi_bank_transfer) // default/'manual_upi_bank_transfer' — see doc 23/migration 42
+        }
+
+        val expectedText = formatExpectedDate(refund.expectedByDate)
+        if (expectedText != null && refund.status != "refunded" && refund.status != "rejected") {
+            binding.refundExpectedText.visibility = View.VISIBLE
+            binding.refundExpectedText.text = getString(R.string.refund_expected_by_format, expectedText)
+        } else {
+            binding.refundExpectedText.visibility = View.GONE
+        }
+
+        if (!refund.reference.isNullOrBlank()) {
+            binding.refundReferenceText.visibility = View.VISIBLE
+            binding.refundReferenceText.text = getString(R.string.refund_reference_format, refund.reference)
+        } else {
+            binding.refundReferenceText.visibility = View.GONE
+        }
+
+        renderRefundTimeline(refund)
+    }
+
+    /** Builds one line per timeline entry the refund has actually passed
+     * through — format_order() only includes stages that happened
+     * (array_filter server-side), so this list is naturally 1-5 rows,
+     * no placeholder rows for stages not yet reached. Plain TextViews
+     * added programmatically; a RecyclerView would be overkill here. */
+    private fun renderRefundTimeline(refund: RefundInfo) {
+        val container = binding.refundTimelineContainer
+        container.removeAllViews()
+        refund.timeline.forEach { entry ->
+            val label = when (entry.status) {
+                "requested" -> getString(R.string.refund_status_requested)
+                "approved" -> getString(R.string.refund_status_approved)
+                "processing" -> getString(R.string.refund_status_processing)
+                "refunded" -> getString(R.string.refund_status_refunded)
+                "rejected" -> getString(R.string.refund_status_rejected)
+                else -> entry.status
+            }
+            val row = TextView(this).apply {
+                text = "• $label — ${formatTimelineTimestamp(entry.at)}"
+                setTextColor(getColorCompat(R.color.text_secondary))
+                textSize = 13f
+            }
+            container.addView(row)
+        }
+    }
+
+    private fun formatAmount(amount: Double): String {
+        // Whole-rupee display when there are no paise, same convention
+        // used elsewhere in this app's order/cart totals.
+        return if (amount == amount.toLong().toDouble()) amount.toLong().toString()
+        else String.format(Locale.getDefault(), "%.2f", amount)
+    }
+
+    /** `expected_by_date` is a plain SQL DATE ("yyyy-MM-dd"), unlike the
+     * datetime timeline entries below — separate parse format needed. */
+    private fun formatExpectedDate(raw: String?): String? {
+        if (raw.isNullOrBlank()) return null
+        return try {
+            val parsed = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(raw)
+            parsed?.let { SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(it) }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun formatTimelineTimestamp(raw: String): String {
+        return try {
+            val parsed = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(raw)
+            parsed?.let { SimpleDateFormat("d MMM, h:mm a", Locale.getDefault()).format(it) } ?: raw
+        } catch (e: Exception) {
+            raw
+        }
+    }
+
+    private fun getColorCompat(colorRes: Int): Int =
+        androidx.core.content.ContextCompat.getColor(this, colorRes)
 
     private fun startPolling() {
         lifecycleScope.launch {
@@ -207,6 +338,11 @@ class OrderStatusActivity : AppCompatActivity() {
                     InAppNotifier.show(this@OrderStatusActivity, "Order cancelled", InAppNotifier.Type.INFO)
                     binding.statusText.text = statusLabel("cancelled")
                     binding.btnCancelOrder.visibility = View.GONE
+                    // Item 25 — cancelling a paid order auto-creates a
+                    // `requested` refund server-side (orders/cancel.php).
+                    // Re-fetch so that card appears in this same session
+                    // instead of only on next screen open.
+                    renderRefund(api.getOrder(orderId).body()?.data?.order?.refund)
                 } else {
                     // Same root-cause fix as CheckoutActivity's placeOrder() —
                     // response.body() is null on this non-2xx branch; the real

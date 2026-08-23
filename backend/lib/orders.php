@@ -460,6 +460,34 @@ function format_order(PDO $db, array $order): array
     $rStmt->execute(['id' => $order['restaurant_id']]);
     $restaurantName = $rStmt->fetch()['name'] ?? null;
 
+    // Item 25 (Refund System, migration 42) — surfaced directly on the
+    // order object rather than a separate endpoint, since the order
+    // status screen already fetches/polls this and recall.md section
+    // 19 wants Amount/Reason/Method/Expected date/Reference/Timeline
+    // shown alongside the order it belongs to. Plain read, no
+    // lib/refunds.php require needed (that file pulls in ledger.php/
+    // audit.php/notifications.php for its write path, unnecessary here).
+    $refundStmt = $db->prepare('SELECT * FROM refunds WHERE order_id = :id LIMIT 1');
+    $refundStmt->execute(['id' => $order['id']]);
+    $refundRow = $refundStmt->fetch();
+    $refund = $refundRow ? [
+        'id' => (int) $refundRow['id'],
+        'amount' => (float) $refundRow['amount'],
+        'reason' => $refundRow['reason'],
+        'status' => $refundRow['status'],
+        'method' => $refundRow['method'],
+        'reference' => $refundRow['refund_reference'],
+        'reject_reason' => $refundRow['reject_reason'],
+        'expected_by_date' => $refundRow['expected_by_date'],
+        'timeline' => array_values(array_filter([
+            $refundRow['requested_at'] ? ['status' => 'requested', 'at' => $refundRow['requested_at']] : null,
+            $refundRow['approved_at'] ? ['status' => 'approved', 'at' => $refundRow['approved_at']] : null,
+            $refundRow['processing_at'] ? ['status' => 'processing', 'at' => $refundRow['processing_at']] : null,
+            $refundRow['refunded_at'] ? ['status' => 'refunded', 'at' => $refundRow['refunded_at']] : null,
+            $refundRow['rejected_at'] ? ['status' => 'rejected', 'at' => $refundRow['rejected_at']] : null,
+        ])),
+    ] : null;
+
     return [
         'id' => (int) $order['id'],
         'order_code' => $order['order_code'],
@@ -486,6 +514,7 @@ function format_order(PDO $db, array $order): array
         'created_at' => $order['created_at'],
         'items' => $items,
         'status_history' => $histStmt->fetchAll(),
+        'refund' => $refund,
     ];
 }
 

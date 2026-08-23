@@ -30,12 +30,30 @@
  * `delivery_address_id` is optional — omit it (no address picked yet)
  * and the platform-wide default restriction applies, same as
  * get_effective_payment_restrictions()'s null-lat/lng fallback.
+ *
+ * 2026-08-23 (item 26 §D.13) — also returns `wallet_allowed` +
+ * `wallet_balance`. Unlike upi_allowed/cod_allowed, wallet has no
+ * area-restriction concept at all (orders/create.php's own §D.12
+ * comment already established this — a wallet debit is the
+ * customer's own already-verified balance, not a new payment rail
+ * an area needs to vet), so wallet_allowed here means something
+ * different from the other two flags: it is NOT "is this rail
+ * enabled in this area" but "does this customer currently have a
+ * positive wallet balance worth showing a radio option for" — a
+ * zero-balance wallet still exists (get_or_create_wallet() creates
+ * it lazily) but there is nothing useful to spend, so the app should
+ * hide the option rather than show it disabled-with-reason the way
+ * cod/upi do. CheckoutActivity's own order-submit path
+ * (orders/create.php) remains the actual source of truth either way
+ * — this stays a convenience pre-check only, same as upi_allowed/
+ * cod_allowed already are.
  */
 
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/payment_restrictions.php';
+require_once __DIR__ . '/../../../lib/wallet.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -66,7 +84,11 @@ if ($addressId !== null) {
 
 $restriction = get_effective_payment_restrictions($db, $lat, $lng);
 
+$walletBalance = get_wallet_balance($db, $customerId);
+
 respond_ok([
     'upi_allowed' => $restriction['upi_allowed'],
     'cod_allowed' => $restriction['cod_allowed'],
+    'wallet_allowed' => $walletBalance > 0,
+    'wallet_balance' => round($walletBalance, 2),
 ]);

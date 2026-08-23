@@ -16,7 +16,7 @@
  * Expects, from the including page:
  *   $admin       — array from admin_require_login()
  *   $pageTitle   — string, shown in <title> and the topbar
- *   $activeNav   — one of 'dashboard' | 'approvals' | 'areas' | 'cod_rules' | 'pricing_rules' | 'payment_restrictions' | 'categories' | 'banners' | 'roles' | 'commission_rules' | 'settlements' | 'platform_ledger'
+ *   $activeNav   — one of 'dashboard' | 'approvals' | 'areas' | 'cod_rules' | 'pricing_rules' | 'payment_restrictions' | 'categories' | 'banners' | 'roles' | 'commission_rules' | 'settlements' | 'platform_ledger' | 'payment_gateways' | 'payment_pending' | 'refunds'
  *   $flash       — string|null, shown once as a toast (not a static banner)
  *   $flashType   — 'success' | 'error'
  */
@@ -89,6 +89,21 @@ $navItems = [
         'key' => 'platform_ledger', 'href' => 'platform-ledger.php', 'label' => 'Platform Cash Flow',
         'perm' => 'payouts_view',
         'icon' => '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/><circle cx="7" cy="15" r="1"/>',
+    ],
+    [
+        'key' => 'payment_gateways', 'href' => 'payment-gateways.php', 'label' => 'Payment Gateways',
+        'perm' => 'payment_providers_manage',
+        'icon' => '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/>',
+    ],
+    [
+        'key' => 'payment_pending', 'href' => 'payment-pending.php', 'label' => 'Pending UPI Payments',
+        'perm' => 'payment_providers_manage',
+        'icon' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
+    ],
+    [
+        'key' => 'refunds', 'href' => 'refunds.php', 'label' => 'Refunds',
+        'perm' => 'refunds_view',
+        'icon' => '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 5v5h5"/>',
     ],
     [
         'key' => 'roles', 'href' => 'roles.php', 'label' => 'Roles & Admins',

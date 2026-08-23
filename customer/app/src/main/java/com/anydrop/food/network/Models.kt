@@ -487,6 +487,28 @@ data class OrderStatusHistoryEntry(
     @SerializedName("created_at") val createdAt: String
 )
 
+// Item 25 (Refund System, migration 42) — mirrors backend/lib/orders.php's
+// format_order() $refund block exactly. `status` is one of:
+// requested | under_review | approved | processing | refunded | rejected
+// (refunds.status ENUM, migration 42). Null on the parent Order when no
+// refund row exists for that order (the normal case).
+data class RefundTimelineEntry(
+    val status: String,
+    val at: String
+)
+
+data class RefundInfo(
+    val id: Int,
+    val amount: Double,
+    val reason: String,
+    val status: String,
+    val method: String?,
+    val reference: String?,
+    @SerializedName("reject_reason") val rejectReason: String?,
+    @SerializedName("expected_by_date") val expectedByDate: String?,
+    val timeline: List<RefundTimelineEntry> = emptyList()
+)
+
 data class Order(
     val id: Int,
     @SerializedName("order_code") val orderCode: String,
@@ -508,7 +530,8 @@ data class Order(
     @SerializedName("estimated_prep_minutes") val estimatedPrepMinutes: Int?,
     @SerializedName("created_at") val createdAt: String,
     val items: List<OrderItemLine> = emptyList(),
-    @SerializedName("status_history") val statusHistory: List<OrderStatusHistoryEntry> = emptyList()
+    @SerializedName("status_history") val statusHistory: List<OrderStatusHistoryEntry> = emptyList(),
+    val refund: RefundInfo? = null
 )
 
 data class CreateOrderResult(
@@ -517,6 +540,48 @@ data class CreateOrderResult(
 )
 
 data class OrderDetailResult(val order: Order)
+
+// ---- Native UPI Payment Gateway (doc 23, 2026-08-23) ----
+// Mirrors backend/lib/payment/UpipeProvider.php's client_payload shape
+// exactly — see PaymentService::initiatePayment()/rebuildClientPayloadFromRow().
+// IMPORTANT: no `qr_url` field — there is deliberately no server-generated
+// QR image (see UpipeProvider.php's own doc-comment on why). The QR is
+// rendered on-device from `upiLink` — see UpiPaymentActivity's use of
+// ZXing's QRCodeWriter.
+data class UpiPaymentInitResult(
+    val method: String, // "upi_qr" or "unavailable"
+    @SerializedName("txn_ref") val txnRef: String? = null,
+    @SerializedName("upi_link") val upiLink: String? = null,
+    @SerializedName("upi_id") val upiId: String? = null,
+    @SerializedName("payee_name") val payeeName: String? = null,
+    val amount: Double? = null,
+    @SerializedName("expires_in_sec") val expiresInSec: Int = 0,
+    @SerializedName("utr_required") val utrRequired: Boolean = true,
+    @SerializedName("utr_window_sec") val utrWindowSec: Int = 300,
+    @SerializedName("poll_interval_sec") val pollIntervalSec: Int = 10,
+    @SerializedName("is_test_mode") val isTestMode: Boolean = false,
+    val instructions: List<String> = emptyList(),
+    val message: String? = null, // populated when method == "unavailable"
+    @SerializedName("already_paid") val alreadyPaid: Boolean = false
+)
+
+// GET .../payment/upi/status — polled every 10s. `status` is one of:
+// not_started | initiated | utr_pending_window | utr_available |
+// utr_submitted | success | failed | expired  (doc 23 §4).
+// NEVER trust a client-side "I paid" claim — this endpoint (and this
+// model) only ever reflects what the backend's own DB says; there is
+// no field here the client can set to influence the result.
+data class UpiPaymentStatusResult(
+    val status: String,
+    @SerializedName("utr_allowed_in_sec") val utrAllowedInSec: Int? = null,
+    @SerializedName("reject_reason") val rejectReason: String? = null,
+    @SerializedName("txn_ref") val txnRef: String? = null
+)
+
+data class SubmitUtrBody(val utr: String)
+
+// status: utr_submitted | utr_window_not_open | invalid_utr | utr_already_used
+data class SubmitUtrResult(val status: String)
 
 data class TrackRider(
     val name: String?,
@@ -578,7 +643,15 @@ data class DeleteAddressResult(val deleted: Boolean)
 // isn't wired into the app yet either and is a separate future item.
 data class PaymentMethodsResult(
     @SerializedName("upi_allowed") val upiAllowed: Boolean = true,
-    @SerializedName("cod_allowed") val codAllowed: Boolean = true
+    @SerializedName("cod_allowed") val codAllowed: Boolean = true,
+    // item 26 §D.13 — unlike upiAllowed/codAllowed (area rail
+    // restrictions), walletAllowed means "customer currently has a
+    // positive balance worth showing a radio for", computed server-side
+    // from wallet_balance > 0. Defaults false/0.0 so an old cached
+    // response or a fresh PaymentMethodsResult() never shows a wallet
+    // option it can't back up.
+    @SerializedName("wallet_allowed") val walletAllowed: Boolean = false,
+    @SerializedName("wallet_balance") val walletBalance: Double = 0.0
 )
 
 // ---- H6 part 2 — door/building photo upload (map pin-drop screen) ----
@@ -747,3 +820,29 @@ data class NotificationsResult(
 
 data class MarkReadResult(val id: Int, @SerializedName("is_read") val isRead: Boolean)
 data class MarkAllReadResult(@SerializedName("marked_read") val markedRead: Int)
+
+// ---- item 26 §D.15 — Customer Wallet screen (Profile → Wallet).
+// Field-for-field mirror of backend/api/v1/customer/wallet.php's
+// response shape (confirmed by reading that file, not assumed) —
+// same discipline as RefundInfo/RefundTimelineEntry mirroring
+// format_order()'s refund object. type/reason are left as raw
+// String rather than a Kotlin enum since wallet_transactions.reason's
+// ENUM ('refund','admin_adjustment','cashback','order_payment') and
+// type ('credit'/'debit') may grow server-side before this screen's
+// next update — same "raw string, render defensively" choice
+// RefundInfo.status/method already made.
+data class WalletTransaction(
+    val id: Int,
+    @SerializedName("order_id") val orderId: Int?,
+    val type: String, // "credit" | "debit"
+    val amount: Double,
+    val reason: String, // "refund" | "admin_adjustment" | "cashback" | "order_payment"
+    val note: String?,
+    @SerializedName("balance_after") val balanceAfter: Double,
+    @SerializedName("created_at") val createdAt: String
+)
+
+data class WalletResult(
+    val balance: Double,
+    val transactions: List<WalletTransaction> = emptyList()
+)
