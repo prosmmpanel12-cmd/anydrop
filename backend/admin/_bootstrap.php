@@ -83,3 +83,37 @@ function admin_escape(?string $value): string
 {
     return htmlspecialchars($value ?? '', ENT_QUOTES, 'UTF-8');
 }
+
+/**
+ * Builds "Neora, Osian, Jodhpur, Rajasthan" style breadcrumb — most
+ * specific first, comma-separated — for one service_areas node.
+ *
+ * 2026-08-21 (app owner request): used anywhere an admin picks a
+ * service_areas node from a dropdown (restaurants.php's area-assign,
+ * banners.php's area targeting) so two nodes with the same name (e.g.
+ * two "Osian" — see recall.md item 2's merge-tool note on how that
+ * happens) are actually distinguishable, and so the full location is
+ * obvious at a glance without hovering or clicking through.
+ *
+ * $areaById must be a full [id => row] map of every service_areas row
+ * (id, name, parent_id) — callers already have $allAreas/$areaOptions
+ * loaded, so this only ever walks parent_id pointers already in memory,
+ * no extra queries per row.
+ *
+ * NOTE: areas.php's own Hierarchy/Merge UI uses a *different* helper,
+ * area_breadcrumb() (biggest-first, "State > District > ..." arrows) —
+ * that ordering reads better for a top-down tree page. This function is
+ * for compact dropdown options elsewhere, deliberately smallest-first
+ * to match how the app owner actually asked for it ("Neora, Osian,
+ * Jodhpur, Rajasthan").
+ */
+function admin_area_breadcrumb_compact(array $area, array $areaById): string
+{
+    $parts = [$area['name']];
+    $cursor = $area;
+    while (!empty($cursor['parent_id']) && isset($areaById[(int) $cursor['parent_id']])) {
+        $cursor = $areaById[(int) $cursor['parent_id']];
+        $parts[] = $cursor['name'];
+    }
+    return implode(', ', $parts);
+}

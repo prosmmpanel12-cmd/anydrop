@@ -161,9 +161,29 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
     // the active address on any result (not just RESULT_OK) since the
     // picker's "Add Address" flow inside it can also change the active
     // address via its own AddressEditorBottomSheet.onSaved.
+    //
+    // recall.md item 18 (2026-08-22) — also reused as the auto-launched
+    // destination for the "location off/unavailable AND zero saved
+    // addresses" branch of resolveActiveAddressThenLoad()'s state
+    // machine, so there's still only one location-picker launch site
+    // wired to the "re-resolve on any result" behaviour, not a second
+    // near-duplicate one.
     private val locationPickerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { resolveActiveAddressThenLoad(forceRefresh = true) }
+
+    // recall.md item 18 — guards the auto-launch below so a user who
+    // backs out of the picker without picking anything isn't immediately
+    // re-prompted by the very re-resolve their cancel just triggered
+    // (locationPickerLauncher's callback always calls
+    // resolveActiveAddressThenLoad(forceRefresh = true), which would
+    // otherwise see "still zero saved addresses" and loop). Reset per
+    // Home instance (a fresh Activity — e.g. relaunching the app — gets
+    // one more prompt), not persisted across app opens, since forcing it
+    // again next time the user genuinely has no address is exactly the
+    // point of this state machine, not something to suppress forever
+    // just because they dismissed it once before.
+    private var hasAutoPromptedForMissingLocation = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -231,10 +251,17 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
 
         binding.swipeRefresh.setOnRefreshListener { reloadCurrentView() }
 
-        // §2.3 — retry button on the "not available in your area yet" state.
-        // Re-runs the same plain load; if the account's location has since
-        // moved into a served area (or a restaurant just launched nearby),
-        // this naturally recovers into the normal Home content.
+        // §2.3 — "not available in your area yet" state's two recovery
+        // actions. "Change Location" is the primary action (recall.md
+        // item 6's explicit spec) — routes through the same
+        // openLocationPicker() the GPS-off banner already uses, so a
+        // customer in a genuinely unserved area has an actual way out
+        // instead of only being able to re-check the same coordinates.
+        // "Try again" stays as a secondary action for the case this
+        // screen's own comment already covers (area launched / location
+        // moved since last check) — re-running the same load can
+        // legitimately recover without changing location at all.
+        binding.btnServiceAreaChangeLocation.setOnClickListener { openLocationPicker() }
         binding.btnServiceAreaRetry.setOnClickListener { loadRestaurants() }
 
         binding.btnCart.setOnClickListener {
@@ -436,9 +463,10 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
     // `is_default` address, same convention AddAddressBody's "first
     // address becomes default" comment already establishes) and caches it
     // via ActiveAddressManager for every subsequent open. A logged-in user
-    // with zero saved addresses still gets the pre-part-9 behaviour —
-    // loadRestaurants() with no lat/lng, nothing filtered out — rather than
-    // being blocked from browsing until they add one.
+    // with zero saved addresses used to just get the pre-part-9 behaviour
+    // (loadRestaurants() with no lat/lng, nothing filtered out) forever —
+    // recall.md item 18 (2026-08-22) closes that gap: see the "zero saved
+    // addresses" branch below.
 
     private fun applyActiveAddressUi(active: ActiveAddressManager.ActiveAddress?) {
         binding.deliveryLocationText.text = if (active != null) {
@@ -448,6 +476,26 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
         }
     }
 
+    /**
+     * recall.md item 18 — "Location off / not available" state machine,
+     * Case B specifically (Case A — permission on, live GPS available —
+     * was already covered by the existing "Use current location" picker
+     * row + the GPS-off banner's re-check on resume; this function isn't
+     * where that path lives). Case B:
+     *
+     *   1. A saved address exists (default, or first if none marked
+     *      default) → use it. (Already existed before this change.)
+     *   2. NO saved address exists at all → don't silently fall back to
+     *      an unfiltered feed forever. Auto-open the same Location
+     *      Picker / Add Address flow the "Change Location" bar already
+     *      uses, Zomato-style, so the user isn't — per this item's own
+     *      wording — "trapped on a blank Home screen merely because
+     *      location permission is disabled." One prompt per Home
+     *      instance (hasAutoPromptedForMissingLocation) — if they back
+     *      out without picking anything, Home falls back to the
+     *      unfiltered feed exactly as it always did, rather than nagging
+     *      them again on every subsequent resolve.
+     */
     private fun resolveActiveAddressThenLoad(forceRefresh: Boolean) {
         val cached = ActiveAddressManager.get(this)
         if (cached != null && !forceRefresh) {
@@ -455,18 +503,38 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
             return
         }
         lifecycleScope.launch {
+            var promptedThisCall = false
             try {
                 val addresses = api.getAddresses().body()?.data?.addresses.orEmpty()
                 val picked = addresses.firstOrNull { it.isDefault } ?: addresses.firstOrNull()
                 if (picked != null) {
                     ActiveAddressManager.set(this@HomeActivity, picked)
                     applyActiveAddressUi(ActiveAddressManager.get(this@HomeActivity))
+                } else if (!hasAutoPromptedForMissingLocation) {
+                    // Confirmed zero saved addresses (not a network
+                    // failure — that's the catch block below, which
+                    // deliberately does NOT auto-prompt, since a
+                    // transient fetch error isn't the same thing as
+                    // "this account genuinely has no address").
+                    hasAutoPromptedForMissingLocation = true
+                    promptedThisCall = true
+                    locationPickerLauncher.launch(
+                        Intent(this@HomeActivity, com.anydrop.food.ui.address.LocationPickerActivity::class.java)
+                    )
                 }
             } catch (e: Exception) {
                 // Non-fatal — Home still loads unfiltered below, same as
                 // before this address concept existed.
             }
-            loadRestaurants()
+            // locationPickerLauncher's own callback already calls
+            // resolveActiveAddressThenLoad(forceRefresh = true) once the
+            // picker returns (picked something or backed out) — calling
+            // loadRestaurants() here too, on the exact same pass that
+            // just launched it, would show one unfiltered frame behind
+            // the picker for no reason.
+            if (!promptedThisCall) {
+                loadRestaurants()
+            }
         }
     }
 
@@ -567,11 +635,18 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
      * old single static banner (showPromoBanner(), splash-config home_promo_*
      * fields) if the list is empty or the request fails — that fallback path
      * is unchanged from before this carousel existed.
+     *
+     * lat/lng (from the currently active address, when one is resolved) are
+     * passed through so the backend can resolve a service area and include
+     * any admin-managed banners scoped to it (recall.md item 17) alongside
+     * the platform-wide ones — omitted entirely when no address is active
+     * yet, same as loadRestaurants()'s existing lat/lng-optional pattern.
      */
     private fun loadPromoBanners() {
         lifecycleScope.launch {
             try {
-                val response = api.getPromoBanners()
+                val active = ActiveAddressManager.get(this@HomeActivity)
+                val response = api.getPromoBanners(lat = active?.latitude, lng = active?.longitude)
                 val banners: List<PromoBanner> = response.body()?.data?.banners ?: emptyList()
                 if (banners.isEmpty()) {
                     showPromoBanner()

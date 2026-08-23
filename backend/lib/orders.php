@@ -10,6 +10,8 @@
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/settings.php';
+require_once __DIR__ . '/delivery_pricing.php';
+require_once __DIR__ . '/commission.php';
 
 /** Generates a unique order code like QRX-8F3K9A. Retries on the rare collision. */
 function generate_order_code(PDO $db): string
@@ -34,6 +36,13 @@ function generate_order_code(PDO $db): string
  * Validates + prices a cart against live DB data.
  *
  * @param array $items [{ menu_item_id, variant_id?, addon_ids?: [], quantity }]
+ * @param float|null $deliveryLat/$deliveryLng — the delivery address's
+ *   coordinates, when known (recall.md Phase B item 14, migration 36).
+ *   Used to compute a real distance-based delivery fee via
+ *   lib/delivery_pricing.php's calculate_delivery_fee(); when either is
+ *   missing (no address picked yet, e.g. an early cart/validate.php
+ *   preview) the old flat delivery_charge_flat setting is used exactly
+ *   as before — nothing regresses for a caller that can't supply them.
  * @return array{
  *   valid: bool,
  *   restaurant: array|null,
@@ -45,7 +54,7 @@ function generate_order_code(PDO $db): string
  *   coupon_id: int|null, error: string|null
  * }
  */
-function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCode, int $customerId, $scheduledForRaw = null): array
+function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCode, int $customerId, $scheduledForRaw = null, ?float $deliveryLat = null, ?float $deliveryLng = null): array
 {
     $result = [
         'valid' => false,
@@ -55,6 +64,7 @@ function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCod
         'item_total' => 0.0,
         'discount_amount' => 0.0,
         'delivery_charge' => 0.0,
+        'delivery_distance_km' => null,
         'platform_fee' => 0.0,
         'tax_amount' => 0.0,
         'packing_charge' => 0.0,
@@ -204,6 +214,23 @@ function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCod
             $specialInstructions = null;
         }
 
+        // recall.md Phase C items 20-23 / migration 38 — per-line
+        // commission, since category/area rules mean two lines on the
+        // SAME order can legitimately carry different rates (e.g. a
+        // cold drink alongside regular food). Resolved and snapshotted
+        // here (not recomputed later) for the same reason
+        // item_name_snapshot/unit_price already are — a later category
+        // reassignment or rule change must never silently change a
+        // historical order's numbers.
+        $lineCategoryIds = get_food_category_ids_for_menu_item($db, $menuItemId);
+        $lineCommission = get_effective_commission_rate(
+            $db,
+            $lineCategoryIds,
+            $restaurant['area_id'] !== null ? (int) $restaurant['area_id'] : null,
+            $restaurant['commission_percent'] !== null ? (float) $restaurant['commission_percent'] : null
+        );
+        $lineCommissionAmount = round($subtotal * $lineCommission['percent'] / 100, 2);
+
         $lineItems[] = [
             'menu_item_id' => $menuItemId,
             'item_name_snapshot' => $item['name'],
@@ -213,6 +240,8 @@ function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCod
             'addons_json' => json_encode($addonNames),
             'special_instructions' => $specialInstructions,
             'subtotal' => $subtotal,
+            'commission_percent' => $lineCommission['percent'],
+            'commission_amount' => $lineCommissionAmount,
         ];
     }
 
@@ -296,22 +325,41 @@ function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCod
         } while (false);
     }
 
-    $deliveryCharge = (float) get_setting('delivery_charge_flat', 25);
+    // recall.md Phase B item 14 / migration 36 — distance-based delivery
+    // fee, replacing the old flat delivery_charge_flat as the default
+    // calculation (that setting is now only the fallback used inside
+    // calculate_delivery_fee() itself when a distance can't be computed).
+    // Restaurant's own latitude/longitude (already exists, set via
+    // restaurant/profile-update.php's map-picker flow) + the delivery
+    // address's lat/lng passed into this function.
+    $restaurantLat = $restaurant['latitude'] !== null ? (float) $restaurant['latitude'] : null;
+    $restaurantLng = $restaurant['longitude'] !== null ? (float) $restaurant['longitude'] : null;
+    $deliveryPricing = calculate_delivery_fee($db, $restaurantLat, $restaurantLng, $deliveryLat, $deliveryLng);
+    $deliveryCharge = $deliveryPricing['fee'];
     $platformFee = (float) get_setting('platform_fee_flat', 5);
     $packingCharge = (float) get_setting('packing_charge_flat', 0);
     $taxPercent = (float) get_setting('tax_percent', 5);
     $taxAmount = round(($itemTotal - $discount) * $taxPercent / 100, 2);
 
     $grandTotal = round($itemTotal - $discount + $deliveryCharge + $platformFee + $packingCharge + $taxAmount, 2);
-    // Per-restaurant commission_percent wins over the global default (restaurants.commission_percent
-    // is the "admin override for this restaurant" column referenced in 02_API_Contract.md section 6).
-    $commissionPercent = (float) ($restaurant['commission_percent'] ?? get_setting('commission_default_percent', 15));
-    $commissionAmount = round($itemTotal * $commissionPercent / 100, 2);
+    // recall.md Phase C items 20-23 / migration 38 — order-level
+    // commission_amount is now just the sum of each line's own
+    // snapshot above (get_effective_commission_rate() per line), not a
+    // single flat itemTotal × restaurant.commission_percent — a
+    // restaurant-flat rate is still exactly what each line resolves to
+    // when no category/area rule overrides it, so a restaurant with no
+    // commission_rules configured sees identical numbers to before this
+    // migration.
+    $commissionAmount = round(array_sum(array_column($lineItems, 'commission_amount')), 2);
 
     $result['valid'] = empty($invalid);
     $result['item_total'] = round($itemTotal, 2);
     $result['discount_amount'] = $discount;
     $result['delivery_charge'] = $deliveryCharge;
+    // Breakdown exposed alongside the charge itself so the checkout
+    // screen can show "Delivery fee (2.3 km)" instead of a bare number
+    // — never used to recompute anything client-side, purely display.
+    $result['delivery_distance_km'] = $deliveryPricing['distance_km'];
     $result['platform_fee'] = $platformFee;
     $result['packing_charge'] = $packingCharge;
     $result['tax_amount'] = $taxAmount;

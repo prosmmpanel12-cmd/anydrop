@@ -571,6 +571,16 @@ data class AddAddressResult(val id: Int)
 data class UpdateAddressResult(val id: Int)
 data class DeleteAddressResult(val deleted: Boolean)
 
+// ---- recall.md Phase B item 15 — area-wise general payment method
+// restrictions (backend/api/v1/customer/payment-methods.php). Coarse
+// "is this method allowed here at all" gate — distinct from the
+// finer COD-specific eligibility (backend/lib/cod_rules.php), which
+// isn't wired into the app yet either and is a separate future item.
+data class PaymentMethodsResult(
+    @SerializedName("upi_allowed") val upiAllowed: Boolean = true,
+    @SerializedName("cod_allowed") val codAllowed: Boolean = true
+)
+
 // ---- H6 part 2 — door/building photo upload (map pin-drop screen) ----
 data class AddressPhotoUploadResult(@SerializedName("photo_url") val photoUrl: String)
 

@@ -23,6 +23,8 @@ require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/orders.php';
 require_once __DIR__ . '/../../../lib/notifications.php';
+require_once __DIR__ . '/../../../lib/cod_rules.php';
+require_once __DIR__ . '/../../../lib/payment_restrictions.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -85,11 +87,43 @@ if ($idempotencyKey !== null) {
 }
 
 // Address must belong to this customer, if provided.
+$addressLat = null;
+$addressLng = null;
 if ($addressId !== null) {
-    $addrStmt = $db->prepare('SELECT id FROM customer_addresses WHERE id = :id AND customer_id = :cid LIMIT 1');
+    $addrStmt = $db->prepare('SELECT id, latitude, longitude FROM customer_addresses WHERE id = :id AND customer_id = :cid LIMIT 1');
     $addrStmt->execute(['id' => $addressId, 'cid' => $customerId]);
-    if (!$addrStmt->fetch()) {
+    $addressRow = $addrStmt->fetch();
+    if (!$addressRow) {
         respond_error('validation_error', 422, ['fields' => ['delivery_address_id']]);
+    }
+    $addressLat = $addressRow['latitude'] !== null ? (float) $addressRow['latitude'] : null;
+    $addressLng = $addressRow['longitude'] !== null ? (float) $addressRow['longitude'] : null;
+}
+
+// recall.md Phase B item 15 / migration 37 — general area-wide payment
+// method gate, checked BEFORE the COD-specific fine-grained rule below.
+// This is the coarser "is this method allowed in this area at all"
+// check (e.g. a prepaid-only launch area) — a method that fails this
+// never reaches evaluate_cod_eligibility() at all, since there's no
+// point evaluating COD sub-rules for a customer who can't use COD here
+// under any circumstance.
+$paymentRestriction = get_effective_payment_restrictions($db, $addressLat, $addressLng);
+$methodAllowed = is_payment_method_allowed_in_area($paymentRestriction, $paymentMethod);
+if (!$methodAllowed['allowed']) {
+    respond_error('payment_method_not_allowed', 422, ['reason' => $methodAllowed['reason']]);
+}
+
+// recall.md item 4 / migration 35 — area-wise COD eligibility. Checked
+// before pricing so a rejected COD order fails fast rather than pricing
+// a cart that's about to be rejected anyway. Order-amount cap is
+// checked again after price_cart() below (grand_total isn't known
+// yet at this point) — this first pass only covers the checks that
+// don't need the priced total (enabled/disabled, order-count checks).
+if ($paymentMethod === 'cod') {
+    $codRule = get_effective_cod_rule($db, $addressLat, $addressLng);
+    $codCheck = evaluate_cod_eligibility($db, $codRule, $customerId, null);
+    if (!$codCheck['eligible']) {
+        respond_error('cod_not_eligible', 422, ['reason' => $codCheck['reason']]);
     }
 }
 
@@ -97,7 +131,7 @@ if ($addressId !== null) {
 // restaurant's hours against right-now (a "Deliver Now" order) or skip
 // that check (a scheduled order — validate_scheduled_for() below checks
 // its own target slot against the restaurant's hours instead).
-$priced = price_cart($db, $restaurantId, $items, $couponCode, $customerId, $scheduledForRaw);
+$priced = price_cart($db, $restaurantId, $items, $couponCode, $customerId, $scheduledForRaw, $addressLat, $addressLng);
 
 if ($priced['error']) {
     // H4 follow-up (2026-08-10) — attach min_order_amount + item_total
@@ -110,6 +144,19 @@ if ($priced['error']) {
         $errorData['item_total'] = $priced['item_total'];
     }
     respond_error($priced['error'], 422, $errorData);
+}
+
+// Second COD check — the amount-based cap couldn't be checked before
+// pricing (grand_total wasn't known yet). Enabled/count checks already
+// ran above; re-running evaluate_cod_eligibility() here is cheap (same
+// two count queries) and keeps this a single function to maintain
+// rather than splitting the amount check out into its own inline
+// comparison.
+if ($paymentMethod === 'cod') {
+    $codCheck = evaluate_cod_eligibility($db, $codRule, $customerId, (float) $priced['grand_total']);
+    if (!$codCheck['eligible']) {
+        respond_error('cod_not_eligible', 422, ['reason' => $codCheck['reason']]);
+    }
 }
 
 $otpRequired = $paymentMethod === 'upi' || (bool) get_setting('otp_required_for_cod', false);
@@ -174,8 +221,8 @@ try {
     $orderId = (int) $db->lastInsertId();
 
     $insertItem = $db->prepare(
-        'INSERT INTO order_items (order_id, menu_item_id, item_name_snapshot, variant_name, quantity, unit_price, addons_json, special_instructions, subtotal)
-         VALUES (:oid, :mid, :name, :variant, :qty, :price, :addons, :instructions, :subtotal)'
+        'INSERT INTO order_items (order_id, menu_item_id, item_name_snapshot, variant_name, quantity, unit_price, addons_json, special_instructions, subtotal, commission_percent, commission_amount)
+         VALUES (:oid, :mid, :name, :variant, :qty, :price, :addons, :instructions, :subtotal, :commission_percent, :commission_amount)'
     );
     foreach ($priced['line_items'] as $line) {
         $insertItem->execute([
@@ -188,6 +235,10 @@ try {
             'addons' => $line['addons_json'],
             'instructions' => $line['special_instructions'] ?? null,
             'subtotal' => $line['subtotal'],
+            // recall.md Phase C items 20-23 / migration 38 — per-line
+            // snapshot from price_cart(), see lib/commission.php.
+            'commission_percent' => $line['commission_percent'] ?? null,
+            'commission_amount' => $line['commission_amount'] ?? null,
         ]);
     }
 

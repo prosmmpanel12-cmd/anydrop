@@ -203,10 +203,14 @@ html.rail-pref .app-shell:not(.expanded) .sidebar {
 .nav-item:hover .icon { color: var(--text); }
 .nav-item.icon-dashboard .icon { color: var(--info); }
 .nav-item.icon-approvals .icon { color: var(--warn); }
+.nav-item.icon-restaurants .icon { color: #e6521f; }
+.nav-item.icon-customers .icon { color: #2f8fd6; }
 .nav-item.icon-areas .icon { color: var(--success); }
 .nav-item.icon-roles .icon { color: #a25ee0; }
 .nav-item.active.icon-dashboard .icon { background: var(--info-soft); color: var(--info); }
 .nav-item.active.icon-approvals .icon { background: var(--warn-soft); color: var(--warn); }
+.nav-item.active.icon-restaurants .icon { background: rgba(230, 82, 31, 0.14); color: #e6521f; }
+.nav-item.active.icon-customers .icon { background: rgba(47, 143, 214, 0.14); color: #2f8fd6; }
 .nav-item.active.icon-areas .icon { background: var(--success-soft); color: var(--success); }
 .nav-item.active.icon-roles .icon { background: rgba(162, 94, 224, 0.16); color: #a25ee0; }
 .nav-item:hover { background: var(--surface-2); color: var(--text); }
@@ -340,6 +344,8 @@ input:focus, select:focus, textarea:focus {
 }
 label.field-label { display: block; margin-bottom: 5px; font-size: 12px; color: var(--text-muted); font-weight: 600; }
 .form-grid { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.checkbox-row { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; }
+.checkbox-row input[type="checkbox"] { width: auto; }
 .hint { font-size: 12px; color: var(--text-muted); margin-top: -4px; margin-bottom: 14px; }
 
 /* ---------- Tables ---------- */
@@ -359,6 +365,7 @@ tbody tr:last-child td { border-bottom: none; }
 .badge.level-state { background: var(--info-soft); color: var(--info); }
 .badge.level-district { background: var(--warn-soft); color: var(--warn); }
 .badge.level-city { background: var(--success-soft); color: var(--success); }
+.badge.level-city_village { background: var(--success-soft); color: var(--success); }
 .badge.level-area { background: var(--danger-soft); color: var(--danger); }
 
 .muted { color: var(--text-muted); font-size: 12px; }
@@ -384,6 +391,10 @@ dialog.modal[open]::backdrop { opacity: 1; }
 .modal-title { font-size: 16px; font-weight: 700; margin: 0 0 8px; }
 .modal-text { font-size: 13.5px; color: var(--text-muted); line-height: 1.5; margin: 0 0 18px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+/* Wider variant for the areas.php map-picker dialog — the default 440px
+   modal width is too cramped to actually pick a point on a map. */
+dialog.modal.modal-map { width: min(720px, calc(100vw - 32px)); }
 
 /* ---------- Toasts ---------- */
 .toast-stack {
@@ -447,10 +458,19 @@ dialog.modal[open]::backdrop { opacity: 1; }
         z-index: 30;
     }
     .app-shell.drawer-open .sidebar { transform: translateX(0); }
+    /* !important + higher-specificity guard: a stray .rail class (e.g. a
+       leftover desktop preference) must never hide labels on the mobile
+       drawer — .rail has no meaning here, drawer open/closed is the only
+       mobile state. This is a defensive second layer on top of the JS
+       fix (admin.js now only ever applies .rail above 640px). */
     .app-shell .sidebar .label,
     .app-shell .sidebar .nav-section-title,
-    .app-shell .sidebar .sidebar-footer { display: block; }
-    .app-shell .sidebar .nav-item { justify-content: flex-start; padding: 10px 20px; }
+    .app-shell .sidebar .sidebar-footer,
+    .app-shell.rail .sidebar .label,
+    .app-shell.rail .sidebar .nav-section-title,
+    .app-shell.rail .sidebar .sidebar-footer { display: block !important; }
+    .app-shell .sidebar .nav-item,
+    .app-shell.rail .sidebar .nav-item { justify-content: flex-start !important; padding: 10px 20px !important; }
     .icon-btn.menu-btn { display: flex; }
     .content { padding: 14px; }
     .topbar { padding: 0 12px; }

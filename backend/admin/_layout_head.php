@@ -16,7 +16,7 @@
  * Expects, from the including page:
  *   $admin       — array from admin_require_login()
  *   $pageTitle   — string, shown in <title> and the topbar
- *   $activeNav   — one of 'dashboard' | 'approvals' | 'areas' | 'roles'
+ *   $activeNav   — one of 'dashboard' | 'approvals' | 'areas' | 'cod_rules' | 'pricing_rules' | 'payment_restrictions' | 'categories' | 'banners' | 'roles' | 'commission_rules' | 'settlements' | 'platform_ledger'
  *   $flash       — string|null, shown once as a toast (not a static banner)
  *   $flashType   — 'success' | 'error'
  */
@@ -36,9 +36,59 @@ $navItems = [
         'icon' => '<path d="M3 9l1.5-5h15L21 9"/><path d="M3 9h18v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9z"/><path d="M8 13a2 2 0 0 1-4 0M12 13a2 2 0 0 1-4 0M16 13a2 2 0 0 1-4 0M20 13a2 2 0 0 1-4 0"/>',
     ],
     [
+        'key' => 'restaurants', 'href' => 'restaurants.php', 'label' => 'Restaurants',
+        'perm' => 'restaurants_view',
+        'icon' => '<path d="M4 3v18M4 3c0 3 3 3 3 6s-3 3-3 6M20 3v18M20 8h-4a2 2 0 0 0 0 4h4"/>',
+    ],
+    [
+        'key' => 'customers', 'href' => 'customers.php', 'label' => 'Customers',
+        'perm' => 'customers_view',
+        'icon' => '<path d="M20 21a8 8 0 1 0-16 0"/><circle cx="12" cy="8" r="5"/>',
+    ],
+    [
         'key' => 'areas', 'href' => 'areas.php', 'label' => 'Service Areas',
         'perm' => 'areas_view',
         'icon' => '<path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
+    ],
+    [
+        'key' => 'cod_rules', 'href' => 'cod-rules.php', 'label' => 'COD Rules',
+        'perm' => 'areas_view',
+        'icon' => '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/>',
+    ],
+    [
+        'key' => 'pricing_rules', 'href' => 'pricing-rules.php', 'label' => 'Pricing Rules',
+        'perm' => 'areas_view',
+        'icon' => '<path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+    ],
+    [
+        'key' => 'payment_restrictions', 'href' => 'payment-restrictions.php', 'label' => 'Payment Restrictions',
+        'perm' => 'areas_view',
+        'icon' => '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 9h20"/><path d="M6 14l3 3 7-7"/>',
+    ],
+    [
+        'key' => 'categories', 'href' => 'categories.php', 'label' => 'Categories',
+        'perm' => 'categories_view',
+        'icon' => '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="18" height="7" rx="1.5"/>',
+    ],
+    [
+        'key' => 'banners', 'href' => 'banners.php', 'label' => 'Banners',
+        'perm' => 'banners_view',
+        'icon' => '<rect x="3" y="6" width="18" height="12" rx="1.5"/><path d="M3 10h18"/>',
+    ],
+    [
+        'key' => 'commission_rules', 'href' => 'commission-rules.php', 'label' => 'Commission Rules',
+        'perm' => 'payouts_view',
+        'icon' => '<circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/>',
+    ],
+    [
+        'key' => 'settlements', 'href' => 'settlements.php', 'label' => 'Settlements',
+        'perm' => 'payouts_view',
+        'icon' => '<path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+    ],
+    [
+        'key' => 'platform_ledger', 'href' => 'platform-ledger.php', 'label' => 'Platform Cash Flow',
+        'perm' => 'payouts_view',
+        'icon' => '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/><circle cx="7" cy="15" r="1"/>',
     ],
     [
         'key' => 'roles', 'href' => 'roles.php', 'label' => 'Roles & Admins',
@@ -55,13 +105,19 @@ $initials = strtoupper(substr($admin['username'] ?? '?', 0, 1));
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Anydrop Admin — <?= admin_escape($pageTitle) ?></title>
-<link rel="stylesheet" href="assets/admin.css">
+<link rel="stylesheet" href="assets/admin.css?v=<?= @filemtime(__DIR__ . '/assets/admin.css') ?: '1' ?>">
 <script>
     /* Set theme before first paint to avoid a light/dark flash. */
     (function(){var t=localStorage.getItem('anydrop_admin_theme');
         if(!t){t=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
         document.documentElement.setAttribute('data-theme', t);
-        if(localStorage.getItem('anydrop_admin_sidebar_expanded')==='0'){document.documentElement.classList.add('rail-pref');}
+        /* Rail is a desktop-only preference — only apply it pre-paint above
+           640px, so a rail state saved from a desktop session never causes
+           a mobile drawer to render icon-only (see admin.js's matching
+           isMobile() guard, and admin.css's mobile media query, which is
+           now also a defensive second layer against this). */
+        var isDesktopWidth = !window.matchMedia || window.matchMedia('(min-width: 641px)').matches;
+        if(isDesktopWidth && localStorage.getItem('anydrop_admin_sidebar_expanded')==='0'){document.documentElement.classList.add('rail-pref');}
     })();
 </script>
 </head>

@@ -33,6 +33,7 @@
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
+require_once __DIR__ . '/../../../lib/delivery_pricing.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -169,6 +170,41 @@ if ($hasLat && $hasLng) {
         $params['latitude'] = null;
         $params['longitude'] = null;
     }
+}
+
+// min_order_amount — recall.md Phase B item 13 / migration 36. The
+// restaurant sets its own value (this column already existed and
+// price_cart() already reads it for the below_min_order_amount check —
+// nothing changes there), but it can never be saved below the
+// admin-set floor for whichever service area this restaurant is
+// assigned to (restaurants.area_id, set by admin — recall.md item 2).
+// "Floor, restaurant can go higher" per app owner's explicit answer —
+// not "admin's number always wins" (that would make this field
+// pointless for the restaurant to touch at all). A restaurant with no
+// area_id yet (not assigned by admin) is floored by the platform-wide
+// default only.
+if (array_key_exists('min_order_amount', $body) && $body['min_order_amount'] !== null) {
+    if (!is_numeric($body['min_order_amount']) || (float) $body['min_order_amount'] < 0) {
+        respond_error('validation_error', 422, ['fields' => ['min_order_amount']]);
+    }
+    $requestedMinOrder = round((float) $body['min_order_amount'], 2);
+
+    $dbForFloorCheck = Database::get();
+    $areaStmt = $dbForFloorCheck->prepare('SELECT area_id FROM restaurants WHERE id = :id LIMIT 1');
+    $areaStmt->execute(['id' => $restaurantId]);
+    $currentAreaId = $areaStmt->fetchColumn();
+    $currentAreaId = $currentAreaId !== false && $currentAreaId !== null ? (int) $currentAreaId : null;
+
+    $floor = get_min_order_floor_for_area_id($dbForFloorCheck, $currentAreaId);
+    if ($requestedMinOrder < $floor) {
+        respond_error('min_order_below_area_floor', 422, [
+            'fields' => ['min_order_amount'],
+            'area_floor' => $floor,
+        ]);
+    }
+
+    $fields[] = 'min_order_amount = :min_order_amount';
+    $params['min_order_amount'] = $requestedMinOrder;
 }
 
 $db = Database::get();

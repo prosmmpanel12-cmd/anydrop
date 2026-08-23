@@ -250,6 +250,31 @@
                     android:inputType="text" />
             </com.google.android.material.textfield.TextInputLayout>
 
+            <!-- recall.md Phase B item 13 / migration 36 — restaurant's own
+                 minimum order amount. Server-enforced floor per the area
+                 admin assigned this restaurant to (profile-update.php
+                 rejects a value below that floor with
+                 min_order_below_area_floor + the floor amount) — this
+                 field just lets the owner set their own value at or above
+                 whatever that floor turns out to be; it is NOT itself the
+                 floor. -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                app:boxCornerRadiusTopStart="12dp" app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp" app:boxCornerRadiusBottomEnd="12dp"
+                app:boxStrokeColor="@color/anydrop_primary">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputMinOrderAmount"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/hint_min_order_amount"
+                    android:inputType="numberDecimal" />
+            </com.google.android.material.textfield.TextInputLayout>
+
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

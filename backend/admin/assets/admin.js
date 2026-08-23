@@ -33,8 +33,12 @@
 
     // ---------- Sidebar: desktop collapse / tablet expand / mobile drawer ----------
     if (shell) {
-        // Desktop: remember collapsed-to-rail preference.
-        if (localStorage.getItem(SIDEBAR_KEY) === '0') {
+        // Desktop-only collapse-to-rail preference. Guarded to >640px so a
+        // rail state saved on a desktop session never leaks onto a phone's
+        // off-canvas drawer (drawer open/closed is the only mobile state —
+        // "rail" has no meaning there). See admin.css mobile media query,
+        // which also now defensively ignores .rail as a second layer.
+        if (!isMobile() && localStorage.getItem(SIDEBAR_KEY) === '0') {
             shell.classList.add('rail');
         }
     }
@@ -78,6 +82,12 @@
         if (!isMobile() && shell && shell.classList.contains('drawer-open')) {
             shell.classList.remove('drawer-open');
             toggleOverlay(false);
+        }
+        // Rail is a desktop-only concept — strip it defensively if the
+        // viewport crosses into mobile (e.g. rotating a tablet down, or
+        // resizing a desktop browser window past 640px).
+        if (isMobile() && shell && shell.classList.contains('rail')) {
+            shell.classList.remove('rail');
         }
     });
 

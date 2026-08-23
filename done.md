@@ -154,126 +154,201 @@ Only after successful verification should the final status become:
 
 # Verified Sessions
 
-Add new verified sessions below this line.
-
 <!--
 IMPORTANT:
 Only add a session here after the complete session scope has passed testing.
 Do not use this section as a development TODO list.
 -->
 
-<!--
-🟡 IMPLEMENTED — TEST PENDING (not a verified session yet, do not treat as DONE):
+## 2026-08-21 — Service Area Management (recall.md Phase A item 4)
 
-2026-08-21 — Admin Panel UI Redesign (design system + responsive shell)
-Module: Backend / Admin Web Panel
+**Module:** Backend / Admin Web Panel
 
-Completed:
-- backend/admin/assets/admin.css — one shared design-system file
-  (CSS custom properties, light + dark theme) replacing five separate
-  copy-pasted <style> blocks across dashboard/index/roles/areas/login.
-- backend/admin/assets/admin.js — theme toggle (persisted to
-  localStorage, respects prefers-color-scheme on first visit), responsive
-  sidebar behavior (desktop collapse-to-rail / tablet rail / mobile
-  off-canvas drawer with backdrop), a reusable <dialog>-based confirm
-  modal (replaces every window.confirm()), toast notifications
-  (replaces the static flash <div>), and button loading-spinner state
-  on submit.
-- backend/admin/_layout_head.php + _layout_foot.php — shared page shell
-  (sidebar with permission-gated nav + topbar with theme toggle/user
-  chip), included by every admin page instead of each page carrying its
-  own header/nav markup.
-- Retrofitted dashboard.php, index.php, roles.php, areas.php, login.php
-  onto the new shell/tokens. index.php's reject flow now uses a real
-  dialog instead of a toggled inline box; all destructive/irreversible
-  actions (restaurant reject already had a text reason, admin
-  deactivate, area delete) now go through the shared confirm dialog
-  instead of window.confirm().
-- Responsive at three breakpoints: >1024px desktop (full sidebar,
-  user-collapsible), 641-1024px tablet (icon rail, expandable), <=640px
-  mobile (off-canvas drawer via hamburger).
+### Completed
+- `backend/sql/30_migration_service_areas.sql` — `service_areas`
+  adjacency-list table + additive nullable `area_id` FK on
+  `restaurants` and `customer_addresses`.
+- `backend/sql/34_migration_fix_service_areas_level_enum.sql` — live-DB
+  ENUM fix (the `'area'`→`'village'`→`'city_village'` restructure
+  history, see recall.md item 2 for the full story).
+- `backend/admin/areas.php` — single Add form (State/District/
+  City-Village required, Area optional) with find-or-create-by-name
+  matching, Fetch-by-Pincode autofill, full breadcrumb hierarchy list,
+  duplicate-detection banner, Merge-duplicate-nodes tool, test-
+  coordinates tool.
+- Shared `admin_area_breadcrumb_compact()` helper in `_bootstrap.php`
+  for "Neora, Osian, Jodhpur, Rajasthan" style display everywhere a
+  service-area node is shown or selected.
 
-NOT done in this session:
-- No new functionality — this is a pure UI/UX layer on top of the
-  already-tested RBAC, dashboard, and area-management logic from prior
-  sessions. Business logic in every retrofitted page is untouched.
+### Tested (by app owner, live server)
+- Migrations 30/32/33/34 run against live DB.
+- Add State→District→City/Village→Area chain via the single form;
+  Fetch by Pincode autofill; edit; deactivate; delete-blocked-by-
+  attachment; delete-when-empty; test-coordinates tool against real
+  lat/lng pairs.
+- Duplicate-node banner and Merge tool.
+- Breadcrumb format confirmed correct in the Hierarchy list, the
+  Restaurants area filter/assign dropdowns, and the Banners area
+  dropdown, after a follow-up bug fix (see below).
 
-Follow-up fix (same day, before first live test): the sidebar/content
-shell was originally built with CSS Grid, which on a real mobile
-browser could leave the content area squeezed into a narrow leftover
-column instead of spanning full width (topbar/title not visible,
-everything squeezed left) — rebuilt as flexbox (.app-shell flex row,
-.sidebar fixed-basis, .shell-main flex:1 + min-width:0) which is a
-more predictable pattern for this off-canvas-drawer use case. Also
-gave each sidebar nav icon a distinct colored rounded chip (info/warn/
-success/purple per module) instead of plain flat-monochrome icons, and
-swapped the Approvals icon for a clearer storefront glyph.
+### Bug found & fixed during testing (2026-08-22)
+`$areaOptions` in `restaurants.php`/`banners.php` only selected
+`id, name, level` (no `parent_id`), so `admin_area_breadcrumb_compact()`
+had nothing to walk up and silently fell back to the bare leaf name in
+every dropdown — even though the Restaurants list table's Area column
+(built from the full node map) showed the breadcrumb correctly. Fixed
+by looking up the full node (with `parent_id`) from `$areaNodeById`
+before building the breadcrumb, in all 5 call sites across
+`restaurants.php` and `banners.php`. Re-tested and confirmed working
+by app owner.
 
-Second follow-up fix (root cause of the "duplicate hamburger" / squeezed-
-topbar glitch reported on real-device testing): `.desktop-only` and
-`.menu-btn` base rules were declared *before* `.icon-btn` in the
-stylesheet — since both had equal CSS specificity (single class each),
-the later `.icon-btn { display: flex; }` rule was winning the cascade
-regardless of media query, so the desktop-only sidebar-collapse button
-was showing on phones too (the second, oddly-placed hamburger-looking
-icon in the screenshots), and on tablet widths (641-1024px) there was
-no visible button at all to expand the sidebar rail. Fixed by using
-`.icon-btn.desktop-only` / `.icon-btn.menu-btn` (two-class selectors)
-everywhere instead of relying on source order, and widened the
-hamburger's "hide on desktop" threshold from 641px to 1025px so tablet
-still has a way to expand the rail.
+### Result
+✅ PASS
 
-Tested: NOT YET — needs a live click-through by the app owner across:
+### Remaining
+Still genuinely pending, unchanged from recall.md items 3-5: area-wise
+restaurant visibility, area-wise COD rules, area-wise banner *serving*
+(admin-side targeting exists; the customer-facing fetch endpoint that
+actually filters by area does not).
+
+---
+
+## 2026-08-21 — Admin Restaurant & Customer Management (recall.md Phase A item 5)
+
+**Module:** Backend / Admin Web Panel
+
+### Completed
+- `backend/admin/restaurants.php` — search/filter/pagination over the
+  full restaurants table, per-row Manage dialog with full status
+  lifecycle (approve/reject/suspend/reactivate with reasons), area
+  assignment (writes `restaurants.area_id`), commission_% override,
+  soft-delete.
+- `backend/admin/customers.php` — search/filter/pagination, per-row
+  View dialog with saved addresses, last 5 orders, suspend/reactivate,
+  soft delete.
+- Nav links added; gated on already-seeded RBAC permission keys.
+
+### Tested (by app owner, live server)
+- Search/filter both screens.
+- Full restaurant status lifecycle transitions in order (approve →
+  suspend → reactivate → reject).
+- Area assignment shows up correctly on a real restaurant row (using
+  the corrected breadcrumb format, see Service Area Management entry
+  above).
+- Commission edit persists.
+- Customer suspend/reactivate blocks/allows customer-app login.
+- Both soft-deletes hide the row without breaking existing order
+  history joins.
+
+### Result
+✅ PASS
+
+### Remaining
+No wallet adjustment (blocked on item 18, Customer Wallet, not built
+yet). No bulk actions, no CSV export. Area-wise restaurant *visibility*
+on the Customer Home feed (recall.md item 3) is still untouched — this
+session only lets Admin *set* `restaurants.area_id`, not the
+consumption side.
+
+---
+
+## 2026-08-21 — Admin Category Management (recall.md item 16)
+
+**Module:** Backend / Admin Web Panel
+
+### Completed
+- `backend/sql/32_migration_restaurant_categories.sql` — new
+  `restaurant_categories` table (seeded: Cafe/Bakery/Sweet Shop/
+  Pharmacy/Grocery/Restaurant) + additive `restaurants.restaurant_category_id`.
+- `backend/admin/categories.php` — two tabs: Restaurant Types (new
+  table) and Food Categories (CRUD on the existing `food_categories`
+  table, which previously had no admin UI). Both: add/edit/deactivate/
+  hard-delete-when-empty with a reference-count guard.
+- Gated on already-seeded `categories_view`/`categories_edit`/
+  `categories_delete` permission keys — no new RBAC migration needed.
+
+### Tested (by app owner, live server)
+- Migration 32 run against live DB.
+- Both tabs: add, edit, deactivate, delete-blocked (with reference
+  count shown), delete-when-empty.
+
+### Result
+✅ PASS
+
+### Remaining
+Nothing yet sets `restaurants.restaurant_category_id` on existing
+restaurants or surfaces it in `restaurants.php`'s own list/filter UI —
+flagged as a small follow-up, not part of this session's scope.
+
+---
+
+## 2026-08-21 — Admin Banner Manager (recall.md item 17)
+
+**Module:** Backend / Admin Web Panel
+
+### Completed
+- `backend/sql/33_migration_banners.sql` — new `banners` table.
+- `backend/admin/banners.php` — add/edit with image upload (5MB cap,
+  jpg/png/webp), banner type, deep link, priority, start/end date,
+  area targeting (empty = platform-wide, or scoped to a City/Village
+  or Area node — shown via the breadcrumb helper), deactivate, hard
+  delete (also removes the image file from disk).
+- Draggable 3:1 crop-preview on upload, server-side GD crop with
+  fallback to the untouched original if GD/format support is missing.
+
+### Tested (by app owner, live server)
+- Migration 33 run against live DB.
+- Add with image, edit, replace image, area-scoped vs platform-wide
+  (breadcrumb format confirmed correct after the fix noted in the
+  Service Area Management entry above), deactivate, delete.
+- Crop preview and server-side crop.
+
+### Result
+✅ PASS
+
+### Remaining
+The customer-facing banner-fetch endpoint that would actually filter
+`WHERE area_id IS NULL OR area_id = :customer_area_id` does not exist
+yet — depends on customer address → area resolution (recall.md item 3,
+still pending). Banners created here are admin-side management only
+until that's built.
+
+---
+
+## 2026-08-21 — Admin Panel UI Redesign (design system + responsive shell)
+
+**Module:** Backend / Admin Web Panel
+
+### Completed
+- `backend/admin/assets/admin.css` — shared design-system file (light +
+  dark theme) replacing five separate copy-pasted `<style>` blocks.
+- `backend/admin/assets/admin.js` — theme toggle, responsive sidebar
+  (desktop collapse-to-rail / tablet rail / mobile off-canvas drawer),
+  shared `<dialog>`-based confirm modal, toast notifications, button
+  loading-spinner state.
+- `backend/admin/_layout_head.php` + `_layout_foot.php` — shared page
+  shell, included by every admin page.
+- Retrofitted dashboard/index/roles/areas/login onto the new shell.
+- Two follow-up fixes applied before first live test: rebuilt the
+  shell as flexbox (was CSS Grid, squeezed content on real mobile),
+  and fixed a CSS specificity bug where `.desktop-only`/`.menu-btn`
+  were losing the cascade to `.icon-btn`, causing a duplicate
+  hamburger on phones and no expand button on tablet widths.
+
+### Tested (by app owner, live server, real devices)
 - Desktop: sidebar collapse/expand, theme toggle persists on reload,
   dialogs open/close/animate, toasts appear after form actions.
-- Tablet width (~768-1024px): icon rail default, expand toggle.
-- Mobile width (<=640px): hamburger opens drawer, backdrop tap closes
+- Tablet width (~768-1024px): icon rail default, expand toggle works.
+- Mobile width (≤640px): hamburger opens drawer, backdrop tap closes
   it, forms/tables don't overflow horizontally.
-- Both light and dark theme on all 5 pages (dashboard, approvals,
-  areas, roles, login).
+- Light and dark theme on all 5 retrofitted pages.
 
-Do not mark this DONE until that live test happens and this block is
-promoted to a normal dated entry above.
--->
+### Result
+✅ PASS
 
-Module: Backend / Admin Web Panel
-
-Completed:
-- backend/sql/30_migration_service_areas.sql — new `service_areas`
-  adjacency-list table (parent_id, level enum state/district/city/area,
-  is_active, center_lat/center_lng/radius_km) + additive nullable
-  `area_id` FK on `restaurants` and `customer_addresses` (idempotent,
-  same CONTINUE-HANDLER-for-1060 pattern as migration 25).
-- backend/admin/areas.php — new screen: add area (parent picker derives
-  the child's level automatically), edit name/center/radius, activate/
-  deactivate, hard-delete (only when no children/restaurants/addresses
-  are attached, otherwise blocked with a clear message), full indented
-  hierarchy list with restaurant counts per area, and a "test
-  coordinates" tool (reuses lib/geo.php's haversine_km()) to sanity-
-  check center/radius against a real GPS pair before this feeds into
-  customer address resolution.
-- Gated on the already-seeded `areas_view` / `areas_edit` /
-  `areas_delete` permission keys (backend/sql/29_migration_admin_rbac.sql)
-  — no new permission keys needed.
-- Nav links added from dashboard.php / index.php / roles.php.
-
-NOT done in this session (deliberately out of scope, per recall.md
-Phase B, items 9-16):
-- Customer address -> area_id resolution job/endpoint.
-- Area-wise restaurant visibility filtering on the Home feed.
-- Area-wise COD/payment/banner rules.
-- Restaurant onboarding/admin UI to actually assign a restaurant's
-  area_id (the column exists; nothing sets it yet).
-
-Tested: NOT YET — needs backend/sql/30_migration_service_areas.sql run
-against the live DB, then live click-through by the app owner (add a
-State → District → City → Area chain, edit, deactivate, delete-blocked-
-by-attachment, delete-when-empty, and the test-coordinates tool against
-a couple of real lat/lng pairs).
-
-Do not mark this DONE until that live test happens and this block is
-promoted to a normal dated entry above.
--->
+### Remaining
+No new functionality — pure UI/UX layer. Business logic in every
+retrofitted page is unchanged from its own tested session.
 
 
 ## 2026-08-21 — Admin Dashboard (Phase A item 3)

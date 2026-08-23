@@ -14,11 +14,29 @@
  *
  * Shared by both Checkout's "add address" flow and the Profile → Address
  * Book screen (§2.7) — same editor, same endpoint.
+ *
+ * recall.md item 9 / item 3's remaining gap ("a real column+job would be
+ * cheaper at scale") — customer_addresses.area_id (migration 30) has
+ * existed since the Area Management session but nothing ever wrote to
+ * it; every actual consumer (restaurants/list.php, promo-banners.php,
+ * cod_rules.php) resolves lat/lng → area on the fly per request instead,
+ * which is correct for "wherever the customer's ACTIVE location is right
+ * now" (that's not always a saved address — could be live GPS) and is
+ * intentionally left as-is here, per those files' own docblocks. This
+ * endpoint's job is narrower: persist the resolved area onto the SAVED
+ * ADDRESS ROW itself, so admin screens (customers.php), area-scoped
+ * analytics, and support tooling can query/display "which service area
+ * is this saved address in" without re-running haversine over every
+ * service_areas row on every read. resolve_service_area() (lib/geo.php)
+ * returns nearest-first; the address stores the single nearest match's
+ * id (or NULL if none/no lat-lng), same "don't hide behind unresolved
+ * data" stance as list.php's eligible-set check downstream.
  */
 
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
+require_once __DIR__ . '/../../../lib/geo.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -54,7 +72,23 @@ function format_address(array $a): array
         'latitude' => $a['latitude'] !== null ? (float) $a['latitude'] : null,
         'longitude' => $a['longitude'] !== null ? (float) $a['longitude'] : null,
         'is_default' => (bool) $a['is_default'],
+        'area_id' => isset($a['area_id']) && $a['area_id'] !== null ? (int) $a['area_id'] : null,
     ];
+}
+
+/**
+ * Resolves lat/lng to the nearest service_areas node id, or null if
+ * either coordinate is missing or nothing matches — same "unresolved
+ * stays unresolved" convention as every other resolve_service_area()
+ * caller (never guesses/defaults to some fallback area).
+ */
+function resolve_address_area_id(PDO $db, $lat, $lng): ?int
+{
+    if ($lat === null || $lng === null || $lat === '' || $lng === '') {
+        return null;
+    }
+    $matches = resolve_service_area($db, (float) $lat, (float) $lng);
+    return $matches[0]['id'] ?? null;
 }
 
 // Address id, when present, comes from the router as ?id= (PUT/DELETE),
@@ -82,12 +116,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $displayAddress = build_full_address($body);
+    $areaId = resolve_address_area_id($db, $body['latitude'] ?? null, $body['longitude'] ?? null);
 
     $ins = $db->prepare(
         'INSERT INTO customer_addresses
-            (customer_id, label, address_type, full_address, house_flat_no, floor, landmark, receiver_name, receiver_phone, photo_url, latitude, longitude, is_default)
+            (customer_id, label, address_type, full_address, house_flat_no, floor, landmark, receiver_name, receiver_phone, photo_url, latitude, longitude, is_default, area_id)
          VALUES
-            (:cid, :label, :type, :addr, :house, :floor, :landmark, :rname, :rphone, :photo, :lat, :lng, :def)'
+            (:cid, :label, :type, :addr, :house, :floor, :landmark, :rname, :rphone, :photo, :lat, :lng, :def, :area)'
     );
     $ins->execute([
         'cid' => $customerId,
@@ -103,6 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'lat' => $body['latitude'] ?? null,
         'lng' => $body['longitude'] ?? null,
         'def' => $isDefault ? 1 : 0,
+        'area' => $areaId,
     ]);
 
     respond_ok(['id' => (int) $db->lastInsertId()], 201);
@@ -140,11 +176,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         $photoUrl = $existingPhoto->fetchColumn() ?: null;
     }
 
+    $areaId = resolve_address_area_id($db, $body['latitude'] ?? null, $body['longitude'] ?? null);
+
     $upd = $db->prepare(
         'UPDATE customer_addresses SET
             label = :label, address_type = :type, full_address = :addr, house_flat_no = :house,
             floor = :floor, landmark = :landmark, receiver_name = :rname, receiver_phone = :rphone,
-            photo_url = :photo, latitude = :lat, longitude = :lng, is_default = :def
+            photo_url = :photo, latitude = :lat, longitude = :lng, is_default = :def, area_id = :area
          WHERE id = :id AND customer_id = :cid'
     );
     $upd->execute([
@@ -160,6 +198,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         'lat' => $body['latitude'] ?? null,
         'lng' => $body['longitude'] ?? null,
         'def' => $isDefault ? 1 : 0,
+        'area' => $areaId,
         'id' => $addressId,
         'cid' => $customerId,
     ]);

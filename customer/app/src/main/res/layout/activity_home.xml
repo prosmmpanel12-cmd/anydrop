@@ -784,10 +784,20 @@
             android:gravity="center" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnServiceAreaRetry"
+            android:id="@+id/btnServiceAreaChangeLocation"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
+            android:text="@string/service_area_change_location"
+            android:textSize="13sp"
+            app:cornerRadius="8dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnServiceAreaRetry"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
             android:text="@string/service_area_retry"
             android:textSize="13sp"
             app:cornerRadius="8dp" />

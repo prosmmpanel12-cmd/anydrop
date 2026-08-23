@@ -111,6 +111,14 @@ interface ApiService {
     @GET("customer/addresses.php")
     suspend fun getAddresses(): Response<ApiResponse<AddressListResult>>
 
+    // recall.md Phase B item 15 — which payment methods are allowed at
+    // the selected delivery address's resolved area. Optional query
+    // param, omit for the platform-wide default.
+    @GET("customer/payment-methods.php")
+    suspend fun getPaymentMethods(
+        @Query("delivery_address_id") deliveryAddressId: Int? = null
+    ): Response<ApiResponse<PaymentMethodsResult>>
+
     @POST("customer/addresses.php")
     suspend fun addAddress(@Body body: AddAddressBody): Response<ApiResponse<AddAddressResult>>
 
@@ -136,7 +144,10 @@ interface ApiService {
     // ---- Phase 3.6: Promo carousel ----
 
     @GET("home/promo-banners.php")
-    suspend fun getPromoBanners(): Response<ApiResponse<PromoBannersResult>>
+    suspend fun getPromoBanners(
+        @Query("lat") lat: Double? = null,
+        @Query("lng") lng: Double? = null
+    ): Response<ApiResponse<PromoBannersResult>>
 
     // ---- Phase 3.6: Popular dishes near you ----
 

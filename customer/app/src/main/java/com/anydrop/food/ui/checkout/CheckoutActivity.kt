@@ -22,6 +22,7 @@ import com.anydrop.food.network.CartItemLine
 import com.anydrop.food.network.CartValidateBody
 import com.anydrop.food.network.CreateOrderBody
 import com.anydrop.food.network.CartTotals
+import com.anydrop.food.network.PaymentMethodsResult
 import com.anydrop.food.ui.address.AddressEditorBottomSheet
 import com.anydrop.food.ui.common.InAppNotifier
 import com.anydrop.food.ui.common.ScheduleTimeSlotBottomSheet
@@ -68,6 +69,15 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
     private var restaurantId: Int = 0
     private var addresses: List<Address> = emptyList()
     private var selectedAddressId: Int? = null
+
+    // recall.md Phase B item 15 — area-wise general payment method
+    // restrictions. Refreshed whenever the selected delivery address
+    // changes (loadPaymentMethods()); used by applyPaymentMethodRestrictions()
+    // to grey out a blocked radio before the customer can even tap it,
+    // and re-checked defensively in placeOrder() in case the selection
+    // changed between load and tap. Defaults to both-allowed so the UI
+    // never blocks on a slow/failed network call.
+    private var paymentMethods: PaymentMethodsResult = PaymentMethodsResult()
 
     // H5 — captured from renderBill() so openCouponsSheet() has a real
     // item_total to send; otherwise it's discarded after painting the UI.
@@ -325,6 +335,7 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
                 setOnClickListener {
                     selectedAddressId = address.id
                     binding.addressGroup.children().forEach { v -> if (v is RadioButton && v !== this) v.isChecked = false }
+                    loadPaymentMethods()
                 }
                 setOnLongClickListener {
                     openAddressEditor(editing = address)
@@ -334,9 +345,60 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
             if (radio.isChecked) selectedAddressId = address.id
             binding.addressGroup.addView(radio)
         }
+        loadPaymentMethods()
     }
 
     private fun android.view.ViewGroup.children() = (0 until childCount).map { getChildAt(it) }
+
+    // recall.md Phase B item 15 — refreshes which payment methods are
+    // allowed for the currently-selected delivery address's resolved
+    // area, then re-applies the radio-button gating. Safe to call
+    // repeatedly (address switch, initial load) — always reflects
+    // whichever address is selected at the moment it resolves.
+    private fun loadPaymentMethods() {
+        val addressId = selectedAddressId
+        lifecycleScope.launch {
+            try {
+                val response = api.getPaymentMethods(addressId)
+                paymentMethods = response.body()?.data ?: PaymentMethodsResult()
+            } catch (e: Exception) {
+                // Fails open (both methods stay enabled) — this is only a
+                // pre-check UX nicety; orders/create.php is the real
+                // enforcement and will still reject an actually-disallowed
+                // method server-side even if this call never landed.
+                paymentMethods = PaymentMethodsResult()
+            }
+            applyPaymentMethodRestrictions()
+        }
+    }
+
+    // Disables (doesn't hide — same "show it, explain why it's off"
+    // pattern as the min-order Place Order button) whichever radio the
+    // resolved area doesn't allow, and hops the selection to the other
+    // one if the currently-checked method just became unavailable.
+    private fun applyPaymentMethodRestrictions() {
+        binding.radioCod.isEnabled = paymentMethods.codAllowed
+        binding.radioUpi.isEnabled = paymentMethods.upiAllowed
+        binding.radioCod.alpha = if (paymentMethods.codAllowed) 1.0f else 0.5f
+        binding.radioUpi.alpha = if (paymentMethods.upiAllowed) 1.0f else 0.5f
+
+        if (binding.radioCod.isChecked && !paymentMethods.codAllowed && paymentMethods.upiAllowed) {
+            binding.radioUpi.isChecked = true
+        } else if (binding.radioUpi.isChecked && !paymentMethods.upiAllowed && paymentMethods.codAllowed) {
+            binding.radioCod.isChecked = true
+        }
+
+        if (!paymentMethods.codAllowed) {
+            binding.radioCod.text = getString(R.string.pay_cod) + " — " + getString(R.string.payment_method_unavailable_here)
+        } else {
+            binding.radioCod.text = getString(R.string.pay_cod)
+        }
+        if (!paymentMethods.upiAllowed) {
+            binding.radioUpi.text = getString(R.string.pay_upi) + " — " + getString(R.string.payment_method_unavailable_here)
+        } else {
+            binding.radioUpi.text = getString(R.string.pay_upi)
+        }
+    }
 
     private fun loadBill() {
         lifecycleScope.launch {
@@ -507,6 +569,19 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
         }
 
         val paymentMethod = if (binding.radioUpi.isChecked) "upi" else "cod"
+
+        // recall.md Phase B item 15 — defensive re-check against the
+        // last-loaded restriction, in case the selection changed after
+        // loadPaymentMethods() resolved but before the tap (e.g. a very
+        // fast double-tap). orders/create.php enforces this regardless;
+        // this only avoids an avoidable round-trip + 422.
+        if ((paymentMethod == "cod" && !paymentMethods.codAllowed) ||
+            (paymentMethod == "upi" && !paymentMethods.upiAllowed)
+        ) {
+            InAppNotifier.show(this, getString(R.string.payment_method_unavailable_here), InAppNotifier.Type.INFO)
+            return
+        }
+
         val instructions = binding.inputInstructions.text?.toString()?.trim().orEmpty().ifEmpty { null }
 
         // bugs.md #2.4 — reuse the same key if one's already pending for
@@ -594,6 +669,11 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
                         // a real message.
                         "restaurant_closed" -> getString(R.string.restaurant_closed_error)
                         "restaurant_not_accepting_orders" -> getString(R.string.restaurant_paused_error)
+                        // recall.md Phase B item 15 — server-side source of
+                        // truth for the same restriction applyPaymentMethodRestrictions()
+                        // already tries to prevent client-side; this is the
+                        // fallback message if that pre-check was stale/skipped.
+                        "payment_method_not_allowed" -> getString(R.string.payment_method_unavailable_here)
                         // I4 — one generic message covering all four
                         // scheduled_time_* codes from validate_scheduled_for()
                         // rather than a message per code (design decision left

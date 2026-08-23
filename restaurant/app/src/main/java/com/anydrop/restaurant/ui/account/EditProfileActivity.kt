@@ -296,6 +296,12 @@ class EditProfileActivity : AppCompatActivity() {
         binding.inputName.setText(profile.name)
         binding.inputAddress.setText(profile.address.orEmpty())
         binding.inputCuisineTags.setText(profile.cuisineTags.orEmpty())
+        // recall.md Phase B item 13 / migration 36 — show the owner's
+        // current value, blank if it's 0/never set, so an empty field
+        // doesn't silently look like a real "₹0 minimum" to the owner.
+        binding.inputMinOrderAmount.setText(
+            profile.minOrderAmount?.takeIf { it > 0.0 }?.let { formatAmountForInput(it) }.orEmpty()
+        )
         binding.inputDescription.setText(profile.description.orEmpty())
 
         currentLogoUrl = profile.logoUrl
@@ -451,7 +457,13 @@ class EditProfileActivity : AppCompatActivity() {
                     closingTime = String.format(Locale.US, "%02d:%02d", closingHour, closingMinute),
                     workingDays = selectedDays.joinToString(","),
                     description = binding.inputDescription.text?.toString()?.trim().orEmpty(),
-                    logoUrl = logoUrlToSave
+                    logoUrl = logoUrlToSave,
+                    // recall.md Phase B item 13 / migration 36 — blank
+                    // field means "leave unchanged" (profile-update.php
+                    // treats a missing key that way); an actual number
+                    // gets server-validated against the area floor.
+                    minOrderAmount = binding.inputMinOrderAmount.text?.toString()?.trim()
+                        ?.takeIf { it.isNotEmpty() }?.toDoubleOrNull()
                 )
 
                 val response = api.updateProfile(body)
@@ -462,7 +474,16 @@ class EditProfileActivity : AppCompatActivity() {
                     setResult(RESULT_OK)
                     finish()
                 } else {
-                    InAppNotifier.show(this@EditProfileActivity, getString(R.string.profile_save_failed), InAppNotifier.Type.ERROR)
+                    // recall.md Phase B item 13 — surface the actual area
+                    // floor when that's why the save failed, instead of
+                    // the generic failure toast, so the owner knows what
+                    // number to type instead of guessing.
+                    val floorMessage = parseAreaFloorError(response.errorBody()?.string())
+                    InAppNotifier.show(
+                        this@EditProfileActivity,
+                        floorMessage ?: getString(R.string.profile_save_failed),
+                        InAppNotifier.Type.ERROR
+                    )
                 }
             } catch (e: Exception) {
                 InAppNotifier.show(this@EditProfileActivity, getString(R.string.profile_save_failed), InAppNotifier.Type.ERROR)
@@ -498,6 +519,39 @@ class EditProfileActivity : AppCompatActivity() {
             response.body()?.data?.logoUrl
         } else {
             null
+        }
+    }
+
+    /** recall.md Phase B item 13 — pulls `data.area_floor` out of a
+     * `min_order_below_area_floor` error body, ad hoc with a fresh
+     * Gson/JsonParser same as readProfileExtra() below, since
+     * ApiResponse<T>'s `data` is only typed for the success shape and
+     * this is the one error whose body carries information worth
+     * showing the owner. Returns null for any other error (including
+     * a body that fails to parse at all) so the caller falls back to
+     * the generic failure message. */
+    private fun parseAreaFloorError(errorBodyRaw: String?): String? {
+        if (errorBodyRaw.isNullOrBlank()) return null
+        return try {
+            val obj = com.google.gson.JsonParser.parseString(errorBodyRaw).asJsonObject
+            if (obj.get("error")?.asString != "min_order_below_area_floor") return null
+            val floor = obj.getAsJsonObject("data")?.get("area_floor")?.asDouble ?: return null
+            getString(R.string.min_order_below_area_floor, formatAmountForInput(floor))
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /** Trims a trailing ".0" for a whole-rupee amount (₹150 instead of
+     * ₹150.0) but keeps real paise (₹150.5) — same idea as every other
+     * currency display spot in this app, just inlined here since this
+     * is the only place in this screen formatting a raw Double back
+     * into editable/display text. */
+    private fun formatAmountForInput(amount: Double): String {
+        return if (amount == amount.toLong().toDouble()) {
+            amount.toLong().toString()
+        } else {
+            amount.toString()
         }
     }
 

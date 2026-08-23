@@ -7,6 +7,26 @@
  * (operational_status busy/temp_closed) rather than simply outside its
  * fixed hours; lets the app show "Temporarily unavailable" instead of a
  * plain "Closed" for that case (Part B follow-up).
+ *
+ * Service-area filter (recall.md item 3): resolves lat/lng to a
+ * service_areas node via lib/geo.php's resolve_service_area() — same
+ * nearest-within-radius rule and same eligible-set (nearest node + its
+ * parent when the nearest is level='area') already used by
+ * home/promo-banners.php for area-targeted banners. This is layered ON
+ * TOP of the existing per-restaurant delivery_radius_km haversine check
+ * below, never a replacement for it — a restaurant with a mismatched
+ * area_id is excluded even if it's geometrically within its own
+ * delivery_radius_km, and a restaurant within the matched area still
+ * has to separately pass its own radius check. Per the app owner's
+ * explicit 2026-08-21 clarification, these two checks measure different
+ * things (area-center-to-customer vs. restaurant-to-customer) and must
+ * never be conflated or have one substitute for the other.
+ * A restaurant with area_id still NULL (not yet assigned by an admin)
+ * is not excluded by this filter — same "don't hide behind unresolved
+ * data" stance the radius check below already takes for missing
+ * lat/lng. Same for an unresolved customer (no lat/lng, or no area
+ * match at all): the area filter is simply skipped, radius-only
+ * behaviour unchanged from before this filter existed.
  */
 
 require_once __DIR__ . '/../../../config/database.php';
@@ -36,6 +56,22 @@ $perPage = min(50, max(1, (int) ($_GET['per_page'] ?? 20)));
 $offset = ($page - 1) * $perPage;
 
 $db = Database::get();
+
+// Eligible service-area ids for this customer's resolved location —
+// see docblock above. Empty array means either no lat/lng or no area
+// match, in which case the per-restaurant area check below is skipped
+// entirely (radius-only, unchanged behaviour).
+$eligibleAreaIds = [];
+if ($lat !== null && $lng !== null) {
+    $resolvedAreas = resolve_service_area($db, $lat, $lng);
+    if (!empty($resolvedAreas)) {
+        $nearestArea = $resolvedAreas[0];
+        $eligibleAreaIds[] = $nearestArea['id'];
+        if ($nearestArea['level'] === 'area' && $nearestArea['parent_id'] !== null) {
+            $eligibleAreaIds[] = $nearestArea['parent_id'];
+        }
+    }
+}
 
 $where = ["status = 'approved'", "deleted_at IS NULL"];
 $params = [];
@@ -167,6 +203,15 @@ foreach ($all as $r) {
         // placeholder rule; refine once delivery_charge logic is implemented in Phase 2
     }
     if ($filter === 'rating_4' && (float) $r['rating_avg'] < 4.0) {
+        continue;
+    }
+
+    // Service-area filter — see docblock above. Only enforced when the
+    // customer resolved to at least one area AND this restaurant has an
+    // area_id assigned; either side missing means "not enough
+    // information to say they don't match" so the restaurant is kept
+    // (radius check below still applies regardless).
+    if (!empty($eligibleAreaIds) && $r['area_id'] !== null && !in_array((int) $r['area_id'], $eligibleAreaIds, true)) {
         continue;
     }
 

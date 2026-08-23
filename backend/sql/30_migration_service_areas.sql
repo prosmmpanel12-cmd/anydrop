@@ -2,19 +2,36 @@
 -- Anydrop — Migration 30: Service Area Management
 --
 -- Implements recall.md item 2 / docs/19_Admin_Panel_Full_Spec_And_Payment_
--- Email_Architecture_2026-08-14.md §2 — the State → District → City →
--- Area hierarchy that restaurant visibility, banner targeting, COD
--- rules, and analytics filters all key off (recall.md items 2-5).
+-- Email_Architecture_2026-08-14.md §2 — the State → District → City/
+-- Village → Area hierarchy that restaurant visibility, banner targeting,
+-- COD rules, and analytics filters all key off (recall.md items 2-5).
 --
 -- Single self-referencing adjacency-list table (parent_id), not four
 -- separate State/District/City/Area tables — matches doc 19 §2's
 -- reasoning: simpler to query/extend, and variable depth is fine (some
 -- areas may not need a full 4-level chain).
 --
--- `center_lat`/`center_lng`/`radius_km` are only meaningful at
--- level='area' — that's what customer_addresses.area_id resolution
--- (recall.md item 3) checks against. v1 is circle-radius, not polygon
--- geofencing (doc 19 §2's explicitly flagged v1 simplification).
+-- `center_lat`/`center_lng`/`radius_km` are meaningful at level=
+-- 'city_village' OR level='area' — whichever ends up being the deepest
+-- node actually created in a given branch, since Area is optional (see
+-- the 2026-08-21 note below). That's what customer_addresses.area_id
+-- resolution (recall.md item 3) checks against. v1 is circle-radius, not
+-- polygon geofencing (doc 19 §2's explicitly flagged v1 simplification).
+--
+-- 2026-08-21: deepest level renamed 'area' -> 'village' per app owner
+-- (hierarchy is State -> District -> City -> Village). The table name
+-- `service_areas` and the `area_id` FK columns are unchanged — "area"
+-- there means "service area" (the whole hierarchy concept), not this
+-- specific leaf level, so renaming those would be unnecessary churn.
+--
+-- 2026-08-21 (later same day): restructured again per app owner. 'city'
+-- and the 'village' rename above are now merged into a single level,
+-- 'city_village' (label "City/Village" — one node, urban or rural).
+-- Below that, a NEW, genuinely optional level 'area' was added back —
+-- a City/Village does not need an Area child; add one only when a
+-- specific sub-locality needs its own rules. Because it's optional,
+-- center_lat/center_lng/radius_km can now live on either level (see
+-- above), not just one fixed level as originally built.
 --
 -- restaurants.area_id / customer_addresses.area_id are additive nullable
 -- FKs — existing rows stay NULL (unassigned) until an admin assigns them
@@ -33,12 +50,12 @@
 CREATE TABLE IF NOT EXISTS service_areas (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     parent_id BIGINT UNSIGNED NULL,                 -- NULL = top level (State)
-    level ENUM('state','district','city','area') NOT NULL,
+    level ENUM('state','district','city_village','area') NOT NULL,
     name VARCHAR(100) NOT NULL,
     is_active TINYINT(1) NOT NULL DEFAULT 1,         -- disable without deleting (recall.md §2)
-    center_lat DECIMAL(10,8) NULL,                   -- 'area' level only: resolution center
+    center_lat DECIMAL(10,8) NULL,                   -- 'city_village' or 'area' only: resolution center
     center_lng DECIMAL(11,8) NULL,
-    radius_km DECIMAL(4,1) NULL,                     -- 'area' level only: resolution radius
+    radius_km DECIMAL(4,1) NULL,                     -- 'city_village' or 'area' only: resolution radius
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_area_parent FOREIGN KEY (parent_id) REFERENCES service_areas(id),

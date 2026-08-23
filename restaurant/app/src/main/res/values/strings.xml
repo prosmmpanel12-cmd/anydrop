@@ -192,6 +192,7 @@
     <string name="coupon_public_toggle_hint">Public coupons are auto-suggested to customers on the offers screen. Private ones only work if the customer types the exact code.</string>
     <string name="btn_change_logo">Change logo</string>
     <string name="hint_cuisine_tags">Cuisine tags (comma separated)</string>
+    <string name="hint_min_order_amount">Minimum order amount (₹)</string>
     <string name="hint_profile_description">Description (optional)</string>
     <string name="label_hours">Hours</string>
     <string name="label_opening_time">Opening time</string>
@@ -207,6 +208,7 @@
     <string name="error_working_days_required">Select at least one working day</string>
     <string name="profile_save_failed">Couldn\'t save — check the details and try again</string>
     <string name="profile_saved">Profile updated</string>
+    <string name="min_order_below_area_floor">Minimum order can\'t be below ₹%1$s for your area</string>
     <string name="logo_upload_failed">Couldn\'t upload the logo — try again</string>
     <string name="btn_add_photo">Add photo</string>
     <string name="btn_change_photo">Change photo</string>

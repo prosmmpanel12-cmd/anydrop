@@ -252,6 +252,7 @@
     <string name="payment_method">Payment method</string>
     <string name="pay_cod">Cash on Delivery</string>
     <string name="pay_upi">UPI</string>
+    <string name="payment_method_unavailable_here">Not available for this address</string>
     <string name="hint_delivery_instructions">Delivery instructions (optional)</string>
     <string name="bill_details">Bill details</string>
     <string name="lbl_item_total">Item total</string>
@@ -291,6 +292,7 @@
     <string name="service_area_unavailable_title">We\'re not available in your area yet</string>
     <string name="service_area_unavailable_message">No restaurants deliver here right now — we\'re working on it. Coming soon!</string>
     <string name="service_area_retry">Try again</string>
+    <string name="service_area_change_location">Change Location</string>
     <!-- Bug 6.1 — Home GPS-off banner. Soft-nudge variant only: the
          "unavailable" variant intentionally reuses
          service_area_unavailable_title instead of a new string here, per

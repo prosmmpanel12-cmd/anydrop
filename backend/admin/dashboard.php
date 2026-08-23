@@ -194,6 +194,8 @@ require __DIR__ . '/_layout_head.php';
     <h2 class="section-title">Quick links</h2>
     <div class="row-actions">
         <?php if ($has('restaurants_view')): ?><a class="btn btn-outline" href="index.php">Pending Restaurant Approvals<?= $pendingRestaurants ? " ({$pendingRestaurants})" : '' ?></a><?php endif; ?>
+        <?php if ($has('restaurants_view')): ?><a class="btn btn-outline" href="restaurants.php">Manage Restaurants</a><?php endif; ?>
+        <?php if ($has('customers_view')): ?><a class="btn btn-outline" href="customers.php">Manage Customers</a><?php endif; ?>
         <?php if ($has('areas_view')): ?><a class="btn btn-outline" href="areas.php">Service Areas</a><?php endif; ?>
         <?php if ($has('roles_manage')): ?><a class="btn btn-outline" href="roles.php">Roles &amp; Permissions / Add Admin</a><?php endif; ?>
     </div>

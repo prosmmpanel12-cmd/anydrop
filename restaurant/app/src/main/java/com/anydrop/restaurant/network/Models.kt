@@ -93,7 +93,13 @@ data class RestaurantProfileDetail(
     @SerializedName("current_due") val currentDue: Double = 0.0,
     val status: String? = null,
     @SerializedName("operational_status") val operationalStatus: String? = null,
-    @SerializedName("rating_avg") val ratingAvg: Double = 0.0
+    @SerializedName("rating_avg") val ratingAvg: Double = 0.0,
+    // recall.md Phase B item 13 / migration 36 — restaurant's own min
+    // order amount, floored server-side (profile-update.php) by
+    // whatever area_pricing_rules/platform-default floor applies to
+    // this restaurant's assigned area. Nullable like every other field
+    // here in case an older cached row predates this column read.
+    @SerializedName("min_order_amount") val minOrderAmount: Double? = null
 )
 
 data class ProfileResult(val restaurant: RestaurantProfileDetail)
@@ -111,7 +117,13 @@ data class ProfileUpdateBody(
     @SerializedName("closing_time") val closingTime: String? = null,
     @SerializedName("working_days") val workingDays: String? = null,
     val description: String? = null,
-    @SerializedName("logo_url") val logoUrl: String? = null
+    @SerializedName("logo_url") val logoUrl: String? = null,
+    // recall.md Phase B item 13 / migration 36 — omitted (null) means
+    // "don't change" per profile-update.php's array_key_exists check,
+    // same convention as every other field here; a real value is
+    // server-validated against the restaurant's area floor and
+    // rejected (min_order_below_area_floor) if it's too low.
+    @SerializedName("min_order_amount") val minOrderAmount: Double? = null
 )
 
 data class LogoUploadResult(@SerializedName("logo_url") val logoUrl: String)
