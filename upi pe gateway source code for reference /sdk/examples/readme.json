@@ -1,0 +1,175 @@
+{
+  "title": "UpiPE API — Complete Guide (Hinglish mein)",
+  "version": "2.0",
+  "by": "YourApis",
+  "description": "Yeh guide tumhe batayega UpiPE API kaise kaam karti hai, kaise integrate karo, aur common examples ke saath sab samjhayega.",
+
+  "quick_summary": {
+    "kya_hai": "UpiPE API ek UPI payment gateway hai jo tumhari PHP site pe laga sakte ho. Customer QR scan karega, pay karega, aur tumhara server automatically verify kar lega.",
+    "kya_chahiye": [
+      "YourApis ka API Key (yourapi.42web.io se lo)",
+      "Apni website pe PHP 7.4+",
+      "MySQL database",
+      "Apna UPI ID (jaise yourname@upi ya 9876543210@paytm)"
+    ]
+  },
+
+  "setup": {
+    "step_1": "MySQL mein config/schema.sql run karo — 2 tables ban jayenge",
+    "step_2": "config/db.php mein apna DB host/user/pass daalo",
+    "step_3": "Panel mein login karo: yoursite.com/UpiPE_api/panel/login.php",
+    "step_4": "Settings tab mein apna UPI ID save karo",
+    "step_5": "(Optional) Paytm MID + Key daalo agar auto verify chahiye",
+    "step_6": "SDK/examples folder apni site pe upload karo, done!"
+  },
+
+  "flow_diagram": {
+    "1_order_banao": "createOrder(499, 'user_id') → order_id + QR URL milega",
+    "2_qr_dikhao":   "QR Image HTML mein dikhao: <img src='$qr_url'>",
+    "3_user_pay_kare":"Customer UPI app se QR scan karke pay karta hai",
+    "4_verify_karo": "verifyPayment(order_id) call karo",
+    "5_response":    {
+      "paid":           "✅ Payment aagayi! Apna action karo (access do, DB update, etc.)",
+      "not_paid":       "⏳ Abhi nahi aayi. Thodi der baad dobara try karo.",
+      "utr_required":   "📝 Customer se 12-digit UTR maango, verifyPayment(order_id, utr) call karo",
+      "manual_pending": "🕐 UTR submit ho gaya. Merchant (tum) approve/reject karo",
+      "expired":        "❌ Order expire hua (30 min). Naya order banao."
+    }
+  },
+
+  "api_endpoints": {
+    "create_order": {
+      "url":    "GET /api/create_order.php",
+      "params": {
+        "apikey":      "YourApi API Key (required)",
+        "amount":      "Amount in ₹, minimum 1 (required)",
+        "customer_id": "Tumhara user/order ID (required)",
+        "note":        "Payment note (optional, default: 'Payment')",
+        "mode":        "auto ya manual (optional, default: auto)"
+      },
+      "response_success": {
+        "status":          "success",
+        "order_id":        "QRP3A9F1C1718000000",
+        "amount":          499,
+        "qr_url":          "https://api.qrserver.com/...",
+        "upi_link":        "upi://pay?pa=...",
+        "deep_links":      {"gpay": "gpay://...", "phonepe": "phonepe://...", "paytm": "paytmmp://..."},
+        "mode":            "auto",
+        "expires_in_sec":  1800
+      }
+    },
+    "verify_payment": {
+      "url":    "POST /api/verify_payment.php",
+      "params": {
+        "apikey":   "YourApi API Key (required)",
+        "order_id": "create_order se mila order_id (required)",
+        "utr":      "12-digit UTR (sirf manual mode mein)"
+      },
+      "all_possible_status": {
+        "paid":           "✅ Auto verify success — payment aagayi",
+        "already_paid":   "✅ Pehle hi verify ho chuka tha",
+        "not_paid":       "⏳ Payment abhi nahi aayi",
+        "utr_required":   "📝 UTR submit karna hoga",
+        "manual_pending": "🕐 UTR submit, merchant review karega",
+        "expired":        "❌ Order expire ho gaya",
+        "rejected":       "❌ Merchant ne reject kiya"
+      }
+    },
+    "order_status": {
+      "url":    "GET /api/order_status.php",
+      "params": {"apikey": "required", "order_id": "required"},
+      "use_when": "Current status sirf check karna ho, verify nahi karna"
+    },
+    "manual_orders": {
+      "url":    "GET /api/manual_orders.php",
+      "params": {"apikey": "required", "status": "MANUAL_PENDING (default) ya PAID ya REJECTED ya ALL"},
+      "use_when": "Apne pending UTR orders dekhne ho (merchant dashboard)"
+    },
+    "manual_action": {
+      "url":    "POST /api/manual_action.php",
+      "params": {"apikey": "required", "order_id": "required", "action": "approve ya reject", "reject_reason": "optional"},
+      "use_when": "UTR verify karke manually approve ya reject karna ho"
+    }
+  },
+
+  "sdk_examples": {
+    "example_1_password_reveal": {
+      "file": "examples/01_basic_order.php",
+      "description": "Payment ke baad password/secret reveal karo",
+      "code_snippet": "<?php\n$order = $qr->createOrder(49, 'user_123', 'Password Access');\n// QR dikhao → user pay kare → check_status.php poll karo\n// status === 'paid' hone par:\n$pass = 'SECRET#2024';\necho 'Payment successful! Amount: ₹' . $result['amount'] . ' | Password: ' . $pass;"
+    },
+    "example_2_auto_polling": {
+      "file": "examples/02_polling_auto.php",
+      "description": "Background mein automatically payment check karta rahe — user kuch nahi karta",
+      "best_for": "Membership, subscription, download access"
+    },
+    "example_3_manual_utr": {
+      "file": "examples/03_manual_verify.php",
+      "description": "Customer UTR submit karta hai manually — then merchant approve karta hai",
+      "best_for": "Wallet recharge, account topup, high-value payments"
+    }
+  },
+
+  "common_use_cases": {
+    "case_1_password_show": {
+      "scenario": "User pay kare toh password dikhao",
+      "code": "if ($qr->isPaid($orderId)) {\n  echo 'Payment successful! ₹' . $amount . '\n';\n  echo 'Tumhara password: ULTRA#2024';\n} else {\n  echo 'Payment abhi pending hai.';\n}"
+    },
+    "case_2_digital_product": {
+      "scenario": "Payment ke baad download link do",
+      "code": "$verify = $qr->verifyPayment($orderId);\nif ($verify['status'] === 'paid') {\n  $link = generateDownloadLink();\n  echo json_encode(['status'=>'paid', 'download'=>$link]);\n}"
+    },
+    "case_3_database_update": {
+      "scenario": "Payment ke baad user ka premium status update karo",
+      "code": "$verify = $qr->verifyPayment($orderId);\nif ($verify['status'] === 'paid') {\n  $pdo->prepare('UPDATE users SET is_premium=1, premium_until=DATE_ADD(NOW(),INTERVAL 30 DAY) WHERE id=?')\n       ->execute([$userId]);\n  echo 'Premium activated!';\n}"
+    },
+    "case_4_amount_check": {
+      "scenario": "Payment amount verify karna",
+      "code": "$verify = $qr->verifyPayment($orderId);\nif ($verify['status'] === 'paid') {\n  if ((float)$verify['amount'] >= 499) {\n    // Sahi amount mila\n    activatePremium();\n  } else {\n    // Kam amount — handle karo\n    echo 'Amount mismatch!';\n  }\n}"
+    }
+  },
+
+  "manual_vs_auto": {
+    "auto_mode": {
+      "kab_use_karo": "Jab Paytm MID aur Key ho (panel Settings mein set karo)",
+      "kaise_kaam_karta_hai": "Customer pay kare → verify_payment.php call karo → Paytm API automatically check karega → 'paid' status aayega",
+      "pros": ["Zero user action", "Fast (10-30 seconds)"],
+      "cons": ["Paytm MID zaroorat", "Max 3 auto attempts"]
+    },
+    "manual_mode": {
+      "kab_use_karo": "Jab Paytm MID nahi ho, ya UPI direct use kar rahe ho (BHIM, GPay, PhonePe)",
+      "kaise_kaam_karta_hai": "Customer pay kare → UTR copy kare → form mein paste kare → merchant verify karega → approve/reject",
+      "pros": ["Koi extra setup nahi", "Kisi bhi UPI se kaam karta hai"],
+      "cons": ["Manual step hai", "Merchant approval chahiye"]
+    }
+  },
+
+  "panel_guide": {
+    "login_url":   "yoursite.com/UpiPE_api/panel/login.php",
+    "login_how":   "Sirf apna YourApis API Key daalo — koi password nahi",
+    "tabs": {
+      "overview":  "Daily/Monthly credits, payment stats, account info",
+      "orders":    "Last 10 orders ka status dekhte raho",
+      "settings":  "UPI ID, Display Name, Paytm MID/Key save karo",
+      "endpoints": "API URLs copy karo, SDK download karo"
+    },
+    "important": "Settings mein UPI ID save karna MANDATORY hai — bina iske koi payment nahi hogi"
+  },
+
+  "troubleshooting": {
+    "upi_id_not_set": "Panel → Settings → UPI ID daalo. Ye error create_order pe aati hai.",
+    "auto_verify_not_working": "Panel → Settings → Paytm MID + Key sahi daalo. Ya mode=manual use karo.",
+    "order_not_found": "order_id galat hai ya dusre apikey ka order hai. Apna wala hi pass karo.",
+    "utr_invalid": "Exactly 12 digit UTR chahiye — Bank app → Transaction Details → Reference Number",
+    "order_expired": "30 minute mein verify nahi hua. createOrder() dobara call karo naya order banao.",
+    "api_key_invalid": "YourApis dashboard pe jao, key active hai? Key sahi copy kiya?"
+  },
+
+  "security_tips": [
+    "API key kabhi frontend JavaScript mein mat daalo — sirf PHP server side mein",
+    "verify_payment ka result SERVER SIDE pe check karo, client side pe nahi",
+    "Ek order_id ek hi baar verify hoti hai — duplicate check automatic hai",
+    "UTR duplicate check bhi automatic hai — ek UTR se do payments nahi ho sakti",
+    "HTTPS use karo production mein"
+  ]
+}

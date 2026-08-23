@@ -36,6 +36,15 @@ if ((int) $order['restaurant_id'] !== (int) $owner['owner_id']) {
 if ($order['status'] !== 'pending') {
     respond_error('invalid_status_transition', 409);
 }
+// UPI FIX (2026-08-23): a 'upi' order sits in orders.status = 'pending'
+// from the moment it's placed, same as any other order — but unlike
+// cod/wallet, its payment_status can still be 'pending' too (payment
+// not yet verified). Block accept until PaymentService::
+// promoteOrderIfNeeded() has flipped it to 'paid' — never let a
+// restaurant confirm/prep an order nobody has actually paid for.
+if ($order['payment_method'] === 'upi' && $order['payment_status'] !== 'paid') {
+    respond_error('payment_not_confirmed', 409);
+}
 
 $prepMinutes = isset($body['estimated_prep_minutes']) ? max(1, (int) $body['estimated_prep_minutes']) : 20;
 

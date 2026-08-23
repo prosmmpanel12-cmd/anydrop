@@ -1,0 +1,32 @@
+Options -Indexes
+Options +FollowSymLinks
+
+DirectoryIndex index.php index.html
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /api/upi/
+
+    # Panel login pe redirect karo
+    RewriteRule ^$ panel/login.php [L,R=302]
+
+    # Already existing file/folder ho toh bypass
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # API routes
+    RewriteRule ^api/(.*)$ api/$1 [L]
+</IfModule>
+
+# Sensitive files block karo
+<FilesMatch "\.(sql|log|env|json|md|sh|bak)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# config aur core folder restrict karo
+<IfModule mod_authz_core.c>
+    <DirectoryMatch "/(config|core|lib)/">
+        Require all denied
+    </DirectoryMatch>
+</IfModule>

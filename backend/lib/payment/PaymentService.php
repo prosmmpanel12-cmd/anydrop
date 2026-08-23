@@ -173,7 +173,7 @@ class PaymentService
     public static function getClientStatus(PDO $db, array $order): array
     {
         $stmt = $db->prepare(
-            'SELECT t.*, p.config_json, p.driver_key FROM payment_transactions t
+            'SELECT t.*, p.config_json, p.driver_key, p.is_test_mode FROM payment_transactions t
              JOIN payment_providers p ON p.id = t.provider_id
              WHERE t.order_id = :oid ORDER BY t.id DESC LIMIT 1'
         );
@@ -191,6 +191,7 @@ class PaymentService
         require_once self::DRIVER_CLASSES[$driverKey];
         $className = ucfirst($driverKey) . 'Provider';
         $config = json_decode($txn['config_json'] ?? '{}', true) ?: [];
+        $config['is_test_mode'] = (bool) $txn['is_test_mode'];
         $provider = new $className();
         $verifyResult = $provider->verify($txn['provider_txn_id'], $config);
         $dbStatus = $verifyResult['status'];
@@ -250,6 +251,12 @@ class PaymentService
         insert_status_history($db, (int) $order['id'], (string) $order['status'], 'system', null, 'UPI payment confirmed (txn ' . $txn['provider_txn_id'] . ')');
         record_paid_order_ledger_entries($db, $order);
         create_notification('customer', (int) $order['customer_id'], 'Payment received', 'Your UPI payment for order ' . $order['order_code'] . ' is confirmed.', 'order', ['order_id' => (int) $order['id']]);
+        // UPI FIX (2026-08-23): this is the first moment a UPI order's
+        // payment is genuinely confirmed — create.php deliberately held
+        // back the restaurant's "New order received" notification until
+        // now (see create.php's own note) so a restaurant can never be
+        // alerted about, or act on, an order nobody has paid for yet.
+        create_notification('restaurant', (int) $order['restaurant_id'], 'New order received', 'Order ' . $order['order_code'] . ' — ₹' . number_format((float) $order['grand_total'], 0), 'order', ['order_id' => (int) $order['id'], 'screen' => 'order_detail']);
         write_audit_log('system', null, 'order_payment_confirmed', ['order_id' => (int) $order['id'], 'txn_ref' => $txn['provider_txn_id']]);
     }
 

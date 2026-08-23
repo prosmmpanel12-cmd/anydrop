@@ -48,6 +48,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $expirySec = max(60, (int) ($_POST['expiry_sec'] ?? 900));
             $utrWindowSec = max(0, (int) ($_POST['utr_window_sec'] ?? 300));
             $utrRequired = isset($_POST['utr_required']) ? true : false;
+            $mid = trim($_POST['mid'] ?? '');
+            $paytmMerchantKey = trim($_POST['paytm_merchant_key'] ?? '');
             $isActive = isset($_POST['is_active']) ? 1 : 0;
             $isTestMode = isset($_POST['is_test_mode']) ? 1 : 0;
             $priority = max(0, (int) ($_POST['priority'] ?? 0));
@@ -58,6 +60,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'expiry_sec' => $expirySec,
                 'utr_window_sec' => $utrWindowSec,
                 'utr_required' => $utrRequired,
+                // Optional — Paytm MID-based auto-verify (doc 23 addendum
+                // §A6). Leave both blank to stay manual-UTR-only, exactly
+                // like the UPIPE reference source's own "mid empty →
+                // silently degrade to manual" rule
+                // (docs/payment_reference/upipe_source/upi/api/create_order.php).
+                // IMPORTANT: this only verifies transactions Paytm itself
+                // actually processed under this MID — a QR built from a
+                // plain upi_id above (not a Paytm-issued collect request)
+                // won't be found by Paytm's status API, so auto-verify
+                // will simply never fire and every order falls through to
+                // the UTR window untouched. Only fill these in if your
+                // UPI collection is genuinely running through this Paytm
+                // MID.
+                'mid' => $mid,
+                'paytm_merchant_key' => $paytmMerchantKey,
             ];
 
             $upd = $db->prepare(
@@ -126,6 +143,19 @@ require __DIR__ . '/_layout_head.php';
                 <input type="checkbox" name="utr_required" <?= ($cfg['utr_required'] ?? true) ? 'checked' : '' ?>>
                 Require a customer-submitted UTR before it shows in the review queue
             </label>
+            <label>Paytm MID (enables auto-verify)
+                <input type="text" name="mid" value="<?= admin_escape($cfg['mid'] ?? '') ?>" placeholder="Leave blank to stay manual-only (UTR + admin approval)">
+            </label>
+            <label>Paytm Merchant Key (optional — only used for refunds, not needed for auto-verify)
+                <input type="text" name="paytm_merchant_key" value="<?= admin_escape($cfg['paytm_merchant_key'] ?? '') ?>" placeholder="From your Paytm merchant dashboard — leave blank if not doing refunds through this">
+            </label>
+            <p class="muted">
+                MID + Merchant Key only auto-verify payments Paytm itself
+                actually processed under that MID. If your UPI collection
+                isn't running through Paytm, leave both blank — auto-verify
+                will just never fire otherwise, and orders will sit on the
+                UTR window with nothing checking them.
+            </p>
             <?php else: ?>
             <p class="muted">Driver key <code><?= admin_escape($p['driver_key']) ?></code> has no
                 implementing class yet — see doc 23 §9. Nothing to configure until it's built.</p>

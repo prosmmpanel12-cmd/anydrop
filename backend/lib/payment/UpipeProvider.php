@@ -33,6 +33,7 @@
 
 require_once __DIR__ . '/PaymentProviderInterface.php';
 require_once __DIR__ . '/ManualVerificationProviderInterface.php';
+require_once __DIR__ . '/PaytmStatusClient.php';
 require_once __DIR__ . '/../../config/database.php';
 
 class UpipeProvider implements PaymentProviderInterface, ManualVerificationProviderInterface
@@ -124,6 +125,31 @@ class UpipeProvider implements PaymentProviderInterface, ManualVerificationProvi
             ];
         }
 
+        // AUTO-VERIFY (mid present) — exactly the same fallback order as
+        // the UPIPE reference source: try auto first, and if it doesn't
+        // resolve, fall straight through to the existing UTR-window logic
+        // below (no behavior change for accounts with no MID configured).
+        $mid = trim((string) ($config['mid'] ?? ''));
+        $merchantKey = trim((string) ($config['paytm_merchant_key'] ?? ''));
+        // Merchant key is NOT required for the status check itself —
+        // in the reference source (lib/encdec_paytm.php) it's only ever
+        // used to compute a CHECKSUM for initiateTxnRefund(); the KEY
+        // field getTxnStatusNew() sends is a plain passthrough, no
+        // hashing. MID alone is what identifies which merchant's
+        // transaction to look up.
+        if ($row['status'] === 'initiated' && $mid !== '') {
+            $auto = $this->tryAutoVerify($db, $row, $mid, $merchantKey, (bool) ($config['is_test_mode'] ?? false));
+            if ($auto !== null) {
+                return $auto;
+            }
+            // Auto check ran and didn't resolve (PENDING/ERROR/mismatch) —
+            // re-fetch, since tryAutoVerify may have already flipped the
+            // row to 'expired' via the same expiry path failing requests
+            // pass through, then continue to the normal UTR-window flow.
+            $stmt->execute(['ref' => $providerTxnId]);
+            $row = $stmt->fetch() ?: $row;
+        }
+
         return [
             'status' => $row['status'],
             'raw_response' => [
@@ -132,6 +158,99 @@ class UpipeProvider implements PaymentProviderInterface, ManualVerificationProvi
                 'utr' => $row['utr'],
                 'reject_reason' => $row['reject_reason'],
             ],
+        ];
+    }
+
+    /**
+     * Calls Paytm's real merchant-status API for this transaction's
+     * order ref. Returns a verify()-shaped result ONLY when Paytm gives
+     * a definitive TXN_SUCCESS (and the amount matches) — every other
+     * outcome (PENDING, TXN_FAILURE, ERROR, not-found) returns null so
+     * verify() falls through to the ordinary UTR-window path untouched.
+     * Never marks a transaction 'success' on anything but a real,
+     * amount-matched Paytm response — same amount-mismatch rule
+     * adminDecision() already enforces for the manual path.
+     */
+    private function tryAutoVerify(PDO $db, array $row, string $mid, string $merchantKey, bool $testMode): ?array
+    {
+        $db->prepare('UPDATE payment_transactions SET utr_attempts = utr_attempts + 1 WHERE id = :id AND status = :s')
+            ->execute(['id' => $row['id'], 's' => 'initiated']);
+
+        $result = PaytmStatusClient::checkStatus($mid, (string) $row['provider_txn_id'], $merchantKey, $testMode);
+
+        if ($result['status'] !== 'TXN_SUCCESS') {
+            // PENDING / TXN_FAILURE / ERROR / anything else — not a
+            // verified payment. Don't touch the row; let the normal
+            // UTR-window / expiry logic in verify() keep handling it.
+            return null;
+        }
+
+        $txnAmount = (float) ($result['raw']['TXNAMOUNT'] ?? 0);
+        if (abs($txnAmount - (float) $row['amount']) > 0.01) {
+            // Paytm says success but the amount doesn't match this
+            // order's own amount — same guard adminDecision() applies
+            // manually. Do not auto-mark paid; leave it for a human.
+            return [
+                'status' => $row['status'],
+                'raw_response' => ['native' => true, 'reason' => 'auto_amount_mismatch', 'paytm_amount' => $txnAmount],
+            ];
+        }
+
+        // Dedupe (doc 23 addendum §A6 / migration 42) — same rule the
+        // UPIPE reference source applies to BANKTXNID even on its own
+        // auto-verify branch: a single real bank transaction can never
+        // be allowed to pay off two different orders. Paytm's own
+        // reference (BANKTXNID, falling back to TXNID) is the unique
+        // key here — enforced by uq_ptxn_provider_bank_ref, not just
+        // this pre-check, to close the same race a concurrent request
+        // could otherwise slip through.
+        $bankRef = trim((string) ($result['raw']['BANKTXNID'] ?? $result['raw']['TXNID'] ?? ''));
+        if ($bankRef === '') {
+            // Paytm said success but gave us nothing to dedupe against —
+            // same as the reference source's "Transaction ID not found.
+            // Please try again." Don't trust a bare STATUS alone.
+            return [
+                'status' => $row['status'],
+                'raw_response' => ['native' => true, 'reason' => 'auto_missing_bank_ref'],
+            ];
+        }
+
+        try {
+            $stmt = $db->prepare(
+                "UPDATE payment_transactions
+                 SET status = 'success', provider_bank_ref = :ref, amount_confirmed = :ac, raw_response_json = :raw
+                 WHERE id = :id AND status = 'initiated'"
+            );
+            $stmt->execute([
+                'ref' => $bankRef,
+                'ac' => $txnAmount,
+                'raw' => json_encode(['native' => true, 'auto' => true, 'paytm' => $result['raw']], JSON_UNESCAPED_SLASHES),
+                'id' => $row['id'],
+            ]);
+        } catch (PDOException $e) {
+            if ((int) $e->getCode() === 23000 || str_contains($e->getMessage(), 'uq_ptxn_provider_bank_ref')) {
+                // This exact bank transaction already paid off a
+                // different order — refuse, same as the manual UTR
+                // path's own uq_ptxn_utr collision handling.
+                return [
+                    'status' => $row['status'],
+                    'raw_response' => ['native' => true, 'reason' => 'auto_bank_ref_already_used'],
+                ];
+            }
+            throw $e;
+        }
+
+        if ($stmt->rowCount() === 0) {
+            // Lost a race (e.g. admin approved manually a moment
+            // earlier) — re-fetch and report whatever actually stuck.
+            $fresh = $db->prepare('SELECT status FROM payment_transactions WHERE id = :id');
+            $fresh->execute(['id' => $row['id']]);
+            return ['status' => $fresh->fetchColumn() ?: $row['status'], 'raw_response' => ['native' => true, 'reason' => 'race_lost']];
+        }
+
+        return [
+            'status' => 'success',
+            'raw_response' => ['native' => true, 'auto' => true, 'txn_id' => (int) $row['id']],
         ];
     }
 

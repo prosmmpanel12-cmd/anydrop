@@ -421,14 +421,26 @@ $order = $fetch->fetch();
 // lib/notifications.php's kdoc). OrderPollingService already covers the
 // urgent sound/alarm path on the restaurant app; this is the persistent
 // "you can look back at this later" record the bell list is for.
-create_notification(
-    'restaurant',
-    $restaurantId,
-    'New order received',
-    "Order $orderCode — ₹" . number_format((float) $order['grand_total'], 0),
-    'order',
-    ['order_id' => $orderId, 'screen' => 'order_detail']
-);
+//
+// UPI FIX (2026-08-23): only fire this immediately for payment methods
+// that are already resolved at this point — 'cod' (pays on delivery,
+// nothing to wait for) and 'wallet' (already flipped to payment_status
+// = 'paid' above, synchronously, before we got here). A 'upi' order is
+// still payment_status = 'pending' right now — the restaurant must NOT
+// be alerted or shown as "New order received" until the payment
+// actually clears. That notification is sent instead from
+// PaymentService::promoteOrderIfNeeded(), the same moment payment_status
+// flips to 'paid' (via customer poll or admin UTR approval) — see there.
+if ($paymentMethod !== 'upi' || $order['payment_status'] === 'paid') {
+    create_notification(
+        'restaurant',
+        $restaurantId,
+        'New order received',
+        "Order $orderCode — ₹" . number_format((float) $order['grand_total'], 0),
+        'order',
+        ['order_id' => $orderId, 'screen' => 'order_detail']
+    );
+}
 
 respond_ok([
     'order' => format_order($db, $order),
