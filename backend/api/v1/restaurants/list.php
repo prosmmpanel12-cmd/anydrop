@@ -61,16 +61,24 @@ $db = Database::get();
 // see docblock above. Empty array means either no lat/lng or no area
 // match, in which case the per-restaurant area check below is skipped
 // entirely (radius-only, unchanged behaviour).
+//
+// Bug fix (2026-08-24) — same fix as home/promo-banners.php's identical
+// pattern (see that file's history for the full writeup). This used to
+// only look at resolve_service_area()'s nearest match, so a customer
+// sitting inside two overlapping service-area circles could fail to
+// match the farther-but-still-containing one even though they're
+// genuinely inside it too — a restaurant scoped to that area would
+// wrongly disappear from their list. Now walks the whole match list.
 $eligibleAreaIds = [];
 if ($lat !== null && $lng !== null) {
     $resolvedAreas = resolve_service_area($db, $lat, $lng);
-    if (!empty($resolvedAreas)) {
-        $nearestArea = $resolvedAreas[0];
-        $eligibleAreaIds[] = $nearestArea['id'];
-        if ($nearestArea['level'] === 'area' && $nearestArea['parent_id'] !== null) {
-            $eligibleAreaIds[] = $nearestArea['parent_id'];
+    foreach ($resolvedAreas as $match) {
+        $eligibleAreaIds[] = $match['id'];
+        if ($match['level'] === 'area' && $match['parent_id'] !== null) {
+            $eligibleAreaIds[] = $match['parent_id'];
         }
     }
+    $eligibleAreaIds = array_values(array_unique($eligibleAreaIds));
 }
 
 $where = ["status = 'approved'", "deleted_at IS NULL"];

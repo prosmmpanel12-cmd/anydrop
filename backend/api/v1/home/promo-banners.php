@@ -111,16 +111,30 @@ $lng = isset($_GET['lng']) && $_GET['lng'] !== '' ? (float) $_GET['lng'] : null;
 // specific Area under it (banners.php's area picker only ever assigns a
 // banner to a 'city_village' or 'area' node, never state/district, so
 // walking any further up the chain isn't needed).
+//
+// Bug fix (2026-08-24) — this used to only look at resolve_service_area()'s
+// nearest match ($resolved[0]). resolve_service_area() itself returns
+// every node whose circle contains the point, not just the closest one
+// (see its own kdoc, which explicitly flags this as something "the
+// banner-fetch case may want" — this just hadn't been done yet). Only
+// checking the nearest node meant a customer sitting inside *two*
+// overlapping service-area circles (e.g. a small village node nested
+// near/inside a larger City/Village node's radius) would never match a
+// banner scoped to the farther-but-still-containing one, even though
+// they're genuinely inside it too — exactly what a City/Village-level
+// banner (like one scoped to "Osian") is supposed to reach regardless
+// of whether some smaller, nearer node also happens to contain the same
+// point. Now walks the whole list.
 $eligibleAreaIds = [];
 if ($lat !== null && $lng !== null) {
     $resolved = resolve_service_area($db, $lat, $lng);
-    if (!empty($resolved)) {
-        $nearest = $resolved[0];
-        $eligibleAreaIds[] = $nearest['id'];
-        if ($nearest['level'] === 'area' && $nearest['parent_id'] !== null) {
-            $eligibleAreaIds[] = $nearest['parent_id'];
+    foreach ($resolved as $match) {
+        $eligibleAreaIds[] = $match['id'];
+        if ($match['level'] === 'area' && $match['parent_id'] !== null) {
+            $eligibleAreaIds[] = $match['parent_id'];
         }
     }
+    $eligibleAreaIds = array_values(array_unique($eligibleAreaIds));
 }
 
 if (empty($eligibleAreaIds)) {
