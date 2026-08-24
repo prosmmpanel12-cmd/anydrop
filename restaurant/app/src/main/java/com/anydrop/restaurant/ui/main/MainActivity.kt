@@ -15,6 +15,7 @@ import com.anydrop.restaurant.data.TokenManager
 import com.anydrop.restaurant.databinding.ActivityMainBinding
 import com.anydrop.restaurant.network.ApiClient
 import com.anydrop.restaurant.network.OperationalStatusUpdateBody
+import com.anydrop.restaurant.network.SessionEvents
 import com.anydrop.restaurant.service.OrderNotificationHelper
 import com.anydrop.restaurant.service.OrderPollingService
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -92,6 +93,16 @@ class MainActivity : AppCompatActivity() {
         if (!tokenManager.isLoggedIn()) {
             goToLogin()
             return
+        }
+
+        // Doc 26 — mirrors the Customer app's HomeActivity wiring of the
+        // same event: ApiClient's suspensionInterceptor already cleared
+        // the token by the time this fires, so all that's left here is
+        // navigating away and carrying the reason along for Login to show.
+        lifecycleScope.launch {
+            SessionEvents.accountSuspended.collect { reason ->
+                goToLogin(reason)
+            }
         }
 
         startOrderPollingService()
@@ -300,10 +311,14 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun goToLogin() {
+    // [reason] is only ever non-null when called from the suspension
+    // observer above (doc 26) — the plain not-logged-in check at the top
+    // of onCreate() calls this with no argument, same as before.
+    private fun goToLogin(reason: String? = null) {
         startActivity(
             Intent(this, LoginActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+                .putExtra(LoginActivity.EXTRA_SUSPENSION_REASON, reason)
         )
         finish()
     }

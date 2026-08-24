@@ -71,7 +71,7 @@ if (!$customer) {
     $customer = $stmt->fetch();
 } else {
     if (!$customer['is_active']) {
-        respond_error('account_suspended', 403);
+        respond_error('account_suspended', 403, ['reason' => $customer['suspension_reason'] ?? null]);
     }
 }
 

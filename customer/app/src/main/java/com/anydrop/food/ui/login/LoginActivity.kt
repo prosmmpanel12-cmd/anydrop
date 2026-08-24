@@ -23,6 +23,13 @@ import kotlinx.coroutines.launch
 
 class LoginActivity : AppCompatActivity() {
 
+    companion object {
+        // Doc 26 — HomeActivity's suspension observer passes this when it
+        // force-navigates here after a mid-session `account_suspended`
+        // 403; it's whatever the backend's `data.reason` held, or null.
+        const val EXTRA_SUSPENSION_REASON = "extra_suspension_reason"
+    }
+
     private lateinit var binding: ActivityLoginBinding
     private lateinit var tokenManager: TokenManager
     private val api by lazy { ApiClient.create(this) }
@@ -46,6 +53,17 @@ class LoginActivity : AppCompatActivity() {
 
         loadBanner()
         setupLegalLinks()
+
+        // Doc 26 — shown once, right after arriving here. Falls back to a
+        // generic message since `suspension_reason` is a nullable column.
+        if (intent.hasExtra(EXTRA_SUSPENSION_REASON)) {
+            val reason = intent.getStringExtra(EXTRA_SUSPENSION_REASON)
+            InAppNotifier.show(
+                this,
+                "Your account was suspended" + (reason?.let { ": $it" } ?: ". Contact support for details."),
+                InAppNotifier.Type.ERROR
+            )
+        }
     }
 
     /**

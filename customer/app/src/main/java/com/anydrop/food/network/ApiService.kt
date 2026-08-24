@@ -143,6 +143,16 @@ interface ApiService {
         @Query("delivery_address_id") deliveryAddressId: Int? = null
     ): Response<ApiResponse<PaymentMethodsResult>>
 
+    // Wired in 2026-08-23 (app owner report) — finer per-customer COD
+    // rule check (min prepaid orders / max amount / daily cap), was
+    // built server-side but never called from the app before this.
+    // See CodEligibilityResult's kdoc.
+    @GET("customer/cod-eligibility.php")
+    suspend fun getCodEligibility(
+        @Query("delivery_address_id") deliveryAddressId: Int? = null,
+        @Query("order_amount") orderAmount: Double? = null
+    ): Response<ApiResponse<CodEligibilityResult>>
+
     @POST("customer/addresses.php")
     suspend fun addAddress(@Body body: AddAddressBody): Response<ApiResponse<AddAddressResult>>
 

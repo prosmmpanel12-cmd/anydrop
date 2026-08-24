@@ -18,6 +18,13 @@ import kotlinx.coroutines.launch
 
 class LoginActivity : AppCompatActivity() {
 
+    companion object {
+        // Doc 26 — MainActivity's suspension observer passes this when it
+        // force-navigates here after a mid-session `account_suspended`
+        // 403; it's whatever the backend's `data.reason` held, or null.
+        const val EXTRA_SUSPENSION_REASON = "extra_suspension_reason"
+    }
+
     private lateinit var binding: ActivityLoginBinding
     private val api by lazy { ApiClient.create(this) }
     private lateinit var tokenManager: TokenManager
@@ -39,6 +46,19 @@ class LoginActivity : AppCompatActivity() {
         binding.btnGoSignup.setOnClickListener {
             startActivity(Intent(this, SignupActivity::class.java))
             overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        }
+
+        // Doc 26 — shown once, right after the token check above (never
+        // reached if already logged in, which can't happen right after
+        // a forced logout anyway). Falls back to a generic message since
+        // `suspension_reason`/`rejection_reason` are nullable columns.
+        if (intent.hasExtra(EXTRA_SUSPENSION_REASON)) {
+            val reason = intent.getStringExtra(EXTRA_SUSPENSION_REASON)
+            InAppNotifier.show(
+                this,
+                "Your account was suspended" + (reason?.let { ": $it" } ?: ". Contact support for details."),
+                InAppNotifier.Type.ERROR
+            )
         }
     }
 

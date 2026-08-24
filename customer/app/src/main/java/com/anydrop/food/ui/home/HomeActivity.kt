@@ -33,6 +33,7 @@ import com.anydrop.food.network.PopularItem
 import com.anydrop.food.network.PromoBanner
 import com.anydrop.food.network.Restaurant
 import com.anydrop.food.network.SearchItem
+import com.anydrop.food.network.SessionEvents
 import com.anydrop.food.notifications.DailyEngagementScheduler
 import com.anydrop.food.notifications.NotificationHelper
 import com.anydrop.food.ui.cart.CartBottomSheetFragment
@@ -190,6 +191,23 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
         binding = ActivityHomeBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // Doc 26 — the interceptor in ApiClient already dropped the
+        // token and emitted here the moment any authenticated call came
+        // back 403 account_suspended; this is purely the "tell the user
+        // and get them off screens that will now just keep 403ing" half.
+        // Home is the one long-lived Activity every screen funnels
+        // through (see loadPromoBanners()/onResume() above), so this is
+        // the only place this needs to be observed.
+        lifecycleScope.launch {
+            SessionEvents.accountSuspended.collect { reason ->
+                startActivity(
+                    Intent(this@HomeActivity, LoginActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                        .putExtra(LoginActivity.EXTRA_SUSPENSION_REASON, reason)
+                )
+            }
+        }
+
         // Cart-persistence restore (closes the "cart empties on app
         // restart" gap) — HomeActivity.onCreate only runs once per fresh
         // process (standard launch mode, only reachable post-login via
@@ -326,6 +344,8 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
     }
 
     private var isFirstResume = true
+    private var lastBannerLoadAtMs = 0L
+    private val BANNER_REFRESH_THROTTLE_MS = 60_000L
 
     override fun onResume() {
         super.onResume()
@@ -353,6 +373,17 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
         if (!isFirstResume && ActiveAddressManager.get(this) == null) {
             applyActiveAddressUi(null)
             resolveActiveAddressThenLoad(forceRefresh = true)
+        }
+        // Bug fix (2026-08-23, app owner report): banners created/edited
+        // in the admin panel weren't showing up for a customer whose app
+        // was already open — loadPromoBanners() used to only ever run
+        // once, from onCreate(). Home is a long-lived Activity (users
+        // background/foreground it constantly rather than relaunching),
+        // so re-check here too. Throttled (not every resume) since this
+        // is a network call and app-switching can be rapid; 60s roughly
+        // matches this endpoint's own Cache-Control: max-age=120 window.
+        if (!isFirstResume && System.currentTimeMillis() - lastBannerLoadAtMs > BANNER_REFRESH_THROTTLE_MS) {
+            loadPromoBanners()
         }
         isFirstResume = false
     }
@@ -643,6 +674,7 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
      * yet, same as loadRestaurants()'s existing lat/lng-optional pattern.
      */
     private fun loadPromoBanners() {
+        lastBannerLoadAtMs = System.currentTimeMillis()
         lifecycleScope.launch {
             try {
                 val active = ActiveAddressManager.get(this@HomeActivity)

@@ -76,9 +76,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $flashType = 'error';
             } else {
                 $newState = $customer['is_active'] ? 0 : 1;
-                $db->prepare('UPDATE customers SET is_active = :a WHERE id = :id')->execute(['a' => $newState, 'id' => $customerId]);
-                write_audit_log('admin', $admin['id'], $newState ? 'customer_reactivated' : 'customer_suspended', ['customer_id' => $customerId]);
-                $flash = admin_escape($customer['name'] ?: $customer['email']) . ($newState ? ' reactivated.' : ' suspended.');
+                if ($newState === 0) {
+                    // Suspending — require a reason (doc 25: same
+                    // account_suspended payload the app now shows comes
+                    // from this column via lib/auth.php's per-request
+                    // check, so an empty reason here means a blank
+                    // dialog on the customer's end).
+                    $reason = trim($_POST['reason'] ?? '');
+                    if ($reason === '') {
+                        $flash = 'A suspension reason is required.';
+                        $flashType = 'error';
+                    } else {
+                        $db->prepare('UPDATE customers SET is_active = 0, suspension_reason = :r WHERE id = :id')
+                            ->execute(['r' => $reason, 'id' => $customerId]);
+                        write_audit_log('admin', $admin['id'], 'customer_suspended', ['customer_id' => $customerId, 'reason' => $reason]);
+                        $flash = admin_escape($customer['name'] ?: $customer['email']) . ' suspended.';
+                    }
+                } else {
+                    $db->prepare('UPDATE customers SET is_active = 1, suspension_reason = NULL WHERE id = :id')
+                        ->execute(['id' => $customerId]);
+                    write_audit_log('admin', $admin['id'], 'customer_reactivated', ['customer_id' => $customerId]);
+                    $flash = admin_escape($customer['name'] ?: $customer['email']) . ' reactivated.';
+                }
             }
         } elseif ($formAction === 'soft_delete') {
             if (!$canDelete) {
@@ -157,7 +176,7 @@ $page = min($page, $totalPages);
 $offset = ($page - 1) * $perPage;
 
 $listStmt = $db->prepare(
-    "SELECT c.id, c.name, c.email, c.mobile, c.login_type, c.is_active, c.created_at,
+    "SELECT c.id, c.name, c.email, c.mobile, c.login_type, c.is_active, c.suspension_reason, c.created_at,
             (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id) AS order_count,
             (SELECT MAX(created_at) FROM orders o WHERE o.customer_id = c.id) AS last_order_at
      FROM customers c
@@ -284,7 +303,10 @@ require __DIR__ . '/_layout_head.php';
         <dialog class="modal" id="cust-<?= (int) $c['id'] ?>">
             <div class="modal-body">
                 <h3 class="modal-title"><?= admin_escape($c['name'] ?: '(no name)') ?></h3>
-                <p class="modal-text"><?= admin_escape($c['email']) ?> · <?= admin_escape($c['mobile'] ?: 'no mobile') ?></p>
+                <p class="modal-text">
+                    <?= admin_escape($c['email']) ?> · <?= admin_escape($c['mobile'] ?: 'no mobile') ?>
+                    <?php if (!$c['is_active'] && $c['suspension_reason']): ?><br>Suspension reason: <?= admin_escape($c['suspension_reason']) ?><?php endif; ?>
+                </p>
 
                 <div class="section-title" style="margin-top:10px;">Saved addresses</div>
                 <?php if (empty($addressesByCustomer[$c['id']])): ?>
@@ -346,17 +368,33 @@ require __DIR__ . '/_layout_head.php';
                 <?php endif; ?>
 
                 <?php if ($canSuspend): ?>
-                    <form method="post" style="margin-top:16px;">
-                        <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
-                        <input type="hidden" name="customer_id" value="<?= (int) $c['id'] ?>">
-                        <input type="hidden" name="form_action" value="toggle_active">
-                        <button type="submit" class="btn <?= $c['is_active'] ? 'btn-outline danger' : 'btn-approve' ?>" style="width:100%;"
-                            data-confirm-title="<?= $c['is_active'] ? 'Suspend' : 'Reactivate' ?> this customer?"
-                            data-confirm-text="<?= $c['is_active'] ? 'They will not be able to log in or place orders until reactivated.' : 'They will be able to log in and order again.' ?>"
-                            data-confirm-ok-label="<?= $c['is_active'] ? 'Suspend' : 'Reactivate' ?>">
-                            <?= $c['is_active'] ? 'Suspend customer' : 'Reactivate customer' ?>
-                        </button>
-                    </form>
+                    <?php if ($c['is_active']): ?>
+                        <form method="post" style="margin-top:16px;">
+                            <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
+                            <input type="hidden" name="customer_id" value="<?= (int) $c['id'] ?>">
+                            <input type="hidden" name="form_action" value="toggle_active">
+                            <label class="field-label">Suspension reason</label>
+                            <textarea name="reason" style="width:100%; min-height:60px;" required></textarea>
+                            <button type="submit" class="btn btn-outline danger" style="width:100%; margin-top:8px;"
+                                data-confirm-title="Suspend this customer?"
+                                data-confirm-text="They will not be able to log in or place orders until reactivated — this now takes effect immediately, even mid-session."
+                                data-confirm-ok-label="Suspend">
+                                Suspend customer
+                            </button>
+                        </form>
+                    <?php else: ?>
+                        <form method="post" style="margin-top:16px;">
+                            <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
+                            <input type="hidden" name="customer_id" value="<?= (int) $c['id'] ?>">
+                            <input type="hidden" name="form_action" value="toggle_active">
+                            <button type="submit" class="btn btn-approve" style="width:100%;"
+                                data-confirm-title="Reactivate this customer?"
+                                data-confirm-text="They will be able to log in and order again."
+                                data-confirm-ok-label="Reactivate">
+                                Reactivate customer
+                            </button>
+                        </form>
+                    <?php endif; ?>
                 <?php endif; ?>
 
                 <?php if ($canDelete): ?>

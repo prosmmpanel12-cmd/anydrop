@@ -23,6 +23,7 @@ import com.anydrop.food.network.CartValidateBody
 import com.anydrop.food.network.CreateOrderBody
 import com.anydrop.food.network.CartTotals
 import com.anydrop.food.network.PaymentMethodsResult
+import com.anydrop.food.network.CodEligibilityResult
 import com.anydrop.food.ui.address.AddressEditorBottomSheet
 import com.anydrop.food.ui.common.InAppNotifier
 import com.anydrop.food.ui.common.ScheduleTimeSlotBottomSheet
@@ -360,6 +361,8 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
 
     private fun android.view.ViewGroup.children() = (0 until childCount).map { getChildAt(it) }
 
+    private var codEligibility: CodEligibilityResult = CodEligibilityResult()
+
     // recall.md Phase B item 15 — refreshes which payment methods are
     // allowed for the currently-selected delivery address's resolved
     // area, then re-applies the radio-button gating. Safe to call
@@ -378,8 +381,28 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
                 // method server-side even if this call never landed.
                 paymentMethods = PaymentMethodsResult()
             }
-            applyPaymentMethodRestrictions()
+            refreshCodEligibility()
         }
+    }
+
+    // Split out from loadPaymentMethods() so renderBill() can re-run just
+    // this part once the real grand total is known (see its call site).
+    private suspend fun refreshCodEligibility() {
+        val addressId = selectedAddressId
+        // Only worth checking the finer per-customer COD rule when the
+        // area allows COD at all — no point asking "am I personally
+        // eligible" for a rail this area doesn't offer.
+        codEligibility = if (paymentMethods.codAllowed) {
+            try {
+                val resp = api.getCodEligibility(addressId, lastKnownGrandTotal)
+                resp.body()?.data ?: CodEligibilityResult()
+            } catch (e: Exception) {
+                CodEligibilityResult() // fails open, same reasoning as above
+            }
+        } else {
+            CodEligibilityResult()
+        }
+        applyPaymentMethodRestrictions()
     }
 
     // Disables (doesn't hide — same "show it, explain why it's off"
@@ -398,19 +421,33 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
     // real guard against a stale/insufficient balance, same
     // "convenience pre-check only" caveat as cod/upi).
     private fun applyPaymentMethodRestrictions() {
-        binding.radioCod.isEnabled = paymentMethods.codAllowed
+        // COD is only actually usable when BOTH the coarse area gate
+        // (paymentMethods.codAllowed) AND the finer per-customer rule
+        // (codEligibility.eligible) pass — see CodEligibilityResult's
+        // kdoc for why these are two separate checks.
+        val codUsable = paymentMethods.codAllowed && codEligibility.eligible
+
+        binding.radioCod.isEnabled = codUsable
         binding.radioUpi.isEnabled = paymentMethods.upiAllowed
-        binding.radioCod.alpha = if (paymentMethods.codAllowed) 1.0f else 0.5f
+        binding.radioCod.alpha = if (codUsable) 1.0f else 0.5f
         binding.radioUpi.alpha = if (paymentMethods.upiAllowed) 1.0f else 0.5f
 
-        if (binding.radioCod.isChecked && !paymentMethods.codAllowed && paymentMethods.upiAllowed) {
+        if (binding.radioCod.isChecked && !codUsable && paymentMethods.upiAllowed) {
             binding.radioUpi.isChecked = true
-        } else if (binding.radioUpi.isChecked && !paymentMethods.upiAllowed && paymentMethods.codAllowed) {
+        } else if (binding.radioUpi.isChecked && !paymentMethods.upiAllowed && codUsable) {
             binding.radioCod.isChecked = true
         }
 
-        if (!paymentMethods.codAllowed) {
-            binding.radioCod.text = getString(R.string.pay_cod) + " — " + getString(R.string.payment_method_unavailable_here)
+        if (!codUsable) {
+            // Prefer the specific per-customer reason (e.g. "Available
+            // after 3 prepaid orders") over the generic area-level one —
+            // it's only ever present when the area itself does allow COD
+            // (see the codAllowed-gated fetch in loadPaymentMethods()),
+            // so an area-level block always falls through to the generic
+            // "not available here" text below.
+            val reason = codEligibility.reason
+                ?: getString(R.string.payment_method_unavailable_here)
+            binding.radioCod.text = getString(R.string.pay_cod) + " — " + reason
         } else {
             binding.radioCod.text = getString(R.string.pay_cod)
         }
@@ -433,7 +470,7 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
             // hidden radio checked with no fallback the way cod/upi
             // hop to each other above, so fall back to whichever of
             // cod/upi is currently allowed, preferring Cod.
-            if (paymentMethods.codAllowed) {
+            if (codUsable) {
                 binding.radioCod.isChecked = true
             } else if (paymentMethods.upiAllowed) {
                 binding.radioUpi.isChecked = true
@@ -554,6 +591,14 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
     private fun renderBill(totals: CartTotals) {
         lastKnownItemTotal = totals.itemTotal
         lastKnownGrandTotal = totals.grandTotal
+        // The COD amount-cap check (cod-eligibility.php's max_cod_order_amount)
+        // needs the real grand total, which isn't known yet the first time
+        // loadPaymentMethods() runs (right after addresses load, before this
+        // bill call resolves) — re-check now that we actually have it. Only
+        // matters when COD is even on the table; harmless no-op otherwise.
+        if (paymentMethods.codAllowed) {
+            lifecycleScope.launch { refreshCodEligibility() }
+        }
         setRow(binding.rowItemTotal.root, getString(R.string.lbl_item_total), totals.itemTotal)
         setRow(binding.rowDiscount.root, getString(R.string.lbl_discount), -totals.discountAmount, hideIfZero = true)
         setRow(binding.rowDelivery.root, getString(R.string.lbl_delivery_charge), totals.deliveryCharge)

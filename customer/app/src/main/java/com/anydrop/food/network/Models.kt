@@ -639,8 +639,8 @@ data class DeleteAddressResult(val deleted: Boolean)
 // ---- recall.md Phase B item 15 — area-wise general payment method
 // restrictions (backend/api/v1/customer/payment-methods.php). Coarse
 // "is this method allowed here at all" gate — distinct from the
-// finer COD-specific eligibility (backend/lib/cod_rules.php), which
-// isn't wired into the app yet either and is a separate future item.
+// finer COD-specific eligibility (backend/lib/cod_rules.php), wired
+// in via CodEligibilityResult below (2026-08-23).
 data class PaymentMethodsResult(
     @SerializedName("upi_allowed") val upiAllowed: Boolean = true,
     @SerializedName("cod_allowed") val codAllowed: Boolean = true,
@@ -652,6 +652,26 @@ data class PaymentMethodsResult(
     // option it can't back up.
     @SerializedName("wallet_allowed") val walletAllowed: Boolean = false,
     @SerializedName("wallet_balance") val walletBalance: Double = 0.0
+)
+
+// Finer, per-customer COD rule (backend/lib/cod_rules.php via
+// customer/cod-eligibility.php) — separate from PaymentMethodsResult's
+// codAllowed, which only answers "is COD enabled in this area at all".
+// A customer can be in a COD-enabled area and still be ineligible right
+// now (e.g. needs N prepaid/UPI orders first, over the per-order cap,
+// or hit today's COD-order limit) — `reason` is a ready-to-show string
+// from the server (e.g. "Available after 3 prepaid orders"), no copy
+// or threshold math needed on the app side.
+data class CodEligibilityResult(
+    val eligible: Boolean = true,
+    val reason: String? = null,
+    val rule: CodRule? = null
+)
+
+data class CodRule(
+    @SerializedName("min_prepaid_orders") val minPrepaidOrders: Int? = null,
+    @SerializedName("max_cod_order_amount") val maxCodOrderAmount: Double? = null,
+    @SerializedName("max_cod_orders_per_day") val maxCodOrdersPerDay: Int? = null
 )
 
 // ---- H6 part 2 — door/building photo upload (map pin-drop screen) ----

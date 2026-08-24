@@ -71,12 +71,55 @@ function get_authenticated_owner(): ?array
     return ['owner_type' => $row['owner_type'], 'owner_id' => (int) $row['owner_id']];
 }
 
-/** Call at the top of any protected endpoint. Halts request with 401 if not authenticated. */
+/**
+ * Call at the top of any protected endpoint. Halts request with 401 if
+ * not authenticated, or 403 `account_suspended` if the token is valid
+ * but the account behind it has since been suspended/deactivated.
+ *
+ * Doc 25: previously a valid (unexpired) token was treated as
+ * sufficient on its own — restaurants.status / customers.is_active was
+ * only ever checked at login (restaurant-login.php,
+ * customer-verify-otp.php). That meant an admin suspending an
+ * already-logged-in restaurant or customer had no practical effect
+ * until their token's TOKEN_LIFETIME_DAYS expiry. This re-checks on
+ * every authenticated request instead — one indexed lookup by primary
+ * key, kept deliberately minimal since it runs on every call.
+ */
 function require_auth(string $expectedOwnerType): array
 {
     $owner = get_authenticated_owner();
     if (!$owner || $owner['owner_type'] !== $expectedOwnerType) {
         respond_error('unauthorized', 401);
     }
+
+    $db = Database::get();
+
+    if ($expectedOwnerType === 'restaurant') {
+        $stmt = $db->prepare(
+            'SELECT status, rejection_reason FROM restaurants WHERE id = :id AND deleted_at IS NULL LIMIT 1'
+        );
+        $stmt->execute(['id' => $owner['owner_id']]);
+        $row = $stmt->fetch();
+        // No row = either soft-deleted or the id vanished — same
+        // "can't use this account anymore" outcome as suspended.
+        // `pending`/`rejected` aren't checked here: login already
+        // blocks both, and a currently-logged-in restaurant (i.e. one
+        // that has a valid token at all) can only have reached that
+        // state via approved -> suspended, never retroactively back to
+        // pending/rejected — see doc 25.
+        if (!$row || $row['status'] === 'suspended') {
+            respond_error('account_suspended', 403, ['reason' => $row['rejection_reason'] ?? null]);
+        }
+    } elseif ($expectedOwnerType === 'customer') {
+        $stmt = $db->prepare(
+            'SELECT is_active, suspension_reason FROM customers WHERE id = :id AND deleted_at IS NULL LIMIT 1'
+        );
+        $stmt->execute(['id' => $owner['owner_id']]);
+        $row = $stmt->fetch();
+        if (!$row || !$row['is_active']) {
+            respond_error('account_suspended', 403, ['reason' => $row['suspension_reason'] ?? null]);
+        }
+    }
+
     return $owner;
 }

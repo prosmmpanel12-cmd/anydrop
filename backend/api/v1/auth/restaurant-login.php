@@ -33,7 +33,7 @@ if (!$restaurant || !password_verify($password, $restaurant['password_hash'])) {
 }
 
 if ($restaurant['status'] === 'suspended') {
-    respond_error('account_suspended', 403);
+    respond_error('account_suspended', 403, ['reason' => $restaurant['rejection_reason'] ?? null]);
 }
 
 if ($restaurant['status'] === 'pending') {
@@ -41,7 +41,7 @@ if ($restaurant['status'] === 'pending') {
 }
 
 if ($restaurant['status'] === 'rejected') {
-    respond_error('account_suspended', 403);
+    respond_error('account_suspended', 403, ['reason' => $restaurant['rejection_reason'] ?? null]);
 }
 
 $token = create_auth_token('restaurant', (int) $restaurant['id']);
