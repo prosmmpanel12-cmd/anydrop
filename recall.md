@@ -2125,12 +2125,16 @@ Do NOT randomly pick features.
 
 ## Phase D — Offers
 
-28. Restaurant Offers Engine
-29. Combo pricing
-30. Free delivery offers
-31. Happy hours
-32. Offer eligibility/stacking rules
-33. Central server-side pricing engine
+28. Restaurant Offers Engine — 🟡 backend + admin built 2026-08-24, NOT
+    device/build-verified; Android (Restaurant App create/manage screen,
+    Customer App offer display) NOT built yet. See docs/29 for full
+    scope/handover.
+29. Combo pricing — 🔴 explicitly deferred (see docs/29 — needs a
+    multi-item bundle model item 28's schema doesn't cover)
+30. Free delivery offers — 🟡 built as part of item 28 (offer_type='free_delivery')
+31. Happy hours — 🟡 built as part of item 28 (start_time/end_time + weekdays on any offer type, not a separate mechanism)
+32. Offer eligibility/stacking rules — 🟡 built as part of item 28 (doc 20 §13's "1 item/restaurant offer + 1 coupon + 1 delivery offer" rule, hardcoded not admin-configurable yet)
+33. Central server-side pricing engine — 🟡 lib/offers.php + price_cart() integration built as part of item 28; still the same "not device-verified" status as every other pricing path in this codebase
 
 ## Phase E — Support / Trust
 
@@ -2198,7 +2202,7 @@ Before starting any new task:
 | Overall feature history | `docs/features.md` |
 | Restaurant full scope | `docs/18_Restaurant_App_Full_Scope_And_Rating_System.md` |
 | Admin + Area + Banner + Payment architecture | `docs/19_Admin_Panel_Full_Spec_And_Payment_Email_Architecture_2026-08-14.md` |
-| Restaurant Offers Engine | `docs/20_Offers_Pricing_UI_Polish_Notes.md` |
+| Restaurant Offers Engine | `docs/20_Offers_Pricing_UI_Polish_Notes.md` (product spec) + `docs/29_Handover_2026-08-24_Offers_Engine_Backend_Built.md` (what's actually built vs pending) |
 | Production gaps | `docs/21_Production_Feature_Gap_Plan.md` |
 | Live Rider Tracking | `docs/03_Live_Tracking.md` |
 | Database / ledger architecture | `docs/01_Database_Schema.md` |

@@ -190,6 +190,87 @@
     <string name="coupon_unarchive_failed">Couldn\'t restore coupon</string>
     <string name="coupon_public_toggle_label">Show on coupon screen</string>
     <string name="coupon_public_toggle_hint">Public coupons are auto-suggested to customers on the offers screen. Private ones only work if the customer types the exact code.</string>
+
+    <!-- Restaurant Offers screen (doc 20 §1/§12/§14; docs/29 "Not built"
+         item 1, this session). See OfferManagerActivity/OfferAdapter/
+         dialog_add_offer.xml — screen itself not yet wired up
+         (AccountFragment row + manifest + Activity/Adapter Kotlin still
+         pending as of this string batch), added here so the layouts
+         that already reference these keys don't fail to compile. -->
+    <string name="account_row_offers">Offers</string>
+    <string name="offer_manager_title">Offers</string>
+    <string name="offer_add_title">New Offer</string>
+    <string name="offer_edit_title">Edit Offer</string>
+    <string name="offer_empty_state">No offers yet — tap + to create one.</string>
+    <string name="offer_tab_active">Active</string>
+    <string name="offer_tab_scheduled">Scheduled</string>
+    <string name="offer_tab_expired">Expired</string>
+    <string name="offer_tab_paused">Paused</string>
+
+    <string name="offer_hint_title">Offer title (e.g. 3 Samosa @ ₹50)</string>
+    <string name="offer_hint_offer_type">Offer type</string>
+    <string name="offer_type_quantity_deal">Quantity deal</string>
+    <string name="offer_type_buy_x_for_y">Buy X for ₹Y</string>
+    <string name="offer_type_buy_x_get_y">Buy X get Y</string>
+    <string name="offer_type_percent_discount">% discount</string>
+    <string name="offer_type_flat_discount">₹ flat discount</string>
+    <string name="offer_type_free_delivery">Free delivery</string>
+    <string name="offer_edit_type_locked_fmt">Type: %1$s (can\'t be changed after creation)</string>
+
+    <string name="offer_hint_required_qty">Required quantity</string>
+    <string name="offer_hint_offer_price">Offer price (₹)</string>
+    <string name="offer_hint_get_qty">Free quantity</string>
+    <string name="offer_hint_discount_percent">Discount percent</string>
+    <string name="offer_hint_discount_flat">Flat discount (₹)</string>
+
+    <string name="offer_hint_scope">Applies to</string>
+    <string name="offer_scope_item">Item</string>
+    <string name="offer_scope_category">Category</string>
+    <string name="offer_scope_restaurant">Whole restaurant</string>
+    <string name="offer_hint_menu_item">Select menu item</string>
+    <string name="offer_hint_food_category">Select category</string>
+
+    <string name="offer_hint_min_order">Min order amount (optional)</string>
+
+    <string name="offer_hint_eligibility">Customer eligibility</string>
+    <string name="offer_eligibility_all">All customers</string>
+    <string name="offer_eligibility_new">New customers only</string>
+    <string name="offer_eligibility_existing">Existing customers only</string>
+
+    <string name="offer_hint_start_date">Start date (optional)</string>
+    <string name="offer_hint_end_date">End date (optional)</string>
+    <string name="offer_hint_start_time">Start time (optional)</string>
+    <string name="offer_hint_end_time">End time (optional)</string>
+    <string name="offer_hint_weekdays">Repeat on (leave blank for every day)</string>
+
+    <string name="offer_hint_daily_limit">Daily usage limit (optional)</string>
+    <string name="offer_hint_total_limit">Total usage limit (optional)</string>
+    <string name="offer_hint_per_customer_limit">Per-customer limit (optional)</string>
+
+    <string name="offer_action_edit">Edit</string>
+    <string name="offer_action_pause">Pause</string>
+    <string name="offer_action_resume">Resume</string>
+    <string name="offer_action_view">View</string>
+
+    <string name="offer_status_active">ACTIVE</string>
+    <string name="offer_status_paused">PAUSED</string>
+    <string name="offer_status_disabled">DISABLED BY ADMIN</string>
+
+    <string name="offer_used_of_fmt">Used: %1$d / %2$d</string>
+    <string name="offer_used_unlimited_fmt">Used: %1$d</string>
+    <string name="offer_valid_range_fmt">Valid: %1$s – %2$s</string>
+    <string name="offer_valid_from_fmt">Valid from %1$s</string>
+    <string name="offer_valid_until_fmt">Valid until %1$s</string>
+
+    <string name="offer_created">Offer created</string>
+    <string name="offer_create_failed">Couldn\'t create offer</string>
+    <string name="offer_updated">Offer updated</string>
+    <string name="offer_update_failed">Couldn\'t update offer</string>
+    <string name="offer_paused_success">Offer paused</string>
+    <string name="offer_resumed_success">Offer resumed</string>
+    <string name="offer_pause_resume_failed">Couldn\'t update offer status</string>
+    <string name="offer_disabled_by_admin_message">This offer was disabled by the AnyDrop team and can\'t be resumed from here.</string>
+
     <string name="btn_change_logo">Change logo</string>
     <string name="hint_cuisine_tags">Cuisine tags (comma separated)</string>
     <string name="hint_min_order_amount">Minimum order amount (₹)</string>

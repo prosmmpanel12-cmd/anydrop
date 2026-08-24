@@ -225,12 +225,14 @@ try {
             order_code, customer_id, idempotency_key, restaurant_id, status,
             item_total, delivery_charge, platform_fee, packing_charge, tax_amount, discount_amount,
             grand_total, commission_amount, payment_method, payment_status,
-            delivery_address_id, delivery_instructions, scheduled_for, coupon_id, delivery_otp
+            delivery_address_id, delivery_instructions, scheduled_for, coupon_id, delivery_otp,
+            offer_id, offer_discount_amount, free_delivery_offer_id, free_delivery_discount_amount
         ) VALUES (
             :code, :cust, :idem, :rest, \'pending\',
             :item_total, :delivery_charge, :platform_fee, :packing_charge, :tax_amount, :discount_amount,
             :grand_total, :commission_amount, :payment_method, :payment_status,
-            :address_id, :instructions, :scheduled_for, :coupon_id, :otp
+            :address_id, :instructions, :scheduled_for, :coupon_id, :otp,
+            :offer_id, :offer_discount, :fd_offer_id, :fd_discount
         )'
     );
     $insertOrder->execute([
@@ -253,6 +255,11 @@ try {
         'scheduled_for' => $scheduledFor,
         'coupon_id' => $priced['coupon_id'],
         'otp' => $deliveryOtp,
+        // recall.md Phase D item 28 / migration 47 — Offers Engine.
+        'offer_id' => $priced['offer_id'],
+        'offer_discount' => $priced['offer_discount_amount'],
+        'fd_offer_id' => $priced['free_delivery_offer_id'],
+        'fd_discount' => $priced['free_delivery_discount_amount'],
     ]);
     $orderId = (int) $db->lastInsertId();
 
@@ -369,11 +376,77 @@ try {
         $couponUse->execute(['cid' => $priced['coupon_id'], 'uid' => $customerId, 'oid' => $orderId]);
     }
 
+    // recall.md Phase D item 28 / migration 47 — restaurant Offers
+    // Engine. Same race-protection shape as the coupon block just
+    // above (bugs.md #1.3's fix, applied here from day one instead of
+    // retrofitted later): price_cart()'s own usage-limit check ran
+    // before this transaction opened, so a locking re-check right
+    // before the insert is what actually serializes two near-
+    // simultaneous orders both trying to claim the last slot of a
+    // limited offer. Both the auto-applied item/restaurant offer and
+    // the free-delivery offer go through the same helper — they're
+    // independent stacking slots (doc 20 §13) but share identical
+    // limit-checking logic, so one function handles both rather than
+    // duplicating the lock/recheck/insert dance twice.
+    $recordOfferUsage = function (int $offerId, float $discountAmount) use ($db, $customerId, $orderId): void {
+        $lockStmt = $db->prepare(
+            'SELECT daily_limit, total_limit, per_customer_limit FROM promo_offers WHERE id = :oid LIMIT 1 FOR UPDATE'
+        );
+        $lockStmt->execute(['oid' => $offerId]);
+        $offerRow = $lockStmt->fetch();
+
+        if ($offerRow) {
+            if ($offerRow['per_customer_limit'] !== null) {
+                $recheck = $db->prepare('SELECT COUNT(*) AS c FROM offer_usages WHERE offer_id = :oid AND customer_id = :uid');
+                $recheck->execute(['oid' => $offerId, 'uid' => $customerId]);
+                if ((int) $recheck->fetch()['c'] >= (int) $offerRow['per_customer_limit']) {
+                    throw new RuntimeException('offer_usage_limit_reached');
+                }
+            }
+            if ($offerRow['daily_limit'] !== null) {
+                $recheck = $db->prepare('SELECT COUNT(*) AS c FROM offer_usages WHERE offer_id = :oid AND DATE(created_at) = CURDATE()');
+                $recheck->execute(['oid' => $offerId]);
+                if ((int) $recheck->fetch()['c'] >= (int) $offerRow['daily_limit']) {
+                    throw new RuntimeException('offer_usage_limit_reached');
+                }
+            }
+            if ($offerRow['total_limit'] !== null) {
+                $recheck = $db->prepare('SELECT COUNT(*) AS c FROM offer_usages WHERE offer_id = :oid');
+                $recheck->execute(['oid' => $offerId]);
+                if ((int) $recheck->fetch()['c'] >= (int) $offerRow['total_limit']) {
+                    throw new RuntimeException('offer_usage_limit_reached');
+                }
+            }
+        }
+
+        $insertUsage = $db->prepare(
+            'INSERT INTO offer_usages (offer_id, order_id, customer_id, discount_amount) VALUES (:oid, :ordid, :uid, :amt)'
+        );
+        $insertUsage->execute(['oid' => $offerId, 'ordid' => $orderId, 'uid' => $customerId, 'amt' => $discountAmount]);
+    };
+
+    if ($priced['offer_id'] !== null) {
+        $recordOfferUsage((int) $priced['offer_id'], (float) $priced['offer_discount_amount']);
+    }
+    if ($priced['free_delivery_offer_id'] !== null) {
+        $recordOfferUsage((int) $priced['free_delivery_offer_id'], (float) $priced['free_delivery_discount_amount']);
+    }
+
     $db->commit();
 } catch (Throwable $e) {
     $db->rollBack();
     if ($e->getMessage() === 'coupon_usage_limit_reached') {
         respond_error('coupon_usage_limit_reached', 422);
+    }
+    // recall.md Phase D item 28 — the rare race the pre-check inside
+    // price_cart() can't catch (same TOCTOU shape as the coupon
+    // limit above — two near-simultaneous orders both passing the
+    // cheap check before either's locked recheck+insert lands). No
+    // amount/limit payload needed here — the app's cart just needs to
+    // know to re-fetch pricing and try again; the offer that raced
+    // away will simply no longer be selected as "best" on retry.
+    if ($e->getMessage() === 'offer_usage_limit_reached') {
+        respond_error('offer_usage_limit_reached', 422);
     }
     // recall.md item 26 §D.12 — the rare race the pre-check above can't
     // catch (balance drained by another concurrent order between the

@@ -176,6 +176,25 @@
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground" />
 
+                <!-- Offers row (doc 20 §14; docs/29 "Not built" item 1,
+                     session 7) — opens OfferManagerActivity. Same row
+                     style as the rows above; placed next to
+                     btnCouponsRow per session 7's handover. -->
+                <TextView
+                    android:id="@+id/btnOffersRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_card_rounded"
+                    android:padding="16dp"
+                    android:text="@string/account_row_offers"
+                    android:textColor="@color/anydrop_primary"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground" />
+
                 <!-- Reviews row (docs/restorent/00_Status.md, this
                      session) — opens ReviewListActivity. Same row style
                      as the rows above. -->

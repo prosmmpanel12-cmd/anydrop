@@ -125,6 +125,17 @@ interface ApiService {
     @POST("restaurant/coupons-update.php")
     suspend fun updateCoupon(@Query("id") id: Int, @Body body: CouponUpdateBody): Response<ApiResponse<CouponResult>>
 
+    // ---- Restaurant Offers (doc 20 §1/§12/§14; backend built docs/29) ----
+
+    @GET("restaurant/offers-list.php")
+    suspend fun getOffers(): Response<ApiResponse<OffersListResult>>
+
+    @POST("restaurant/offers-create.php")
+    suspend fun createOffer(@Body body: OfferCreateBody): Response<ApiResponse<OfferResult>>
+
+    @POST("restaurant/offers-update.php")
+    suspend fun updateOffer(@Query("id") id: Int, @Body body: OfferUpdateBody): Response<ApiResponse<OfferResult>>
+
     // ---- Notification bell (Type 1 — system-generated, docs/Status.md
     // 2026-08-20). Mirrors the Customer App's ApiService entry of the same
     // name — called against notifications.php directly with the action/id

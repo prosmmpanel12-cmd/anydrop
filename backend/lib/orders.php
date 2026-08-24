@@ -12,6 +12,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/settings.php';
 require_once __DIR__ . '/delivery_pricing.php';
 require_once __DIR__ . '/commission.php';
+require_once __DIR__ . '/offers.php';
 
 /** Generates a unique order code like QRX-8F3K9A. Retries on the rare collision. */
 function generate_order_code(PDO $db): string
@@ -72,6 +73,17 @@ function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCod
         'commission_amount' => 0.0,
         'min_order_amount' => 0.0,
         'coupon_id' => null,
+        // recall.md Phase D item 28 / migration 47 — restaurant
+        // Offers Engine. Kept as separate fields from coupon_id/
+        // discount_amount (never merged) so a bill can show "Item
+        // Discount" (this) and "Coupon" (existing) as two distinct
+        // lines per doc 20 §42's price-breakdown mock.
+        'offer_id' => null,
+        'offer_discount_amount' => 0.0,
+        'offer_title' => null,
+        'free_delivery_offer_id' => null,
+        'free_delivery_discount_amount' => 0.0,
+        'free_delivery_offer_title' => null,
         'error' => null,
     ];
 
@@ -325,6 +337,34 @@ function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCod
         } while (false);
     }
 
+    // recall.md Phase D item 28 / migration 47 — restaurant Offers
+    // Engine, auto-applied (no code entry, unlike the coupon block
+    // above). Runs AFTER the coupon block so both discounts exist
+    // before totals below, but is otherwise fully independent of it —
+    // doc 20 §13's stacking rule allows exactly one of each
+    // simultaneously (1 item/restaurant offer + 1 coupon + 1 delivery
+    // offer), never offer-vs-offer competition for the same slot. A
+    // bad/no-match offer situation is never an "error" the way an
+    // invalid coupon code is — there's no user-entered code to be
+    // wrong about, so this silently contributes 0 when nothing
+    // eligible matches, rather than setting $result['error'].
+    $offerDiscount = 0.0;
+    $offerId = null;
+    $offerTitle = null;
+    $bestOffer = select_best_auto_offer($db, $restaurantId, $lineItems, $itemTotal, $customerId);
+    if ($bestOffer !== null) {
+        $offerDiscount = $bestOffer['discount'];
+        $offerId = (int) $bestOffer['offer']['id'];
+        $offerTitle = $bestOffer['offer']['title'];
+    }
+    // Never let item discount + coupon discount together exceed the
+    // item total itself — same defensive floor the coupon block
+    // already applies to itself alone (`min($discount, $itemTotal)`),
+    // extended here since the two now combine.
+    if ($discount + $offerDiscount > $itemTotal) {
+        $offerDiscount = max(0.0, $itemTotal - $discount);
+    }
+
     // recall.md Phase B item 14 / migration 36 — distance-based delivery
     // fee, replacing the old flat delivery_charge_flat as the default
     // calculation (that setting is now only the fallback used inside
@@ -336,12 +376,37 @@ function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCod
     $restaurantLng = $restaurant['longitude'] !== null ? (float) $restaurant['longitude'] : null;
     $deliveryPricing = calculate_delivery_fee($db, $restaurantLat, $restaurantLng, $deliveryLat, $deliveryLng);
     $deliveryCharge = $deliveryPricing['fee'];
+
+    // Free-delivery offer — its own stacking slot (doc 20 §13), never
+    // competes with the item/restaurant offer above. Applied after the
+    // delivery fee itself is known, since the discount is capped at
+    // whatever that fee actually is (see select_best_free_delivery_offer()).
+    $freeDeliveryDiscount = 0.0;
+    $freeDeliveryOfferId = null;
+    $freeDeliveryOfferTitle = null;
+    $bestFreeDelivery = select_best_free_delivery_offer($db, $restaurantId, $itemTotal, $deliveryCharge, $customerId);
+    if ($bestFreeDelivery !== null) {
+        $freeDeliveryDiscount = $bestFreeDelivery['discount'];
+        $freeDeliveryOfferId = (int) $bestFreeDelivery['offer']['id'];
+        $freeDeliveryOfferTitle = $bestFreeDelivery['offer']['title'];
+    }
+
     $platformFee = (float) get_setting('platform_fee_flat', 5);
     $packingCharge = (float) get_setting('packing_charge_flat', 0);
     $taxPercent = (float) get_setting('tax_percent', 5);
-    $taxAmount = round(($itemTotal - $discount) * $taxPercent / 100, 2);
+    // Tax base is item_total net of BOTH discounts (coupon + offer) —
+    // doc 20 §2's price-breakdown order computes Tax after Item
+    // Discount and Coupon Discount are already subtracted, never
+    // before. Delivery fee (or its free-delivery waiver) never enters
+    // the tax base either way, same as before this migration.
+    $taxAmount = round(($itemTotal - $discount - $offerDiscount) * $taxPercent / 100, 2);
 
-    $grandTotal = round($itemTotal - $discount + $deliveryCharge + $platformFee + $packingCharge + $taxAmount, 2);
+    $grandTotal = round(
+        $itemTotal - $discount - $offerDiscount
+        + ($deliveryCharge - $freeDeliveryDiscount)
+        + $platformFee + $packingCharge + $taxAmount,
+        2
+    );
     // recall.md Phase C items 20-23 / migration 38 — order-level
     // commission_amount is now just the sum of each line's own
     // snapshot above (get_effective_commission_rate() per line), not a
@@ -366,6 +431,12 @@ function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCod
     $result['grand_total'] = $grandTotal;
     $result['commission_amount'] = $commissionAmount;
     $result['coupon_id'] = $couponId;
+    $result['offer_id'] = $offerId;
+    $result['offer_discount_amount'] = $offerDiscount;
+    $result['offer_title'] = $offerTitle;
+    $result['free_delivery_offer_id'] = $freeDeliveryOfferId;
+    $result['free_delivery_discount_amount'] = $freeDeliveryDiscount;
+    $result['free_delivery_offer_title'] = $freeDeliveryOfferTitle;
 
     return $result;
 }
@@ -501,6 +572,22 @@ function format_order(PDO $db, array $order): array
         'packing_charge' => (float) $order['packing_charge'],
         'tax_amount' => (float) $order['tax_amount'],
         'discount_amount' => (float) $order['discount_amount'],
+        // recall.md Phase D item 28 / migration 47 — restaurant Offers
+        // Engine snapshot, distinct from discount_amount (the coupon)
+        // per doc 20 §42's price-breakdown mock. offer_title/
+        // free_delivery_offer_title are read live from
+        // promo_offers (not snapshotted onto the order row) —
+        // fine for now since nothing here lets a restaurant rename an
+        // offer after the fact (offers-update.php's title field
+        // exists, so this is a known small gap: renaming an offer
+        // would change how an old order's bill displays its label,
+        // though never the amount, which orders.offer_discount_amount
+        // does snapshot). Flagged for a future title-snapshot column
+        // if that turns out to matter in practice.
+        'offer_id' => $order['offer_id'] !== null ? (int) $order['offer_id'] : null,
+        'offer_discount_amount' => (float) ($order['offer_discount_amount'] ?? 0),
+        'free_delivery_offer_id' => $order['free_delivery_offer_id'] !== null ? (int) $order['free_delivery_offer_id'] : null,
+        'free_delivery_discount_amount' => (float) ($order['free_delivery_discount_amount'] ?? 0),
         'grand_total' => (float) $order['grand_total'],
         'payment_method' => $order['payment_method'],
         'payment_status' => $order['payment_status'],

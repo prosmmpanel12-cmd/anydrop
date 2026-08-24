@@ -87,5 +87,17 @@ respond_ok([
     'invalid_items' => $priced['invalid_items'],
     'min_order_amount' => $priced['min_order_amount'],
     'warning' => $priced['error'], // e.g. below_min_order_amount, set alongside partial data
+    // recall.md Phase D item 28 / migration 47 — restaurant Offers
+    // Engine preview, same auto-applied best-fit selection
+    // orders/create.php will actually charge (price_cart() is the one
+    // function both call, so this can never drift from the real
+    // order — same guarantee this endpoint's own kdoc already states
+    // for the coupon/delivery numbers above).
+    'offer_id' => $priced['offer_id'],
+    'offer_title' => $priced['offer_title'],
+    'offer_discount_amount' => $priced['offer_discount_amount'],
+    'free_delivery_offer_id' => $priced['free_delivery_offer_id'],
+    'free_delivery_offer_title' => $priced['free_delivery_offer_title'],
+    'free_delivery_discount_amount' => $priced['free_delivery_discount_amount'],
 ]);
 

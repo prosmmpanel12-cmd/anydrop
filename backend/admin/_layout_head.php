@@ -16,7 +16,7 @@
  * Expects, from the including page:
  *   $admin       — array from admin_require_login()
  *   $pageTitle   — string, shown in <title> and the topbar
- *   $activeNav   — one of 'dashboard' | 'approvals' | 'areas' | 'cod_rules' | 'pricing_rules' | 'payment_restrictions' | 'categories' | 'banners' | 'roles' | 'commission_rules' | 'settlements' | 'platform_ledger' | 'payment_gateways' | 'payment_pending' | 'refunds'
+ *   $activeNav   — one of 'dashboard' | 'approvals' | 'areas' | 'cod_rules' | 'pricing_rules' | 'payment_restrictions' | 'categories' | 'banners' | 'roles' | 'commission_rules' | 'settlements' | 'platform_ledger' | 'payment_gateways' | 'payment_pending' | 'refunds' | 'offers'
  *   $flash       — string|null, shown once as a toast (not a static banner)
  *   $flashType   — 'success' | 'error'
  */
@@ -104,6 +104,11 @@ $navItems = [
         'key' => 'refunds', 'href' => 'refunds.php', 'label' => 'Refunds',
         'perm' => 'refunds_view',
         'icon' => '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 5v5h5"/>',
+    ],
+    [
+        'key' => 'offers', 'href' => 'offers.php', 'label' => 'Offers',
+        'perm' => 'offers_view',
+        'icon' => '<path d="M20.59 13.41L11 3.83A2 2 0 0 0 9.59 3.24H4a1 1 0 0 0-1 1v5.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.82 0l4.6-4.6a2 2 0 0 0 0-2.82z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
     ],
     [
         'key' => 'roles', 'href' => 'roles.php', 'label' => 'Roles & Admins',

@@ -87,6 +87,12 @@ class AccountFragment : Fragment() {
             startActivity(Intent(requireContext(), CouponManagerActivity::class.java))
         }
 
+        // Offers (doc 20 §14; docs/29 "Not built" item 1, session 7) —
+        // opens OfferManagerActivity. Same launch pattern as Coupons above.
+        binding.btnOffersRow.setOnClickListener {
+            startActivity(Intent(requireContext(), OfferManagerActivity::class.java))
+        }
+
         // Reviews reply (docs/restorent/00_Status.md, this session) —
         // same row style/placement as Banners/Coupons above.
         binding.btnReviewsRow.setOnClickListener {

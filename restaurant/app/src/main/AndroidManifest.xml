@@ -139,6 +139,13 @@
             android:name=".ui.account.CouponManagerActivity"
             android:exported="false" />
 
+        <!-- "Offers" screen (doc 20 §14; docs/29 "Not built" item 1,
+             session 7). Launched from AccountFragment's new row, same
+             exported="false" as every other internal-only screen here. -->
+        <activity
+            android:name=".ui.account.OfferManagerActivity"
+            android:exported="false" />
+
         <!-- "Ring until acted on" alarm screen (2026-08-18) — launched via
              OrderNotificationHelper's full-screen intent. singleTask +
              excludeFromRecents so a burst of orders can't stack multiple

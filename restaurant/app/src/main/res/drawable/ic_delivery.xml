@@ -1,0 +1,13 @@
+<!-- Offers screen (doc 20 §14, this session) — stands in for the 🚚
+     emoji doc 20 §2's customer-facing mock uses ("🚚 FREE DELIVERY"),
+     used on free_delivery offer cards. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?attr/colorControlNormal">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M18,18.5c0.83,0 1.5,-0.67 1.5,-1.5s-0.67,-1.5 -1.5,-1.5s-1.5,0.67 -1.5,1.5S17.17,18.5 18,18.5zM19.5,9.5l2.5,3v4h-2c0,1.38 -1.12,2.5 -2.5,2.5S15,17.88 15,16.5H9c0,1.38 -1.12,2.5 -2.5,2.5S4,17.88 4,16.5H2v-11C2,4.67 2.67,4 3.5,4h13c0.83,0 1.5,0.67 1.5,1.5v4zM6.5,18.5c0.83,0 1.5,-0.67 1.5,-1.5s-0.67,-1.5 -1.5,-1.5S5,16.17 5,17S5.67,18.5 6.5,18.5zM15,7.5H4V16h0.34C4.75,15.29 5.55,14.5 6.5,14.5s1.75,0.79 2.16,1.5H15V7.5zM16.5,7.5V11h4.14l-2.06,-2.5H16.5z"/>
+</vector>

@@ -1,0 +1,637 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Add/Edit Offer bottom sheet (doc 20 §1/§12/§14; docs/29 "Not built"
+     item 1, finished this session). Bigger than dialog_add_coupon.xml
+     by design (handover's own note) — six offer_type mechanics each
+     need different fields visible, toggled by OfferManagerActivity's
+     setUpOfferTypeToggle() the same way setUpDiscountTypeToggle()
+     drives dialog_add_coupon.xml's single percent/flat split, just with
+     6 branches instead of 2. Field-for-field mirrors
+     offers-create.php's own per-type validation — see that file's own
+     comment block for why every field here matters.
+
+     Sections, top to bottom:
+       1. Title
+       2. Offer-type chips (6-way single-select)
+       3. Type-specific mechanic fields (only one group visible at a time)
+       4. Scope chips (item/category/restaurant) + item/category picker
+       5. min_order_amount + max_discount_amount (shared, percent-only for the latter)
+       6. Customer eligibility chips
+       7. Start/end date pickers, start/end time pickers (happy-hour window)
+       8. Weekday multi-select chips
+       9. Usage limit fields (daily/total/per-customer)
+       10. Save/Cancel row
+
+     Edit mode (showEditOfferDialog()) hides section 2 and 3 entirely
+     (offer_type/scope/mechanic fields are create-only server-side, same
+     "delete and recreate instead" boundary offers-update.php documents)
+     in favor of a plain label, same pattern editDiscountTypeLabel uses
+     in dialog_add_coupon.xml. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:maxHeight="560dp"
+    android:background="@drawable/bg_dialog_rounded_top">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <View
+            android:layout_width="36dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/bg_sheet_handle" />
+
+        <TextView
+            android:id="@+id/offerDialogTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            tools:text="New Offer" />
+
+        <!-- 1. Title -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:startIconDrawable="@drawable/ic_tag"
+            app:boxCornerRadiusTopStart="12dp"
+            app:boxCornerRadiusTopEnd="12dp"
+            app:boxCornerRadiusBottomStart="12dp"
+            app:boxCornerRadiusBottomEnd="12dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/inputOfferTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/offer_hint_title"
+                android:maxLength="150" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Edit-mode only: offer_type is create-only, shown as a plain
+             label instead of the chip picker below — same reasoning
+             dialog_add_coupon.xml's editDiscountTypeLabel documents. -->
+        <TextView
+            android:id="@+id/editOfferTypeLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_secondary"
+            android:visibility="gone"
+            tools:text="Type: Percent discount (can't be changed after creation)" />
+
+        <!-- 2. Offer-type chips (add-mode only) -->
+        <TextView
+            android:id="@+id/offerTypeHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/offer_hint_offer_type"
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/offerTypeGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            app:singleSelection="true"
+            app:selectionRequired="true">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipTypeQuantityDeal"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/offer_type_quantity_deal"
+                android:checked="true" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipTypeBuyXForY"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/offer_type_buy_x_for_y" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipTypeBuyXGetY"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/offer_type_buy_x_get_y" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipTypePercent"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/offer_type_percent_discount" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipTypeFlat"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/offer_type_flat_discount" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipTypeFreeDelivery"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/offer_type_free_delivery" />
+
+        </com.google.android.material.chip.ChipGroup>
+
+        <!-- 3. Type-specific mechanic fields (add-mode only — one group
+             visible at a time, driven by offerTypeGroup's listener).
+             Field pairing matches offers-create.php's own switch:
+               quantity_deal / buy_x_for_y -> required_qty, offer_price
+               buy_x_get_y                -> required_qty, get_qty
+               percent_discount           -> discount_percent (max_discount_amount lives in section 5)
+               flat_discount              -> discount_flat
+               free_delivery              -> none (min_order_amount only, section 5) -->
+        <LinearLayout
+            android:id="@+id/mechanicQtyPriceGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputRequiredQty1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/offer_hint_required_qty"
+                    android:inputType="number" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputOfferPrice"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/offer_hint_offer_price"
+                    android:inputType="numberDecimal" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/mechanicQtyGetGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp"
+            android:visibility="gone">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputRequiredQty2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/offer_hint_required_qty"
+                    android:inputType="number" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputGetQty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/offer_hint_get_qty"
+                    android:inputType="number" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+        </LinearLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/mechanicPercentGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:visibility="gone"
+            app:startIconDrawable="@drawable/ic_percent">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/inputDiscountPercent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/offer_hint_discount_percent"
+                android:inputType="numberDecimal" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/mechanicFlatGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:visibility="gone">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/inputDiscountFlat"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/offer_hint_discount_flat"
+                android:inputType="numberDecimal" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- 4. Scope (add-mode only — scope is also create-only). The
+             "restaurant" chip is removed entirely (not just hidden) for
+             the three quantity-mechanic types by
+             setUpOfferTypeToggle()/refreshScopeChipsForType(), mirroring
+             offers-create.php's own rejection of scope=restaurant for
+             those types — the form can never construct a request the
+             server will 422 on. -->
+        <TextView
+            android:id="@+id/offerScopeHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/offer_hint_scope"
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/offerScopeGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            app:singleSelection="true"
+            app:selectionRequired="true">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipScopeItem"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/offer_scope_item"
+                android:checked="true" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipScopeCategory"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/offer_scope_category" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipScopeRestaurant"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/offer_scope_restaurant" />
+
+        </com.google.android.material.chip.ChipGroup>
+
+        <!-- Item/category picker — a plain dropdown-style AutoCompleteTextView
+             backed by getMenuItems()/getFoodTags(), same "no new endpoint
+             needed" reuse the handover calls out. Only one of the two is
+             visible at once, matching offerScopeGroup's own selection;
+             both gone entirely when scope=restaurant. -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/menuItemPickerLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            app:endIconMode="dropdown_menu"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+
+            <AutoCompleteTextView
+                android:id="@+id/inputMenuItemPicker"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/offer_hint_menu_item"
+                android:inputType="none" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/foodCategoryPickerLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:visibility="gone"
+            app:endIconMode="dropdown_menu"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+
+            <AutoCompleteTextView
+                android:id="@+id/inputFoodCategoryPicker"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/offer_hint_food_category"
+                android:inputType="none" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- 5. Shared amount fields -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/inputOfferMinOrder"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/offer_hint_min_order"
+                android:inputType="numberDecimal" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- percent_discount only — max_discount_amount caps an
+             otherwise-unbounded percentage-of-order discount, same
+             field/reasoning as dialog_add_coupon.xml's own
+             maxDiscountLayout, just re-shown here for offer_type instead
+             of coupon discount_type. -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/maxDiscountLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:visibility="gone">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/inputOfferMaxDiscount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/coupon_hint_max_discount"
+                android:inputType="numberDecimal" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- 6. Customer eligibility -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/offer_hint_eligibility"
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/eligibilityGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            app:singleSelection="true"
+            app:selectionRequired="true">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipEligibilityAll"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/offer_eligibility_all"
+                android:checked="true" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipEligibilityNew"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/offer_eligibility_new" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipEligibilityExisting"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/offer_eligibility_existing" />
+
+        </com.google.android.material.chip.ChipGroup>
+
+        <!-- 7. Date range (date-only — promo_offers.start_date/end_date
+             are DATE columns, not DATETIME like coupon's valid_until, so
+             a plain MaterialDatePicker with no chained time picker,
+             unlike setUpValidUntilPicker() in CouponManagerActivity). -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="16dp">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/startDateLayout"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                app:startIconDrawable="@drawable/ic_calendar"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_close">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputStartDate"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/offer_hint_start_date"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:cursorVisible="false" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/endDateLayout"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                app:startIconDrawable="@drawable/ic_calendar"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_close">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputEndDate"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/offer_hint_end_date"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:cursorVisible="false" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+        </LinearLayout>
+
+        <!-- Happy-hour time window (start_time/end_time, TIME columns) —
+             separate from the date range above, both optional. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/startTimeLayout"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                app:startIconDrawable="@drawable/ic_clock"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_close">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputStartTime"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/offer_hint_start_time"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:cursorVisible="false" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/endTimeLayout"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                app:startIconDrawable="@drawable/ic_clock"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_close">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputEndTime"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/offer_hint_end_time"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:cursorVisible="false" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+        </LinearLayout>
+
+        <!-- 8. Weekday multi-select — built dynamically in Kotlin from
+             the same 1=Mon..7=Sun dayLabels convention
+             EditProfileActivity.buildDayChips() already uses for
+             restaurants.working_days, matching the CSV "1-7" convention
+             offers-create.php's own weekday-cleaning logic expects. -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/offer_hint_weekdays"
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/weekdaysChipGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            app:singleSelection="false" />
+
+        <!-- 9. Usage limits -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/inputDailyLimit"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/offer_hint_daily_limit"
+                android:inputType="number" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/inputTotalLimit"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/offer_hint_total_limit"
+                android:inputType="number" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/inputPerCustomerLimit"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/offer_hint_per_customer_limit"
+                android:inputType="number" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- 10. Save/Cancel -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="24dp"
+            android:gravity="end">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnOfferDialogCancel"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_cancel" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnOfferDialogSave"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:backgroundTint="@color/anydrop_primary"
+                android:text="@string/btn_save" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</ScrollView>

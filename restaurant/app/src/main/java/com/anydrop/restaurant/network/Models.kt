@@ -205,6 +205,103 @@ data class CouponUpdateBody(
     @SerializedName("usage_limit_per_user") val usageLimitPerUser: Int? = null
 )
 
+// ---- Restaurant Offers (doc 20 §1/§12/§14; backend built docs/29,
+// this session finishes the Restaurant App "Offers" screen, docs/29
+// "Not built" item 1) ----
+//
+// Mirrors backend/lib/offers.php's format_offer() field-for-field.
+// Distinct from Coupon above — see migration 47's own header comment
+// for why the two are separate concepts (auto-applied promo vs
+// code-entry coupon) that nonetheless coexist and can stack together.
+data class PromoOffer(
+    val id: Int,
+    @SerializedName("offer_type") val offerType: String, // quantity_deal|buy_x_for_y|buy_x_get_y|percent_discount|flat_discount|free_delivery
+    val title: String,
+    val scope: String, // item|category|restaurant
+    @SerializedName("menu_item_id") val menuItemId: Int?,
+    @SerializedName("food_category_id") val foodCategoryId: Int?,
+    @SerializedName("required_qty") val requiredQty: Int?,
+    @SerializedName("get_qty") val getQty: Int?,
+    @SerializedName("offer_price") val offerPrice: Double?,
+    @SerializedName("discount_percent") val discountPercent: Double?,
+    @SerializedName("discount_flat") val discountFlat: Double?,
+    @SerializedName("max_discount_amount") val maxDiscountAmount: Double?,
+    @SerializedName("min_order_amount") val minOrderAmount: Double,
+    @SerializedName("customer_eligibility") val customerEligibility: String, // all|new_customer|existing_customer
+    @SerializedName("start_date") val startDate: String?, // yyyy-MM-dd
+    @SerializedName("end_date") val endDate: String?,
+    @SerializedName("start_time") val startTime: String?, // HH:mm:ss
+    @SerializedName("end_time") val endTime: String?,
+    val weekdays: String?, // CSV "1,2,3" (1=Mon..7=Sun), null = every day
+    @SerializedName("daily_limit") val dailyLimit: Int?,
+    @SerializedName("total_limit") val totalLimit: Int?,
+    @SerializedName("per_customer_limit") val perCustomerLimit: Int?,
+    val status: String, // active|paused|disabled — 'disabled' is admin-only, see offers-update.php
+    @SerializedName("created_at") val createdAt: String?,
+    // offers-list.php-only extras — absent (default) when this model is
+    // deserialized from offers-create.php/offers-update.php's response,
+    // which don't compute either.
+    @SerializedName("times_used") val timesUsed: Int = 0,
+    @SerializedName("is_currently_active") val isCurrentlyActive: Boolean = false
+)
+
+data class OffersListResult(@SerializedName("offers") val offers: List<PromoOffer>)
+data class OfferResult(@SerializedName("offer") val offer: PromoOffer)
+
+/** offer_type/scope/menu_item_id/food_category_id and every type-mechanic
+ * field (required_qty/get_qty/offer_price/discount_percent/discount_flat)
+ * are create-only — see offers-update.php's kdoc for why (an already-
+ * redeemed offer's history would become impossible to interpret if the
+ * mechanic changed underneath it), so they only appear here, never in
+ * OfferUpdateBody below. */
+data class OfferCreateBody(
+    @SerializedName("offer_type") val offerType: String,
+    val title: String,
+    val scope: String,
+    @SerializedName("menu_item_id") val menuItemId: Int? = null,
+    @SerializedName("food_category_id") val foodCategoryId: Int? = null,
+    @SerializedName("required_qty") val requiredQty: Int? = null,
+    @SerializedName("get_qty") val getQty: Int? = null,
+    @SerializedName("offer_price") val offerPrice: Double? = null,
+    @SerializedName("discount_percent") val discountPercent: Double? = null,
+    @SerializedName("discount_flat") val discountFlat: Double? = null,
+    @SerializedName("max_discount_amount") val maxDiscountAmount: Double? = null,
+    @SerializedName("min_order_amount") val minOrderAmount: Double? = null,
+    @SerializedName("customer_eligibility") val customerEligibility: String? = null,
+    @SerializedName("start_date") val startDate: String? = null,
+    @SerializedName("end_date") val endDate: String? = null,
+    @SerializedName("start_time") val startTime: String? = null,
+    @SerializedName("end_time") val endTime: String? = null,
+    val weekdays: String? = null,
+    @SerializedName("daily_limit") val dailyLimit: Int? = null,
+    @SerializedName("total_limit") val totalLimit: Int? = null,
+    @SerializedName("per_customer_limit") val perCustomerLimit: Int? = null
+)
+
+/** Partial update — used for the Pause/Resume toggle (status alone), the
+ * soft-delete action (isDeleted alone), and for editing the rest of an
+ * existing offer's restriction fields. Same null-skip convention as
+ * CouponUpdateBody; every field here maps 1:1 to what offers-update.php
+ * actually reads (array_key_exists-gated server-side, not null-gated —
+ * see that file's kdoc — so this class only ever sends fields the user
+ * actually touched via the dialog's "send full current form state"
+ * pattern, same reasoning submitCouponEdit() documents). */
+data class OfferUpdateBody(
+    val status: String? = null,
+    val title: String? = null,
+    @SerializedName("min_order_amount") val minOrderAmount: Double? = null,
+    @SerializedName("max_discount_amount") val maxDiscountAmount: Double? = null,
+    @SerializedName("start_date") val startDate: String? = null,
+    @SerializedName("end_date") val endDate: String? = null,
+    @SerializedName("start_time") val startTime: String? = null,
+    @SerializedName("end_time") val endTime: String? = null,
+    val weekdays: String? = null,
+    @SerializedName("daily_limit") val dailyLimit: Int? = null,
+    @SerializedName("total_limit") val totalLimit: Int? = null,
+    @SerializedName("per_customer_limit") val perCustomerLimit: Int? = null,
+    @SerializedName("is_deleted") val isDeleted: Boolean? = null
+)
+
 // ---- Orders ----
 
 data class OrderItemLine(
