@@ -236,6 +236,11 @@ data class PromoOffer(
     @SerializedName("daily_limit") val dailyLimit: Int?,
     @SerializedName("total_limit") val totalLimit: Int?,
     @SerializedName("per_customer_limit") val perCustomerLimit: Int?,
+    // migration 48 — restaurant-controlled: whether this offer's own
+    // discount can combine with a coupon code at checkout (see
+    // lib/orders.php's own kdoc on the enforcement side). Defaults true
+    // server-side for any row created before migration 48 ran.
+    @SerializedName("allow_coupon_stacking") val allowCouponStacking: Boolean = true,
     val status: String, // active|paused|disabled — 'disabled' is admin-only, see offers-update.php
     @SerializedName("created_at") val createdAt: String?,
     // offers-list.php-only extras — absent (default) when this model is
@@ -275,7 +280,12 @@ data class OfferCreateBody(
     val weekdays: String? = null,
     @SerializedName("daily_limit") val dailyLimit: Int? = null,
     @SerializedName("total_limit") val totalLimit: Int? = null,
-    @SerializedName("per_customer_limit") val perCustomerLimit: Int? = null
+    @SerializedName("per_customer_limit") val perCustomerLimit: Int? = null,
+    // migration 48. Sent explicitly (not left to the server's own
+    // omitted-value-means-true default) so the switch's on-screen state
+    // always matches what actually gets stored, even though both agree
+    // when the switch is left at its default-checked state.
+    @SerializedName("allow_coupon_stacking") val allowCouponStacking: Boolean? = null
 )
 
 /** Partial update — used for the Pause/Resume toggle (status alone), the
@@ -299,6 +309,10 @@ data class OfferUpdateBody(
     @SerializedName("daily_limit") val dailyLimit: Int? = null,
     @SerializedName("total_limit") val totalLimit: Int? = null,
     @SerializedName("per_customer_limit") val perCustomerLimit: Int? = null,
+    // migration 48 — editable after creation (unlike offer_type/scope/
+    // mechanic fields above), same array_key_exists-gated convention as
+    // every other field in this class.
+    @SerializedName("allow_coupon_stacking") val allowCouponStacking: Boolean? = null,
     @SerializedName("is_deleted") val isDeleted: Boolean? = null
 )
 

@@ -95,7 +95,14 @@ respond_ok([
     // for the coupon/delivery numbers above).
     'offer_id' => $priced['offer_id'],
     'offer_title' => $priced['offer_title'],
+    'offer_type' => $priced['offer_type'],
     'offer_discount_amount' => $priced['offer_discount_amount'],
+    // Migration 48 follow-up (app owner ask, 2026-08-25) — B1G1-style
+    // free-item preview + the coupon-vs-offer stacking toggle's result,
+    // see lib/orders.php price_cart()'s own comment on both fields.
+    'offer_free_units' => $priced['offer_free_units'],
+    'offer_free_item_label' => $priced['offer_free_item_label'],
+    'coupon_disabled_by_offer' => $priced['coupon_disabled_by_offer'],
     'free_delivery_offer_id' => $priced['free_delivery_offer_id'],
     'free_delivery_offer_title' => $priced['free_delivery_offer_title'],
     'free_delivery_discount_amount' => $priced['free_delivery_discount_amount'],

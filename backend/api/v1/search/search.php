@@ -27,6 +27,7 @@ require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/favorites.php';
 require_once __DIR__ . '/../../../lib/restaurant_status.php';
+require_once __DIR__ . '/../../../lib/offers.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -228,6 +229,18 @@ $itemStmt = $db->prepare(
 $itemStmt->execute(['q' => $like]);
 $rawItems = $itemStmt->fetchAll();
 
+// Offers Engine badge (app owner ask, 2026-08-25) — same per-restaurant
+// caching pattern as home/popular-items.php's identical addition;
+// category-scoped matching skipped here for the same reason (item-
+// scoped/restaurant-wide offers still badge correctly).
+$browsableOffersByRestaurant = [];
+foreach ($rawItems as $it) {
+    $rid = (int) $it['r_id'];
+    if (!isset($browsableOffersByRestaurant[$rid])) {
+        $browsableOffersByRestaurant[$rid] = get_browsable_offers_for_restaurant($db, $rid, (int) $owner['owner_id']);
+    }
+}
+
 $items = [];
 foreach ($rawItems as $it) {
     $rArr = [
@@ -267,6 +280,8 @@ foreach ($rawItems as $it) {
         // own menu.
         'is_cross_restaurant_match' => !in_array((int) $it['r_id'], $restaurantIds, true),
         'is_saved' => isset($savedItems[(int) $it['id']]),
+        'offer_tag' => ($badgeOffer = pick_item_badge_offer($browsableOffersByRestaurant[(int) $it['r_id']], (int) $it['id'], null))
+            ? offer_badge_label($badgeOffer) : null,
     ];
 }
 

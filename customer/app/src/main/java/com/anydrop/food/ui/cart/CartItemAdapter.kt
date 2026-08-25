@@ -3,10 +3,12 @@ package com.anydrop.food.ui.cart
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
 import com.anydrop.food.data.CartLine
 import com.anydrop.food.data.CartManager
 import com.anydrop.food.data.CartSyncManager
 import com.anydrop.food.databinding.ItemCartLineBinding
+import com.anydrop.food.network.ApiClient
 
 /** Item rows for a single restaurant's cart section (see RestaurantCartAdapter). */
 class CartItemAdapter(
@@ -46,6 +48,17 @@ class CartItemAdapter(
                 else com.anydrop.food.R.drawable.bg_badge_nonveg
             )
 
+            // App owner ask (2026-08-25) — dish photo in the cart list.
+            // Same static-files base-URL prefix every other image load in
+            // the app needs (MenuAdapter's own comment explains why the
+            // raw relative path alone never renders), null image clears
+            // any recycled-view thumbnail rather than leaving a stale one.
+            if (!line.item.imageUrl.isNullOrBlank()) {
+                binding.cartLineImage.load(ApiClient.baseUrlForStaticFiles(binding.root.context) + line.item.imageUrl)
+            } else {
+                binding.cartLineImage.setImageDrawable(null)
+            }
+
             val note = listOfNotNull(line.addonSummary, line.specialInstructions?.takeIf { it.isNotBlank() })
                 .joinToString(" · ")
             if (note.isNotBlank()) {
@@ -68,3 +81,4 @@ class CartItemAdapter(
         }
     }
 }
+

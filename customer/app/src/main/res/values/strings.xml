@@ -62,6 +62,10 @@
     <string name="notif_permission_positive">Yes, enable notifications</string>
     <string name="notif_permission_negative">Not now</string>
 
+    <!-- docs/33/34/35 — "Offers" category chip destination screen -->
+    <string name="offers_screen_title">Offers</string>
+    <string name="offers_screen_empty">No offers running right now — check back soon</string>
+
     <!-- Restaurant detail -->
     <string name="btn_add_to_cart">Add</string>
     <string name="highly_reordered">Highly reordered</string>
@@ -108,6 +112,15 @@
     <string name="coupon_percent_off">%1$s%% OFF</string>
     <string name="coupon_percent_off_capped">%1$s%% OFF up to ₹%2$s</string>
     <string name="coupon_min_order_line">Min order ₹%1$s</string>
+
+    <!-- docs/33 — Checkout offer strip + B1G1 free-item row + coupon-
+         disabled-by-offer note. offer_applied_amount mirrors
+         coupon_applied's own "you saved ₹%1$s" phrasing so the two rows
+         read consistently when both happen to be visible at once (e.g.
+         an offer with allow_coupon_stacking = 1 alongside a coupon). -->
+    <string name="offer_applied_amount">%1$s — you saved ₹%2$s</string>
+    <string name="offer_free_item_label">%1$s × %2$d — FREE</string>
+    <string name="coupon_disabled_by_offer_note">Coupon not applied — combines only with select offers</string>
     <string name="coupon_add_more_to_unlock">Add ₹%1$s more to unlock</string>
     <string name="coupon_used_up">Already used the maximum times</string>
 

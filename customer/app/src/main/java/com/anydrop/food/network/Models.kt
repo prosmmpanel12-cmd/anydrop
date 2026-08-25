@@ -166,7 +166,11 @@ data class SearchItem(
     @SerializedName("restaurant_is_open_now") val restaurantIsOpenNow: Boolean,
     @SerializedName("distance_km") val distanceKm: Double?,
     @SerializedName("is_cross_restaurant_match") val isCrossRestaurantMatch: Boolean = false,
-    @SerializedName("is_saved") val isSaved: Boolean = false
+    @SerializedName("is_saved") val isSaved: Boolean = false,
+    // Offers Engine badge (app owner ask, 2026-08-25) — same field
+    // search.php now returns, mirrors MenuItem.offerTag's own defaulted-
+    // null convention so an older cached response keeps deserializing.
+    @SerializedName("offer_tag") val offerTag: String? = null
 )
 
 /**
@@ -190,7 +194,8 @@ fun SearchItem.toMenuItem(): MenuItem = MenuItem(
     isRecommended = isRecommended,
     isBestseller = isBestseller,
     prepTimeMinutes = 0,
-    isSaved = isSaved
+    isSaved = isSaved,
+    offerTag = offerTag
 )
 
 data class SearchResponse(
@@ -374,7 +379,28 @@ data class CartTotals(
     @SerializedName("grand_total") val grandTotal: Double,
     @SerializedName("invalid_items") val invalidItems: List<CartInvalidItem> = emptyList(),
     @SerializedName("min_order_amount") val minOrderAmount: Double? = null,
-    val warning: String? = null
+    val warning: String? = null,
+    // recall.md Phase D item 28 / migration 47+48 — restaurant Offers
+    // Engine preview (docs/29's own "checkout-screen offer strip" item,
+    // app owner ask 2026-08-25). All defaulted so an older cached
+    // response (or a build against a backend that hasn't deployed this
+    // change yet) keeps deserializing exactly as before.
+    @SerializedName("offer_id") val offerId: Int? = null,
+    @SerializedName("offer_title") val offerTitle: String? = null,
+    @SerializedName("offer_type") val offerType: String? = null,
+    @SerializedName("offer_discount_amount") val offerDiscountAmount: Double = 0.0,
+    // B1G1-style synthetic free-item row — only non-zero/non-null when
+    // offerType == "buy_x_get_y". See lib/offers.php compute_offer_discount()'s
+    // own kdoc for why only this offer type has a distinct free unit to
+    // label (every other type discounts money off an existing line).
+    @SerializedName("offer_free_units") val offerFreeUnits: Int = 0,
+    @SerializedName("offer_free_item_label") val offerFreeItemLabel: String? = null,
+    // Migration 48 — true when a coupon the customer applied got
+    // dropped because the winning offer's allow_coupon_stacking = 0.
+    @SerializedName("coupon_disabled_by_offer") val couponDisabledByOffer: Boolean = false,
+    @SerializedName("free_delivery_offer_id") val freeDeliveryOfferId: Int? = null,
+    @SerializedName("free_delivery_offer_title") val freeDeliveryOfferTitle: String? = null,
+    @SerializedName("free_delivery_discount_amount") val freeDeliveryDiscountAmount: Double = 0.0
 )
 
 // ---- H5: Checkout "View all offers & coupons" page ----
@@ -718,7 +744,10 @@ data class PopularItem(
     @SerializedName("restaurant_logo_url") val restaurantLogoUrl: String?,
     @SerializedName("restaurant_rating") val restaurantRating: Double,
     @SerializedName("distance_km") val distanceKm: Double?,
-    @SerializedName("is_saved") val isSaved: Boolean = false
+    @SerializedName("is_saved") val isSaved: Boolean = false,
+    // Offers Engine badge (app owner ask, 2026-08-25) — same field
+    // popular-items.php now returns, same defaulted-null convention.
+    @SerializedName("offer_tag") val offerTag: String? = null
 )
 
 /** Same rationale as SearchItem.toMenuItem() above — PopularItem has an
@@ -734,10 +763,61 @@ fun PopularItem.toMenuItem(): MenuItem = MenuItem(
     isRecommended = isRecommended,
     isBestseller = isBestseller,
     prepTimeMinutes = 0,
-    isSaved = isSaved
+    isSaved = isSaved,
+    offerTag = offerTag
 )
 
 data class PopularItemsResult(val items: List<PopularItem>)
+
+// ---- "Offers" category chip browse screen (docs/33/34) ----
+
+/**
+ * One restaurant section on the Offers screen — a restaurant currently
+ * running at least one browsable offer, plus just the items on its menu
+ * that offer actually badges. Mirrors offers-browse.php's response shape
+ * exactly (docs/33's own spec, built docs/34).
+ */
+data class OfferBrowseRestaurant(
+    val id: Int,
+    val name: String,
+    @SerializedName("logo_url") val logoUrl: String?,
+    @SerializedName("rating_avg") val ratingAvg: Double,
+    @SerializedName("distance_km") val distanceKm: Double?,
+    @SerializedName("offer_titles") val offerTitles: List<String> = emptyList(),
+    val items: List<OfferBrowseItem> = emptyList()
+)
+
+data class OfferBrowseItem(
+    val id: Int,
+    val name: String,
+    @SerializedName("image_url") val imageUrl: String?,
+    val price: Double,
+    @SerializedName("is_veg") val isVeg: Boolean,
+    @SerializedName("offer_tag") val offerTag: String?
+)
+
+/** Same rationale as PopularItem/SearchItem's own toMenuItem() — this
+ * screen's item cards need a MenuItem to hand to
+ * ItemDetailBottomSheetFragment/CartAddHelper, same as every other
+ * cross-restaurant listing in the app. offers-browse.php's row is
+ * deliberately terser than MenuItem (no description/prepTimeMinutes/etc
+ * — this screen doesn't need them), so the rest default the same way
+ * PopularItem.toMenuItem() already defaults prepTimeMinutes. */
+fun OfferBrowseItem.toMenuItem(): MenuItem = MenuItem(
+    id = id,
+    name = name,
+    description = null,
+    price = price,
+    discountPercent = 0.0,
+    isVeg = isVeg,
+    imageUrl = imageUrl,
+    isRecommended = false,
+    isBestseller = false,
+    prepTimeMinutes = 0,
+    offerTag = offerTag
+)
+
+data class OffersBrowseResult(val restaurants: List<OfferBrowseRestaurant> = emptyList())
 
 // ---- Favorites / bookmarks (§2.5) ----
 

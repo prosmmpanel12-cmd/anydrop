@@ -351,11 +351,37 @@ function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCod
     $offerDiscount = 0.0;
     $offerId = null;
     $offerTitle = null;
+    $offerType = null;
+    $offerFreeUnits = 0;
+    $offerFreeItemLabel = null;
+    $couponDisabledByOffer = false;
     $bestOffer = select_best_auto_offer($db, $restaurantId, $lineItems, $itemTotal, $customerId);
     if ($bestOffer !== null) {
         $offerDiscount = $bestOffer['discount'];
         $offerId = (int) $bestOffer['offer']['id'];
         $offerTitle = $bestOffer['offer']['title'];
+        $offerType = $bestOffer['offer']['offer_type'];
+        $offerFreeUnits = (int) $bestOffer['free_units'];
+        $offerFreeItemLabel = $bestOffer['item_label'];
+
+        // Migration 48 — per-offer coupon-stacking toggle (app owner
+        // ask: "allow user to use coupon on offer item or not"). The
+        // coupon block above already ran and may have set $discount/
+        // $couponId — if the offer that actually won this cart's
+        // single item/restaurant-offer slot says no, drop the coupon
+        // here rather than earlier, since which offer wins can itself
+        // depend on the cart contents and isn't known until now. This
+        // never re-opens invalid_coupon/coupon_min_order_not_met/etc.
+        // — those already-set errors are about the code itself, not
+        // about stacking, so they're left alone; a valid-but-now-
+        // blocked coupon just silently contributes 0, same "not an
+        // error, just a non-match" convention $offerDiscount itself
+        // already uses when an offer's scope matches nothing.
+        if ($couponId !== null && empty($bestOffer['offer']['allow_coupon_stacking'])) {
+            $couponDisabledByOffer = true;
+            $discount = 0.0;
+            $couponId = null;
+        }
     }
     // Never let item discount + coupon discount together exceed the
     // item total itself — same defensive floor the coupon block
@@ -434,6 +460,21 @@ function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCod
     $result['offer_id'] = $offerId;
     $result['offer_discount_amount'] = $offerDiscount;
     $result['offer_title'] = $offerTitle;
+    $result['offer_type'] = $offerType;
+    // buy_x_get_y only (e.g. B1G1) — lets the cart/checkout screen
+    // render a synthetic "<item_label> x<offer_free_units> FREE — ₹0"
+    // row alongside the real line items, rather than only showing the
+    // aggregate rupee discount. 0/null for every other offer type,
+    // which discounts money off an existing line instead of granting
+    // a distinct free unit.
+    $result['offer_free_units'] = $offerFreeUnits;
+    $result['offer_free_item_label'] = $offerFreeItemLabel;
+    // Migration 48 — true when a coupon the customer entered/had
+    // applied was dropped because the auto-applied offer above has
+    // allow_coupon_stacking=0. The checkout screen should surface this
+    // (e.g. "Coupon not applicable with this offer") rather than
+    // silently showing a lower discount than the customer expected.
+    $result['coupon_disabled_by_offer'] = $couponDisabledByOffer;
     $result['free_delivery_offer_id'] = $freeDeliveryOfferId;
     $result['free_delivery_discount_amount'] = $freeDeliveryDiscount;
     $result['free_delivery_offer_title'] = $freeDeliveryOfferTitle;

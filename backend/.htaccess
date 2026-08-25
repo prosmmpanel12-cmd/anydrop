@@ -49,6 +49,9 @@ RewriteRule ^api/v1/customer/favorites/?$ api/v1/customer/favorites.php [L,QSA]
 RewriteRule ^api/v1/customer/faqs/?$ api/v1/customer/faqs.php [L,QSA]
 RewriteRule ^api/v1/customer/feedback/?$ api/v1/customer/feedback.php [L,QSA]
 
+# docs/33/34 — "Offers" category chip's own browse screen
+RewriteRule ^api/v1/home/offers-browse/?$ api/v1/home/offers-browse.php [L,QSA]
+
 # Item 26 — Customer Wallet (recall.md section 18)
 RewriteRule ^api/v1/customer/wallet/?$ api/v1/customer/wallet.php [L,QSA]
 

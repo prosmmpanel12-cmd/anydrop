@@ -580,6 +580,16 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
             binding.couponEntryRow.visibility = View.VISIBLE
             binding.couponAppliedRow.visibility = View.GONE
         }
+
+        // docs/33 — a customer who typed a code that got silently dropped
+        // because the winning offer doesn't allow stacking shouldn't be
+        // left wondering why it didn't do anything. Independent of the
+        // entry/applied row switch above — this note can show alongside
+        // either (the code is still sitting in the input, or was cleared
+        // by applyCoupon()'s own COUPON_ERROR_CODES branch, either way
+        // couponDisabledByOffer is the reason it's not contributing).
+        binding.couponDisabledByOfferText.visibility =
+            if (totals.couponDisabledByOffer) View.VISIBLE else View.GONE
     }
 
     private fun couponErrorMessage(code: String): String = when (code) {
@@ -605,6 +615,36 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
         setRow(binding.rowPlatformFee.root, getString(R.string.lbl_platform_fee), totals.platformFee)
         setRow(binding.rowTax.root, getString(R.string.lbl_tax), totals.taxAmount)
         binding.grandTotalText.text = "₹${"%.2f".format(totals.grandTotal)}"
+
+        // docs/33 — offer strip + B1G1 free-item row. Which offer won (if
+        // any) is genuine business logic price_cart() already resolved —
+        // this just displays what the server sent, no client-side offer
+        // matching.
+        if (totals.offerId != null && totals.offerTitle != null) {
+            binding.offerAppliedRow.visibility = View.VISIBLE
+            binding.offerAppliedText.text = getString(
+                R.string.offer_applied_amount,
+                totals.offerTitle,
+                "%.0f".format(totals.offerDiscountAmount)
+            )
+        } else {
+            binding.offerAppliedRow.visibility = View.GONE
+        }
+
+        // buy_x_get_y is the only offer type compute_offer_discount() gives
+        // a distinct free-unit/label to (see lib/offers.php's own kdoc) —
+        // every other type discounts money off an existing line and has
+        // nothing to show here.
+        if (totals.offerFreeUnits > 0 && totals.offerFreeItemLabel != null) {
+            binding.offerFreeItemRow.visibility = View.VISIBLE
+            binding.offerFreeItemText.text = getString(
+                R.string.offer_free_item_label,
+                totals.offerFreeItemLabel,
+                totals.offerFreeUnits
+            )
+        } else {
+            binding.offerFreeItemRow.visibility = View.GONE
+        }
 
         // H4 defense-in-depth: below_min_order_amount now comes back with the
         // real (non-zero) bill from a fixed price_cart(), but keep this guard

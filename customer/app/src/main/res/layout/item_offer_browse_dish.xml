@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- docs/33/34 — Offers screen dish card. Same body/ADD/qty-stepper shape
+     as item_search_dish.xml (see OfferBrowseAdapter.DishVH), minus the
+     restaurant-tag chip — this screen already groups items under their
+     restaurant's own header row, so repeating "from <Restaurant>" on
+     every card underneath it would be redundant. -->
 <androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -32,16 +37,6 @@
                 android:layout_height="70dp"
                 android:scaleType="centerCrop"
                 android:background="@color/anydrop_primary_container" />
-
-            <ImageView
-                android:id="@+id/dishBookmark"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:layout_gravity="top|end"
-                android:padding="4dp"
-                android:background="@drawable/bg_bookmark_circle"
-                android:src="@drawable/ic_bookmark_outline"
-                app:tint="@color/text_primary" />
 
             <LinearLayout
                 android:id="@+id/qtyStepper"
@@ -145,11 +140,9 @@
                 android:textColor="@color/text_primary"
                 tools:text="₹299" />
 
-            <!-- Offers Engine tag pill (docs/33, mirrors item_menu_item.xml's
-                 itemOfferTag) — visible only when item.offerTag is non-null,
-                 bound in SearchResultsAdapter.DishVH.bind(). Text comes
-                 straight from the server's offer_badge_label(), no client
-                 formatting. -->
+            <!-- Offers Engine tag pill — same field/pattern as
+                 item_menu_item.xml's itemOfferTag, this screen's whole
+                 reason to exist, so it's never hidden here. -->
             <TextView
                 android:id="@+id/dishOfferTag"
                 android:layout_width="wrap_content"
@@ -157,31 +150,11 @@
                 android:layout_marginTop="4dp"
                 android:background="@drawable/bg_pill_offer"
                 android:paddingHorizontal="8dp"
-                android:paddingVertical="2dp"
-                android:textColor="@color/offer_fg"
-                android:textSize="9sp"
-                android:textStyle="bold"
-                android:visibility="gone"
-                tools:text="3 @ ₹50"
-                tools:visibility="visible" />
-
-            <!-- Restaurant tag — "from <Restaurant Name>", the key requirement:
-                 every item card always shows which restaurant it comes from,
-                 including items pulled in from other restaurants for the
-                 same dish search. -->
-            <TextView
-                android:id="@+id/dishRestaurantTag"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:background="@drawable/bg_chip_unselected"
-                android:paddingHorizontal="8dp"
                 android:paddingVertical="3dp"
                 android:textSize="11sp"
-                android:textColor="@color/anydrop_primary"
-                android:maxLines="1"
-                android:ellipsize="end"
-                tools:text="from La Pino'z Pizza" />
+                android:textColor="@color/offer_fg"
+                android:textStyle="bold"
+                tools:text="3 @ ₹50" />
 
         </LinearLayout>
 

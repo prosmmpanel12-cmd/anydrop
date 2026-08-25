@@ -192,6 +192,14 @@ interface ApiService {
         @Query("limit") limit: Int = 15
     ): Response<ApiResponse<PopularItemsResult>>
 
+    // ---- docs/33/34: "Offers" category chip browse screen ----
+
+    @GET("home/offers-browse.php")
+    suspend fun getOffersBrowse(
+        @Query("lat") lat: Double? = null,
+        @Query("lng") lng: Double? = null
+    ): Response<ApiResponse<OffersBrowseResult>>
+
     // ---- Phase 3.6: Favorites / bookmarks ----
 
     @GET("customer/favorites.php")

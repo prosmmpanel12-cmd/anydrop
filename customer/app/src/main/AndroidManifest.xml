@@ -159,6 +159,10 @@
             android:name=".ui.orderstatus.OrderStatusActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".ui.offers.OfferScreenActivity"
+            android:exported="false" />
+
     </application>
 
 </manifest>

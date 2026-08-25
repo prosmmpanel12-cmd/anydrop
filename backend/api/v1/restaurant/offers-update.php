@@ -5,7 +5,8 @@
  * Request: partial — any of { "status": "active"|"paused",
  *   "title", "min_order_amount", "max_discount_amount",
  *   "start_date", "end_date", "start_time", "end_time", "weekdays",
- *   "daily_limit", "total_limit", "per_customer_limit", "is_deleted" }.
+ *   "daily_limit", "total_limit", "per_customer_limit",
+ *   "allow_coupon_stacking" (migration 48), "is_deleted" }.
  *   Same null-skip partial-update convention as coupons-update.php —
  *   only fields present in the body are touched.
  * Response: { "offer": {...format_offer()} }
@@ -148,6 +149,14 @@ if (array_key_exists('total_limit', $body)) {
 if (array_key_exists('per_customer_limit', $body)) {
     $fieldsSql[] = 'per_customer_limit = :per_customer_limit';
     $params['per_customer_limit'] = $body['per_customer_limit'] !== null ? (int) $body['per_customer_limit'] : null;
+}
+if (array_key_exists('allow_coupon_stacking', $body)) {
+    // Migration 48 — editable post-creation (unlike the mechanic
+    // fields above) since it's a restriction toggle, not part of the
+    // offer's pricing math itself; changing it doesn't retroactively
+    // affect any past offer_usages row's already-snapshotted discount.
+    $fieldsSql[] = 'allow_coupon_stacking = :allow_coupon_stacking';
+    $params['allow_coupon_stacking'] = (int) (bool) $body['allow_coupon_stacking'];
 }
 
 if (!empty($fieldsSql)) {

@@ -1075,7 +1075,14 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
             try {
                 val response = api.getHomeCategories()
                 val list: List<FoodCategory> = response.body()?.data ?: emptyList()
-                categoryAdapter.submit(list)
+                // docs/33's own plan — synthetic "Offers" chip prepended
+                // client-side (not a real category row from the backend).
+                // slug="__offers__" is a sentinel onCategoryTapped() checks
+                // for before its usual toggle-active-category logic.
+                val withOffers = listOf(
+                    FoodCategory(id = -1, name = getString(R.string.explore_offers), slug = "__offers__", iconUrl = null)
+                ) + list
+                categoryAdapter.submit(withOffers)
             } catch (e: Exception) {
                 // Non-fatal — the row just stays empty if categories fail to load.
             }
@@ -1083,6 +1090,14 @@ class HomeActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationReque
     }
 
     private fun onCategoryTapped(category: FoodCategory) {
+        // "Offers" chip (docs/33/34/35) — opens its own browse screen
+        // instead of becoming the active category filter. Must come before
+        // the toggle logic below so this chip never sets
+        // activeCategorySlug and never calls loadCategoryItems().
+        if (category.slug == "__offers__") {
+            startActivity(Intent(this, com.anydrop.food.ui.offers.OfferScreenActivity::class.java))
+            return
+        }
         // Tapping the already-active category again clears it back to "All".
         activeCategorySlug = if (activeCategorySlug == category.slug) null else category.slug
         categoryAdapter.setSelected(activeCategorySlug)

@@ -2704,3 +2704,18 @@ prep (Razorpay/Cashfree, doc 23 §9), or cashback granting/expiry
 (needs a scheduler/cron entry point that doesn't exist anywhere in
 this codebase yet — flagged in `lib/wallet.php`'s own header comment
 as blocked on that, not on wallet logic itself).
+
+**2026-08-25 (session 9) — Offers Engine continued: coupon-stacking
+toggle (migration 48) + Home/Search offer badges (partial) + cart item
+photo, all built; session stopped mid-way at owner's request to
+package up progress. Full detail in
+docs/33_Handover_2026-08-25_Offer_Coupon_Toggle_And_Badges_Extended_Partial.md
+— READ THAT FIRST before continuing this thread.** Short version: done
+= migration 48 + full backend/model wiring for the coupon↔offer
+stacking toggle, `offer_tag` added to home/popular-items.php and
+search.php (data only, no UI pill yet), cart list now shows item
+photos. Not done = the pills themselves on Home/Search, the new
+"Offers" category chip + browse screen (no backend endpoint exists
+yet either), and reading the now-ready `CartTotals` offer fields into
+CheckoutActivity's UI (offer strip + B1G1 free-item row). See docs/33
+for the exact next-session order.

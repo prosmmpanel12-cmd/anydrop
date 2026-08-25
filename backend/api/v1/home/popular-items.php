@@ -15,6 +15,7 @@ require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/favorites.php';
+require_once __DIR__ . '/../../../lib/offers.php';
 
 header('Access-Control-Allow-Origin: *');
 header('Cache-Control: max-age=60');
@@ -46,12 +47,39 @@ $rows = $stmt->fetchAll();
 
 $savedItems = get_saved_item_ids((int) $owner['owner_id']);
 
+// Offers Engine badge (app owner ask, 2026-08-25 — "tags [offer badges]
+// on home/search too", per docs/32's own "not done this session" #2).
+// Same get_browsable_offers_for_restaurant()/pick_item_badge_offer()
+// pair restaurants/menu.php already uses — fetched once per distinct
+// restaurant appearing in this row (small set, popular items across a
+// handful of nearby restaurants), not once per item, to avoid an
+// otherwise-easy N+1 (dozens of items can share one restaurant).
+$browsableOffersByRestaurant = [];
+foreach ($rows as $it) {
+    $rid = (int) $it['r_id'];
+    if (!isset($browsableOffersByRestaurant[$rid])) {
+        $browsableOffersByRestaurant[$rid] = get_browsable_offers_for_restaurant($db, $rid, (int) $owner['owner_id']);
+    }
+}
+
 $items = [];
 foreach ($rows as $it) {
     $distanceKm = null;
     if ($lat !== null && $lng !== null && $it['r_lat'] !== null && $it['r_lng'] !== null) {
         $distanceKm = round(haversine_km($lat, $lng, (float) $it['r_lat'], (float) $it['r_lng']), 2);
     }
+
+    $rid = (int) $it['r_id'];
+    // Category-scoped offer matching is deliberately skipped here
+    // (categoryId passed as null) — unlike restaurants/menu.php, this
+    // row spans many different restaurants' menus, and resolving each
+    // item's food_category_id here would mean an extra per-item bulk
+    // query this endpoint doesn't already run. Item-scoped and
+    // restaurant-wide offers (the two most common badge cases) still
+    // match correctly; a category-scoped-only offer simply won't badge
+    // an item here yet — flagged as a follow-up, not a correctness bug
+    // (nothing about pricing/checkout depends on this badge).
+    $badgeOffer = pick_item_badge_offer($browsableOffersByRestaurant[$rid], (int) $it['id'], null);
 
     $items[] = [
         'id' => (int) $it['id'],
@@ -69,6 +97,7 @@ foreach ($rows as $it) {
         'restaurant_rating' => (float) $it['r_rating_avg'],
         'distance_km' => $distanceKm,
         'is_saved' => isset($savedItems[(int) $it['id']]),
+        'offer_tag' => $badgeOffer !== null ? offer_badge_label($badgeOffer) : null,
     ];
 }
 

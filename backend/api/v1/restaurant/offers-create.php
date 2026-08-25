@@ -179,17 +179,25 @@ $dailyLimit = isset($body['daily_limit']) && $body['daily_limit'] !== null ? (in
 $totalLimit = isset($body['total_limit']) && $body['total_limit'] !== null ? (int) $body['total_limit'] : null;
 $perCustomerLimit = isset($body['per_customer_limit']) && $body['per_customer_limit'] !== null ? (int) $body['per_customer_limit'] : null;
 
+// Migration 48 — "allow this offer to also combine with a coupon"
+// toggle. Defaults true (1) when omitted, matching the column's own
+// DB default, so an older client that doesn't send this field yet
+// keeps producing offers with today's always-stackable behavior.
+$allowCouponStacking = array_key_exists('allow_coupon_stacking', $body)
+    ? (int) (bool) $body['allow_coupon_stacking']
+    : 1;
+
 $insert = $db->prepare(
     'INSERT INTO promo_offers (
         restaurant_id, offer_type, title, scope, menu_item_id, food_category_id,
         required_qty, get_qty, offer_price, discount_percent, discount_flat, max_discount_amount,
         min_order_amount, customer_eligibility, start_date, end_date, start_time, end_time, weekdays,
-        daily_limit, total_limit, per_customer_limit, status
+        daily_limit, total_limit, per_customer_limit, allow_coupon_stacking, status
     ) VALUES (
         :rid, :type, :title, :scope, :mid, :cid,
         :reqqty, :getqty, :oprice, :dpercent, :dflat, :maxdiscount,
         :minorder, :eligibility, :sdate, :edate, :stime, :etime, :weekdays,
-        :daily, :total, :percustomer, \'active\'
+        :daily, :total, :percustomer, :allowcoupon, \'active\'
     )'
 );
 $insert->execute([
@@ -215,6 +223,7 @@ $insert->execute([
     'daily' => $dailyLimit,
     'total' => $totalLimit,
     'percustomer' => $perCustomerLimit,
+    'allowcoupon' => $allowCouponStacking,
 ]);
 $newId = (int) $db->lastInsertId();
 

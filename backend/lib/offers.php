@@ -233,13 +233,25 @@ function get_offer_scoped_lines(PDO $db, array $offer, array $lineItems): array
  * failure; select_best_auto_offer() below simply won't pick a
  * zero-discount offer over a better one (or over none at all).
  *
- * @return array{discount: float, matched_qty: int}
+ * `free_units`/`item_label` (added for the app owner's "show the free
+ * item in the cart, e.g. ₹0 extra item on a B1G1" ask) are populated
+ * ONLY for buy_x_get_y — every other type discounts money off an
+ * existing line rather than granting a distinct free unit, so there's
+ * no single "free item" to label. `item_label` is the scoped line's
+ * own item_name_snapshot (first matched line — a category/restaurant-
+ * scoped B1G1 across mixed items still needs one name to show on the
+ * cart's synthetic free-item row; picking the first is an arbitrary
+ * but stable choice, same "array order, already deterministic" logic
+ * select_best_auto_offer()'s own tie-break comment already documents
+ * elsewhere in this file).
+ *
+ * @return array{discount: float, matched_qty: int, free_units: int, item_label: ?string}
  */
 function compute_offer_discount(PDO $db, array $offer, array $lineItems): array
 {
     $scopedLines = get_offer_scoped_lines($db, $offer, $lineItems);
     if (empty($scopedLines)) {
-        return ['discount' => 0.0, 'matched_qty' => 0];
+        return ['discount' => 0.0, 'matched_qty' => 0, 'free_units' => 0, 'item_label' => null];
     }
 
     $matchedQty = (int) array_sum(array_column($scopedLines, 'quantity'));
@@ -250,7 +262,7 @@ function compute_offer_discount(PDO $db, array $offer, array $lineItems): array
         case 'buy_x_for_y':
             $requiredQty = (int) $offer['required_qty'];
             if ($requiredQty <= 0 || $matchedQty < $requiredQty) {
-                return ['discount' => 0.0, 'matched_qty' => $matchedQty];
+                return ['discount' => 0.0, 'matched_qty' => $matchedQty, 'free_units' => 0, 'item_label' => null];
             }
             // Average per-unit price across the scoped lines (handles a
             // category-scoped offer where matched items don't all cost
@@ -264,36 +276,41 @@ function compute_offer_discount(PDO $db, array $offer, array $lineItems): array
             $normalCostPerSet = $avgUnitPrice * $requiredQty;
             $offerPrice = (float) $offer['offer_price'];
             $discountPerSet = max(0.0, $normalCostPerSet - $offerPrice);
-            return ['discount' => round($discountPerSet * $sets, 2), 'matched_qty' => $matchedQty];
+            return ['discount' => round($discountPerSet * $sets, 2), 'matched_qty' => $matchedQty, 'free_units' => 0, 'item_label' => null];
 
         case 'buy_x_get_y':
             $requiredQty = (int) $offer['required_qty'];
             $getQty = (int) $offer['get_qty'];
             $setSize = $requiredQty + $getQty;
             if ($requiredQty <= 0 || $getQty <= 0 || $matchedQty < $setSize) {
-                return ['discount' => 0.0, 'matched_qty' => $matchedQty];
+                return ['discount' => 0.0, 'matched_qty' => $matchedQty, 'free_units' => 0, 'item_label' => null];
             }
             $avgUnitPrice = $scopedSubtotal / max(1, $matchedQty);
             $sets = intdiv($matchedQty, $setSize);
             $freeUnits = $sets * $getQty;
-            return ['discount' => round($freeUnits * $avgUnitPrice, 2), 'matched_qty' => $matchedQty];
+            return [
+                'discount' => round($freeUnits * $avgUnitPrice, 2),
+                'matched_qty' => $matchedQty,
+                'free_units' => $freeUnits,
+                'item_label' => $scopedLines[0]['item_name_snapshot'] ?? null,
+            ];
 
         case 'percent_discount':
             $discount = round($scopedSubtotal * (float) $offer['discount_percent'] / 100, 2);
             if ($offer['max_discount_amount'] !== null) {
                 $discount = min($discount, (float) $offer['max_discount_amount']);
             }
-            return ['discount' => min($discount, $scopedSubtotal), 'matched_qty' => $matchedQty];
+            return ['discount' => min($discount, $scopedSubtotal), 'matched_qty' => $matchedQty, 'free_units' => 0, 'item_label' => null];
 
         case 'flat_discount':
             $discount = (float) $offer['discount_flat'];
-            return ['discount' => min($discount, $scopedSubtotal), 'matched_qty' => $matchedQty];
+            return ['discount' => min($discount, $scopedSubtotal), 'matched_qty' => $matchedQty, 'free_units' => 0, 'item_label' => null];
 
         default:
             // free_delivery has its own dedicated selection function
             // below (it doesn't discount item lines at all) — reaching
             // here would be a caller bug, not a real cart state.
-            return ['discount' => 0.0, 'matched_qty' => $matchedQty];
+            return ['discount' => 0.0, 'matched_qty' => $matchedQty, 'free_units' => 0, 'item_label' => null];
     }
 }
 
@@ -325,7 +342,12 @@ function select_best_auto_offer(PDO $db, int $restaurantId, array $lineItems, fl
             continue;
         }
         if ($best === null || $computed['discount'] > $best['discount']) {
-            $best = ['offer' => $offer, 'discount' => $computed['discount']];
+            $best = [
+                'offer' => $offer,
+                'discount' => $computed['discount'],
+                'free_units' => $computed['free_units'],
+                'item_label' => $computed['item_label'],
+            ];
         }
     }
 
@@ -394,6 +416,12 @@ function format_offer(array $offer): array
         'total_limit' => $offer['total_limit'] !== null ? (int) $offer['total_limit'] : null,
         'per_customer_limit' => $offer['per_customer_limit'] !== null ? (int) $offer['per_customer_limit'] : null,
         'status' => $offer['status'],
+        // Migration 48 — per-offer opt-out of the "+1 coupon" stacking
+        // slot doc 20 §13 otherwise always allows. Defaults true (1) so
+        // an offer created before this column existed (or any row from
+        // a DB that hasn't run migration 48 yet, via the ?? fallback)
+        // behaves exactly like today — coupon stacking allowed.
+        'allow_coupon_stacking' => (bool) ($offer['allow_coupon_stacking'] ?? 1),
         'created_at' => $offer['created_at'],
     ];
 }

@@ -246,6 +246,16 @@ class SearchResultsAdapter(
             // own dish or a cross-restaurant "also available at" match.
             binding.dishRestaurantTag.text =
                 binding.root.context.getString(R.string.from_restaurant, item.restaurantName)
+
+            // Offers Engine tag pill (docs/33) — same offerTag field/pattern
+            // as MenuAdapter.ItemVH.bind(), text straight from the server.
+            if (!item.offerTag.isNullOrBlank()) {
+                binding.dishOfferTag.text = item.offerTag
+                binding.dishOfferTag.visibility = View.VISIBLE
+            } else {
+                binding.dishOfferTag.visibility = View.GONE
+            }
+
             if (!item.imageUrl.isNullOrBlank()) {
                 binding.dishImage.load(ApiClient.baseUrlForStaticFiles(binding.root.context) + item.imageUrl) {
                     placeholder(R.drawable.ic_restaurant)

@@ -419,6 +419,66 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- migration 48 — allow_coupon_stacking. Shared across every
+             offer_type (unlike freeDeliveryNoticeBanner above, which is
+             type-conditional) — placed here, right after the shared
+             amount fields and before eligibility, since it's the same
+             kind of "applies no matter which mechanic chip is checked"
+             field. Same pill-toggle row shape as dialog_add_coupon.xml's
+             switchPublic (icon + label/hint column + trailing switch),
+             for visual consistency between the two dialogs. Defaults
+             checked — offers-create.php already treats an omitted value
+             as true, so the switch's default state matches what the
+             backend would do even if this field were never touched. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginEnd="10dp"
+                android:src="@drawable/ic_tag"
+                app:tint="@color/text_secondary"
+                android:contentDescription="@null" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/offer_stacking_toggle_label"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/offer_stacking_toggle_hint"
+                    android:textSize="11sp"
+                    android:textColor="@color/text_secondary" />
+
+            </LinearLayout>
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchAllowCouponStacking"
+                style="@style/Widget.AnydropRestaurant.Switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:checked="true" />
+
+        </LinearLayout>
+
         <!-- 6. Customer eligibility -->
         <TextView
             android:layout_width="wrap_content"

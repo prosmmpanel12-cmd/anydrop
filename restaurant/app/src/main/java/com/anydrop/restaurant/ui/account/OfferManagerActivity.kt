@@ -272,6 +272,7 @@ class OfferManagerActivity : AppCompatActivity() {
         offer.dailyLimit?.let { dialogBinding.inputDailyLimit.setText(it.toString()) }
         offer.totalLimit?.let { dialogBinding.inputTotalLimit.setText(it.toString()) }
         offer.perCustomerLimit?.let { dialogBinding.inputPerCustomerLimit.setText(it.toString()) }
+        dialogBinding.switchAllowCouponStacking.isChecked = offer.allowCouponStacking
 
         val editDialog = BottomSheetDialog(this)
         editDialog.setContentView(dialogBinding.root)
@@ -339,6 +340,7 @@ class OfferManagerActivity : AppCompatActivity() {
         offer.dailyLimit?.let { dialogBinding.inputDailyLimit.setText(it.toString()) }
         offer.totalLimit?.let { dialogBinding.inputTotalLimit.setText(it.toString()) }
         offer.perCustomerLimit?.let { dialogBinding.inputPerCustomerLimit.setText(it.toString()) }
+        dialogBinding.switchAllowCouponStacking.isChecked = offer.allowCouponStacking
 
         // Disable every remaining editable field — read-only means
         // read-only, not just "Save is hidden."
@@ -346,7 +348,8 @@ class OfferManagerActivity : AppCompatActivity() {
             dialogBinding.inputOfferMinOrder, dialogBinding.inputOfferMaxDiscount,
             dialogBinding.inputStartDate, dialogBinding.inputEndDate,
             dialogBinding.inputStartTime, dialogBinding.inputEndTime,
-            dialogBinding.inputDailyLimit, dialogBinding.inputTotalLimit, dialogBinding.inputPerCustomerLimit
+            dialogBinding.inputDailyLimit, dialogBinding.inputTotalLimit, dialogBinding.inputPerCustomerLimit,
+            dialogBinding.switchAllowCouponStacking
         ).forEach { it.isEnabled = false }
         dialogBinding.eligibilityGroup.isEnabled = false
         for (i in 0 until dialogBinding.eligibilityGroup.childCount) {
@@ -764,6 +767,7 @@ class OfferManagerActivity : AppCompatActivity() {
         val dailyLimit = dialogBinding.inputDailyLimit.text?.toString()?.trim()?.toIntOrNull()
         val totalLimit = dialogBinding.inputTotalLimit.text?.toString()?.trim()?.toIntOrNull()
         val perCustomerLimit = dialogBinding.inputPerCustomerLimit.text?.toString()?.trim()?.toIntOrNull()
+        val allowCouponStacking = dialogBinding.switchAllowCouponStacking.isChecked
 
         lifecycleScope.launch {
             try {
@@ -789,7 +793,8 @@ class OfferManagerActivity : AppCompatActivity() {
                         weekdays = weekdays,
                         dailyLimit = dailyLimit,
                         totalLimit = totalLimit,
-                        perCustomerLimit = perCustomerLimit
+                        perCustomerLimit = perCustomerLimit,
+                        allowCouponStacking = allowCouponStacking
                     )
                 )
                 val created = response.body()?.data?.offer
@@ -842,6 +847,7 @@ class OfferManagerActivity : AppCompatActivity() {
         val dailyLimit = dialogBinding.inputDailyLimit.text?.toString()?.trim()?.toIntOrNull()
         val totalLimit = dialogBinding.inputTotalLimit.text?.toString()?.trim()?.toIntOrNull()
         val perCustomerLimit = dialogBinding.inputPerCustomerLimit.text?.toString()?.trim()?.toIntOrNull()
+        val allowCouponStacking = dialogBinding.switchAllowCouponStacking.isChecked
 
         lifecycleScope.launch {
             try {
@@ -858,7 +864,8 @@ class OfferManagerActivity : AppCompatActivity() {
                         weekdays = weekdays,
                         dailyLimit = dailyLimit,
                         totalLimit = totalLimit,
-                        perCustomerLimit = perCustomerLimit
+                        perCustomerLimit = perCustomerLimit,
+                        allowCouponStacking = allowCouponStacking
                     )
                 )
                 val updated = response.body()?.data?.offer

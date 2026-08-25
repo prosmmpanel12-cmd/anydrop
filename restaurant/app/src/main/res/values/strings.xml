@@ -233,6 +233,12 @@
 
     <string name="offer_hint_min_order">Min order amount (optional)</string>
 
+    <!-- migration 48 — allow_coupon_stacking. Backend already treats a
+         missing/omitted value as true (see offers-create.php), so the
+         switch defaults to checked in the add dialog to match. -->
+    <string name="offer_stacking_toggle_label">Allow coupon stacking</string>
+    <string name="offer_stacking_toggle_hint">When on, a customer can combine this offer with a coupon code at checkout. When off, this offer\'s own discount always wins and any coupon they entered is dropped for this order.</string>
+
     <string name="offer_hint_eligibility">Customer eligibility</string>
     <string name="offer_eligibility_all">All customers</string>
     <string name="offer_eligibility_new">New customers only</string>

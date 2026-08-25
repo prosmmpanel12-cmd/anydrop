@@ -45,7 +45,11 @@ class FoodCategoryAdapter(
 
     inner class VH(private val binding: ItemFoodCategoryBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(category: FoodCategory) {
-            val isSelected = category.slug == selectedSlug
+            // The synthetic "Offers" chip (docs/33/34/35) opens its own
+            // screen and never becomes the active category filter — it
+            // must never render with the selection ring/badge either,
+            // regardless of what selectedSlug currently is.
+            val isSelected = category.slug == selectedSlug && category.slug != "__offers__"
             val ctx = binding.root.context
 
             binding.categoryName.text = category.name
@@ -69,7 +73,13 @@ class FoodCategoryAdapter(
             binding.categoryRemoveBadge.visibility = if (isSelected) android.view.View.VISIBLE else android.view.View.GONE
             binding.categoryRemoveBadge.setOnClickListener { onClick(category) }
 
-            if (!category.iconUrl.isNullOrBlank()) {
+            if (category.slug == "__offers__") {
+                // Always null iconUrl for this synthetic entry — without
+                // this branch it would fall through to the generic
+                // ic_restaurant fallback below, same as any other category
+                // with no admin-set icon.
+                binding.categoryIcon.setImageResource(R.drawable.ic_offer_tag)
+            } else if (!category.iconUrl.isNullOrBlank()) {
                 binding.categoryIcon.load(category.iconUrl) {
                     placeholder(R.drawable.ic_restaurant)
                     error(R.drawable.ic_restaurant)

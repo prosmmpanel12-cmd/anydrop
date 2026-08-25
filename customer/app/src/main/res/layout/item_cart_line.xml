@@ -12,6 +12,20 @@
         android:paddingVertical="12dp"
         android:gravity="center_vertical">
 
+    <!-- App owner ask (2026-08-25): show the item's dish photo in the
+         cart list, not just the veg/non-veg dot — reuses the exact same
+         rounded-corner treatment item_menu_item.xml's itemImage already
+         uses (bg_card_rounded), just shrunk to fit this denser row.
+         Falls back to ic_restaurant via Coil's placeholder/error, same
+         convention as MenuAdapter/FoodCategoryAdapter's own image loads. -->
+    <ImageView
+        android:id="@+id/cartLineImage"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginEnd="10dp"
+        android:scaleType="centerCrop"
+        android:background="@drawable/bg_card_rounded" />
+
     <View
         android:id="@+id/cartLineVegBadge"
         android:layout_width="14dp"
