@@ -243,6 +243,12 @@ data class MenuItem(
     // field (shouldn't happen post-rollout, but just in case) doesn't
     // wrongly grey out every item.
     @SerializedName("is_available") val isAvailable: Boolean = true,
+    // Offers Engine badge (app owner feedback, 2026-08-24) — short
+    // display text ("3 @ ₹50", "20% OFF") when an item/category/
+    // restaurant-wide offer currently applies to this item, null
+    // otherwise. Defaulted null so an older cached response missing
+    // this field renders with no tag rather than crashing.
+    @SerializedName("offer_tag") val offerTag: String? = null,
     val variants: List<MenuVariant> = emptyList(),
     val addons: List<MenuAddon> = emptyList()
 )
@@ -254,6 +260,11 @@ data class MenuCategory(
     // relative path, needs ApiClient.baseUrlForStaticFiles() prefix same
     // as every other image_url field, see MenuAdapter's HeaderVH.
     @SerializedName("image_url") val imageUrl: String? = null,
+    // Offers Engine discount icon (app owner feedback, 2026-08-24) — true
+    // when any item shown in this category currently carries an
+    // offer_tag. Defaulted false for the same older-cached-response
+    // reason as MenuItem.offerTag above.
+    @SerializedName("has_active_offer") val hasActiveOffer: Boolean = false,
     val items: List<MenuItem>
 )
 

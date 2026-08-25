@@ -397,3 +397,96 @@ function format_offer(array $offer): array
         'created_at' => $offer['created_at'],
     ];
 }
+
+/**
+ * Browse-time offer set for a restaurant's menu screen (customer app
+ * item tags + category discount icon, restaurants/menu.php).
+ *
+ * Deliberately a *different*, looser eligibility check than
+ * is_offer_eligible()/price_cart() use — there's no cart yet at browse
+ * time, so min_order_amount and the daily/total/per_customer usage
+ * limits are skipped here on purpose (a badge means "this offer exists
+ * and could apply to you", not "your current cart already qualifies" —
+ * price_cart()/compute_offer_discount() remain the one authoritative
+ * check at cart/validate.php and order-placement time; nothing here
+ * changes what a customer actually gets charged). Date range, weekday/
+ * happy-hour window, and per-customer new/existing eligibility are
+ * still checked, since a badge that's wrong about "is this live right
+ * now, for you" would be actively misleading rather than just
+ * approximate. free_delivery is excluded outright — it's a
+ * restaurant-wide checkout perk, not a per-item/category discount, and
+ * has no natural home on a menu card.
+ */
+function get_browsable_offers_for_restaurant(PDO $db, int $restaurantId, int $customerId): array
+{
+    $offers = get_date_eligible_offers_for_restaurant($db, $restaurantId);
+    $now = time();
+    return array_values(array_filter($offers, function ($offer) use ($db, $now, $customerId) {
+        if ($offer['offer_type'] === 'free_delivery') {
+            return false;
+        }
+        if (!is_offer_time_eligible($offer, $now)) {
+            return false;
+        }
+        return is_offer_customer_eligible($db, $offer, $customerId);
+    }));
+}
+
+/**
+ * Short display label for a menu-card offer tag / offers bottom sheet
+ * row — intentionally terse (renders on a small pill, not a
+ * paragraph), one line per offer_type mirroring offers-create.php's
+ * own per-type field table. number_format(...,'0')-trimmed so a whole
+ * number like 50.00 shows as "50", not "50.00".
+ */
+function offer_badge_label(array $offer): string
+{
+    $trimNum = fn(float $n, int $decimals) => rtrim(rtrim(number_format($n, $decimals), '0'), '.');
+    switch ($offer['offer_type']) {
+        case 'quantity_deal':
+        case 'buy_x_for_y':
+            return $offer['required_qty'] . ' @ ₹' . $trimNum((float) $offer['offer_price'], 2);
+        case 'buy_x_get_y':
+            return 'Buy ' . $offer['required_qty'] . ' Get ' . $offer['get_qty'] . ' Free';
+        case 'percent_discount':
+            return $trimNum((float) $offer['discount_percent'], 1) . '% OFF';
+        case 'flat_discount':
+            return '₹' . $trimNum((float) $offer['discount_flat'], 2) . ' OFF';
+        default:
+            return $offer['title'];
+    }
+}
+
+/**
+ * Picks the single best browsable offer for one menu item, out of
+ * $browsableOffers (already restaurant-scoped and eligibility-
+ * filtered by get_browsable_offers_for_restaurant()). Precedence is by
+ * scope specificity — item-scoped beats category-scoped beats
+ * restaurant-wide — same "more specific wins" intuition
+ * select_best_auto_offer() applies at cart time; unlike that function
+ * this doesn't compare discount *value*, since there's no cart amount
+ * to compute an actual rupee discount against yet at browse time.
+ * Oldest-id-first within a tier (array order, already ASC by id from
+ * the DB query) breaks ties the same way select_best_auto_offer() does.
+ */
+function pick_item_badge_offer(array $browsableOffers, int $itemId, ?int $categoryId): ?array
+{
+    foreach ($browsableOffers as $offer) {
+        if ($offer['scope'] === 'item' && (int) $offer['menu_item_id'] === $itemId) {
+            return $offer;
+        }
+    }
+    if ($categoryId !== null) {
+        foreach ($browsableOffers as $offer) {
+            if ($offer['scope'] === 'category' && (int) $offer['food_category_id'] === $categoryId) {
+                return $offer;
+            }
+        }
+    }
+    foreach ($browsableOffers as $offer) {
+        if ($offer['scope'] === 'restaurant') {
+            return $offer;
+        }
+    }
+    return null;
+}

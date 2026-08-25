@@ -22,7 +22,7 @@ private const val TYPE_HEADER = 0
 private const val TYPE_ITEM = 1
 
 private sealed class Row {
-    data class Header(val title: String, val imageUrl: String?) : Row()
+    data class Header(val title: String, val imageUrl: String?, val hasActiveOffer: Boolean) : Row()
     data class Item(val item: MenuItem) : Row()
 }
 
@@ -46,7 +46,7 @@ class MenuAdapter(
         rows.clear()
         categories.forEach { category ->
             if (category.items.isNotEmpty()) {
-                rows.add(Row.Header(category.name, category.imageUrl))
+                rows.add(Row.Header(category.name, category.imageUrl, category.hasActiveOffer))
                 category.items.forEach { rows.add(Row.Item(it)) }
             }
         }
@@ -106,7 +106,7 @@ class MenuAdapter(
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         when (val row = rows[position]) {
-            is Row.Header -> (holder as HeaderVH).bind(row.title, row.imageUrl)
+            is Row.Header -> (holder as HeaderVH).bind(row.title, row.imageUrl, row.hasActiveOffer)
             is Row.Item -> (holder as ItemVH).bind(row.item)
         }
     }
@@ -115,8 +115,9 @@ class MenuAdapter(
 
     private inner class HeaderVH(private val binding: ItemMenuCategoryHeaderBinding) :
         RecyclerView.ViewHolder(binding.root) {
-        fun bind(title: String, imageUrl: String?) {
+        fun bind(title: String, imageUrl: String?, hasActiveOffer: Boolean) {
             binding.categoryHeaderTitle.text = title
+            binding.categoryHeaderOfferIcon.visibility = if (hasActiveOffer) View.VISIBLE else View.GONE
 
             val context = binding.root.context
             if (!imageUrl.isNullOrBlank()) {
@@ -154,6 +155,18 @@ class MenuAdapter(
             // existing is_bestseller flag rather than adding a new field.
             binding.itemHighlyReordered.visibility =
                 if (item.isBestseller) View.VISIBLE else View.GONE
+
+            // Offers Engine tag pill (app owner feedback, 2026-08-24) —
+            // independent of the discount-percent corner badge below
+            // (that one is the item's own base discount_percent field,
+            // this one is a restaurant-created promo_offers entry — an
+            // item can have either, both, or neither at once).
+            if (!item.offerTag.isNullOrBlank()) {
+                binding.itemOfferTag.text = item.offerTag
+                binding.itemOfferTag.visibility = View.VISIBLE
+            } else {
+                binding.itemOfferTag.visibility = View.GONE
+            }
 
             // Discount corner badge (features.md §4) — reuses the existing
             // discount_percent field, no backend change needed.

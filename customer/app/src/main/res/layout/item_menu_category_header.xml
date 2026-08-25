@@ -7,6 +7,7 @@
      else image_url is optional in this app. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
@@ -32,5 +33,21 @@
         android:textSize="16sp"
         android:textStyle="bold"
         android:textColor="@color/text_primary" />
+
+    <!-- Discount icon (app owner feedback, 2026-08-24) — visible only
+         when category.hasActiveOffer is true, bound in
+         MenuAdapter.HeaderVH.bind(). Reuses ic_offer_tag.xml, tinted
+         with the app's existing offer_fg color (already used elsewhere
+         for offer/promo accents) rather than introducing a new icon. -->
+    <ImageView
+        android:id="@+id/categoryHeaderOfferIcon"
+        android:layout_width="18dp"
+        android:layout_height="18dp"
+        android:layout_marginStart="6dp"
+        android:src="@drawable/ic_offer_tag"
+        app:tint="@color/offer_fg"
+        android:visibility="gone"
+        android:contentDescription="@null"
+        tools:visibility="visible" />
 
 </LinearLayout>

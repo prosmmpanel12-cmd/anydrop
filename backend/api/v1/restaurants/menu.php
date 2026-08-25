@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/favorites.php';
 require_once __DIR__ . '/../../../lib/geo.php';
 require_once __DIR__ . '/../../../lib/restaurant_status.php';
+require_once __DIR__ . '/../../../lib/offers.php';
 
 header('Access-Control-Allow-Origin: *');
 header('Cache-Control: max-age=300');
@@ -48,6 +49,13 @@ if (!$restaurant) {
 
 $savedRestaurants = get_saved_restaurant_ids((int) $owner['owner_id']);
 $savedItems = get_saved_item_ids((int) $owner['owner_id']);
+
+// Offers Engine (migration 47) — browse-time item tags + category
+// discount icon (app owner feedback, 2026-08-24). See
+// get_browsable_offers_for_restaurant()'s own kdoc for why this is a
+// deliberately looser check than price_cart()'s cart-time one — this
+// only decides what badge to *show*, never what a customer is charged.
+$browsableOffers = get_browsable_offers_for_restaurant($db, $restaurantId, (int) $owner['owner_id']);
 
 $tagStmt = $db->prepare(
     "SELECT rt.name, rt.slug FROM restaurant_tag_map rtm
@@ -126,6 +134,16 @@ foreach ($items as $item) {
         'is_kids_choice' => (bool) ($item['is_kids_choice'] ?? false),
         'prep_time_minutes' => (int) $item['prep_time_minutes'],
         'is_saved' => isset($savedItems[(int) $item['id']]),
+        // Offers Engine badge (app owner feedback, 2026-08-24) — null
+        // when no item/category/restaurant offer currently applies to
+        // this item, see pick_item_badge_offer()'s own kdoc for the
+        // item > category > restaurant precedence. Short display text
+        // only ("3 @ ₹50", "20% OFF") — the full offer record isn't
+        // needed on a menu card, unlike the checkout-time
+        // cart/validate.php response which already carries
+        // offer_title/offer_discount_amount for the applied offer.
+        'offer_tag' => ($badgeOffer = pick_item_badge_offer($browsableOffers, (int) $item['id'], $item['category_id'] !== null ? (int) $item['category_id'] : null))
+            ? offer_badge_label($badgeOffer) : null,
         'variants' => array_map(fn($v) => [
             'id' => (int) $v['id'],
             'name' => $v['name'],
@@ -144,6 +162,7 @@ foreach ($items as $item) {
 
 $result = [];
 foreach ($categories as $cat) {
+    $catItems = $itemsByCategory[$cat['id']] ?? [];
     $result[] = [
         'id' => (int) $cat['id'],
         'name' => $cat['name'],
@@ -152,7 +171,13 @@ foreach ($categories as $cat) {
         // relative path, same as every other image_url field here; the
         // client prefixes it with its static-files base URL.
         'image_url' => $cat['image_url'],
-        'items' => $itemsByCategory[$cat['id']] ?? [],
+        // Offers Engine discount icon (app owner feedback, 2026-08-24) —
+        // true when any item actually shown in this category carries an
+        // offer_tag above (covers item-scoped, category-scoped, and
+        // restaurant-wide offers alike, since a restaurant-wide offer
+        // would tag every item in every category the same way).
+        'has_active_offer' => (bool) array_filter($catItems, fn($item) => $item['offer_tag'] !== null),
+        'items' => $catItems,
     ];
 }
 
@@ -161,6 +186,7 @@ if (!empty($itemsByCategory[0])) {
     $result[] = [
         'id' => null,
         'name' => 'Other',
+        'has_active_offer' => (bool) array_filter($itemsByCategory[0], fn($item) => $item['offer_tag'] !== null),
         'items' => $itemsByCategory[0],
     ];
 }
