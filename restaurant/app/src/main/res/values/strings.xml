@@ -223,6 +223,7 @@
     <string name="offer_hint_discount_percent">Discount percent</string>
     <string name="offer_hint_discount_flat">Flat discount (₹)</string>
 
+    <string name="offer_free_delivery_notice">Free Delivery offer: the customer won\'t be charged a delivery fee — the delivery fee will be deducted from your (restaurant\'s) settlement instead.\nनिःशुल्क डिलीवरी ऑफर: ग्राहक से डिलीवरी शुल्क नहीं लिया जाएगा — यह शुल्क आपके (रेस्टोरेंट के) सेटलमेंट में से काटा जाएगा।</string>
     <string name="offer_hint_scope">Applies to</string>
     <string name="offer_scope_item">Item</string>
     <string name="offer_scope_category">Category</string>
@@ -264,8 +265,10 @@
 
     <string name="offer_created">Offer created</string>
     <string name="offer_create_failed">Couldn\'t create offer</string>
+    <string name="offer_create_failed_detail">Couldn\'t create offer (%1$s)</string>
     <string name="offer_updated">Offer updated</string>
     <string name="offer_update_failed">Couldn\'t update offer</string>
+    <string name="offer_update_failed_detail">Couldn\'t update offer (%1$s)</string>
     <string name="offer_paused_success">Offer paused</string>
     <string name="offer_resumed_success">Offer resumed</string>
     <string name="offer_pause_resume_failed">Couldn\'t update offer status</string>

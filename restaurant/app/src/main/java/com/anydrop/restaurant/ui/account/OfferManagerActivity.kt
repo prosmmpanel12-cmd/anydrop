@@ -22,6 +22,7 @@ import com.google.android.material.datepicker.MaterialDatePicker
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.timepicker.MaterialTimePicker
 import com.google.android.material.timepicker.TimeFormat
+import com.google.gson.Gson
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -237,6 +238,11 @@ class OfferManagerActivity : AppCompatActivity() {
         dialogBinding.maxDiscountLayout.visibility = if (offer.offerType == "percent_discount") View.VISIBLE else View.GONE
         offer.maxDiscountAmount?.let { dialogBinding.inputOfferMaxDiscount.setText(formatEditableAmount(it)) }
 
+        // Locked-type free_delivery offers still show the payout notice
+        // in edit mode — offer_type can't change after creation, so
+        // this is exactly as relevant here as at create time.
+        dialogBinding.freeDeliveryNoticeBanner.visibility = if (offer.offerType == "free_delivery") View.VISIBLE else View.GONE
+
         if (offer.minOrderAmount > 0) {
             dialogBinding.inputOfferMinOrder.setText(formatEditableAmount(offer.minOrderAmount))
         }
@@ -307,6 +313,7 @@ class OfferManagerActivity : AppCompatActivity() {
 
         dialogBinding.maxDiscountLayout.visibility = if (offer.offerType == "percent_discount") View.VISIBLE else View.GONE
         offer.maxDiscountAmount?.let { dialogBinding.inputOfferMaxDiscount.setText(formatEditableAmount(it)) }
+        dialogBinding.freeDeliveryNoticeBanner.visibility = if (offer.offerType == "free_delivery") View.VISIBLE else View.GONE
         if (offer.minOrderAmount > 0) {
             dialogBinding.inputOfferMinOrder.setText(formatEditableAmount(offer.minOrderAmount))
         }
@@ -375,6 +382,7 @@ class OfferManagerActivity : AppCompatActivity() {
         val isQtyGet = checkedTypeChipId == dialogBinding.chipTypeBuyXGetY.id
         val isPercent = checkedTypeChipId == dialogBinding.chipTypePercent.id
         val isFlat = checkedTypeChipId == dialogBinding.chipTypeFlat.id
+        val isFreeDelivery = checkedTypeChipId == dialogBinding.chipTypeFreeDelivery.id
         val isQuantityMechanic = isQtyPrice || isQtyGet // quantity_deal | buy_x_for_y | buy_x_get_y
 
         dialogBinding.mechanicQtyPriceGroup.visibility = if (isQtyPrice) View.VISIBLE else View.GONE
@@ -382,6 +390,7 @@ class OfferManagerActivity : AppCompatActivity() {
         dialogBinding.mechanicPercentGroup.visibility = if (isPercent) View.VISIBLE else View.GONE
         dialogBinding.maxDiscountLayout.visibility = if (isPercent) View.VISIBLE else View.GONE
         dialogBinding.mechanicFlatGroup.visibility = if (isFlat) View.VISIBLE else View.GONE
+        dialogBinding.freeDeliveryNoticeBanner.visibility = if (isFreeDelivery) View.VISIBLE else View.GONE
 
         refreshScopeChipsForType(dialogBinding, isQuantityMechanic)
     }
@@ -633,6 +642,38 @@ class OfferManagerActivity : AppCompatActivity() {
      * kdoc for why: an early return here still needs to keep the bottom
      * sheet open (rather than the default AlertDialog-style auto-
      * dismiss-on-invalid-input) so the restaurant can fix what's wrong. */
+    /**
+     * Both offers-create.php and offers-update.php reply with
+     * {success:false, error:"validation_error", data:{fields:[...]}}
+     * (or a plain error code with no fields, e.g. account_suspended) on
+     * failure — but a non-2xx response never populates
+     * ApiResponse<T>.data via Retrofit/Gson (only response.errorBody()
+     * carries it), so every submit*() below was previously showing the
+     * exact same generic "Couldn't create/update offer" string
+     * regardless of *why* — a validation_error on menu_item_id looked
+     * identical to a 500 or a dropped connection. This reads
+     * response.errorBody() once and surfaces the real error code (+
+     * field names, if any) so that distinction is visible on-screen
+     * instead of only in server logs the restaurant can't see.
+     */
+    private fun serverErrorDetail(errorBody: okhttp3.ResponseBody?): String? {
+        if (errorBody == null) return null
+        return try {
+            val bodyStr = errorBody.string()
+            val map = Gson().fromJson(bodyStr, Map::class.java)
+            val errorCode = map?.get("error") as? String
+            val data = map?.get("data") as? Map<*, *>
+            val fields = (data?.get("fields") as? List<*>)?.joinToString(", ")
+            when {
+                errorCode != null && !fields.isNullOrEmpty() -> "$errorCode: $fields"
+                errorCode != null -> errorCode
+                else -> null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     private fun submitNewOffer(dialogBinding: DialogAddOfferBinding): Boolean {
         val title = dialogBinding.inputOfferTitle.text?.toString()?.trim().orEmpty()
         if (title.isEmpty()) {
@@ -756,7 +797,13 @@ class OfferManagerActivity : AppCompatActivity() {
                     InAppNotifier.show(this@OfferManagerActivity, getString(R.string.offer_created), InAppNotifier.Type.SUCCESS)
                     loadOffers()
                 } else {
-                    InAppNotifier.show(this@OfferManagerActivity, getString(R.string.offer_create_failed), InAppNotifier.Type.ERROR)
+                    val detail = serverErrorDetail(response.errorBody())
+                    val message = if (detail != null) {
+                        getString(R.string.offer_create_failed_detail, detail)
+                    } else {
+                        getString(R.string.offer_create_failed)
+                    }
+                    InAppNotifier.show(this@OfferManagerActivity, message, InAppNotifier.Type.ERROR)
                 }
             } catch (e: Exception) {
                 InAppNotifier.show(this@OfferManagerActivity, getString(R.string.offer_create_failed), InAppNotifier.Type.ERROR)
@@ -819,7 +866,13 @@ class OfferManagerActivity : AppCompatActivity() {
                     InAppNotifier.show(this@OfferManagerActivity, getString(R.string.offer_updated), InAppNotifier.Type.SUCCESS)
                     loadOffers()
                 } else {
-                    InAppNotifier.show(this@OfferManagerActivity, getString(R.string.offer_update_failed), InAppNotifier.Type.ERROR)
+                    val detail = serverErrorDetail(response.errorBody())
+                    val message = if (detail != null) {
+                        getString(R.string.offer_update_failed_detail, detail)
+                    } else {
+                        getString(R.string.offer_update_failed)
+                    }
+                    InAppNotifier.show(this@OfferManagerActivity, message, InAppNotifier.Type.ERROR)
                 }
             } catch (e: Exception) {
                 InAppNotifier.show(this@OfferManagerActivity, getString(R.string.offer_update_failed), InAppNotifier.Type.ERROR)

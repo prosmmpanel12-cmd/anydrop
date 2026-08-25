@@ -26,7 +26,7 @@
      "delete and recreate instead" boundary offers-update.php documents)
      in favor of a plain label, same pattern editDiscountTypeLabel uses
      in dialog_add_coupon.xml. -->
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -272,6 +272,28 @@
                 android:inputType="numberDecimal" />
 
         </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Free-delivery notice — shown only when offer_type =
+             free_delivery (add mode via applyOfferTypeVisibility(), edit
+             mode via showEditOfferDialog() when the offer's locked type
+             is free_delivery). Free delivery here means the customer
+             pays no delivery fee; the delivery fee itself is not waived
+             system-wide, it is charged to the restaurant instead
+             (deducted at settlement) — this notice exists so a
+             restaurant can't create the offer without seeing that
+             tradeoff first. -->
+        <TextView
+            android:id="@+id/freeDeliveryNoticeBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_banner_info"
+            android:padding="12dp"
+            android:text="@string/offer_free_delivery_notice"
+            android:textSize="12sp"
+            android:textColor="@color/info_fg"
+            android:visibility="gone"
+            tools:visibility="visible" />
 
         <!-- 4. Scope (add-mode only — scope is also create-only). The
              "restaurant" chip is removed entirely (not just hidden) for
@@ -634,4 +656,4 @@
 
     </LinearLayout>
 
-</ScrollView>
+</androidx.core.widget.NestedScrollView>
