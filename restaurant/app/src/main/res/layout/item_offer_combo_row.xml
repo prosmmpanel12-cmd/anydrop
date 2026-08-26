@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One row of dialog_add_offer.xml's combo-item builder (migration 50 /
+     docs/40 Step 4). Inflated at runtime, one per row, into
+     mechanicComboGroup's comboItemsContainer by
+     OfferManagerActivity.addComboItemRow() — not used anywhere else.
+     Mirrors menuItemPickerLayout's own dropdown-style AutoCompleteTextView
+     (same "no new endpoint needed" getMenuItems() reuse), plus a small
+     qty field and a remove button, since a combo needs N of these
+     instead of dialog_add_offer.xml's single scope-level picker. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:layout_marginTop="8dp">
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="3"
+        app:endIconMode="dropdown_menu"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+
+        <AutoCompleteTextView
+            android:id="@+id/inputComboItemPicker"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/offer_hint_combo_item_picker"
+            android:inputType="none" />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="6dp">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/inputComboItemQty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/offer_hint_combo_item_qty"
+            android:inputType="number"
+            android:text="1" />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <ImageButton
+        android:id="@+id/btnRemoveComboItem"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="4dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_close"
+        app:tint="@color/text_secondary"
+        android:contentDescription="@null" />
+
+</LinearLayout>

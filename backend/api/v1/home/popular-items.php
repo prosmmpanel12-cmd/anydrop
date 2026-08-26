@@ -55,10 +55,15 @@ $savedItems = get_saved_item_ids((int) $owner['owner_id']);
 // handful of nearby restaurants), not once per item, to avoid an
 // otherwise-easy N+1 (dozens of items can share one restaurant).
 $browsableOffersByRestaurant = [];
+$comboIndexByRestaurant = [];
 foreach ($rows as $it) {
     $rid = (int) $it['r_id'];
     if (!isset($browsableOffersByRestaurant[$rid])) {
         $browsableOffersByRestaurant[$rid] = get_browsable_offers_for_restaurant($db, $rid, (int) $owner['owner_id']);
+        // docs/40 Step 6 — see index_combo_offers()'s own kdoc; cached
+        // alongside the browsable-offers set it's derived from, same
+        // per-restaurant-once pattern.
+        $comboIndexByRestaurant[$rid] = index_combo_offers($db, $browsableOffersByRestaurant[$rid]);
     }
 }
 
@@ -79,7 +84,7 @@ foreach ($rows as $it) {
     // match correctly; a category-scoped-only offer simply won't badge
     // an item here yet — flagged as a follow-up, not a correctness bug
     // (nothing about pricing/checkout depends on this badge).
-    $badgeOffer = pick_item_badge_offer($browsableOffersByRestaurant[$rid], (int) $it['id'], null);
+    $badgeOffer = pick_item_badge_offer($browsableOffersByRestaurant[$rid], (int) $it['id'], null, $comboIndexByRestaurant[$rid]['index']);
 
     $items[] = [
         'id' => (int) $it['id'],
@@ -97,7 +102,7 @@ foreach ($rows as $it) {
         'restaurant_rating' => (float) $it['r_rating_avg'],
         'distance_km' => $distanceKm,
         'is_saved' => isset($savedItems[(int) $it['id']]),
-        'offer_tag' => $badgeOffer !== null ? offer_badge_label($badgeOffer) : null,
+        'offer_tag' => $badgeOffer !== null ? offer_badge_label($badgeOffer, (int) $it['id'], $comboIndexByRestaurant[$rid]['names']) : null,
     ];
 }
 

@@ -131,6 +131,7 @@
 
     <!-- Checkout (Phase 3) -->
     <string name="checkout_title">Checkout</string>
+    <string name="checkout_your_items">Your Items</string>
     <string name="delivery_address">Delivery address</string>
     <string name="hint_full_address">House / flat, street, area, city</string>
     <string name="btn_save_address">Save address</string>

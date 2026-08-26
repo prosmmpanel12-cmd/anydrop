@@ -414,6 +414,38 @@
 
             </LinearLayout>
 
+            <!-- App owner ask (2026-08-25) — actual cart item list on
+                 the Checkout screen itself (image + name + qty + price),
+                 not just the aggregate bill-total rows below. Reuses
+                 CartItemAdapter/item_cart_line.xml verbatim — same
+                 image/price/offer-tag treatment the cart sheet already
+                 has, so a customer doesn't see two different-looking
+                 item rows between the cart sheet and checkout. Read-
+                 only here (no qty +/- stepper interaction — see
+                 CheckoutItemAdapter's own kdoc for why the stepper
+                 controls are hidden rather than reusing CartItemAdapter
+                 directly), nested inside this screen's own ScrollView
+                 (nestedScrollingEnabled=false so the RecyclerView
+                 doesn't fight the parent ScrollView for the scroll
+                 gesture) rather than its own scrollable list. -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/checkout_your_items"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/checkoutItemList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card_rounded"
+                android:paddingHorizontal="12dp"
+                android:nestedScrollingEnabled="false"
+                tools:listitem="@layout/item_cart_line" />
+
             <!-- Bill details -->
             <TextView
                 android:layout_width="wrap_content"

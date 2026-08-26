@@ -215,7 +215,7 @@ data class CouponUpdateBody(
 // code-entry coupon) that nonetheless coexist and can stack together.
 data class PromoOffer(
     val id: Int,
-    @SerializedName("offer_type") val offerType: String, // quantity_deal|buy_x_for_y|buy_x_get_y|percent_discount|flat_discount|free_delivery
+    @SerializedName("offer_type") val offerType: String, // quantity_deal|buy_x_for_y|buy_x_get_y|percent_discount|flat_discount|free_delivery|combo
     val title: String,
     val scope: String, // item|category|restaurant
     @SerializedName("menu_item_id") val menuItemId: Int?,
@@ -241,13 +241,39 @@ data class PromoOffer(
     // lib/orders.php's own kdoc on the enforcement side). Defaults true
     // server-side for any row created before migration 48 ran.
     @SerializedName("allow_coupon_stacking") val allowCouponStacking: Boolean = true,
+    // Migration 49 — apply_mode: "default" (today's unchanged auto-apply
+    // behavior, never has a code) vs "coupon_based" (same mechanics, but
+    // only ever considered at checkout when the customer types [code] —
+    // see lib/offers.php's find_coupon_based_offer_by_code()). Both
+    // create-only server-side (offers-update.php rejects changing
+    // either after creation, same "delete and recreate" boundary as
+    // offer_type/scope). [isPublic] is the one migration-49 field that
+    // stays editable post-creation, meaningful only when applyMode is
+    // "coupon_based" — a "default" offer is never listed by is_public in
+    // the first place, so its value there is irrelevant either way.
+    @SerializedName("apply_mode") val applyMode: String = "default",
+    val code: String? = null,
+    @SerializedName("is_public") val isPublic: Boolean = true,
     val status: String, // active|paused|disabled — 'disabled' is admin-only, see offers-update.php
     @SerializedName("created_at") val createdAt: String?,
     // offers-list.php-only extras — absent (default) when this model is
     // deserialized from offers-create.php/offers-update.php's response,
     // which don't compute either.
     @SerializedName("times_used") val timesUsed: Int = 0,
-    @SerializedName("is_currently_active") val isCurrentlyActive: Boolean = false
+    @SerializedName("is_currently_active") val isCurrentlyActive: Boolean = false,
+    // Migration 50 / docs/40 — only ever non-empty for offer_type="combo"
+    // (format_offer()'s own contract, see that function's kdoc); empty
+    // list, never null, for every other type.
+    @SerializedName("combo_items") val comboItems: List<ComboItem> = emptyList()
+)
+
+/** One row of a combo's fixed item list — mirrors offer_combo_items
+ * (menu_item_id, required_qty) exactly, no item name (the backend
+ * doesn't join menu_items here, see format_offer()'s kdoc) — callers
+ * that need a display name resolve it locally via getMenuItems(). */
+data class ComboItem(
+    @SerializedName("menu_item_id") val menuItemId: Int,
+    @SerializedName("required_qty") val requiredQty: Int
 )
 
 data class OffersListResult(@SerializedName("offers") val offers: List<PromoOffer>)
@@ -285,7 +311,26 @@ data class OfferCreateBody(
     // omitted-value-means-true default) so the switch's on-screen state
     // always matches what actually gets stored, even though both agree
     // when the switch is left at its default-checked state.
-    @SerializedName("allow_coupon_stacking") val allowCouponStacking: Boolean? = null
+    @SerializedName("allow_coupon_stacking") val allowCouponStacking: Boolean? = null,
+    // Migration 49, create-only — see PromoOffer's own kdoc on the pair.
+    // [code] is only read server-side (and only required) when
+    // [applyMode] == "coupon_based"; left null for a "default" offer.
+    @SerializedName("apply_mode") val applyMode: String? = null,
+    val code: String? = null,
+    @SerializedName("is_public") val isPublic: Boolean? = null,
+    // Migration 50 / docs/40 — required (2+ distinct items) only when
+    // offerType == "combo"; left null otherwise, matching offers-create.php's
+    // own "only read for offer_type='combo'" gating (see that file's kdoc).
+    @SerializedName("combo_items") val comboItems: List<ComboItemBody>? = null
+)
+
+/** Request-side mirror of ComboItem (Models.kt's response-side twin) —
+ * kept as a separate class rather than reused, same "create body vs
+ * response model are different shapes" split every other
+ * OfferCreateBody field already follows relative to PromoOffer. */
+data class ComboItemBody(
+    @SerializedName("menu_item_id") val menuItemId: Int,
+    @SerializedName("required_qty") val requiredQty: Int
 )
 
 /** Partial update — used for the Pause/Resume toggle (status alone), the
@@ -313,6 +358,13 @@ data class OfferUpdateBody(
     // mechanic fields above), same array_key_exists-gated convention as
     // every other field in this class.
     @SerializedName("allow_coupon_stacking") val allowCouponStacking: Boolean? = null,
+    // Migration 49 — the one apply_mode-related field still editable
+    // post-creation (apply_mode/code themselves are not — see
+    // PromoOffer's kdoc). Only meaningful for an offer whose applyMode
+    // is already "coupon_based"; sent as null for a "default" offer
+    // since offers-update.php gates on array_key_exists, and there's
+    // nothing here to change.
+    @SerializedName("is_public") val isPublic: Boolean? = null,
     @SerializedName("is_deleted") val isDeleted: Boolean? = null
 )
 

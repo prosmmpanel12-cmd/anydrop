@@ -46,8 +46,8 @@ $stmt = $db->prepare(
 $stmt->execute(['rid' => $restaurantId]);
 $rows = $stmt->fetchAll();
 
-$offers = array_map(function ($r) {
-    $formatted = format_offer($r);
+$offers = array_map(function ($r) use ($db) {
+    $formatted = format_offer($r, $db);
     $formatted['times_used'] = (int) $r['times_used'];
     $formatted['is_currently_active'] = $r['status'] === 'active'
         && (empty($r['start_date']) || $r['start_date'] <= date('Y-m-d'))

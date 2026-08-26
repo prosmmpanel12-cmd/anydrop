@@ -234,10 +234,13 @@ $rawItems = $itemStmt->fetchAll();
 // category-scoped matching skipped here for the same reason (item-
 // scoped/restaurant-wide offers still badge correctly).
 $browsableOffersByRestaurant = [];
+$comboIndexByRestaurant = [];
 foreach ($rawItems as $it) {
     $rid = (int) $it['r_id'];
     if (!isset($browsableOffersByRestaurant[$rid])) {
         $browsableOffersByRestaurant[$rid] = get_browsable_offers_for_restaurant($db, $rid, (int) $owner['owner_id']);
+        // docs/40 Step 6 — see index_combo_offers()'s own kdoc.
+        $comboIndexByRestaurant[$rid] = index_combo_offers($db, $browsableOffersByRestaurant[$rid]);
     }
 }
 
@@ -280,8 +283,8 @@ foreach ($rawItems as $it) {
         // own menu.
         'is_cross_restaurant_match' => !in_array((int) $it['r_id'], $restaurantIds, true),
         'is_saved' => isset($savedItems[(int) $it['id']]),
-        'offer_tag' => ($badgeOffer = pick_item_badge_offer($browsableOffersByRestaurant[(int) $it['r_id']], (int) $it['id'], null))
-            ? offer_badge_label($badgeOffer) : null,
+        'offer_tag' => ($badgeOffer = pick_item_badge_offer($browsableOffersByRestaurant[(int) $it['r_id']], (int) $it['id'], null, $comboIndexByRestaurant[(int) $it['r_id']]['index']))
+            ? offer_badge_label($badgeOffer, (int) $it['id'], $comboIndexByRestaurant[(int) $it['r_id']]['names']) : null,
     ];
 }
 

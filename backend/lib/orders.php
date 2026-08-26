@@ -287,6 +287,22 @@ function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCod
     // `break` out of the coupon check so pricing always continues below.
     $discount = 0.0;
     $couponId = null;
+    // Migration 49 — set only when the typed code resolved to a
+    // coupon_based promo_offers row (never a real coupons row). Folded
+    // into the $offerId/$offerDiscount/$offerTitle slot below (that's
+    // the column wired to offer_usages, which is what a promo_offers
+    // row must record against) rather than $couponId, but still
+    // competes for the coupon "slot" in the stacking rule the same way
+    // a real coupon does — see the merge right after select_best_auto_offer()
+    // below. $codeOfferFreeUnits/$codeOfferFreeItemLabel carry a
+    // buy_x_get_y code-offer's synthetic free-item row the same way the
+    // auto path's $offerFreeUnits/$offerFreeItemLabel already do.
+    $codeOfferId = null;
+    $codeOfferDiscount = 0.0;
+    $codeOfferTitle = null;
+    $codeOfferType = null;
+    $codeOfferFreeUnits = 0;
+    $codeOfferFreeItemLabel = null;
     if (!empty($couponCode)) {
         do {
             $cStmt = $db->prepare(
@@ -299,41 +315,73 @@ function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCod
             $cStmt->execute(['code' => strtoupper(trim($couponCode)), 'rid' => $restaurantId]);
             $coupon = $cStmt->fetch();
 
-            if (!$coupon) {
+            if ($coupon) {
+                if ($itemTotal < (float) $coupon['min_order_amount']) {
+                    $result['error'] = 'coupon_min_order_not_met';
+                    break;
+                }
+                if ($coupon['usage_limit_per_user'] !== null) {
+                    $uStmt = $db->prepare(
+                        'SELECT COUNT(*) AS c FROM coupon_usages WHERE coupon_id = :cid AND customer_id = :uid'
+                    );
+                    $uStmt->execute(['cid' => $coupon['id'], 'uid' => $customerId]);
+                    if ((int) $uStmt->fetch()['c'] >= (int) $coupon['usage_limit_per_user']) {
+                        $result['error'] = 'coupon_usage_limit_reached';
+                        break;
+                    }
+                }
+                if ($coupon['usage_limit_total'] !== null) {
+                    $tStmt = $db->prepare('SELECT COUNT(*) AS c FROM coupon_usages WHERE coupon_id = :cid');
+                    $tStmt->execute(['cid' => $coupon['id']]);
+                    if ((int) $tStmt->fetch()['c'] >= (int) $coupon['usage_limit_total']) {
+                        $result['error'] = 'coupon_usage_limit_reached';
+                        break;
+                    }
+                }
+
+                $discount = $coupon['discount_type'] === 'percent'
+                    ? round($itemTotal * (float) $coupon['discount_value'] / 100, 2)
+                    : (float) $coupon['discount_value'];
+                if ($coupon['max_discount_amount'] !== null) {
+                    $discount = min($discount, (float) $coupon['max_discount_amount']);
+                }
+                $discount = min($discount, $itemTotal);
+                $couponId = (int) $coupon['id'];
+                break;
+            }
+
+            // Migration 49 — not a real coupon code; try a restaurant's
+            // own coupon_based offer before giving up as invalid_coupon.
+            // $lineItems/$itemTotal are already built (line-pricing loop
+            // above this whole block) so compute_offer_discount() below
+            // has real cart data to match against.
+            $codeOffer = find_coupon_based_offer_by_code($db, $restaurantId, (string) $couponCode);
+            if (!$codeOffer) {
                 $result['error'] = 'invalid_coupon';
                 break;
             }
-            if ($itemTotal < (float) $coupon['min_order_amount']) {
+            if (!is_offer_eligible($db, $codeOffer, $lineItems, $itemTotal, $customerId)) {
+                // Same single generic message a real coupon's min-order
+                // failure uses — is_offer_eligible() itself doesn't say
+                // *which* check failed, and min_order_amount is by far
+                // the most common reason a customer would hit this, so
+                // this reuses that existing, already-translated message
+                // rather than introducing a new error code+string pair
+                // for what's the same underlying "not usable yet" idea.
                 $result['error'] = 'coupon_min_order_not_met';
                 break;
             }
-            if ($coupon['usage_limit_per_user'] !== null) {
-                $uStmt = $db->prepare(
-                    'SELECT COUNT(*) AS c FROM coupon_usages WHERE coupon_id = :cid AND customer_id = :uid'
-                );
-                $uStmt->execute(['cid' => $coupon['id'], 'uid' => $customerId]);
-                if ((int) $uStmt->fetch()['c'] >= (int) $coupon['usage_limit_per_user']) {
-                    $result['error'] = 'coupon_usage_limit_reached';
-                    break;
-                }
+            $computed = compute_offer_discount($db, $codeOffer, $lineItems);
+            if ($computed['discount'] <= 0) {
+                $result['error'] = 'coupon_min_order_not_met';
+                break;
             }
-            if ($coupon['usage_limit_total'] !== null) {
-                $tStmt = $db->prepare('SELECT COUNT(*) AS c FROM coupon_usages WHERE coupon_id = :cid');
-                $tStmt->execute(['cid' => $coupon['id']]);
-                if ((int) $tStmt->fetch()['c'] >= (int) $coupon['usage_limit_total']) {
-                    $result['error'] = 'coupon_usage_limit_reached';
-                    break;
-                }
-            }
-
-            $discount = $coupon['discount_type'] === 'percent'
-                ? round($itemTotal * (float) $coupon['discount_value'] / 100, 2)
-                : (float) $coupon['discount_value'];
-            if ($coupon['max_discount_amount'] !== null) {
-                $discount = min($discount, (float) $coupon['max_discount_amount']);
-            }
-            $discount = min($discount, $itemTotal);
-            $couponId = (int) $coupon['id'];
+            $codeOfferId = (int) $codeOffer['id'];
+            $codeOfferDiscount = $computed['discount'];
+            $codeOfferTitle = $codeOffer['title'];
+            $codeOfferType = $codeOffer['offer_type'];
+            $codeOfferFreeUnits = (int) $computed['free_units'];
+            $codeOfferFreeItemLabel = $computed['item_label'];
         } while (false);
     }
 
@@ -382,6 +430,34 @@ function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCod
             $discount = 0.0;
             $couponId = null;
         }
+        // Migration 49 — a typed coupon_based-offer code fills the same
+        // "coupon" stacking slot a real coupon does (app owner's own
+        // framing: coupon_based offers are entered exactly like a
+        // coupon), so it's governed by the SAME allow_coupon_stacking
+        // toggle on whichever auto default offer just won the item/
+        // restaurant-offer slot above — dropped here on the identical
+        // stacking-conflict basis as the real-coupon branch just above,
+        // never a separate rule.
+        if ($codeOfferId !== null && empty($bestOffer['offer']['allow_coupon_stacking'])) {
+            $couponDisabledByOffer = true;
+            $codeOfferId = null;
+            $codeOfferDiscount = 0.0;
+        }
+    }
+    // Migration 49 — the auto default offer (if any) already claimed
+    // the $offerId/$offerDiscount slot above; a coupon_based offer
+    // entered by code only takes that slot when no auto offer won it
+    // at all (offer-vs-offer competition for the one slot was never
+    // meant to happen per doc 20 §13 — a coupon_based offer's code is
+    // effectively "spend the coupon slot on an offer instead", not a
+    // second simultaneous item/restaurant offer).
+    if ($codeOfferId !== null && $offerId === null) {
+        $offerId = $codeOfferId;
+        $offerDiscount = $codeOfferDiscount;
+        $offerTitle = $codeOfferTitle;
+        $offerType = $codeOfferType;
+        $offerFreeUnits = $codeOfferFreeUnits;
+        $offerFreeItemLabel = $codeOfferFreeItemLabel;
     }
     // Never let item discount + coupon discount together exceed the
     // item total itself — same defensive floor the coupon block

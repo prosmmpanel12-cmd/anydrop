@@ -117,7 +117,38 @@ $offerTypeLabels = [
     'percent_discount' => '% Discount',
     'flat_discount' => 'Flat Discount',
     'free_delivery' => 'Free Delivery',
+    'combo' => 'Combo/Bundle',
 ];
+
+// docs/40 Step 5 — per-combo item list for the Type column. Batched
+// single query (same "IN() batch, not N+1" pattern offers-create.php's
+// own ownership check already uses) against just the combo offer ids
+// present on this page, joined to menu_items for a display name —
+// get_offer_combo_items() in lib/offers.php deliberately returns ids
+// only (it's used for matching, not display), so this page reads
+// offer_combo_items directly instead of calling it.
+$comboItemsByOffer = [];
+$comboOfferIds = array_values(array_unique(array_map(
+    fn ($o) => (int) $o['id'],
+    array_filter($offers, fn ($o) => $o['offer_type'] === 'combo')
+)));
+if (!empty($comboOfferIds)) {
+    $placeholders = implode(',', array_fill(0, count($comboOfferIds), '?'));
+    $stmt = $db->prepare(
+        "SELECT oci.offer_id, oci.required_qty, m.name AS item_name
+         FROM offer_combo_items oci
+         JOIN menu_items m ON m.id = oci.menu_item_id
+         WHERE oci.offer_id IN ($placeholders)
+         ORDER BY oci.offer_id, m.name"
+    );
+    $stmt->execute($comboOfferIds);
+    foreach ($stmt->fetchAll() as $row) {
+        $comboItemsByOffer[(int) $row['offer_id']][] = [
+            'name' => $row['item_name'],
+            'required_qty' => (int) $row['required_qty'],
+        ];
+    }
+}
 
 $csrf = admin_csrf_token();
 $pageTitle = 'Offers';
@@ -129,12 +160,22 @@ require __DIR__ . '/_layout_head.php';
 <div class="card">
     <h2>Restaurant Offers</h2>
     <p class="muted">
-        Every offer here is restaurant-created and auto-applied at
-        checkout (no code entry, unlike Coupons) — created via the
+        Every offer here is restaurant-created — created via the
         Restaurant App/API, live the moment it's created. This page is
         after-the-fact moderation: Pause/Resume toggles the same flag
         the restaurant can flip themselves; Disable is an admin-only
         override the restaurant cannot undo on their own.
+    </p>
+    <p class="muted">
+        Migration 49 — an offer's <strong>Mode</strong> is either
+        Default (auto-applied at checkout, no code entry) or Coupon
+        Based (only applies when a customer types the offer's own
+        code, same input box Coupons use). A Coupon Based offer is
+        also either Public (listed on the customer app's "View all
+        offers" screen) or Private (code-only, not listed anywhere —
+        same as a private Coupon). Mode and code are set once at
+        creation and cannot be changed afterward from the Restaurant
+        App; Public/Private can be changed any time.
     </p>
 
     <form method="get" class="filters-row">
@@ -153,12 +194,35 @@ require __DIR__ . '/_layout_head.php';
     <?php else: ?>
     <div class="table-responsive">
     <table>
-        <tr><th>Restaurant</th><th>Title</th><th>Type</th><th>Scope</th><th>Min Order</th><th>Valid</th><th>Used</th><th>Status</th><?php if ($canManage): ?><th></th><?php endif; ?></tr>
+        <tr><th>Restaurant</th><th>Title</th><th>Type</th><th>Mode</th><th>Scope</th><th>Min Order</th><th>Valid</th><th>Used</th><th>Status</th><?php if ($canManage): ?><th></th><?php endif; ?></tr>
         <?php foreach ($offers as $o): ?>
         <tr>
             <td><?= admin_escape($o['restaurant_name']) ?></td>
             <td><?= admin_escape($o['title']) ?></td>
-            <td><?= admin_escape($offerTypeLabels[$o['offer_type']] ?? $o['offer_type']) ?></td>
+            <td>
+                <?= admin_escape($offerTypeLabels[$o['offer_type']] ?? $o['offer_type']) ?>
+                <?php if ($o['offer_type'] === 'combo'): ?>
+                    <?php $comboItems = $comboItemsByOffer[(int) $o['id']] ?? []; ?>
+                    <?php if (!empty($comboItems)): ?>
+                        <br><span class="muted" style="font-size:12px;">
+                        <?php foreach ($comboItems as $i => $ci): ?>
+                            <?= $i > 0 ? ', ' : '' ?><?= admin_escape($ci['name']) ?> ×<?= (int) $ci['required_qty'] ?>
+                        <?php endforeach; ?>
+                        </span>
+                    <?php else: ?>
+                        <br><span class="muted" style="font-size:12px;">(no items on file)</span>
+                    <?php endif; ?>
+                <?php endif; ?>
+            </td>
+            <td>
+                <?php if (($o['apply_mode'] ?? 'default') === 'coupon_based'): ?>
+                    <span class="badge active">Coupon Based</span>
+                    <br><code><?= admin_escape((string) $o['code']) ?></code>
+                    <br><span class="muted"><?= !empty($o['is_public']) ? 'Public' : 'Private' ?></span>
+                <?php else: ?>
+                    <span class="muted">Default</span>
+                <?php endif; ?>
+            </td>
             <td><?= admin_escape($o['scope']) ?></td>
             <td>₹<?= admin_escape((string) $o['min_order_amount']) ?></td>
             <td>

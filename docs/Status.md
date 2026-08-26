@@ -1,6 +1,17 @@
 # Anydrop — Project Status
 
-**Last Updated:** 2026-08-20 (even later) — Notification bell, Customer App Android UI built (bell icon + badge in Home top bar, notification list screen, mark-read/mark-all-read wiring) — **not build-verified, not tested on-device.** See that entry below. Everything before it is unchanged.
+**Last Updated:** 2026-08-25 (session 14) — Restaurant App offer create/
+edit screen now has UI for `apply_mode` (Default vs Coupon Based),
+`code`, and `is_public` — the one gap docs/35's coupon-based-offers
+session left open. **Not build-verified, not tested on-device.** See
+`docs/38_Handover_2026-08-25_Offer_ApplyMode_CouponBased_UI_Wired.md`
+for full detail. Everything else in this file (below the 2026-08-20
+entry that follows) predates docs/33 through docs/38 — those five
+sessions' worth of Offers Engine / Offers browse screen / coupon-
+stacking-toggle / apply-mode work were tracked via their own numbered
+handover docs rather than fresh entries here; check `docs/` for
+anything numbered 29 or higher before assuming this file's older
+entries are current.
 
 ## 2026-08-20 (even later) — Notification bell, Customer App Android UI — NOT tested, NOT build-verified
 
@@ -4116,4 +4127,237 @@ gets re-specified; every genuinely new table/column is flagged there.
 instruction.** Nothing in that doc has been built yet — say which item
 to start with (doc's own §14 has a recommended build order).
 
+
+## Combo/Bundle Offer Type — Steps 1-3b/6 done (2026-08-25/26)
+
+Step 1: migration `backend/sql/50_migration_combo_offers.sql` written —
+`promo_offers.offer_type` ENUM +'combo', new `offer_combo_items` table
+(offer_id, menu_item_id, required_qty). Not run against a live DB (no
+MySQL CLI in sandbox) — balance-checked only.
+
+Step 2: `backend/lib/offers.php` — new `get_offer_combo_items()`
+(fetches a combo's item/required_qty rows) + a new `'combo'` case in
+`compute_offer_discount()`. A combo bypasses `get_offer_scoped_lines()`
+entirely (its `scope` stays unused/'restaurant' per migration 50) —
+matching is all-or-nothing against every `offer_combo_items` row's
+`required_qty`, discount is (sum of each item's cart unit_price ×
+required_qty) − `offer_price` floored at 0, and multiple simultaneous
+bundles use the same `intdiv()` "how many full sets fit" approach
+`quantity_deal` already uses, capped by whichever ingredient runs out
+first. `select_best_auto_offer()` needed no change, per plan.
+No PHP CLI in sandbox — balance-checked (braces/parens/brackets), not
+`php -l`-verified.
+
+Step 3: verification only, no code change. Confirmed both
+`cart/validate.php` (preview) and `orders/create.php` (placement) call
+`price_cart()` fresh against the actual client-submitted cart, and
+`create.php` has no client-supplied `offer_id` — the applied offer is
+always server-selected. That's the *only* re-validation any existing
+offer_type gets (no separate scope-recheck exists anywhere else in
+`create.php`), so Step 2's combo case — which re-derives cart-item
+quantities from whatever `$lineItems` it's called with — is
+automatically re-validated at placement the same way every other type
+already is. `recordOfferUsage()`'s daily/total/per_customer limit
+re-check (under `FOR UPDATE`) also already covers combo generically.
+
+Step 3b (2026-08-26) — bug found while prepping for Step 4, not part
+of the original plan: `backend/api/v1/restaurant/offers-create.php`
+(the real creation endpoint) had never been touched by Steps 1-3 and
+still rejected `offer_type: "combo"` outright (`'combo'` missing from
+`$validTypes`), with no code path to write `offer_combo_items` even if
+it had been accepted, and `format_offer()` didn't return a combo's
+items either — so nothing built on top of this (Step 4's Android
+dialog) could have actually worked end-to-end. Fixed:
+- `offers-create.php`: `'combo'` added to `$validTypes`; `scope`
+  forced server-side to `'restaurant'` for combo (per migration 50);
+  `offer_price` validated as the bundle price; new `combo_items` field
+  (array of `{menu_item_id, required_qty}`, min 2 distinct items,
+  each ownership-checked against the caller's own menu items in one
+  batched query, de-duplicated before insert); the `promo_offers` +
+  `offer_combo_items` inserts now run inside one transaction so a
+  combo can never end up half-written.
+- `format_offer()`: new optional `?PDO $db = null` param; returns
+  `combo_items` (`[]` for non-combo, or a combo fetched without `$db`)
+  so no caller needs a null-check. `offers-create.php`,
+  `offers-list.php`, `offers-update.php` all updated to pass `$db`.
+  `offers-update.php` needed no other change — combo items correctly
+  stay non-editable there, "delete and recreate" same as every other
+  type's mechanic fields.
+- Small bonus fix: `backend/admin/offers.php`'s `$offerTypeLabels` was
+  missing a `'combo'` entry (would've shown the raw enum string) —
+  added `'Combo/Bundle'`.
+- Swept the rest of `backend/` for the same class of bug (string-
+  concatenated SQL / unbound `$_GET`/`$body` interpolation into
+  queries) — every other partial-update endpoint builds its `SET
+  field = :placeholder` list dynamically but always binds via prepared
+  statements; no new injection findings.
+- Balance-checked only, not `php -l`-verified — same sandbox
+  limitation as every other step.
+
+Next: Step 4, Restaurant App create/edit dialog (Android) — now safe
+to build against a backend that actually accepts combo. Full plan +
+per-step tracking in `docs/40_Plan_Combo_Bundle_Offer_Type_2026-08-25.md`.
+
+
+## Combo/Bundle Offer Type — Step 4/6 done (2026-08-26)
+
+Restaurant App create/edit dialog (Android), built against the now-fixed
+`offers-create.php`:
+
+- `dialog_add_offer.xml`: new `chipTypeCombo` chip; new
+  `mechanicComboGroup` (a `comboItemsContainer` LinearLayout that rows
+  get inflated into at runtime, a `btnAddComboItem` button, a dedicated
+  `inputComboPrice` field — separate View from `inputOfferPrice` since
+  the two mechanic groups can't share one). Scope chips + item/category
+  pickers are hidden entirely when Combo is selected (matching
+  migration 50's "scope forced to restaurant, unused for matching"),
+  not just left visible-but-meaningless. New `comboItemsLockedLabel`
+  for edit/view mode (combo_items is create-only).
+- New `item_offer_combo_row.xml` — one row (item dropdown + qty +
+  remove button); `showAddOfferDialog()` starts with 2 pre-added rows
+  (docs/40's 2+ item minimum).
+- `OfferManagerActivity.kt`: `addComboItemRow()` +
+  `comboMenuItemsCache` (reuses the existing `getMenuItems()` fetch,
+  no extra round trip); `submitNewOffer()` collects the rows into
+  `ComboItemBody`, de-dupes by menu_item_id client-side, validates 2+
+  items + bundle price > 0 before ever calling the API (mirrors
+  `offers-create.php`'s own validation); `applyComboItemsLockedLabel()`
+  (shared by edit/view) shows the combo's items immediately from
+  `PromoOffer.comboItems` using id placeholders, then upgrades to real
+  names once a `getMenuItems()` lookup resolves — `format_offer()`
+  only returns ids, not names.
+- `Models.kt`: `PromoOffer.comboItems: List<ComboItem>`,
+  `OfferCreateBody.comboItems: List<ComboItemBody>?`. `OfferUpdateBody`
+  untouched (combo items aren't editable post-creation).
+- `OfferAdapter`/`item_offer_card.xml`: no change needed — the offer
+  card's rendering (title/usage/validity/status + fire/delivery icon
+  split) is already generic across every offer_type.
+- Balance-checked only (braces/parens for the .kt, tag-count for both
+  .xml files) — no Gradle/Kotlin compiler in this sandbox, not build-
+  verified.
+
+Next: Step 5, admin panel per-combo item-list visibility (the type-
+label fix already landed in Step 3b; showing the actual item set is
+still open). Full plan + per-step tracking in
+`docs/40_Plan_Combo_Bundle_Offer_Type_2026-08-25.md`.
+
+
+## Combo/Bundle Offer Type — Step 5 done (2026-08-26)
+
+`backend/admin/offers.php` — per-combo item-set visibility:
+
+- New batched query (one `IN()` against just the combo offer ids on
+  the current page — same batching style as `offers-create.php`'s
+  Step 3b ownership check) joins `offer_combo_items` to `menu_items`
+  for display names. `lib/offers.php`'s `get_offer_combo_items()`
+  stays id-only on purpose (it's the matching-path helper, not a
+  display one), so this page queries `offer_combo_items` directly
+  instead of calling it.
+- Type column now shows each combo's item list (`Name ×qty`,
+  comma-joined) under the type label. A combo somehow saved with zero
+  `offer_combo_items` rows (the same "not impossible" case that
+  function's own kdoc already calls out) renders `(no items on file)`
+  instead of silently showing nothing, so a half-written combo stays
+  visible to admin.
+- Bundle price (`offer_price`) intentionally NOT added to this table —
+  no other offer type's mechanic value (percent/flat amount, X/Y
+  quantities, etc.) is shown here either, so leaving it out matches
+  this table's existing scope rather than being a gap.
+- Balance-checked (`<?php`/`<?=`/`?>` tag counts, braces/parens/
+  brackets) — no PHP CLI in this sandbox, not `php -l`-verified, same
+  standing limitation as every prior step.
+
+Next: Step 6, Customer App display (combo item list + bundle price on
+the offer card, distinct from a plain percent/flat badge) — the last
+step in docs/40's plan. Full plan + per-step tracking in
+`docs/40_Plan_Combo_Bundle_Offer_Type_2026-08-25.md`.
+
+
+## Combo/Bundle Offer Type — Step 6 done (2026-08-26) — closes docs/40's plan, Steps 1-6 all done
+
+Found while starting this step, not part of the original plan: browse-time
+item badging had a real correctness bug, not just a missing feature.
+`pick_item_badge_offer()` matches by `scope`, and migration 50 forces a
+combo's `scope` to `'restaurant'` (unused for matching, per that
+migration's own contract). That meant the function's existing
+restaurant-wide fallback tier would match a live combo and badge
+**every menu item in the restaurant** with the combo's tag — not just
+the combo's own required items — across all four browse-time badge
+endpoints (`restaurants/menu.php`, `home/popular-items.php`,
+`search/search.php`, `home/offers-browse.php`).
+
+`backend/lib/offers.php`:
+- New `index_combo_offers(PDO $db, array $offers): array` — one
+  batched query (skipped entirely when the offer set has no combo
+  row) building two maps from a restaurant's already-fetched
+  `$browsableOffers`: `menu_item_id => combo offer id` (for matching)
+  and `offer_id => [menu_item_id => name]` (for labeling). Built once
+  per restaurant, same "batch once, not N+1" discipline Step 5's admin
+  query already used.
+- `pick_item_badge_offer()` gained a new combo tier — checked after
+  item-scope and category-scope, before the restaurant-wide fallback
+  — using that index; the restaurant-wide fallback itself now
+  explicitly excludes `offer_type === 'combo'`, closing the bug above
+  at its root so all four endpoints are fixed by one shared change.
+- `offer_badge_label()` gained a `'combo'` case: instead of falling to
+  the generic `default` (which just echoes the offer's own title), it
+  now names the *other* items in the bundle plus the bundle price —
+  e.g. `"Combo w/ Fries, Coke — ₹199"` on the Burger's own badge —
+  capped at 3 named items (`+N more`) since the pill TextView has no
+  `maxLines`/`ellipsize` in any of its 5 layout uses (hand-checked all
+  5: `item_menu_item.xml`, `item_popular_dish.xml`,
+  `item_search_dish.xml`, `item_offer_browse_dish.xml`, plus
+  `item_cart_line.xml` which reads the same cached field but isn't one
+  of the 4 endpoints changed here). This delivers docs/40's own "item
+  list + bundle price on the offer card" ask through the existing
+  generic `offer_tag` string field — no new field needed.
+
+All 4 badge-producing endpoints (`restaurants/menu.php`,
+`home/popular-items.php`, `search/search.php`,
+`home/offers-browse.php`) updated to build the combo index once per
+restaurant and thread it through both the matching and labeling calls.
+
+**Android side needed zero changes** — `MenuItem.offerTag`/
+`PopularItem.offerTag`/`SearchItem.offerTag`/`OfferBrowseItem.offerTag`
+are all plain `String?`, already wired end-to-end to an unconstrained
+pill `TextView`, so the richer combo text renders through the existing
+pipeline with a normal backend deploy, no client rebuild required. The
+checkout offer strip (`CheckoutActivity.renderBill()`, already generic
+over `offerTitle`/`offerDiscountAmount` since Step 2) and the Offers
+screen (`OfferScreenActivity`/`OfferBrowseAdapter`, docs/36) both pick
+up correct combo behavior automatically as a result.
+
+Balance-checked with a comment-stripped brace/paren/bracket count
+(several of this change's own explanatory comments contain unbalanced
+parens in prose, which would otherwise false-positive a naive count) —
+no PHP CLI in this sandbox, not `php -l`-verified, same standing
+limitation as every prior step.
+
+**This closes docs/40's plan — Steps 1-6 all done.** Nothing in this
+feature is device/build-verified anywhere (no PHP CLI, Kotlin
+compiler, Gradle, or live DB in this sandbox). A real `php -l` pass +
+migration 50 run + live click-through is still required before this is
+production-ready — checklist:
+1. Run migration 50 against a real DB.
+2. `php -l` every file this feature touched across docs/40's Steps
+   1-6 (lib/offers.php, offers-create.php, offers-list.php,
+   offers-update.php, admin/offers.php, restaurants/menu.php,
+   home/popular-items.php, search/search.php, home/offers-browse.php).
+3. Create a combo via the Restaurant App (2+ items, a bundle price) →
+   confirm it saves and shows correctly in admin/offers.php's item
+   list (Step 5) and the Restaurant App's own edit/view mode (Step 4).
+4. Browse Home/Search/the restaurant's menu/the Offers screen →
+   confirm ONLY the combo's own items badge (e.g. "Combo w/ Fries,
+   Coke — ₹199"), NOT every item on that restaurant's menu — this is
+   the specific regression Step 6 fixed and the one most worth a real
+   device check.
+5. Add the combo's required items to cart, checkout → confirm the
+   offer strip shows the combo's title + correct discount, and that
+   removing a required item before placing drops the discount to 0
+   (Step 3's re-validation claim, still never actually run against a
+   live DB).
+
+Per `PENDING.md` item 31's existing "full build/device/live DB
+regression" requirement — this feature is one more item on that same
+standing list, not a special case.
 

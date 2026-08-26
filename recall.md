@@ -2129,8 +2129,58 @@ Do NOT randomly pick features.
     device/build-verified; Android (Restaurant App create/manage screen,
     Customer App offer display) NOT built yet. See docs/29 for full
     scope/handover.
-29. Combo pricing — 🔴 explicitly deferred (see docs/29 — needs a
-    multi-item bundle model item 28's schema doesn't cover)
+29. Combo pricing — 🟡 built 2026-08-26, Steps 1-6 all done (see full
+    log below), NOT device/build-verified.
+    — the actual restaurant-facing creation endpoint — had never been
+    touched by Steps 1-3 and still rejected `offer_type: "combo"`
+    outright (not in `$validTypes`), with no insert path into
+    `offer_combo_items` and no `format_offer()` combo_items output
+    either; fixed all three (validation + `combo_items` array +
+    ownership check + transactional dual-insert; `format_offer()` now
+    takes an optional `$db` and returns `combo_items`), plus a small
+    admin/offers.php label-map fix (`combo` was missing a display
+    label). Swept the rest of backend/ for the same class of bug
+    (string-concatenated SQL); found none. **Step 4 (2026-08-26):**
+    Restaurant App create/edit dialog — `dialog_add_offer.xml` gained a
+    Combo chip + repeatable item-picker builder (new
+    `item_offer_combo_row.xml` row layout) + dedicated bundle-price
+    field, with scope hidden entirely for this type; `Models.kt` gained
+    `PromoOffer.comboItems`/`OfferCreateBody.comboItems`;
+    `OfferManagerActivity.kt` wired add/validate/submit plus an
+    edit/view read-only combo-items label (names resolved via a
+    `getMenuItems()` lookup, since the backend only returns ids).
+    **Step 5 (2026-08-26):** `admin/offers.php` — batched `IN()` query
+    joins `offer_combo_items` to `menu_items` for display names (the
+    lib's own `get_offer_combo_items()` returns ids only, by design —
+    a matching helper, not a display one), Type column now lists each
+    combo's items (`Name ×qty`) under the type label, with a
+    "(no items on file)" fallback for a combo somehow saved with zero
+    rows rather than rendering nothing. Deliberately did not add the
+    bundle price to this table — no other offer type shows its
+    mechanic value there either, so that's an existing-scope match,
+    not a gap. **Step 6 (2026-08-26) — closes this item, Steps 1-6 all
+    done:** found (not originally planned) that `pick_item_badge_offer()`'s
+    scope-based matching had a real bug for combo, not just a missing
+    feature — migration 50 forces a combo's `scope` to `'restaurant'`
+    (unused for matching), which meant every one of the 4 browse-time
+    badge endpoints (`restaurants/menu.php`, `home/popular-items.php`,
+    `search/search.php`, `home/offers-browse.php`) would badge EVERY
+    menu item in a restaurant with a live combo's tag, not just the
+    combo's own items. Fixed at the root: new
+    `index_combo_offers()` in `lib/offers.php` (batched per-restaurant
+    item/name index), a new combo tier in `pick_item_badge_offer()`
+    (checked before the restaurant-wide fallback, which now explicitly
+    excludes `offer_type === 'combo'`), and a new `'combo'` case in
+    `offer_badge_label()` that names the bundle's OTHER items + price
+    (e.g. "Combo w/ Fries, Coke — ₹199", capped at 3 named items) —
+    this IS the "item list + bundle price on the offer card" Step 6
+    asked for, delivered through the existing generic `offer_tag`
+    string field. All 4 endpoints updated to build+thread the index.
+    Android needed zero changes — `offerTag` is a plain `String?`
+    everywhere, already wired to an unconstrained pill (no `maxLines`/
+    `ellipsize` on any of the 5 layouts using it, hand-checked). See
+    docs/40 for full plan + step tracking; its own closing note has the
+    still-outstanding device/build verification checklist.
 30. Free delivery offers — 🟡 built as part of item 28 (offer_type='free_delivery')
 31. Happy hours — 🟡 built as part of item 28 (start_time/end_time + weekdays on any offer type, not a separate mechanism)
 32. Offer eligibility/stacking rules — 🟡 built as part of item 28 (doc 20 §13's "1 item/restaurant offer + 1 coupon + 1 delivery offer" rule, hardcoded not admin-configurable yet)

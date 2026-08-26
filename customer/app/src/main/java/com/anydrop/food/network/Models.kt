@@ -411,8 +411,16 @@ data class CouponListResult(
 
 data class CouponListItem(
     val code: String,
-    @SerializedName("discount_type") val discountType: String, // "flat" | "percent"
+    // Migration 49 — "flat" | "percent" (real coupon) | "offer" (a
+    // restaurant's coupon_based promo_offers row, folded into this
+    // same list by coupons/list.php). "offer" has no single %/₹
+    // discount_value the way a real coupon does — offerLabel carries
+    // the human-readable badge (e.g. "Buy 1 Get 1 Free") instead; the
+    // UI shows offerLabel when discountType == "offer", the usual
+    // discountValue-based line otherwise.
+    @SerializedName("discount_type") val discountType: String,
     @SerializedName("discount_value") val discountValue: Double,
+    @SerializedName("offer_label") val offerLabel: String? = null,
     @SerializedName("min_order_amount") val minOrderAmount: Double,
     @SerializedName("max_discount_amount") val maxDiscountAmount: Double? = null,
     @SerializedName("valid_until") val validUntil: String? = null,

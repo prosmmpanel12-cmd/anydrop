@@ -57,6 +57,11 @@ $savedItems = get_saved_item_ids((int) $owner['owner_id']);
 // only decides what badge to *show*, never what a customer is charged.
 $browsableOffers = get_browsable_offers_for_restaurant($db, $restaurantId, (int) $owner['owner_id']);
 
+// docs/40 Step 6 — combo item/name index, built once for this
+// restaurant's offer set (empty arrays, no query, when it has no live
+// combo). See index_combo_offers()'s own kdoc for the shape.
+$comboIndex = index_combo_offers($db, $browsableOffers);
+
 $tagStmt = $db->prepare(
     "SELECT rt.name, rt.slug FROM restaurant_tag_map rtm
      INNER JOIN restaurant_tags rt ON rt.id = rtm.restaurant_tag_id
@@ -142,8 +147,8 @@ foreach ($items as $item) {
         // needed on a menu card, unlike the checkout-time
         // cart/validate.php response which already carries
         // offer_title/offer_discount_amount for the applied offer.
-        'offer_tag' => ($badgeOffer = pick_item_badge_offer($browsableOffers, (int) $item['id'], $item['category_id'] !== null ? (int) $item['category_id'] : null))
-            ? offer_badge_label($badgeOffer) : null,
+        'offer_tag' => ($badgeOffer = pick_item_badge_offer($browsableOffers, (int) $item['id'], $item['category_id'] !== null ? (int) $item['category_id'] : null, $comboIndex['index']))
+            ? offer_badge_label($badgeOffer, (int) $item['id'], $comboIndex['names']) : null,
         'variants' => array_map(fn($v) => [
             'id' => (int) $v['id'],
             'name' => $v['name'],

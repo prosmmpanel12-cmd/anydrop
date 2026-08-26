@@ -4,14 +4,22 @@
  * Auth: Restaurant token
  * Request: {
  *   "offer_type": "quantity_deal"|"buy_x_for_y"|"buy_x_get_y"|
- *                 "percent_discount"|"flat_discount"|"free_delivery",
+ *                 "percent_discount"|"flat_discount"|"free_delivery"|
+ *                 "combo" (migration 50, docs/40),
  *   "title", "scope": "item"|"category"|"restaurant",
  *   "menu_item_id"?, "food_category_id"?,
  *   "required_qty"?, "get_qty"?, "offer_price"?,
  *   "discount_percent"?, "discount_flat"?, "max_discount_amount"?,
  *   "min_order_amount"?, "customer_eligibility"?,
  *   "start_date"?, "end_date"?, "start_time"?, "end_time"?, "weekdays"?,
- *   "daily_limit"?, "total_limit"?, "per_customer_limit"?
+ *   "daily_limit"?, "total_limit"?, "per_customer_limit"?,
+ *   "apply_mode"?: "default"|"coupon_based" (default "default"),
+ *   "code"?: required, unique, when apply_mode="coupon_based",
+ *   "is_public"?: bool (default true, coupon_based only — see below),
+ *   "combo_items"?: [{ "menu_item_id", "required_qty" }, ...] —
+ *     required (2+ distinct items) when offer_type="combo", ignored
+ *     otherwise. `scope` is forced to "restaurant" server-side for a
+ *     combo regardless of what's sent (see migration 50).
  * }
  * Response: { "offer": {...format_offer()} }
  *
@@ -49,7 +57,7 @@ $restaurantId = $owner['owner_id'];
 $body = get_json_body();
 require_fields($body, ['offer_type', 'title', 'scope']);
 
-$validTypes = ['quantity_deal', 'buy_x_for_y', 'buy_x_get_y', 'percent_discount', 'flat_discount', 'free_delivery'];
+$validTypes = ['quantity_deal', 'buy_x_for_y', 'buy_x_get_y', 'percent_discount', 'flat_discount', 'free_delivery', 'combo'];
 $offerType = (string) $body['offer_type'];
 if (!in_array($offerType, $validTypes, true)) {
     respond_error('validation_error', 422, ['fields' => ['offer_type']]);
@@ -71,6 +79,16 @@ if (!in_array($scope, ['item', 'category', 'restaurant'], true)) {
 $quantityTypes = ['quantity_deal', 'buy_x_for_y', 'buy_x_get_y'];
 if (in_array($offerType, $quantityTypes, true) && $scope === 'restaurant') {
     respond_error('validation_error', 422, ['fields' => ['scope']]);
+}
+
+// Migration 50 / docs/40 — a combo's matching is entirely driven by
+// offer_combo_items, not `scope` (see that migration's own header).
+// `scope` is forced to 'restaurant' here regardless of what the
+// client sent, same "column stays non-NULL but unused" contract the
+// migration documents, so a combo never triggers the item/category
+// ownership checks below for a value that wouldn't be read anyway.
+if ($offerType === 'combo') {
+    $scope = 'restaurant';
 }
 
 $db = Database::get();
@@ -141,9 +159,69 @@ if (in_array($offerType, ['quantity_deal', 'buy_x_for_y'], true)) {
     if ($discountFlat <= 0) {
         respond_error('validation_error', 422, ['fields' => ['discount_flat']]);
     }
+} elseif ($offerType === 'combo') {
+    // Migration 50 — offer_price is reused as the combo's fixed bundle
+    // price, same field quantity_deal/buy_x_for_y already validate
+    // above, just for a different offer_type.
+    if (empty($body['offer_price'])) {
+        respond_error('validation_error', 422, ['fields' => ['offer_price']]);
+    }
+    $offerPrice = (float) $body['offer_price'];
+    if ($offerPrice <= 0) {
+        respond_error('validation_error', 422, ['fields' => ['offer_price']]);
+    }
 }
 // free_delivery needs none of the above — min_order_amount (below) is
 // its only real lever, per doc 20 §2's own examples.
+
+// combo_items — required only for offer_type='combo'. Each entry must
+// name a distinct menu_item_id (ownership-checked, same boundary the
+// scope='item' branch above enforces) with its own required_qty >= 1.
+// De-duplicated by menu_item_id (last one wins) rather than rejected
+// outright on a client-side duplicate, since the DB's own
+// uniq_combo_offer_item index would otherwise turn an honest UI mistake
+// into a raw SQL error instead of a clean validation_error.
+$comboItems = [];
+if ($offerType === 'combo') {
+    $rawComboItems = $body['combo_items'] ?? null;
+    if (!is_array($rawComboItems) || count($rawComboItems) < 2) {
+        // A "combo" of fewer than 2 distinct items is just a regular
+        // single-item offer wearing a combo costume — reject early
+        // rather than let compute_offer_discount()'s combo case accept
+        // a degenerate one-item bundle silently.
+        respond_error('validation_error', 422, ['fields' => ['combo_items']]);
+    }
+    $byMenuItemId = [];
+    foreach ($rawComboItems as $ci) {
+        if (!is_array($ci) || empty($ci['menu_item_id']) || empty($ci['required_qty'])) {
+            respond_error('validation_error', 422, ['fields' => ['combo_items']]);
+        }
+        $ciMenuItemId = (int) $ci['menu_item_id'];
+        $ciRequiredQty = (int) $ci['required_qty'];
+        if ($ciMenuItemId <= 0 || $ciRequiredQty < 1) {
+            respond_error('validation_error', 422, ['fields' => ['combo_items']]);
+        }
+        $byMenuItemId[$ciMenuItemId] = $ciRequiredQty;
+    }
+    if (count($byMenuItemId) < 2) {
+        respond_error('validation_error', 422, ['fields' => ['combo_items']]);
+    }
+    // Ownership check — every combo item must be this restaurant's own,
+    // non-deleted menu item, same boundary scope='item' enforces above.
+    // Batched into one IN() query rather than per-item round trips.
+    $placeholders = implode(',', array_fill(0, count($byMenuItemId), '?'));
+    $ownCheck = $db->prepare(
+        "SELECT id FROM menu_items WHERE id IN ($placeholders) AND restaurant_id = ? AND deleted_at IS NULL"
+    );
+    $ownCheck->execute([...array_keys($byMenuItemId), $restaurantId]);
+    $ownedIds = array_map(fn ($r) => (int) $r['id'], $ownCheck->fetchAll());
+    if (count($ownedIds) !== count($byMenuItemId)) {
+        respond_error('validation_error', 422, ['fields' => ['combo_items']]);
+    }
+    foreach ($byMenuItemId as $mid => $reqQty) {
+        $comboItems[] = ['menu_item_id' => $mid, 'required_qty' => $reqQty];
+    }
+}
 
 $maxDiscountAmount = isset($body['max_discount_amount']) && $body['max_discount_amount'] !== null
     ? (float) $body['max_discount_amount'] : null;
@@ -187,47 +265,107 @@ $allowCouponStacking = array_key_exists('allow_coupon_stacking', $body)
     ? (int) (bool) $body['allow_coupon_stacking']
     : 1;
 
-$insert = $db->prepare(
-    'INSERT INTO promo_offers (
-        restaurant_id, offer_type, title, scope, menu_item_id, food_category_id,
-        required_qty, get_qty, offer_price, discount_percent, discount_flat, max_discount_amount,
-        min_order_amount, customer_eligibility, start_date, end_date, start_time, end_time, weekdays,
-        daily_limit, total_limit, per_customer_limit, allow_coupon_stacking, status
-    ) VALUES (
-        :rid, :type, :title, :scope, :mid, :cid,
-        :reqqty, :getqty, :oprice, :dpercent, :dflat, :maxdiscount,
-        :minorder, :eligibility, :sdate, :edate, :stime, :etime, :weekdays,
-        :daily, :total, :percustomer, :allowcoupon, \'active\'
-    )'
-);
-$insert->execute([
-    'rid' => $restaurantId,
-    'type' => $offerType,
-    'title' => $title,
-    'scope' => $scope,
-    'mid' => $menuItemId,
-    'cid' => $foodCategoryId,
-    'reqqty' => $requiredQty,
-    'getqty' => $getQty,
-    'oprice' => $offerPrice,
-    'dpercent' => $discountPercent,
-    'dflat' => $discountFlat,
-    'maxdiscount' => $maxDiscountAmount,
-    'minorder' => $minOrderAmount,
-    'eligibility' => $customerEligibility,
-    'sdate' => $startDate,
-    'edate' => $endDate,
-    'stime' => $startTime,
-    'etime' => $endTime,
-    'weekdays' => $weekdays,
-    'daily' => $dailyLimit,
-    'total' => $totalLimit,
-    'percustomer' => $perCustomerLimit,
-    'allowcoupon' => $allowCouponStacking,
-]);
-$newId = (int) $db->lastInsertId();
+// Migration 49 — apply_mode: 'default' (today's unchanged auto-apply
+// behavior, no code) vs 'coupon_based' (same offer mechanics, but only
+// considered at checkout when the customer types `code` — see
+// lib/offers.php's find_coupon_based_offer_by_code()). code/is_public
+// only make sense for coupon_based; kept null/default for a 'default'
+// offer the same way quantity/percent/flat fields above are only
+// populated for their own relevant offer_type.
+$applyMode = (string) ($body['apply_mode'] ?? 'default');
+if (!in_array($applyMode, ['default', 'coupon_based'], true)) {
+    respond_error('validation_error', 422, ['fields' => ['apply_mode']]);
+}
+
+$code = null;
+$isPublic = 1;
+if ($applyMode === 'coupon_based') {
+    if (empty($body['code'])) {
+        respond_error('validation_error', 422, ['fields' => ['code']]);
+    }
+    $code = strtoupper(trim((string) $body['code']));
+    if ($code === '' || mb_strlen($code) > 50) {
+        respond_error('validation_error', 422, ['fields' => ['code']]);
+    }
+    // Uniqueness pre-check — friendlier than letting the uniq_offer_code
+    // index reject it with a raw SQL error; the index itself remains the
+    // real guarantee against a race between this check and the insert.
+    $dupStmt = $db->prepare('SELECT id FROM promo_offers WHERE code = :code LIMIT 1');
+    $dupStmt->execute(['code' => $code]);
+    if ($dupStmt->fetch()) {
+        respond_error('validation_error', 422, ['fields' => ['code'], 'reason' => 'code_already_in_use']);
+    }
+    $isPublic = array_key_exists('is_public', $body) ? (int) (bool) $body['is_public'] : 1;
+}
+
+// docs/40 Step 3b — a combo needs two writes (promo_offers +
+// offer_combo_items) that must succeed or fail together: a combo row
+// with no items would silently price as a zero-discount no-op (see
+// get_offer_combo_items()'s own kdoc), and an orphaned offer_combo_items
+// row with no parent would violate its own FK. Every other offer_type
+// only ever does the single promo_offers insert, so the transaction
+// wraps both but costs those types nothing extra.
+$db->beginTransaction();
+try {
+    $insert = $db->prepare(
+        'INSERT INTO promo_offers (
+            restaurant_id, offer_type, apply_mode, code, is_public, title, scope, menu_item_id, food_category_id,
+            required_qty, get_qty, offer_price, discount_percent, discount_flat, max_discount_amount,
+            min_order_amount, customer_eligibility, start_date, end_date, start_time, end_time, weekdays,
+            daily_limit, total_limit, per_customer_limit, allow_coupon_stacking, status
+        ) VALUES (
+            :rid, :type, :applymode, :code, :ispublic, :title, :scope, :mid, :cid,
+            :reqqty, :getqty, :oprice, :dpercent, :dflat, :maxdiscount,
+            :minorder, :eligibility, :sdate, :edate, :stime, :etime, :weekdays,
+            :daily, :total, :percustomer, :allowcoupon, \'active\'
+        )'
+    );
+    $insert->execute([
+        'rid' => $restaurantId,
+        'type' => $offerType,
+        'applymode' => $applyMode,
+        'code' => $code,
+        'ispublic' => $isPublic,
+        'title' => $title,
+        'scope' => $scope,
+        'mid' => $menuItemId,
+        'cid' => $foodCategoryId,
+        'reqqty' => $requiredQty,
+        'getqty' => $getQty,
+        'oprice' => $offerPrice,
+        'dpercent' => $discountPercent,
+        'dflat' => $discountFlat,
+        'maxdiscount' => $maxDiscountAmount,
+        'minorder' => $minOrderAmount,
+        'eligibility' => $customerEligibility,
+        'sdate' => $startDate,
+        'edate' => $endDate,
+        'stime' => $startTime,
+        'etime' => $endTime,
+        'weekdays' => $weekdays,
+        'daily' => $dailyLimit,
+        'total' => $totalLimit,
+        'percustomer' => $perCustomerLimit,
+        'allowcoupon' => $allowCouponStacking,
+    ]);
+    $newId = (int) $db->lastInsertId();
+
+    if ($offerType === 'combo') {
+        $itemInsert = $db->prepare(
+            'INSERT INTO offer_combo_items (offer_id, menu_item_id, required_qty) VALUES (:oid, :mid, :qty)'
+        );
+        foreach ($comboItems as $ci) {
+            $itemInsert->execute(['oid' => $newId, 'mid' => $ci['menu_item_id'], 'qty' => $ci['required_qty']]);
+        }
+    }
+
+    $db->commit();
+} catch (Throwable $e) {
+    $db->rollBack();
+    throw $e;
+}
 
 $fetchStmt = $db->prepare('SELECT * FROM promo_offers WHERE id = :id LIMIT 1');
 $fetchStmt->execute(['id' => $newId]);
 
-respond_ok(['offer' => format_offer($fetchStmt->fetch())], 201);
+respond_ok(['offer' => format_offer($fetchStmt->fetch(), $db)], 201);

@@ -76,6 +76,145 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- 1b. Apply mode — migration 49 (add-mode only). Default =
+             today's unchanged auto-apply behavior, no code. Coupon
+             Based = same offer mechanics, but only ever considered at
+             checkout when the customer types the code below — same
+             concept as a real coupon's code, just backed by an offer
+             row instead of a `coupons` row (see PromoOffer's own kdoc).
+             Both apply_mode and code are create-only server-side, so
+             this whole block (chips + code field) only exists in
+             add-mode; edit/view mode show editApplyModeLabel instead. -->
+        <TextView
+            android:id="@+id/applyModeHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/offer_hint_apply_mode"
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/applyModeGroup"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            app:singleSelection="true"
+            app:selectionRequired="true">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipApplyModeDefault"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/offer_apply_mode_default_label"
+                android:checked="true" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipApplyModeCouponBased"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/offer_apply_mode_coupon_based_label" />
+
+        </com.google.android.material.chip.ChipGroup>
+
+        <!-- Revealed only when Coupon Based is selected. Same styling
+             as dialog_add_coupon.xml's own inputCode field. -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/offerCodeLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:visibility="gone"
+            app:startIconDrawable="@drawable/ic_tag">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/inputOfferCode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/offer_hint_code"
+                android:inputType="textCapCharacters"
+                android:maxLength="50" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Edit/view-mode only: apply_mode + code are both create-only,
+             shown as a plain label instead of the chips/field above —
+             same reasoning editOfferTypeLabel documents for offer_type.
+             Includes the code inline (e.g. "Coupon based — code: SAVE20")
+             since there's nowhere else to see it once the field above is
+             hidden. -->
+        <TextView
+            android:id="@+id/editApplyModeLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_secondary"
+            android:visibility="gone"
+            tools:text="Apply mode: Coupon based — code SAVE20 (can\'t be changed after creation)" />
+
+        <!-- Public/private — migration 49, editable post-creation (unlike
+             apply_mode/code above). Only meaningful — and only ever
+             shown — for a Coupon Based offer, same reasoning
+             dialog_add_coupon.xml's switchPublic row documents for real
+             coupons: a Default offer is never listed by is_public in the
+             first place. Shown in add-mode once Coupon Based is picked,
+             and in edit/view mode whenever the existing offer already is
+             one. -->
+        <LinearLayout
+            android:id="@+id/offerPublicRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginEnd="10dp"
+                android:src="@drawable/ic_visibility"
+                app:tint="@color/text_secondary"
+                android:contentDescription="@null" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/offer_public_toggle_label"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/offer_public_toggle_hint"
+                    android:textSize="11sp"
+                    android:textColor="@color/text_secondary" />
+
+            </LinearLayout>
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchOfferPublic"
+                style="@style/Widget.AnydropRestaurant.Switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:checked="true" />
+
+        </LinearLayout>
+
         <!-- Edit-mode only: offer_type is create-only, shown as a plain
              label instead of the chip picker below — same reasoning
              dialog_add_coupon.xml's editDiscountTypeLabel documents. -->
@@ -150,6 +289,13 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/offer_type_free_delivery" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipTypeCombo"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/offer_type_combo" />
 
         </com.google.android.material.chip.ChipGroup>
 
@@ -272,6 +418,79 @@
                 android:inputType="numberDecimal" />
 
         </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Migration 50 / docs/40 Step 4 — combo/bundle mechanic group.
+             Distinct from the scope section below: a combo's matching is
+             driven entirely by combo_items (see offers-create.php's own
+             comment), so scope/menu-item/category pickers are hidden
+             entirely for this type (applyOfferTypeVisibility()) rather
+             than reused. inputComboPrice is a separate field from
+             inputOfferPrice above — same wire field (offer_price)
+             server-side, just can't be the same View since the two
+             groups are mutually exclusive but both need to exist in the
+             layout tree for visibility toggling to work. -->
+        <LinearLayout
+            android:id="@+id/mechanicComboGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="8dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/offer_hint_combo_items"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary" />
+
+            <LinearLayout
+                android:id="@+id/comboItemsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAddComboItem"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/btn_add_combo_item" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputComboPrice"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/offer_hint_combo_price"
+                    android:inputType="numberDecimal" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+        </LinearLayout>
+
+        <!-- Edit/view-mode only: combo_items is create-only (same
+             "delete and recreate" boundary as every other mechanic
+             field) — shown as a plain label instead of the builder
+             above, listing each item by id×qty (backend's combo_items
+             response only carries menu_item_id/required_qty, not names
+             — showEditOfferDialog()/showViewOfferDialog() resolve names
+             locally via getMenuItems() before setting this text). -->
+        <TextView
+            android:id="@+id/comboItemsLockedLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_secondary"
+            android:visibility="gone"
+            tools:text="Combo items (can't be changed after creation): 1× Burger, 1× Fries, 1× Coke" />
 
         <!-- Free-delivery notice — shown only when offer_type =
              free_delivery (add mode via applyOfferTypeVisibility(), edit

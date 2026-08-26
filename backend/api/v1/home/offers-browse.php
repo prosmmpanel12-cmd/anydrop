@@ -123,9 +123,15 @@ foreach ($restaurantIds as $rid) {
         continue;
     }
 
+    // docs/40 Step 6 — see index_combo_offers()'s own kdoc. Without
+    // this, a live combo here would (before this fix) badge and list
+    // EVERY item on the restaurant's menu via the old restaurant-wide
+    // scope fallback, instead of just the combo's own item set.
+    $comboIndex = index_combo_offers($db, $browsableOffers);
+
     $items = [];
     foreach ($menuItemsByRestaurant[$rid] ?? [] as $mi) {
-        $badgeOffer = pick_item_badge_offer($browsableOffers, (int) $mi['id'], null);
+        $badgeOffer = pick_item_badge_offer($browsableOffers, (int) $mi['id'], null, $comboIndex['index']);
         if ($badgeOffer === null) {
             continue;
         }
@@ -135,7 +141,7 @@ foreach ($restaurantIds as $rid) {
             'image_url' => $mi['image_url'],
             'price' => (float) $mi['price'],
             'is_veg' => (bool) $mi['is_veg'],
-            'offer_tag' => offer_badge_label($badgeOffer),
+            'offer_tag' => offer_badge_label($badgeOffer, (int) $mi['id'], $comboIndex['names']),
         ];
     }
 

@@ -6,7 +6,8 @@
  *   "title", "min_order_amount", "max_discount_amount",
  *   "start_date", "end_date", "start_time", "end_time", "weekdays",
  *   "daily_limit", "total_limit", "per_customer_limit",
- *   "allow_coupon_stacking" (migration 48), "is_deleted" }.
+ *   "allow_coupon_stacking" (migration 48),
+ *   "is_public" (migration 49, coupon_based offers only), "is_deleted" }.
  *   Same null-skip partial-update convention as coupons-update.php —
  *   only fields present in the body are touched.
  * Response: { "offer": {...format_offer()} }
@@ -20,15 +21,18 @@
  * silently clamping it, so a bad client payload never accidentally
  * unpauses something an admin deliberately disabled.
  *
- * offer_type, scope, menu_item_id, food_category_id, and the
- * type-specific mechanic fields (required_qty/get_qty/offer_price/
- * discount_percent/discount_flat) are deliberately NOT editable here —
- * same "delete and recreate instead" reasoning coupons-update.php
- * documents for code/discount_type: changing the mechanic of an offer
- * that already has offer_usages history against it would make that
- * history impossible to interpret correctly later (a discount_amount
- * snapshot on an old usage row would no longer match what the current
- * offer config implies).
+ * offer_type, scope, menu_item_id, food_category_id, apply_mode, code,
+ * and the type-specific mechanic fields (required_qty/get_qty/
+ * offer_price/discount_percent/discount_flat) are deliberately NOT
+ * editable here — same "delete and recreate instead" reasoning
+ * coupons-update.php documents for code/discount_type: changing the
+ * mechanic (or the code customers already know) of an offer that
+ * already has offer_usages history against it would make that history
+ * impossible to interpret correctly later, and a code swap out from
+ * under customers who've seen/saved the old one is its own separate
+ * confusion. is_public is the one migration-49 field kept editable —
+ * a pure visibility toggle (same as allow_coupon_stacking above),
+ * doesn't touch pricing math or already-snapshotted usage history.
  *
  * "Delete" is a soft delete (deleted_at stamped, never a hard DELETE)
  * for the same reason coupons-update.php's is_archived exists —
@@ -158,6 +162,16 @@ if (array_key_exists('allow_coupon_stacking', $body)) {
     $fieldsSql[] = 'allow_coupon_stacking = :allow_coupon_stacking';
     $params['allow_coupon_stacking'] = (int) (bool) $body['allow_coupon_stacking'];
 }
+if (array_key_exists('is_public', $body)) {
+    // Migration 49 — only meaningful for a coupon_based offer (a
+    // 'default' offer is never listed by is_public in the first
+    // place, see coupons/list.php's inclusion query), but not rejected
+    // outright for a 'default' row either — same "harmless no-op
+    // field" tolerance the rest of this codebase extends elsewhere
+    // rather than adding a cross-field validation error here.
+    $fieldsSql[] = 'is_public = :is_public';
+    $params['is_public'] = (int) (bool) $body['is_public'];
+}
 
 if (!empty($fieldsSql)) {
     $sql = 'UPDATE promo_offers SET ' . implode(', ', $fieldsSql) . ' WHERE id = :id';
@@ -167,4 +181,4 @@ if (!empty($fieldsSql)) {
 $fetchStmt = $db->prepare('SELECT * FROM promo_offers WHERE id = :id LIMIT 1');
 $fetchStmt->execute(['id' => $id]);
 
-respond_ok(['offer' => format_offer($fetchStmt->fetch())]);
+respond_ok(['offer' => format_offer($fetchStmt->fetch(), $db)]);

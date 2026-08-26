@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.anydrop.food.R
 import com.anydrop.food.data.CartManager
 import com.anydrop.food.databinding.ActivityCheckoutBinding
@@ -148,6 +149,18 @@ class CheckoutActivity : AppCompatActivity(), AddressEditorBottomSheet.LocationR
         binding.btnRemoveCoupon.setOnClickListener { removeCoupon() }
         binding.rowViewAllOffers.setOnClickListener { openCouponsSheet() }
         binding.rowDeliveryTime.setOnClickListener { openScheduleSheet() }
+
+        // App owner ask (2026-08-25) — read-only cart item list (image +
+        // name + qty + price + offer badge) on this screen. Static from
+        // the in-memory cart the moment this Activity opens — not
+        // re-submitted on every renderBill() refresh, since quantities
+        // can only change back in the cart sheet (this screen has no
+        // +/- controls, see CheckoutItemAdapter's own kdoc), so the list
+        // itself never goes stale within one checkout session.
+        val checkoutItemAdapter = CheckoutItemAdapter()
+        binding.checkoutItemList.layoutManager = LinearLayoutManager(this)
+        binding.checkoutItemList.adapter = checkoutItemAdapter
+        checkoutItemAdapter.submit(cart.getLines())
 
         // Pre-fill in case a coupon was already applied earlier in this
         // checkout session (e.g. user backed out and returned) — CartManager

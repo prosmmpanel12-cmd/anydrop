@@ -68,6 +68,21 @@ class CartItemAdapter(
                 binding.cartLineCustomization.visibility = android.view.View.GONE
             }
 
+            // App owner ask (2026-08-25) — B1G1/offer badge on the cart
+            // line itself, using MenuItem.offerTag already loaded onto
+            // this line (no network call — this is a static "an offer
+            // exists for this item" hint, not a live re-priced amount;
+            // the real discount only resolves at Checkout via
+            // /cart/validate, same "browse-time badge is approximate,
+            // checkout is authoritative" split every other offer_tag
+            // display in the app already follows).
+            if (!line.item.offerTag.isNullOrBlank()) {
+                binding.cartLineOfferTag.text = line.item.offerTag
+                binding.cartLineOfferTag.visibility = android.view.View.VISIBLE
+            } else {
+                binding.cartLineOfferTag.visibility = android.view.View.GONE
+            }
+
             binding.btnLineIncrease.setOnClickListener {
                 CartManager.add(restaurantId, line.item)
                 CartSyncManager.scheduleSync(binding.root.context)

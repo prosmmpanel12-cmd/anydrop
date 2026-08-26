@@ -2,6 +2,7 @@ package com.anydrop.restaurant.ui.account
 
 import android.view.View
 import android.widget.ArrayAdapter
+import android.widget.AutoCompleteTextView
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import androidx.lifecycle.lifecycleScope
@@ -9,7 +10,9 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.anydrop.restaurant.R
 import com.anydrop.restaurant.databinding.ActivityOfferManagerBinding
 import com.anydrop.restaurant.databinding.DialogAddOfferBinding
+import com.anydrop.restaurant.databinding.ItemOfferComboRowBinding
 import com.anydrop.restaurant.network.ApiClient
+import com.anydrop.restaurant.network.ComboItemBody
 import com.anydrop.restaurant.network.FoodTag
 import com.anydrop.restaurant.network.MenuItem
 import com.anydrop.restaurant.network.OfferCreateBody
@@ -55,6 +58,14 @@ class OfferManagerActivity : AppCompatActivity() {
      * a slice at a time. Re-bucketed (no re-fetch) on every tab switch. */
     private var allOffers: List<PromoOffer> = emptyList()
     private var currentTab = 0 // 0=Active, 1=Scheduled, 2=Expired, 3=Paused — matches offerTabs' TabItem order
+
+    /** Fetched once per dialog open by setUpPickers(), reused by
+     * addComboItemRow()/btnAddComboItem so a combo row's item dropdown
+     * doesn't need its own separate getMenuItems() round trip. Reset
+     * (implicitly, via reassignment) every time a fresh dialog opens —
+     * this Activity has one dialog open at a time, same lifetime as
+     * [allOffers] above but per-dialog rather than per-screen. */
+    private var comboMenuItemsCache: List<MenuItem> = emptyList()
 
     private val dayLabels = linkedMapOf(
         1 to R.string.day_short_mon, 2 to R.string.day_short_tue, 3 to R.string.day_short_wed,
@@ -176,8 +187,10 @@ class OfferManagerActivity : AppCompatActivity() {
         val dialogBinding = DialogAddOfferBinding.inflate(layoutInflater)
         dialogBinding.offerDialogTitle.text = getString(R.string.offer_add_title)
 
+        comboMenuItemsCache = emptyList()
         setUpOfferTypeToggle(dialogBinding)
         setUpScopeToggle(dialogBinding)
+        setUpApplyModeToggle(dialogBinding)
         setUpPickers(dialogBinding)
         setUpDatePicker(dialogBinding.startDateLayout, dialogBinding.inputStartDate, R.string.offer_hint_start_date, "offer_start_date_picker")
         setUpDatePicker(dialogBinding.endDateLayout, dialogBinding.inputEndDate, R.string.offer_hint_end_date, "offer_end_date_picker")
@@ -191,6 +204,7 @@ class OfferManagerActivity : AppCompatActivity() {
         // actually selected before the user touches anything.
         applyOfferTypeVisibility(dialogBinding, checkedTypeChipId = dialogBinding.chipTypeQuantityDeal.id)
         applyScopeVisibility(dialogBinding, checkedScopeChipId = dialogBinding.chipScopeItem.id)
+        applyApplyModeVisibility(dialogBinding, checkedApplyModeChipId = dialogBinding.chipApplyModeDefault.id)
 
         val addDialog = BottomSheetDialog(this)
         addDialog.setContentView(dialogBinding.root)
@@ -225,8 +239,25 @@ class OfferManagerActivity : AppCompatActivity() {
         dialogBinding.mechanicQtyGetGroup.visibility = View.GONE
         dialogBinding.mechanicPercentGroup.visibility = View.GONE
         dialogBinding.mechanicFlatGroup.visibility = View.GONE
+        dialogBinding.mechanicComboGroup.visibility = View.GONE
         dialogBinding.editOfferTypeLabel.visibility = View.VISIBLE
         dialogBinding.editOfferTypeLabel.text = getString(R.string.offer_edit_type_locked_fmt, offerTypeDisplayName(offer.offerType))
+        applyComboItemsLockedLabel(dialogBinding, offer)
+
+        // apply_mode/code are create-only (migration 49) — same locked-
+        // label treatment as offer_type above. is_public stays editable,
+        // but only meaningful (and only shown) for a coupon_based offer.
+        dialogBinding.applyModeHint.visibility = View.GONE
+        dialogBinding.applyModeGroup.visibility = View.GONE
+        dialogBinding.offerCodeLayout.visibility = View.GONE
+        dialogBinding.editApplyModeLabel.visibility = View.VISIBLE
+        dialogBinding.editApplyModeLabel.text = if (offer.applyMode == "coupon_based") {
+            getString(R.string.offer_apply_mode_locked_coupon_based_fmt, offer.code.orEmpty())
+        } else {
+            getString(R.string.offer_apply_mode_locked_default_fmt)
+        }
+        dialogBinding.offerPublicRow.visibility = if (offer.applyMode == "coupon_based") View.VISIBLE else View.GONE
+        dialogBinding.switchOfferPublic.isChecked = offer.isPublic
 
         dialogBinding.offerScopeHint.visibility = View.GONE
         dialogBinding.offerScopeGroup.visibility = View.GONE
@@ -304,8 +335,26 @@ class OfferManagerActivity : AppCompatActivity() {
         dialogBinding.mechanicQtyGetGroup.visibility = View.GONE
         dialogBinding.mechanicPercentGroup.visibility = View.GONE
         dialogBinding.mechanicFlatGroup.visibility = View.GONE
+        dialogBinding.mechanicComboGroup.visibility = View.GONE
         dialogBinding.editOfferTypeLabel.visibility = View.VISIBLE
         dialogBinding.editOfferTypeLabel.text = getString(R.string.offer_edit_type_locked_fmt, offerTypeDisplayName(offer.offerType))
+        applyComboItemsLockedLabel(dialogBinding, offer)
+
+        // apply_mode/code are create-only (migration 49) — same locked-
+        // label treatment as offer_type above. is_public is disabled
+        // further below along with every other field on this read-only
+        // dialog, but only shown at all for a coupon_based offer.
+        dialogBinding.applyModeHint.visibility = View.GONE
+        dialogBinding.applyModeGroup.visibility = View.GONE
+        dialogBinding.offerCodeLayout.visibility = View.GONE
+        dialogBinding.editApplyModeLabel.visibility = View.VISIBLE
+        dialogBinding.editApplyModeLabel.text = if (offer.applyMode == "coupon_based") {
+            getString(R.string.offer_apply_mode_locked_coupon_based_fmt, offer.code.orEmpty())
+        } else {
+            getString(R.string.offer_apply_mode_locked_default_fmt)
+        }
+        dialogBinding.offerPublicRow.visibility = if (offer.applyMode == "coupon_based") View.VISIBLE else View.GONE
+        dialogBinding.switchOfferPublic.isChecked = offer.isPublic
 
         dialogBinding.offerScopeHint.visibility = View.GONE
         dialogBinding.offerScopeGroup.visibility = View.GONE
@@ -349,7 +398,7 @@ class OfferManagerActivity : AppCompatActivity() {
             dialogBinding.inputStartDate, dialogBinding.inputEndDate,
             dialogBinding.inputStartTime, dialogBinding.inputEndTime,
             dialogBinding.inputDailyLimit, dialogBinding.inputTotalLimit, dialogBinding.inputPerCustomerLimit,
-            dialogBinding.switchAllowCouponStacking
+            dialogBinding.switchAllowCouponStacking, dialogBinding.switchOfferPublic
         ).forEach { it.isEnabled = false }
         dialogBinding.eligibilityGroup.isEnabled = false
         for (i in 0 until dialogBinding.eligibilityGroup.childCount) {
@@ -371,6 +420,44 @@ class OfferManagerActivity : AppCompatActivity() {
         viewDialog.show()
     }
 
+    /**
+     * Combo's item list is create-only (same "delete and recreate"
+     * boundary as every other mechanic field) — shown as a plain label
+     * in both edit and view mode, since there's no editable UI for it
+     * post-creation. [PromoOffer.comboItems] (menu_item_id/required_qty)
+     * is already available synchronously from the offers-list.php/
+     * offers-update.php response, so the label is set immediately with
+     * an id-based placeholder, then upgraded to real item names once
+     * getMenuItems() resolves — format_offer() doesn't join menu_items
+     * server-side (see that function's own kdoc), so there's no way to
+     * get names without this extra round trip.
+     */
+    private fun applyComboItemsLockedLabel(dialogBinding: DialogAddOfferBinding, offer: PromoOffer) {
+        if (offer.offerType != "combo") {
+            dialogBinding.comboItemsLockedLabel.visibility = View.GONE
+            return
+        }
+        dialogBinding.comboItemsLockedLabel.visibility = View.VISIBLE
+        fun render(nameById: Map<Int, String>) {
+            dialogBinding.comboItemsLockedLabel.text = getString(
+                R.string.offer_combo_items_locked_fmt,
+                offer.comboItems.joinToString(", ") { ci ->
+                    getString(R.string.offer_combo_item_line_fmt, ci.requiredQty, nameById[ci.menuItemId] ?: "#${ci.menuItemId}")
+                }
+            )
+        }
+        render(emptyMap())
+        lifecycleScope.launch {
+            try {
+                val response = api.getMenuItems()
+                val items: List<MenuItem> = if (response.isSuccessful) response.body()?.data?.items.orEmpty() else emptyList()
+                render(items.associateBy({ it.id }, { it.name }))
+            } catch (e: Exception) {
+                // Label just keeps showing the id-based placeholder.
+            }
+        }
+    }
+
     // ---- Offer-type toggle (add-mode only) ----
 
     private fun setUpOfferTypeToggle(dialogBinding: DialogAddOfferBinding) {
@@ -386,6 +473,7 @@ class OfferManagerActivity : AppCompatActivity() {
         val isPercent = checkedTypeChipId == dialogBinding.chipTypePercent.id
         val isFlat = checkedTypeChipId == dialogBinding.chipTypeFlat.id
         val isFreeDelivery = checkedTypeChipId == dialogBinding.chipTypeFreeDelivery.id
+        val isCombo = checkedTypeChipId == dialogBinding.chipTypeCombo.id
         val isQuantityMechanic = isQtyPrice || isQtyGet // quantity_deal | buy_x_for_y | buy_x_get_y
 
         dialogBinding.mechanicQtyPriceGroup.visibility = if (isQtyPrice) View.VISIBLE else View.GONE
@@ -393,7 +481,33 @@ class OfferManagerActivity : AppCompatActivity() {
         dialogBinding.mechanicPercentGroup.visibility = if (isPercent) View.VISIBLE else View.GONE
         dialogBinding.maxDiscountLayout.visibility = if (isPercent) View.VISIBLE else View.GONE
         dialogBinding.mechanicFlatGroup.visibility = if (isFlat) View.VISIBLE else View.GONE
+        dialogBinding.mechanicComboGroup.visibility = if (isCombo) View.VISIBLE else View.GONE
         dialogBinding.freeDeliveryNoticeBanner.visibility = if (isFreeDelivery) View.VISIBLE else View.GONE
+
+        // Migration 50 — a combo's matching is entirely combo_items-
+        // driven (see offers-create.php's own comment); scope is
+        // forced to 'restaurant' server-side regardless of what's
+        // picked here, so the whole scope section (chips + item/
+        // category picker) is hidden entirely for this type rather
+        // than left visible-but-meaningless.
+        dialogBinding.offerScopeHint.visibility = if (isCombo) View.GONE else View.VISIBLE
+        dialogBinding.offerScopeGroup.visibility = if (isCombo) View.GONE else View.VISIBLE
+        if (isCombo) {
+            dialogBinding.menuItemPickerLayout.visibility = View.GONE
+            dialogBinding.foodCategoryPickerLayout.visibility = View.GONE
+            // Start with 2 rows (docs/40's own "2+ distinct items"
+            // minimum) rather than 0 — an empty builder with only a
+            // "+ Add item" button reads as broken on first glance.
+            // Backfilled again by setUpPickers() itself if this fires
+            // before getMenuItems() has returned (comboMenuItemsCache
+            // still empty), so the dropdowns aren't left unpopulated.
+            if (dialogBinding.comboItemsContainer.childCount == 0) {
+                addComboItemRow(dialogBinding, comboMenuItemsCache)
+                addComboItemRow(dialogBinding, comboMenuItemsCache)
+            }
+        } else {
+            applyScopeVisibility(dialogBinding, dialogBinding.offerScopeGroup.checkedChipId)
+        }
 
         refreshScopeChipsForType(dialogBinding, isQuantityMechanic)
     }
@@ -448,6 +562,27 @@ class OfferManagerActivity : AppCompatActivity() {
         }
     }
 
+    // ---- Apply mode toggle (add-mode only) — migration 49 ----
+
+    private fun setUpApplyModeToggle(dialogBinding: DialogAddOfferBinding) {
+        dialogBinding.applyModeGroup.setOnCheckedStateChangeListener { _, checkedIds ->
+            val checkedId = checkedIds.firstOrNull() ?: return@setOnCheckedStateChangeListener
+            applyApplyModeVisibility(dialogBinding, checkedId)
+        }
+    }
+
+    /**
+     * Coupon Based reveals the code field and the public/private switch
+     * (default-checked, matching offers-create.php's own omitted-means-
+     * true default); Default hides both — a "default" offer never has a
+     * code and is never listed by is_public in the first place.
+     */
+    private fun applyApplyModeVisibility(dialogBinding: DialogAddOfferBinding, checkedApplyModeChipId: Int) {
+        val isCouponBased = checkedApplyModeChipId == dialogBinding.chipApplyModeCouponBased.id
+        dialogBinding.offerCodeLayout.visibility = if (isCouponBased) View.VISIBLE else View.GONE
+        dialogBinding.offerPublicRow.visibility = if (isCouponBased) View.VISIBLE else View.GONE
+    }
+
     // ---- Menu item / food category pickers (add-mode only) ----
 
     /**
@@ -468,10 +603,25 @@ class OfferManagerActivity : AppCompatActivity() {
             try {
                 val response = api.getMenuItems()
                 val items: List<MenuItem> = if (response.isSuccessful) response.body()?.data?.items.orEmpty() else emptyList()
+                comboMenuItemsCache = items
                 val arrayAdapter = ArrayAdapter(this@OfferManagerActivity, android.R.layout.simple_list_item_1, items.map { it.name })
                 dialogBinding.inputMenuItemPicker.setAdapter(arrayAdapter)
                 dialogBinding.inputMenuItemPicker.setOnItemClickListener { _, _, position, _ ->
                     dialogBinding.inputMenuItemPicker.tag = items[position].id
+                }
+                // Backfill the two starter combo rows' dropdowns if
+                // applyOfferTypeVisibility() already added them (Combo
+                // was the default-checked chip, or the restaurant tapped
+                // it) before this fetch returned — those rows were
+                // created with an empty items list and have nothing to
+                // pick from otherwise.
+                if (dialogBinding.mechanicComboGroup.visibility == View.VISIBLE) {
+                    for (i in 0 until dialogBinding.comboItemsContainer.childCount) {
+                        val row = dialogBinding.comboItemsContainer.getChildAt(i)
+                        val picker = row.findViewById<AutoCompleteTextView>(R.id.inputComboItemPicker)
+                        picker.setAdapter(arrayAdapter)
+                        picker.setOnItemClickListener { _, _, position, _ -> picker.tag = items[position].id }
+                    }
                 }
             } catch (e: Exception) {
                 // Dropdown just stays unpopulated — not fatal, the
@@ -490,6 +640,30 @@ class OfferManagerActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 // Same as above.
             }
+        }
+        dialogBinding.btnAddComboItem.setOnClickListener {
+            addComboItemRow(dialogBinding, comboMenuItemsCache)
+        }
+    }
+
+    /**
+     * One row of the combo-item builder (item picker + qty + remove) —
+     * inflated via item_offer_combo_row.xml, same tag-holds-the-id
+     * idiom [setUpPickers]'s own scope pickers use, since
+     * ComboItemBody.menuItemId needs the id, not the display name shown
+     * in the field. [items] may be empty (getMenuItems() still in
+     * flight) — the row is still added with an empty dropdown and
+     * backfilled by setUpPickers() once the fetch resolves.
+     */
+    private fun addComboItemRow(dialogBinding: DialogAddOfferBinding, items: List<MenuItem>) {
+        val rowBinding = ItemOfferComboRowBinding.inflate(layoutInflater, dialogBinding.comboItemsContainer, true)
+        val arrayAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, items.map { it.name })
+        rowBinding.inputComboItemPicker.setAdapter(arrayAdapter)
+        rowBinding.inputComboItemPicker.setOnItemClickListener { _, _, position, _ ->
+            rowBinding.inputComboItemPicker.tag = items[position].id
+        }
+        rowBinding.btnRemoveComboItem.setOnClickListener {
+            dialogBinding.comboItemsContainer.removeView(rowBinding.root)
         }
     }
 
@@ -635,6 +809,7 @@ class OfferManagerActivity : AppCompatActivity() {
         "buy_x_get_y" -> getString(R.string.offer_type_buy_x_get_y)
         "percent_discount" -> getString(R.string.offer_type_percent_discount)
         "flat_discount" -> getString(R.string.offer_type_flat_discount)
+        "combo" -> getString(R.string.offer_type_combo)
         else -> getString(R.string.offer_type_free_delivery)
     }
 
@@ -690,13 +865,23 @@ class OfferManagerActivity : AppCompatActivity() {
             dialogBinding.chipTypePercent.id -> "percent_discount"
             dialogBinding.chipTypeFlat.id -> "flat_discount"
             dialogBinding.chipTypeFreeDelivery.id -> "free_delivery"
+            dialogBinding.chipTypeCombo.id -> "combo"
             else -> "quantity_deal"
         }
 
-        val scope = when (dialogBinding.offerScopeGroup.checkedChipId) {
-            dialogBinding.chipScopeCategory.id -> "category"
-            dialogBinding.chipScopeRestaurant.id -> "restaurant"
-            else -> "item"
+        // Migration 50 — scope is meaningless for a combo (matching is
+        // entirely combo_items-driven) and forced to 'restaurant'
+        // server-side regardless of what's sent; the scope chips are
+        // hidden entirely for this type (applyOfferTypeVisibility()), so
+        // there's nothing meaningful to read from offerScopeGroup here.
+        val scope = if (offerType == "combo") {
+            "restaurant"
+        } else {
+            when (dialogBinding.offerScopeGroup.checkedChipId) {
+                dialogBinding.chipScopeCategory.id -> "category"
+                dialogBinding.chipScopeRestaurant.id -> "restaurant"
+                else -> "item"
+            }
         }
 
         val menuItemId = if (scope == "item") dialogBinding.inputMenuItemPicker.tag as? Int else null
@@ -715,6 +900,7 @@ class OfferManagerActivity : AppCompatActivity() {
         var offerPrice: Double? = null
         var discountPercent: Double? = null
         var discountFlat: Double? = null
+        var comboItems: List<ComboItemBody>? = null
 
         when (offerType) {
             "quantity_deal", "buy_x_for_y" -> {
@@ -747,6 +933,39 @@ class OfferManagerActivity : AppCompatActivity() {
                     return false
                 }
             }
+            "combo" -> {
+                // Migration 50 — offer_price is reused as the combo's
+                // fixed bundle price, same wire field quantity_deal/
+                // buy_x_for_y validate above, just read from the
+                // combo-only inputComboPrice field (see that field's own
+                // layout comment for why it can't be the same View).
+                offerPrice = dialogBinding.inputComboPrice.text?.toString()?.trim()?.toDoubleOrNull()
+                if (offerPrice == null || offerPrice <= 0) {
+                    InAppNotifier.show(this, getString(R.string.offer_create_failed), InAppNotifier.Type.ERROR)
+                    return false
+                }
+                // De-duplicate by menu_item_id client-side (last row
+                // wins) — same tolerance offers-create.php's own
+                // combo_items validation extends server-side, so a
+                // restaurant who accidentally picks the same item twice
+                // gets a working combo instead of a raw validation error.
+                val collected = LinkedHashMap<Int, Int>()
+                for (i in 0 until dialogBinding.comboItemsContainer.childCount) {
+                    val row = dialogBinding.comboItemsContainer.getChildAt(i)
+                    val picker = row.findViewById<AutoCompleteTextView>(R.id.inputComboItemPicker)
+                    val qtyField = row.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.inputComboItemQty)
+                    val itemId = picker?.tag as? Int
+                    val qty = qtyField?.text?.toString()?.trim()?.toIntOrNull()
+                    if (itemId != null && qty != null && qty >= 1) {
+                        collected[itemId] = qty
+                    }
+                }
+                if (collected.size < 2) {
+                    InAppNotifier.show(this, getString(R.string.offer_combo_min_items_error), InAppNotifier.Type.ERROR)
+                    return false
+                }
+                comboItems = collected.map { (id, qty) -> ComboItemBody(menuItemId = id, requiredQty = qty) }
+            }
             // free_delivery needs none of the above.
         }
 
@@ -768,6 +987,26 @@ class OfferManagerActivity : AppCompatActivity() {
         val totalLimit = dialogBinding.inputTotalLimit.text?.toString()?.trim()?.toIntOrNull()
         val perCustomerLimit = dialogBinding.inputPerCustomerLimit.text?.toString()?.trim()?.toIntOrNull()
         val allowCouponStacking = dialogBinding.switchAllowCouponStacking.isChecked
+
+        // Migration 49 — apply_mode. code/is_public only matter (and are
+        // only read) when coupon_based is selected; left null otherwise,
+        // matching offers-create.php's own "code required only for
+        // coupon_based" validation.
+        val applyMode = if (dialogBinding.applyModeGroup.checkedChipId == dialogBinding.chipApplyModeCouponBased.id) {
+            "coupon_based"
+        } else {
+            "default"
+        }
+        var offerCode: String? = null
+        var isPublic: Boolean? = null
+        if (applyMode == "coupon_based") {
+            offerCode = dialogBinding.inputOfferCode.text?.toString()?.trim().orEmpty()
+            if (offerCode.isEmpty()) {
+                InAppNotifier.show(this, getString(R.string.offer_code_required_error), InAppNotifier.Type.ERROR)
+                return false
+            }
+            isPublic = dialogBinding.switchOfferPublic.isChecked
+        }
 
         lifecycleScope.launch {
             try {
@@ -794,7 +1033,11 @@ class OfferManagerActivity : AppCompatActivity() {
                         dailyLimit = dailyLimit,
                         totalLimit = totalLimit,
                         perCustomerLimit = perCustomerLimit,
-                        allowCouponStacking = allowCouponStacking
+                        allowCouponStacking = allowCouponStacking,
+                        applyMode = applyMode,
+                        code = offerCode,
+                        isPublic = isPublic,
+                        comboItems = comboItems
                     )
                 )
                 val created = response.body()?.data?.offer
@@ -848,6 +1091,15 @@ class OfferManagerActivity : AppCompatActivity() {
         val totalLimit = dialogBinding.inputTotalLimit.text?.toString()?.trim()?.toIntOrNull()
         val perCustomerLimit = dialogBinding.inputPerCustomerLimit.text?.toString()?.trim()?.toIntOrNull()
         val allowCouponStacking = dialogBinding.switchAllowCouponStacking.isChecked
+        // is_public is only meaningful for a coupon_based offer —
+        // showEditOfferDialog() only shows offerPublicRow for one, so
+        // its visibility is the signal for whether to send this field
+        // at all (a "default" offer has nothing here to change).
+        val isPublic = if (dialogBinding.offerPublicRow.visibility == View.VISIBLE) {
+            dialogBinding.switchOfferPublic.isChecked
+        } else {
+            null
+        }
 
         lifecycleScope.launch {
             try {
@@ -865,7 +1117,8 @@ class OfferManagerActivity : AppCompatActivity() {
                         dailyLimit = dailyLimit,
                         totalLimit = totalLimit,
                         perCustomerLimit = perCustomerLimit,
-                        allowCouponStacking = allowCouponStacking
+                        allowCouponStacking = allowCouponStacking,
+                        isPublic = isPublic
                     )
                 )
                 val updated = response.body()?.data?.offer

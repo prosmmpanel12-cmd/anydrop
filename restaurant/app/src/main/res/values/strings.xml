@@ -215,13 +215,39 @@
     <string name="offer_type_percent_discount">% discount</string>
     <string name="offer_type_flat_discount">₹ flat discount</string>
     <string name="offer_type_free_delivery">Free delivery</string>
+    <string name="offer_type_combo">Combo / bundle</string>
     <string name="offer_edit_type_locked_fmt">Type: %1$s (can\'t be changed after creation)</string>
+
+    <!-- Migration 49 — apply_mode (Default vs Coupon Based). -->
+    <string name="offer_hint_apply_mode">How should this offer apply?</string>
+    <string name="offer_apply_mode_default_label">Default</string>
+    <string name="offer_apply_mode_coupon_based_label">Coupon Based</string>
+    <string name="offer_hint_code">Coupon code (e.g. SAVE20)</string>
+    <string name="offer_apply_mode_locked_default_fmt">Apply mode: Default — applies automatically, no code (can\'t be changed after creation)</string>
+    <string name="offer_apply_mode_locked_coupon_based_fmt">Apply mode: Coupon Based — code %1$s (can\'t be changed after creation)</string>
+    <string name="offer_public_toggle_label">Show on offers screen</string>
+    <string name="offer_public_toggle_hint">Public coupon-based offers are auto-suggested to customers on the offers screen. Private ones only apply if the customer types the exact code.</string>
+    <string name="offer_code_required_error">Enter a coupon code for a Coupon Based offer</string>
 
     <string name="offer_hint_required_qty">Required quantity</string>
     <string name="offer_hint_offer_price">Offer price (₹)</string>
     <string name="offer_hint_get_qty">Free quantity</string>
     <string name="offer_hint_discount_percent">Discount percent</string>
     <string name="offer_hint_discount_flat">Flat discount (₹)</string>
+
+    <!-- Migration 50 / docs/40 — combo/bundle. offer_price is a
+         distinct field (inputComboPrice) from inputOfferPrice above
+         since a View can't live in two mutually-exclusive mechanic
+         groups at once; both wire to the same OfferCreateBody.offerPrice
+         field server-side. -->
+    <string name="offer_hint_combo_items">Combo items (add 2 or more)</string>
+    <string name="offer_hint_combo_price">Bundle price (₹)</string>
+    <string name="offer_hint_combo_item_picker">Menu item</string>
+    <string name="offer_hint_combo_item_qty">Qty</string>
+    <string name="btn_add_combo_item">+ Add item</string>
+    <string name="offer_combo_min_items_error">Add at least 2 different menu items to the combo</string>
+    <string name="offer_combo_items_locked_fmt">Combo items (can\'t be changed after creation): %1$s</string>
+    <string name="offer_combo_item_line_fmt">%1$d× %2$s</string>
 
     <string name="offer_free_delivery_notice">Free Delivery offer: the customer won\'t be charged a delivery fee — the delivery fee will be deducted from your (restaurant\'s) settlement instead.\nनिःशुल्क डिलीवरी ऑफर: ग्राहक से डिलीवरी शुल्क नहीं लिया जाएगा — यह शुल्क आपके (रेस्टोरेंट के) सेटलमेंट में से काटा जाएगा।</string>
     <string name="offer_hint_scope">Applies to</string>

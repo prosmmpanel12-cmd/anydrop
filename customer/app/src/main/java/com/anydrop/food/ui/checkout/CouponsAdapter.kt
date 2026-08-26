@@ -43,6 +43,13 @@ class CouponsAdapter(
             val ctx = binding.root.context
             binding.couponCode.text = coupon.code
             binding.couponDiscountLine.text = when {
+                // Migration 49 — a coupon_based restaurant offer (B1G1,
+                // % off, etc.) has no single discount_value the way a
+                // real coupon does; offerLabel is the same human-
+                // readable badge (offer_badge_label()) menu/search item
+                // tags already show for the auto-applied version of
+                // this offer type.
+                coupon.discountType == "offer" && coupon.offerLabel != null -> coupon.offerLabel
                 coupon.discountType == "percent" && coupon.maxDiscountAmount != null ->
                     ctx.getString(
                         R.string.coupon_percent_off_capped,

@@ -26,11 +26,22 @@
  * coupons) is checked the same way price_cart() does, so a coupon that
  * would immediately fail as coupon_usage_limit_reached at Apply time is
  * flagged not-usable here instead of listed as if it works.
+ *
+ * Migration 49 — a restaurant's own public coupon_based promo_offers
+ * are now folded into this same list (second query below, reshaped
+ * into the identical response object coupons already return) so the
+ * checkout "View all offers" screen doesn't need a separate section —
+ * to the customer, a coupon_based offer's code behaves exactly like a
+ * coupon's code, only its origin table differs. Private (is_public=0)
+ * coupon_based offers are excluded here for the identical reason
+ * private coupons already are — still fully redeemable by typed code,
+ * just never suggested.
  */
 
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
+require_once __DIR__ . '/../../../lib/offers.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -96,4 +107,55 @@ $result = array_map(function (array $c) use ($db, $customerId, $itemTotal) {
     ];
 }, $coupons);
 
-respond_ok(['coupons' => $result]);
+// Migration 49 — public coupon_based promo_offers, reshaped into the
+// exact same object shape as the coupons above. discount_type/
+// discount_value are approximated from offer_badge_label()'s own
+// per-type formatting logic (e.g. buy_x_get_y has no single
+// "discount_value" number the way percent/flat coupons do) — this
+// list is a *preview*, same "browse-time badge is approximate,
+// checkout is authoritative" split get_browsable_offers_for_restaurant()
+// itself documents; is_offer_eligible()/compute_offer_discount() at
+// Apply time (price_cart(), via the checkout coupon-code box) remain
+// the one real check.
+$offerStmt = $db->prepare(
+    "SELECT * FROM promo_offers
+     WHERE restaurant_id = :rid AND apply_mode = 'coupon_based' AND is_public = 1
+       AND status = 'active' AND deleted_at IS NULL
+       AND (start_date IS NULL OR start_date <= CURDATE())
+       AND (end_date IS NULL OR end_date >= CURDATE())"
+);
+$offerStmt->execute(['rid' => $restaurantId]);
+$codeOffers = $offerStmt->fetchAll();
+
+$offerResult = array_map(function (array $o) use ($db, $customerId, $itemTotal) {
+    $minOrder = (float) $o['min_order_amount'];
+
+    $usageExhausted = !is_offer_usage_available($db, $o, $customerId);
+    $timeIneligible = !is_offer_time_eligible($o);
+    $belowMinOrder = $itemTotal !== null && $itemTotal < $minOrder;
+
+    $ineligibleReason = $usageExhausted
+        ? 'usage_limit_reached'
+        : ($timeIneligible ? 'not_available_right_now' : ($belowMinOrder ? 'below_min_order' : null));
+
+    return [
+        'code' => $o['code'],
+        // No single discount_type/discount_value for every offer_type
+        // (see offer_badge_label()'s own per-type switch) — 'offer' is
+        // a distinct discount_type value the app's coupon UI treats as
+        // "show offer_label instead of a %/₹ value", not a real coupon
+        // discount_type from the enum coupons.discount_type uses.
+        'discount_type' => 'offer',
+        'discount_value' => 0.0,
+        'offer_label' => offer_badge_label($o),
+        'min_order_amount' => $minOrder,
+        'max_discount_amount' => $o['max_discount_amount'] !== null ? (float) $o['max_discount_amount'] : null,
+        'valid_until' => $o['end_date'],
+        'is_restaurant_specific' => true,
+        'is_eligible' => !$usageExhausted && !$timeIneligible && !$belowMinOrder,
+        'ineligible_reason' => $ineligibleReason,
+        'amount_needed_to_unlock' => $belowMinOrder && $itemTotal !== null ? round($minOrder - $itemTotal, 2) : null,
+    ];
+}, $codeOffers);
+
+respond_ok(['coupons' => array_values(array_merge($result, $offerResult))]);

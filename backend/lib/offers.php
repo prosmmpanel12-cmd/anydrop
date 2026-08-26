@@ -20,10 +20,21 @@
  * v1 rule.
  *
  * WHAT THIS FILE DOES NOT DO (see migration 47's own header for the
- * full list): combo/bundle offers, offer analytics, an admin
- * pre-publish approval queue. Every restaurant-created offer is live
- * the moment it's created (status defaults 'active') — admin's only
- * lever is pausing/disabling it after the fact.
+ * full list): offer analytics, an admin pre-publish approval queue.
+ * Every restaurant-created offer is live the moment it's created
+ * (status defaults 'active') — admin's only lever is pausing/
+ * disabling it after the fact.
+ *
+ * COMBO/BUNDLE OFFERS (offer_type='combo', migration 50, docs/40) —
+ * matching + discount calc live here (get_offer_combo_items() +
+ * compute_offer_discount()'s 'combo' case below); a combo is the one
+ * offer_type that does NOT go through get_offer_scoped_lines(), since
+ * it needs a *set* of distinct menu items rather than one
+ * item/category/restaurant scope — see docs/40 Step 2 for the full
+ * reasoning. Checkout re-validation (docs/40 Step 3), Restaurant App
+ * create UI (Step 4), Admin visibility (Step 5), and Customer App
+ * display (Step 6) are separate, not-yet-done steps — see docs/40 for
+ * per-step status.
  */
 
 require_once __DIR__ . '/../config/database.php';
@@ -56,6 +67,114 @@ function get_date_eligible_offers_for_restaurant(PDO $db, int $restaurantId): ar
     );
     $stmt->execute(['rid' => $restaurantId]);
     return $stmt->fetchAll();
+}
+
+/**
+ * Migration 49 — looks up a single coupon_based offer by the code the
+ * customer typed at checkout, scoped to this restaurant (a
+ * coupon_based offer, unlike a platform coupon, always belongs to one
+ * restaurant — same restaurant_id NOT NULL every other promo_offers
+ * row already has). Returns null on no match; caller (price_cart()'s
+ * coupon block) treats that exactly like an unmatched coupons.code —
+ * `invalid_coupon`. Does NOT check status/date/time/eligibility/usage
+ * here — same "lookup vs eligibility are separate steps" split
+ * get_date_eligible_offers_for_restaurant() + is_offer_eligible()
+ * already follow for the auto path, so callers can distinguish "no
+ * such code" from "code exists but isn't usable right now" (a min-
+ * order-not-met message, not a flat invalid-code message).
+ */
+function find_coupon_based_offer_by_code(PDO $db, int $restaurantId, string $code): ?array
+{
+    $stmt = $db->prepare(
+        "SELECT * FROM promo_offers
+         WHERE restaurant_id = :rid
+           AND apply_mode = 'coupon_based'
+           AND code = :code
+           AND status = 'active'
+           AND deleted_at IS NULL
+           AND (start_date IS NULL OR start_date <= CURDATE())
+           AND (end_date IS NULL OR end_date >= CURDATE())
+         LIMIT 1"
+    );
+    $stmt->execute(['rid' => $restaurantId, 'code' => strtoupper(trim($code))]);
+    $row = $stmt->fetch();
+    return $row !== false ? $row : null;
+}
+
+/**
+ * Migration 50 (docs/40) — the fixed item list for one combo offer:
+ * every distinct menu item required in the bundle, plus how many of
+ * each. Returns an empty array for a combo row that (incorrectly, but
+ * not impossibly — e.g. mid-edit on the Restaurant App) has no rows
+ * yet; compute_offer_discount()'s 'combo' case treats that as a
+ * normal zero-discount non-match, same as every other "eligible but
+ * matches nothing" case in this file, not an error.
+ *
+ * @return array[] each row: menu_item_id, required_qty (both already
+ *   int-cast here so callers don't need to re-cast)
+ */
+function get_offer_combo_items(PDO $db, int $offerId): array
+{
+    $stmt = $db->prepare(
+        'SELECT menu_item_id, required_qty FROM offer_combo_items WHERE offer_id = :oid'
+    );
+    $stmt->execute(['oid' => $offerId]);
+    return array_map(
+        fn ($row) => ['menu_item_id' => (int) $row['menu_item_id'], 'required_qty' => (int) $row['required_qty']],
+        $stmt->fetchAll()
+    );
+}
+
+/**
+ * Migration 50/docs/40 Step 6 — resolves which menu items belong to
+ * which combo offer, once per restaurant's already-fetched browsable-
+ * offer set, so pick_item_badge_offer()/offer_badge_label() don't each
+ * re-query offer_combo_items per item (same "batch once, not N+1"
+ * discipline admin/offers.php's own Step 5 fix used).
+ *
+ * Two maps bundled in one return so callers needing both (every
+ * current caller does) only run one query:
+ *   - 'index': menu_item_id => the (lowest-id) combo offer id that
+ *     requires it. "Lowest id wins" if an item is somehow named by two
+ *     different live combos — same oldest-offer-first tie-break every
+ *     other precedence tier in this file already applies.
+ *   - 'names': offer_id => [menu_item_id => name], the combo's full
+ *     item set with display names, for offer_badge_label()'s 'combo'
+ *     case to list "the OTHER items" without a second query.
+ *
+ * Returns two empty arrays (no query run) when $offers has no combo
+ * rows — the common case for most restaurants.
+ */
+function index_combo_offers(PDO $db, array $offers): array
+{
+    $comboOfferIds = array_values(array_map(
+        fn ($o) => (int) $o['id'],
+        array_filter($offers, fn ($o) => $o['offer_type'] === 'combo')
+    ));
+    if (empty($comboOfferIds)) {
+        return ['index' => [], 'names' => []];
+    }
+
+    $placeholders = implode(',', array_fill(0, count($comboOfferIds), '?'));
+    $stmt = $db->prepare(
+        "SELECT oci.offer_id, oci.menu_item_id, m.name AS item_name
+         FROM offer_combo_items oci
+         JOIN menu_items m ON m.id = oci.menu_item_id
+         WHERE oci.offer_id IN ($placeholders)"
+    );
+    $stmt->execute($comboOfferIds);
+
+    $index = [];
+    $names = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $offerId = (int) $row['offer_id'];
+        $itemId = (int) $row['menu_item_id'];
+        $names[$offerId][$itemId] = $row['item_name'];
+        if (!isset($index[$itemId])) {
+            $index[$itemId] = $offerId;
+        }
+    }
+    return ['index' => $index, 'names' => $names];
 }
 
 /**
@@ -306,6 +425,70 @@ function compute_offer_discount(PDO $db, array $offer, array $lineItems): array
             $discount = (float) $offer['discount_flat'];
             return ['discount' => min($discount, $scopedSubtotal), 'matched_qty' => $matchedQty, 'free_units' => 0, 'item_label' => null];
 
+        case 'combo':
+            // docs/40 Step 2 — a combo ignores $scopedLines/$matchedQty/
+            // $scopedSubtotal above entirely (those come from `scope`,
+            // which migration 50 deliberately leaves unused/'restaurant'
+            // for a combo row — see this file's header comment and the
+            // migration's own header). Matching here is driven purely by
+            // offer_combo_items: a specific set of distinct menu items,
+            // each with its own required_qty.
+            $comboItems = get_offer_combo_items($db, (int) $offer['id']);
+            if (empty($comboItems)) {
+                return ['discount' => 0.0, 'matched_qty' => 0, 'free_units' => 0, 'item_label' => null];
+            }
+
+            // Collapse the cart into one qty/unit_price entry per
+            // menu_item_id (a cart can carry the same item split across
+            // multiple lines — e.g. two Burger lines with different
+            // special_instructions — so this must sum, not overwrite;
+            // unit_price is taken from whichever line is seen first,
+            // same "one blended rate stands in for the item" reasoning
+            // the quantity_deal/buy_x_get_y cases above already use via
+            // their own $avgUnitPrice).
+            $cartByItem = [];
+            foreach ($lineItems as $line) {
+                $mid = (int) $line['menu_item_id'];
+                if (!isset($cartByItem[$mid])) {
+                    $cartByItem[$mid] = ['quantity' => 0, 'unit_price' => (float) $line['unit_price']];
+                }
+                $cartByItem[$mid]['quantity'] += (int) $line['quantity'];
+            }
+
+            // All-or-nothing (docs/40: "a combo is all-or-nothing, not
+            // partial credit") — every required ingredient must clear
+            // its own required_qty or this combo contributes zero
+            // discount. While checking, also track the smallest
+            // "how many full sets fit" across ingredients (same
+            // intdiv()-based approach quantity_deal uses above, applied
+            // per-ingredient) — the whole combo is capped by whichever
+            // ingredient runs out first.
+            $maxSets = null;
+            $normalCostPerSet = 0.0;
+            $totalRequiredQtyPerSet = 0;
+            foreach ($comboItems as $ci) {
+                $mid = $ci['menu_item_id'];
+                $reqQty = $ci['required_qty'];
+                if ($reqQty <= 0 || !isset($cartByItem[$mid]) || $cartByItem[$mid]['quantity'] < $reqQty) {
+                    return ['discount' => 0.0, 'matched_qty' => 0, 'free_units' => 0, 'item_label' => null];
+                }
+                $normalCostPerSet += $cartByItem[$mid]['unit_price'] * $reqQty;
+                $totalRequiredQtyPerSet += $reqQty;
+                $setsForThisItem = intdiv($cartByItem[$mid]['quantity'], $reqQty);
+                $maxSets = $maxSets === null ? $setsForThisItem : min($maxSets, $setsForThisItem);
+            }
+
+            $offerPrice = (float) $offer['offer_price'];
+            // Same "never negative" guard every other offer_type case
+            // above already applies (e.g. quantity_deal's $discountPerSet).
+            $discountPerSet = max(0.0, $normalCostPerSet - $offerPrice);
+            return [
+                'discount' => round($discountPerSet * $maxSets, 2),
+                'matched_qty' => $totalRequiredQtyPerSet * $maxSets,
+                'free_units' => 0,
+                'item_label' => null,
+            ];
+
         default:
             // free_delivery has its own dedicated selection function
             // below (it doesn't discount item lines at all) — reaching
@@ -333,6 +516,14 @@ function select_best_auto_offer(PDO $db, int $restaurantId, array $lineItems, fl
     foreach ($offers as $offer) {
         if ($offer['offer_type'] === 'free_delivery') {
             continue; // separate slot, handled by select_best_free_delivery_offer()
+        }
+        // Migration 49 — coupon_based offers are never auto-applied;
+        // they only enter pricing when the customer types their code
+        // (see find_coupon_based_offer_by_code(), wired into
+        // price_cart()'s coupon block). ?? 'default' keeps this safe
+        // against a pre-migration-49 row shape in case of a stale cache.
+        if (($offer['apply_mode'] ?? 'default') !== 'default') {
+            continue;
         }
         if (!is_offer_eligible($db, $offer, $lineItems, $itemTotal, $customerId)) {
             continue;
@@ -377,6 +568,10 @@ function select_best_free_delivery_offer(PDO $db, int $restaurantId, float $item
         if ($offer['offer_type'] !== 'free_delivery') {
             continue;
         }
+        // Migration 49 — same coupon_based exclusion as select_best_auto_offer().
+        if (($offer['apply_mode'] ?? 'default') !== 'default') {
+            continue;
+        }
         if (!is_offer_eligible($db, $offer, [], $itemTotal, $customerId)) {
             continue;
         }
@@ -390,8 +585,25 @@ function select_best_free_delivery_offer(PDO $db, int $restaurantId, float $item
 }
 
 /** Shapes a promo_offers row for a Restaurant App / customer-facing API response. */
-function format_offer(array $offer): array
+// docs/40 Step 3b — $db is optional (defaults null) purely so every
+// existing call site that doesn't pass one still compiles/runs
+// unchanged; combo_items is only ever populated when a $db connection
+// is actually given AND the row is offer_type='combo' (get_offer_combo_items()
+// needs a real PDO to query the child table — there's no way to derive
+// combo_items from the promo_offers row alone, unlike every other
+// mechanic field above which lives directly on that row). Passing $db
+// is cheap (one extra indexed SELECT) so every restaurant-facing
+// caller (create/update/list) now does; a caller that omits it just
+// gets combo_items: [] for a combo row instead of erroring.
+function format_offer(array $offer, ?PDO $db = null): array
 {
+    $comboItems = [];
+    if ($db !== null && $offer['offer_type'] === 'combo') {
+        $comboItems = array_map(
+            fn ($ci) => ['menu_item_id' => (int) $ci['menu_item_id'], 'required_qty' => (int) $ci['required_qty']],
+            get_offer_combo_items($db, (int) $offer['id'])
+        );
+    }
     return [
         'id' => (int) $offer['id'],
         'offer_type' => $offer['offer_type'],
@@ -422,7 +634,19 @@ function format_offer(array $offer): array
         // a DB that hasn't run migration 48 yet, via the ?? fallback)
         // behaves exactly like today — coupon stacking allowed.
         'allow_coupon_stacking' => (bool) ($offer['allow_coupon_stacking'] ?? 1),
+        // Migration 49 — apply_mode/code/is_public. code is only ever
+        // non-null for apply_mode='coupon_based' (offers-create.php/
+        // offers-update.php enforce this at write time); returned here
+        // regardless so the Restaurant App's edit screen can show it back.
+        'apply_mode' => $offer['apply_mode'] ?? 'default',
+        'code' => $offer['code'] ?? null,
+        'is_public' => (bool) ($offer['is_public'] ?? 1),
         'created_at' => $offer['created_at'],
+        // docs/40 Step 3b — [] for every non-combo offer_type (and for
+        // any combo row fetched without a $db, see this function's own
+        // kdoc above), never null, so the Restaurant App/Admin can
+        // always safely iterate it without a null-check.
+        'combo_items' => $comboItems,
     ];
 }
 
@@ -453,6 +677,17 @@ function get_browsable_offers_for_restaurant(PDO $db, int $restaurantId, int $cu
         if ($offer['offer_type'] === 'free_delivery') {
             return false;
         }
+        // Migration 49 — a coupon_based offer isn't something a
+        // customer "gets" just by having the matching item/category in
+        // their cart, unlike a default auto-applied offer — it needs
+        // the code typed in, so it has no business badging a menu item
+        // or category the way an auto offer does. It can still be
+        // *listed* separately as a suggested coupon (coupons/list.php,
+        // gated on is_public instead) — this only controls the item-tag
+        // badge path.
+        if (($offer['apply_mode'] ?? 'default') !== 'default') {
+            return false;
+        }
         if (!is_offer_time_eligible($offer, $now)) {
             return false;
         }
@@ -467,7 +702,7 @@ function get_browsable_offers_for_restaurant(PDO $db, int $restaurantId, int $cu
  * own per-type field table. number_format(...,'0')-trimmed so a whole
  * number like 50.00 shows as "50", not "50.00".
  */
-function offer_badge_label(array $offer): string
+function offer_badge_label(array $offer, int $itemId = 0, array $comboNames = []): string
 {
     $trimNum = fn(float $n, int $decimals) => rtrim(rtrim(number_format($n, $decimals), '0'), '.');
     switch ($offer['offer_type']) {
@@ -480,6 +715,42 @@ function offer_badge_label(array $offer): string
             return $trimNum((float) $offer['discount_percent'], 1) . '% OFF';
         case 'flat_discount':
             return '₹' . $trimNum((float) $offer['discount_flat'], 2) . ' OFF';
+        case 'combo':
+            // docs/40 Step 6 — a combo pill can't just repeat the type or
+            // the offer's own title the way the default case below does:
+            // "Combo/Bundle" tells a customer nothing about what else to
+            // add or what it costs, unlike every other type's mechanic-
+            // derived label above. Names the OTHER required items (the
+            // item this badge is already sitting on doesn't need to name
+            // itself) plus the bundle price.
+            $others = [];
+            foreach (($comboNames[(int) $offer['id']] ?? []) as $otherItemId => $name) {
+                if ($otherItemId !== $itemId) {
+                    $others[] = $name;
+                }
+            }
+            $priceLabel = '₹' . $trimNum((float) $offer['offer_price'], 2);
+            if (empty($others)) {
+                // Defensive only — offers-create.php's own validation
+                // requires 2+ distinct items in every combo, so this
+                // item being the combo's ONLY resolved item shouldn't
+                // happen; falls back to a plain price pill rather than
+                // an empty "Combo w/" string if it ever does (e.g. a
+                // combo mid-edit with a since-deleted menu item row).
+                return 'Combo ' . $priceLabel;
+            }
+            // Pill has no max-width/ellipsize in any of its 5 layout
+            // uses (wrap_content, no maxLines — checked all 5 XML
+            // files this fix touches) — capped at 3 named items so a
+            // large combo still renders as a pill, not a full-width
+            // banner, on a small screen.
+            if (count($others) > 3) {
+                $shown = array_slice($others, 0, 3);
+                $label = 'Combo w/ ' . implode(', ', $shown) . ' +' . (count($others) - 3) . ' more';
+            } else {
+                $label = 'Combo w/ ' . implode(', ', $others);
+            }
+            return $label . ' — ' . $priceLabel;
         default:
             return $offer['title'];
     }
@@ -489,15 +760,23 @@ function offer_badge_label(array $offer): string
  * Picks the single best browsable offer for one menu item, out of
  * $browsableOffers (already restaurant-scoped and eligibility-
  * filtered by get_browsable_offers_for_restaurant()). Precedence is by
- * scope specificity — item-scoped beats category-scoped beats
- * restaurant-wide — same "more specific wins" intuition
+ * scope specificity — item-scoped beats category-scoped beats a combo
+ * beats restaurant-wide — same "more specific wins" intuition
  * select_best_auto_offer() applies at cart time; unlike that function
  * this doesn't compare discount *value*, since there's no cart amount
  * to compute an actual rupee discount against yet at browse time.
  * Oldest-id-first within a tier (array order, already ASC by id from
  * the DB query) breaks ties the same way select_best_auto_offer() does.
+ *
+ * $comboIndex is index_combo_offers()'s 'index' map (menu_item_id =>
+ * offer_id), built once per restaurant by the caller — a combo's own
+ * `scope` column is forced to 'restaurant' at creation time (migration
+ * 50) but is NOT actually restaurant-wide: it only ever applies to its
+ * own named item set. Checked as its own tier here, and explicitly
+ * EXCLUDED from the restaurant-wide tier below, so a live combo
+ * doesn't incorrectly badge every other item on the menu with its tag.
  */
-function pick_item_badge_offer(array $browsableOffers, int $itemId, ?int $categoryId): ?array
+function pick_item_badge_offer(array $browsableOffers, int $itemId, ?int $categoryId, array $comboIndex = []): ?array
 {
     foreach ($browsableOffers as $offer) {
         if ($offer['scope'] === 'item' && (int) $offer['menu_item_id'] === $itemId) {
@@ -511,8 +790,16 @@ function pick_item_badge_offer(array $browsableOffers, int $itemId, ?int $catego
             }
         }
     }
+    if (isset($comboIndex[$itemId])) {
+        $comboOfferId = $comboIndex[$itemId];
+        foreach ($browsableOffers as $offer) {
+            if ((int) $offer['id'] === $comboOfferId) {
+                return $offer;
+            }
+        }
+    }
     foreach ($browsableOffers as $offer) {
-        if ($offer['scope'] === 'restaurant') {
+        if ($offer['scope'] === 'restaurant' && $offer['offer_type'] !== 'combo') {
             return $offer;
         }
     }
