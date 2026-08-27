@@ -406,8 +406,9 @@ screen, Phase 5").
 
 ## 11b. Customer App — Complete Profile After OTP Login (name + mobile)
 
-**Status:** 🟡 BACKEND BUILT, ANDROID NOT STARTED 2026-08-27 (session 13).
-See `docs/52_Handover_2026-08-27_Admin_Feedback_View_And_Customer_Complete_Profile_Built.md`.
+**Status:** 🟡 SOURCE COMPLETE 2026-08-27 (session 14), NOT DEVICE/BUILD-VERIFIED.
+See `docs/52_Handover_2026-08-27_Admin_Feedback_View_And_Customer_Complete_Profile_Built.md`
+and `docs/53_Handover_2026-08-27_Complete_Profile_Android_Side_Built.md`.
 
 `customers.name` / `customers.mobile` (`01_Database_Schema.md`) have
 always been nullable — email-OTP signup never collected either. App
@@ -419,21 +420,23 @@ verification succeeds, before Home.
       `{name, mobile}`, validates 10-digit mobile, rejects duplicate
       mobile, updates the row
 - [x] `.htaccess` clean route added
-- [ ] Add `mobile` to the `Customer` model in `Models.kt`
-- [ ] `CompleteProfileBody`/`CompleteProfileResult` models
-- [ ] `ApiService.kt` — `completeProfile()` call
-- [ ] New `CompleteProfileActivity.kt` + `activity_complete_profile.xml`
+- [x] Add `mobile` to the `Customer` model in `Models.kt`
+- [x] `CompleteProfileBody`/`CompleteProfileResult` models
+- [x] `ApiService.kt` — `completeProfile()` call
+- [x] New `CompleteProfileActivity.kt` + `activity_complete_profile.xml`
       (name + mobile fields, same visual style as `activity_login.xml`)
-- [ ] `ic_phone.xml` drawable (doesn't exist yet — `ic_mail`/`ic_person`/
+- [x] `ic_phone.xml` drawable (doesn't exist yet — `ic_mail`/`ic_person`/
       `ic_lock` do)
-- [ ] Register the new activity in `AndroidManifest.xml`
-- [ ] Wire `LoginActivity.onVerifyOtp()` — if the returned
+- [x] Register the new activity in `AndroidManifest.xml`
+- [x] Wire `LoginActivity.onVerifyOtp()` — if the returned
       `customer.name` or `customer.mobile` is null, navigate to
       `CompleteProfileActivity` instead of straight to `HomeActivity`
 - [ ] Device/build-verify the full OTP → complete-profile → Home flow
+      (no Android SDK/emulator in this sandbox — needs Android Studio)
 
 ### Main docs
 - `docs/52_Handover_2026-08-27_Admin_Feedback_View_And_Customer_Complete_Profile_Built.md`
+- `docs/53_Handover_2026-08-27_Complete_Profile_Android_Side_Built.md`
 
 ---
 

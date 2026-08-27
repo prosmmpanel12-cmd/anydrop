@@ -25,6 +25,11 @@ interface ApiService {
     @POST("auth/customer-verify-otp.php")
     suspend fun verifyOtp(@Body body: VerifyOtpBody): Response<ApiResponse<AuthResult>>
 
+    // One-time "tell us your name + number" step, called right after
+    // verifyOtp when customer.name or customer.mobile comes back null.
+    @POST("customer/complete-profile.php")
+    suspend fun completeProfile(@Body body: CompleteProfileBody): Response<ApiResponse<CompleteProfileResult>>
+
     @GET("restaurants/list.php")
     suspend fun getRestaurants(
         @Query("lat") lat: Double? = null,

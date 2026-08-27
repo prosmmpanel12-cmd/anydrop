@@ -178,7 +178,20 @@ class LoginActivity : AppCompatActivity() {
                         email = currentEmail
                     )
                     InAppNotifier.show(this@LoginActivity, "Welcome to Anydrop!", InAppNotifier.Type.SUCCESS)
-                    startActivity(Intent(this@LoginActivity, HomeActivity::class.java))
+
+                    // Doc 52 — brand-new email-OTP signups have null
+                    // name/mobile on the customer row; send them to fill
+                    // that in before Home. Returning customers who already
+                    // did this on a previous login get both fields back
+                    // populated and skip straight through.
+                    val customer = body.data.customer
+                    val needsProfile = customer?.name.isNullOrBlank() || customer?.mobile.isNullOrBlank()
+                    val destination = if (needsProfile) {
+                        CompleteProfileActivity::class.java
+                    } else {
+                        HomeActivity::class.java
+                    }
+                    startActivity(Intent(this@LoginActivity, destination))
                     finish()
                 } else {
                     val err = body?.error ?: "Invalid or expired code"

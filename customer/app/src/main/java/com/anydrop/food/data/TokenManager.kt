@@ -21,6 +21,21 @@ class TokenManager(context: Context) {
 
     fun isLoggedIn(): Boolean = !getToken().isNullOrEmpty()
 
+    // Set once CompleteProfileActivity finishes successfully, so a
+    // returning customer's next launch doesn't re-prompt them (see
+    // LoginActivity.onVerifyOtp's null-check, which is the primary
+    // signal — this local flag is just a fast-path cache of it).
+    fun setProfileComplete(name: String, mobile: String) {
+        prefs.edit()
+            .putString(KEY_NAME, name)
+            .putString(KEY_MOBILE, mobile)
+            .apply()
+    }
+
+    fun getName(): String? = prefs.getString(KEY_NAME, null)
+
+    fun getMobile(): String? = prefs.getString(KEY_MOBILE, null)
+
     fun clear() {
         prefs.edit().clear().apply()
     }
@@ -29,5 +44,7 @@ class TokenManager(context: Context) {
         private const val KEY_TOKEN = "token"
         private const val KEY_CUSTOMER_ID = "customer_id"
         private const val KEY_EMAIL = "email"
+        private const val KEY_NAME = "name"
+        private const val KEY_MOBILE = "mobile"
     }
 }

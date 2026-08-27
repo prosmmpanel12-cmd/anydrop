@@ -36,13 +36,21 @@ data class VerifyOtpBody(val email: String, val otp: String)
 data class Customer(
     val id: Int,
     val name: String?,
-    val email: String?
+    val email: String?,
+    val mobile: String?
 )
 
 data class AuthResult(
     val customer: Customer?,
     val token: String?
 )
+
+// backend/api/v1/customer/complete-profile.php — one-time step after
+// email-OTP signup to collect name + mobile (both nullable on signup).
+// Not a general profile-edit endpoint; see the PHP file's own kdoc.
+data class CompleteProfileBody(val name: String, val mobile: String)
+
+data class CompleteProfileResult(val customer: Customer?)
 
 data class MessageOnly(val message: String?)
 

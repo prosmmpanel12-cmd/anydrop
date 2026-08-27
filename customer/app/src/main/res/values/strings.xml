@@ -25,6 +25,14 @@
     <string name="btn_verify_otp">Verify &amp; Continue</string>
     <string name="btn_resend_otp">Resend code</string>
 
+    <!-- Complete Profile — shown once after OTP verify if name/mobile
+         are still null on the customer row (first-time signup only). -->
+    <string name="complete_profile_title">Tell us about you</string>
+    <string name="complete_profile_subtitle">Just your name and number, so restaurants and your rider can reach you</string>
+    <string name="hint_full_name">Full name</string>
+    <string name="hint_mobile_number">Mobile number</string>
+    <string name="btn_save_continue">Save &amp; Continue</string>
+
     <!-- Home -->
     <string name="hint_search">Search for restaurant, cuisine or a dish</string>
     <string name="voice_search">Voice search</string>

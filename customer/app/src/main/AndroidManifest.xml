@@ -71,6 +71,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".ui.login.CompleteProfileActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".ui.home.HomeActivity"
             android:exported="false" />
 
