@@ -1,3 +1,12 @@
+NOTE (2026-08-27): Superseded — this prompt's own combo/bundle work is
+long done (Status.md's 2026-08-25/26 entries, closes docs/40's plan).
+Current handover is `NEXT_SESSION_PROMPT.md` at the project root; start
+there instead.
+
+Original content below, kept for history only:
+
+---
+
 Anydrop project zip attached. Unzip it, read recall.md fully (start
 with section 0/33's Phase D item 29 entry — the combo/bundle log —
 then jump to docs/40_Plan_Combo_Bundle_Offer_Type_2026-08-25.md for

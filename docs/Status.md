@@ -4361,3 +4361,120 @@ Per `PENDING.md` item 31's existing "full build/device/live DB
 regression" requirement — this feature is one more item on that same
 standing list, not a special case.
 
+
+## Restaurant Insights Tab — built end-to-end (2026-08-27) — closes PENDING.md item 3
+
+Full detail: `docs/49_Handover_2026-08-27_Restaurant_Insights_Tab_Built.md`.
+
+Picked as this session's target after confirming (by reading actual
+code, not old docs) that review moderation and the Support Ticket
+System admin side were already both done — Restaurant Insights was
+the genuine remaining placeholder (`InsightsFragment.kt` was an empty
+shell, no `restaurant/insights.php` existed).
+
+Built: `backend/api/v1/restaurant/insights.php` (new, no migration
+needed), `ui/insights/OrdersBarChartView.kt` (new custom bar chart —
+no charting library exists in this project), `InsightsFragment.kt`
+rewritten from placeholder, `fragment_insights.xml` rewritten,
+`skeleton_insights.xml` + `item_insight_top_item.xml` +
+`divider_line.xml` new, `Models.kt`/`ApiService.kt` extended.
+
+Deliberately out of scope (flagged in doc 49): Peak hours (not in
+§6's actual spec, only in PENDING.md's broader wishlist), Export
+PDF/Excel (no existing pattern to extend).
+
+Not build/device-verified — no PHP CLI/Android SDK/live DB/device in
+this sandbox, same standing limitation as every prior session. Full
+verification checklist in doc 49.
+
+**Next session:** Admin Analytics remaining filters
+(State/District/Restaurant/Category) + Rider/Payment/Coupon analytics
++ Export, per the app owner's own framing and doc 49's reasoning.
+
+
+## Admin Analytics — remaining scope built (2026-08-27, session 11) — closes PENDING.md item 2's written scope
+
+Full detail: `docs/50_Handover_2026-08-27_Admin_Analytics_Filters_Riders_Payments_Coupons_Export_Built.md`.
+(Entry added retroactively during a later session's doc-audit — this
+was missed from Status.md when it happened.)
+
+Extended `backend/admin/analytics.php` with State/District/Restaurant/
+Category filters (AND-combined with the existing Area filter, one
+shared query-extension pattern), a new Riders section (delivered
+count/revenue/avg delivery time per rider — `orders.rider_id` is a
+real, populated column, confirmed directly against `01_schema.sql`,
+overriding doc 44's older "no Rider App data" framing), a Payments
+section (UPI vs COD), a Coupons section (usage/unique customers/
+discount, off the order's own `discount_amount` snapshot, not the
+coupon's current live value), and a CSV Export gated on the
+pre-existing `reports_export` permission — first export pattern in
+this codebase.
+
+Not build/device-verified — same standing sandbox limitation. Full
+10-item checklist in doc 50.
+
+
+## Doc-accuracy correction (2026-08-27, session 12) — PENDING.md item 4 was stale
+
+`PENDING.md` item 4 ("Full Restaurant Offers Engine") was still marked
+`PENDING` with every checklist box unchecked. This was wrong — this
+file's own "Combo/Bundle Offer Type — Step 6 done ... closes docs/40's
+plan, Steps 1-6 all done" entry above already documents that every
+offer type, the full rule engine, the Restaurant App UI, the Home/
+Search/menu badge pills, the Offers browse screen, and the checkout
+offer strip are built. Re-confirmed directly against current code
+(`lib/offers.php`, `OfferManagerActivity.kt`, `CheckoutActivity.kt`,
+`OfferScreenActivity.kt`) before writing this correction. PENDING.md
+item 4 updated to 🟡 BUILT — NOT build/device-verified, same status
+pattern as items 2/3. Item 1 (Admin Order Control) had the same
+problem (stale PENDING despite `docs/42` confirming it built) and was
+corrected too. No feature code changed for these corrections.
+
+
+## Admin panel: Settlements CSV Export built (2026-08-27, session 12)
+
+Full detail: `docs/51_Handover_2026-08-27_Doc_Audit_And_Settlements_Export_Built.md`.
+
+After the doc-audit corrections above, checked Admin panel side
+specifically for a genuine remaining gap (app owner's own ask). Found
+`admin/settlements.php` (Payout Analytics + Ledger Statement) had no
+CSV export — same gap `analytics.php` had before doc 50, confirmed by
+grep (`Content-Disposition` — zero results in this file before this
+session).
+
+Built, reusing doc 50's exact pattern: gated on the same
+`reports_export` permission (migration 29, no new permission needed),
+`fputcsv`/`Content-Disposition` streaming to `php://output`. Exports
+Payout Analytics stat-card figures + the full Ledger Statement (200
+rows) + Settlement History (50 rows), per-restaurant, for whichever
+`payout_range` is selected. Writes a `settlement_exported` audit log
+entry. No new migration.
+
+Not build/device-verified — same standing sandbox limitation. Full
+5-item checklist in doc 51.
+
+
+## Admin Customer-Feedback View built; Customer Complete-Profile backend built (2026-08-27, session 13)
+
+Full detail: `docs/52_Handover_2026-08-27_Admin_Feedback_View_And_Customer_Complete_Profile_Built.md`.
+
+App owner asked for two things: (1) an admin screen for customer
+feedback, (2) ask name + mobile from the customer right after
+email-OTP login, in the customer app.
+
+(1) is fully built: migration 55 (`feedback_view` permission) +
+`admin/customer-feedback.php` (read-only list, star-rating filter
+chips, message search) + sidebar nav entry. Closes the TODO that's
+been sitting in `api/v1/customer/feedback.php`'s own kdoc since Phase
+3.6 ("Reviewable directly in the `feedback` table, or a future Admin
+Panel screen").
+
+(2) is backend-only this session: `api/v1/customer/complete-profile.php`
+(auth'd, validates name + 10-digit mobile, rejects duplicate mobile)
+plus the `.htaccess` route. The Android side — new
+`CompleteProfileActivity`, model/API wiring, and routing it in after
+`LoginActivity.onVerifyOtp()` when `customer.name`/`mobile` come back
+null — is NOT started. Full step-by-step for next session is in doc
+52 and `PENDING.md` item 11b.
+
+Not build/device-verified — same standing sandbox limitation.

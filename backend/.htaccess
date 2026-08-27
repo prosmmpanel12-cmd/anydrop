@@ -48,6 +48,7 @@ RewriteRule ^api/v1/home/popular-items/?$ api/v1/home/popular-items.php [L,QSA]
 RewriteRule ^api/v1/customer/favorites/?$ api/v1/customer/favorites.php [L,QSA]
 RewriteRule ^api/v1/customer/faqs/?$ api/v1/customer/faqs.php [L,QSA]
 RewriteRule ^api/v1/customer/feedback/?$ api/v1/customer/feedback.php [L,QSA]
+RewriteRule ^api/v1/customer/complete-profile/?$ api/v1/customer/complete-profile.php [L,QSA]
 
 # docs/33/34 — "Offers" category chip's own browse screen
 RewriteRule ^api/v1/home/offers-browse/?$ api/v1/home/offers-browse.php [L,QSA]

@@ -423,8 +423,7 @@ require __DIR__ . '/_layout_head.php';
 <?php if ($canEdit): ?>
 <div class="section">
 <div class="card">
-    <h2><?= $editingBanner ? 'Edit banner' : 'Add banner' ?></h2>
-    <p class="hint">Leave Area empty for a platform-wide banner (all customers). Leave Start/End date empty for no schedule limit.</p>
+    <h2><?= $editingBanner ? 'Edit banner' : 'Add banner' ?> <span class="info-hint"><button type="button" class="info-hint-btn" aria-label="More info">!</button><span class="info-hint-body">Leave Area empty for a platform-wide banner (all customers). Leave Start/End date empty for no schedule limit.</span></span></h2>
     <form method="post" enctype="multipart/form-data" class="form-grid">
         <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
         <input type="hidden" name="form_action" value="<?= $editingBanner ? 'update_banner' : 'create_banner' ?>">
@@ -463,15 +462,17 @@ require __DIR__ . '/_layout_head.php';
             </select>
         </div>
         <div>
-            <label class="field-label">Deep link (optional)</label>
+            <label class="field-label">Deep link (optional) <span class="info-hint">
+                <button type="button" class="info-hint-btn" aria-label="More info">!</button>
+                <span class="info-hint-body">
+                    Leave blank for a visual-only banner (no tap action). Recognized formats:
+                    <code>restaurant:&lt;id&gt;</code>, <code>category:&lt;slug&gt;</code>, or a full
+                    <code>https://</code> link. Anything else is treated as visual-only rather than guessed at —
+                    see <code>home/promo-banners.php</code>'s <code>deep_link_to_target()</code>. Coupon deep-links
+                    aren't supported yet.
+                </span>
+            </span></label>
             <input type="text" name="deep_link" value="<?= admin_escape($editingBanner['deep_link'] ?? '') ?>" placeholder="restaurant:42, category:pizza, or a full https:// URL">
-            <p class="hint" style="margin-top:4px;">
-                Leave blank for a visual-only banner (no tap action). Recognized formats:
-                <code>restaurant:&lt;id&gt;</code>, <code>category:&lt;slug&gt;</code>, or a full
-                <code>https://</code> link. Anything else is treated as visual-only rather than guessed at —
-                see <code>home/promo-banners.php</code>'s <code>deep_link_to_target()</code>. Coupon deep-links
-                aren't supported yet.
-            </p>
         </div>
         <div>
             <label class="field-label">Area (empty = all areas)</label>

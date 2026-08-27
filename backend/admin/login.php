@@ -8,10 +8,22 @@
  *
  * Since migration 29 (admin RBAC): also rejects deactivated admins at
  * login (not just on subsequent page loads) and stamps last_login_at.
+ *
+ * Since migration 51 (login rate limiting, docs/AnyDrop_Admin_
+ * Management_Plan.md §27 P1.2): per-IP throttling is checked first
+ * (before the admins table is even queried), then per-account lockout
+ * once a matching row is found. Every failure — throttled, locked,
+ * wrong password, unknown username — is deliberately shown as the
+ * same generic message where the person could otherwise learn
+ * whether a username exists (see the "Invalid username or password"
+ * branch below); the lockout/throttle messages are the one exception,
+ * since by that point brute-forcing that specific username is already
+ * the visible signal, so naming the lockout doesn't leak anything new.
  */
 
 require_once __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../lib/audit.php';
+require_once __DIR__ . '/../lib/admin_login_throttle.php';
 
 $error = null;
 if (isset($_GET['deactivated'])) {
@@ -21,22 +33,35 @@ if (isset($_GET['deactivated'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
+    $ip = admin_login_client_ip();
 
     if ($username === '' || $password === '') {
         $error = 'Enter both username and password.';
+    } elseif (admin_login_ip_is_throttled($ip)) {
+        $error = 'Too many login attempts from this network. Please try again in a few minutes.';
+        write_audit_log('admin', null, 'admin_login_blocked_ip_throttle', ['username' => $username, 'ip' => $ip]);
     } else {
         $db = Database::get();
-        $stmt = $db->prepare('SELECT id, username, password_hash, is_active FROM admins WHERE username = :u LIMIT 1');
+        $stmt = $db->prepare('SELECT id, username, password_hash, is_active, locked_until FROM admins WHERE username = :u LIMIT 1');
         $stmt->execute(['u' => $username]);
         $admin = $stmt->fetch();
 
-        if ($admin && password_verify($password, $admin['password_hash']) && !$admin['is_active']) {
+        if ($admin && admin_login_account_is_locked($admin)) {
+            $mins = admin_login_lockout_minutes_remaining($admin);
+            $error = "Too many failed attempts. This account is locked for about {$mins} more minute(s).";
+            admin_login_record_attempt($ip, $username, false);
+            write_audit_log('admin', (int) $admin['id'], 'admin_login_blocked_account_locked', ['username' => $username, 'ip' => $ip]);
+        } elseif ($admin && password_verify($password, $admin['password_hash']) && !$admin['is_active']) {
             $error = 'Your admin account has been deactivated. Contact a Super Admin.';
+            admin_login_record_attempt($ip, $username, false);
             write_audit_log('admin', (int) $admin['id'], 'admin_login_blocked_inactive', ['username' => $username]);
         } elseif ($admin && password_verify($password, $admin['password_hash'])) {
             session_regenerate_id(true);
             $_SESSION['admin_id'] = (int) $admin['id'];
             $_SESSION['admin_username'] = $admin['username'];
+
+            admin_login_register_success((int) $admin['id']);
+            admin_login_record_attempt($ip, $username, true);
 
             $upd = $db->prepare('UPDATE admins SET last_login_at = NOW() WHERE id = :id');
             $upd->execute(['id' => (int) $admin['id']]);
@@ -46,6 +71,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         } else {
             $error = 'Invalid username or password.';
+            admin_login_record_attempt($ip, $username, false);
+            if ($admin) {
+                admin_login_register_failure((int) $admin['id']);
+                write_audit_log('admin', (int) $admin['id'], 'admin_login_failed', ['username' => $username, 'ip' => $ip]);
+            } else {
+                write_audit_log('admin', null, 'admin_login_failed_unknown_username', ['username' => $username, 'ip' => $ip]);
+            }
         }
     }
 }

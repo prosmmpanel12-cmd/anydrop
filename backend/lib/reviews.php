@@ -22,13 +22,17 @@ require_once __DIR__ . '/../config/database.php';
  * after a review insert — cheap enough (COUNT+AVG over one restaurant's
  * rows) that a full recompute is simpler and safer than incrementally
  * maintaining a running average.
+ *
+ * Migration 54: a review hidden by admin moderation no longer counts
+ * toward the public rating — same principle as a delivered-order-only
+ * average, an admin-hidden review shouldn't influence what customers see.
  */
 function recalc_restaurant_rating(PDO $db, int $restaurantId): void
 {
     $stmt = $db->prepare(
         'SELECT COUNT(*) AS c, AVG(restaurant_rating) AS a
          FROM reviews
-         WHERE restaurant_id = :rid AND restaurant_rating IS NOT NULL'
+         WHERE restaurant_id = :rid AND restaurant_rating IS NOT NULL AND moderation_status = \'visible\''
     );
     $stmt->execute(['rid' => $restaurantId]);
     $row = $stmt->fetch();
@@ -64,4 +68,62 @@ function require_ratable_order(PDO $db, int $orderId, int $customerId): array
     }
 
     return $order;
+}
+
+/**
+ * Admin action: hides a review (removes it from public rating/listing
+ * without deleting the row — keeps history/audit intact). Recomputes the
+ * restaurant's rating since a hidden review no longer counts toward it.
+ * Caller (admin/review-moderation.php) is responsible for its own
+ * write_audit_log() call — this function only touches the reviews table.
+ */
+function hide_review(PDO $db, int $reviewId, int $adminId, ?string $reason): void
+{
+    $stmt = $db->prepare('SELECT restaurant_id FROM reviews WHERE id = :id LIMIT 1');
+    $stmt->execute(['id' => $reviewId]);
+    $review = $stmt->fetch();
+    if (!$review) {
+        throw new InvalidArgumentException('review_not_found');
+    }
+
+    $db->prepare(
+        'UPDATE reviews
+         SET moderation_status = \'hidden\', hidden_reason = :reason, moderated_by = :admin, moderated_at = NOW()
+         WHERE id = :id'
+    )->execute(['reason' => $reason, 'admin' => $adminId, 'id' => $reviewId]);
+
+    recalc_restaurant_rating($db, (int) $review['restaurant_id']);
+}
+
+/**
+ * Admin action: puts a hidden review back to visible (undo). Recomputes
+ * the rating the same way hide_review() does, in the opposite direction.
+ */
+function restore_review(PDO $db, int $reviewId, int $adminId): void
+{
+    $stmt = $db->prepare('SELECT restaurant_id FROM reviews WHERE id = :id LIMIT 1');
+    $stmt->execute(['id' => $reviewId]);
+    $review = $stmt->fetch();
+    if (!$review) {
+        throw new InvalidArgumentException('review_not_found');
+    }
+
+    $db->prepare(
+        'UPDATE reviews
+         SET moderation_status = \'visible\', hidden_reason = NULL, moderated_by = :admin, moderated_at = NOW()
+         WHERE id = :id'
+    )->execute(['admin' => $adminId, 'id' => $reviewId]);
+
+    recalc_restaurant_rating($db, (int) $review['restaurant_id']);
+}
+
+/**
+ * Admin action: dismisses a report queue entry without hiding the review
+ * — i.e. the report was checked and the review is fine. Clears
+ * is_reported so it drops off the queue; the review_reports rows
+ * themselves are kept (audit trail of who reported what, and why).
+ */
+function dismiss_review_report(PDO $db, int $reviewId): void
+{
+    $db->prepare('UPDATE reviews SET is_reported = 0 WHERE id = :id')->execute(['id' => $reviewId]);
 }

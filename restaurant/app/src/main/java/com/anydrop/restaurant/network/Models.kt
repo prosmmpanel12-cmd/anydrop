@@ -442,6 +442,43 @@ data class DashboardResult(
 data class OperationalStatusUpdateBody(@SerializedName("operational_status") val operationalStatus: String)
 data class OperationalStatusResult(@SerializedName("operational_status") val operationalStatus: String)
 
+// ---- Insights tab (docs/restorent/19 §6) — backend: insights.php ----
+
+data class InsightStats(
+    @SerializedName("total_orders") val totalOrders: Int,
+    @SerializedName("total_earnings") val totalEarnings: Double,
+    @SerializedName("average_order_value") val averageOrderValue: Double,
+    @SerializedName("cancellation_rate_percent") val cancellationRatePercent: Double
+)
+
+data class InsightDailyChartPoint(
+    val date: String,
+    @SerializedName("order_count") val orderCount: Int
+)
+
+data class InsightTopItem(
+    @SerializedName("menu_item_id") val menuItemId: Int?,
+    val name: String,
+    @SerializedName("quantity_sold") val quantitySold: Int,
+    val revenue: Double
+)
+
+data class InsightRepeatCustomers(
+    val count: Int,
+    @SerializedName("distinct_customers_in_range") val distinctCustomersInRange: Int,
+    val percent: Double
+)
+
+data class InsightsResult(
+    val range: String,
+    @SerializedName("from_date") val fromDate: String,
+    @SerializedName("to_date") val toDate: String,
+    val stats: InsightStats,
+    @SerializedName("daily_chart") val dailyChart: List<InsightDailyChartPoint>,
+    @SerializedName("top_items") val topItems: List<InsightTopItem>,
+    @SerializedName("repeat_customers") val repeatCustomers: InsightRepeatCustomers
+)
+
 // ---- Menu Management (Tier 1, docs/18) ----
 
 data class MenuCategory(

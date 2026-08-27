@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 1dp hairline divider, @color/outline — used between rows in
+     simple vertical lists (e.g. Insights tab's top-items list) where
+     a RecyclerView's own ItemDecoration isn't already in play. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <size android:height="1dp" />
+    <solid android:color="@color/outline" />
+</shape>

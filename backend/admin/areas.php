@@ -488,8 +488,7 @@ require __DIR__ . '/_layout_head.php';
     <?php if ($canEdit): ?>
     <div class="section">
     <div class="card">
-        <h2>Add area</h2>
-        <p class="hint">State, District, and City/Village are required — Area is optional. Any of these that already exist (matched by name, case-insensitive) are reused, not duplicated; only what's actually new gets created. Center/radius apply to Area if you fill it in, otherwise to City/Village.</p>
+        <h2>Add area <span class="info-hint"><button type="button" class="info-hint-btn" aria-label="More info">!</button><span class="info-hint-body">State, District, and City/Village are required — Area is optional. Any of these that already exist (matched by name, case-insensitive) are reused, not duplicated; only what's actually new gets created. Center/radius apply to Area if you fill it in, otherwise to City/Village.</span></span></h2>
 
         <div class="card" style="background:var(--bg-subtle,#f7f7f8); margin-bottom:16px;">
             <label class="field-label">Fetch by Pincode (optional)</label>
@@ -536,14 +535,17 @@ require __DIR__ . '/_layout_head.php';
                 <button type="button" id="geocodeLocalityBtn" class="btn btn-outline">📍 Get coordinates for this Area/City-Village name</button>
                 <button type="button" id="chooseOnMapBtn" class="btn btn-outline" data-lat-target="centerLatInput" data-lng-target="centerLngInput">🗺️ Choose on map</button>
                 <span id="geocodeLocalityStatus" class="muted" style="margin-left:8px; font-size:12px;"></span>
-                <p class="hint" style="margin-top:4px;">
-                    Looks up whichever is filled in — Area if you typed one (e.g. "Neora"), otherwise City/Village
-                    (e.g. "Osian") — by name, using the District/State above for context. This is different from
-                    "Fetch by Pincode": a pincode's coordinates are one average point for the whole pincode, which
-                    isn't accurate for a specific Area inside it. Not always able to find small localities — if OSM
-                    doesn't have it mapped, use "Choose on map" instead: it opens a map you can click on directly at
-                    this area's center to get the coordinates.
-                </p>
+                <span class="info-hint" style="margin-left:6px;">
+                    <button type="button" class="info-hint-btn" aria-label="More info">!</button>
+                    <span class="info-hint-body">
+                        Looks up whichever is filled in — Area if you typed one (e.g. "Neora"), otherwise City/Village
+                        (e.g. "Osian") — by name, using the District/State above for context. This is different from
+                        "Fetch by Pincode": a pincode's coordinates are one average point for the whole pincode, which
+                        isn't accurate for a specific Area inside it. Not always able to find small localities — if OSM
+                        doesn't have it mapped, use "Choose on map" instead: it opens a map you can click on directly at
+                        this area's center to get the coordinates.
+                    </span>
+                </span>
             </div>
             <div>
                 <label class="field-label">Center latitude</label>
@@ -711,7 +713,10 @@ require __DIR__ . '/_layout_head.php';
                         data-state="<?= admin_escape($editAncestors['state']) ?>">📍 Re-fetch coordinates by name</button>
                 <button type="button" id="editChooseOnMapBtn" class="btn btn-outline" data-lat-target="editCenterLatInput" data-lng-target="editCenterLngInput">🗺️ Choose on map</button>
                 <span id="editGeocodeStatus" class="muted" style="margin-left:8px; font-size:12px;"></span>
-                <p class="hint" style="margin-top:4px;">Looks up "<?= admin_escape(area_breadcrumb($editingArea, $areaById)) ?>" and refills the fields below — still edited/saved manually, this just overwrites what's currently in the boxes, not the saved record until you hit Save. If OSM can't find it, use "Choose on map" to click the point directly instead.</p>
+                <span class="info-hint" style="margin-left:6px;">
+                    <button type="button" class="info-hint-btn" aria-label="More info">!</button>
+                    <span class="info-hint-body">Looks up "<?= admin_escape(area_breadcrumb($editingArea, $areaById)) ?>" and refills the fields below — still edited/saved manually, this just overwrites what's currently in the boxes, not the saved record until you hit Save. If OSM can't find it, use "Choose on map" to click the point directly instead.</span>
+                </span>
             </div>
             <div>
                 <label class="field-label">Center latitude</label>
@@ -901,8 +906,7 @@ require __DIR__ . '/_layout_head.php';
 
     <div class="section">
     <div class="card">
-        <h2>Test coordinates</h2>
-        <p class="hint">Check which node(s) a GPS pin resolves into — City/Village or Area, whichever has coordinates set — using the same nearest-within-radius rule that'll be used for customer address resolution. Multiple matches mean overlapping radii — worth tightening.</p>
+        <h2>Test coordinates <span class="info-hint"><button type="button" class="info-hint-btn" aria-label="More info">!</button><span class="info-hint-body">Check which node(s) a GPS pin resolves into — City/Village or Area, whichever has coordinates set — using the same nearest-within-radius rule that'll be used for customer address resolution. Multiple matches mean overlapping radii — worth tightening.</span></span></h2>
         <form method="get" class="form-grid">
             <div>
                 <label class="field-label">Latitude</label>
@@ -961,8 +965,7 @@ require __DIR__ . '/_layout_head.php';
     <?php if ($canDelete): ?>
     <div class="section">
     <div class="card">
-        <h2>Merge duplicate nodes</h2>
-        <p class="hint">Pick the node to remove ("Duplicate") and the one to keep. Everything on the duplicate — its children, any restaurants/customer addresses/banners assigned to it — gets moved onto "Keep" first, then the duplicate is deleted. Both must be the same level. This can't be undone.</p>
+        <h2>Merge duplicate nodes <span class="info-hint"><button type="button" class="info-hint-btn" aria-label="More info">!</button><span class="info-hint-body">Pick the node to remove ("Duplicate") and the one to keep. Everything on the duplicate — its children, any restaurants/customer addresses/banners assigned to it — gets moved onto "Keep" first, then the duplicate is deleted. Both must be the same level. This can't be undone.</span></span></h2>
         <form method="post" class="form-grid" onsubmit="return confirm('Merge and delete the duplicate node? This can\'t be undone.');">
             <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
             <input type="hidden" name="form_action" value="merge_area">

@@ -47,6 +47,9 @@ interface ApiService {
     @POST("restaurant/status-update.php")
     suspend fun updateOperationalStatus(@Body body: OperationalStatusUpdateBody): Response<ApiResponse<OperationalStatusResult>>
 
+    @GET("restaurant/insights.php")
+    suspend fun getInsights(@Query("range") range: String = "week"): Response<ApiResponse<InsightsResult>>
+
     // ---- Menu Management (Tier 1, docs/18) ----
 
     @GET("restaurant/categories-list.php")

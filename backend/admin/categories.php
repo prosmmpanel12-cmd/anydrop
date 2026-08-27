@@ -215,13 +215,16 @@ require __DIR__ . '/_layout_head.php';
         <a class="btn <?= $tab === 'restaurant' ? 'btn-primary' : 'btn-outline' ?>" href="?tab=restaurant">Restaurant Types</a>
         <a class="btn <?= $tab === 'food' ? 'btn-primary' : 'btn-outline' ?>" href="?tab=food">Food Categories</a>
     </div>
-    <p class="hint">
-        <?php if ($tab === 'restaurant'): ?>
-            Business type shown on a restaurant's profile/onboarding (Cafe, Bakery, Sweet Shop...). One per restaurant.
-        <?php else: ?>
-            Home-screen chips customers tap to browse by food type (Pizza, Burger, Biryani...). Restaurants tag menu items with these — they can't create new ones.
-        <?php endif; ?>
-    </p>
+    <span class="info-hint">
+        <button type="button" class="info-hint-btn" aria-label="More info">!</button>
+        <span class="info-hint-body">
+            <?php if ($tab === 'restaurant'): ?>
+                Business type shown on a restaurant's profile/onboarding (Cafe, Bakery, Sweet Shop...). One per restaurant.
+            <?php else: ?>
+                Home-screen chips customers tap to browse by food type (Pizza, Burger, Biryani...). Restaurants tag menu items with these — they can't create new ones.
+            <?php endif; ?>
+        </span>
+    </span>
 
     <?php if (empty($allCategories)): ?>
         <p class="muted">No categories yet — add one below to get started.</p>

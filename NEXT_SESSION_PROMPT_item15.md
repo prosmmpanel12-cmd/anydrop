@@ -6,6 +6,9 @@ recall.md section 0's dated notes and the "NEXT SESSION PROMPT —
 Native UPI Payment Gateway" section at the very bottom of recall.md,
 which is the current handover. Start there instead of here.
 
+NOTE (2026-08-27): Even further superseded — current handover is
+`NEXT_SESSION_PROMPT.md` at the project root.
+
 Original content below, kept for history only:
 
 ---

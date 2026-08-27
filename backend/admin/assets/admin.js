@@ -48,6 +48,11 @@
     document.addEventListener('click', function (e) {
         var menuBtn = e.target.closest('.menu-btn');
         if (menuBtn && shell) {
+            // Close any open cselect/info-hint popovers first — they're
+            // position:fixed and would otherwise sit stranded on screen
+            // (wrong coordinates) once the sidebar drawer opens/closes
+            // and the page layout shifts under them.
+            document.querySelectorAll('.cselect.open, .info-hint.open').forEach(function (el) { el.classList.remove('open'); });
             if (isMobile()) {
                 shell.classList.toggle('drawer-open');
                 toggleOverlay(shell.classList.contains('drawer-open'));
@@ -90,6 +95,285 @@
             shell.classList.remove('rail');
         }
     });
+
+    // ---------- Info-hint ("!") popovers ----------
+    // position:fixed body — placed via JS right before it's shown so it
+    // can be clamped to the actual viewport (button position varies:
+    // sidebar hints, form-field hints, page-title hints all sit at
+    // different horizontal spots, and a fixed left:0 in CSS alone runs
+    // off the right edge on a narrow screen once the button isn't near
+    // the left edge itself).
+    function positionInfoHintBody(hint) {
+        var btn = hint.querySelector('.info-hint-btn');
+        var body = hint.querySelector('.info-hint-body');
+        if (!btn || !body) return;
+        var btnRect = btn.getBoundingClientRect();
+        // Measure while temporarily visible-but-offscreen so offsetWidth
+        // is accurate before final placement.
+        body.style.left = '-9999px';
+        body.style.top = '-9999px';
+        body.style.display = 'block';
+        var bodyW = body.offsetWidth;
+        var bodyH = body.offsetHeight;
+        body.style.display = '';
+
+        var margin = 12;
+        var left = btnRect.left;
+        var maxLeft = window.innerWidth - bodyW - margin;
+        if (left > maxLeft) left = maxLeft;
+        if (left < margin) left = margin;
+
+        var top = btnRect.bottom + 8;
+        // If it would run off the bottom, flip to above the button instead.
+        if (top + bodyH > window.innerHeight - margin) {
+            top = btnRect.top - bodyH - 8;
+        }
+        if (top < margin) top = margin;
+
+        body.style.left = left + 'px';
+        body.style.top = top + 'px';
+    }
+
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.info-hint-btn');
+        if (btn) {
+            var hint = btn.closest('.info-hint');
+            var wasOpen = hint.classList.contains('open');
+            // Close any other open hint first (only one popover at a time).
+            document.querySelectorAll('.info-hint.open').forEach(function (el) { el.classList.remove('open'); });
+            if (!wasOpen) {
+                hint.classList.add('open');
+                positionInfoHintBody(hint);
+            }
+            return;
+        }
+        // Click anywhere outside an open hint's button/body closes it.
+        if (!e.target.closest('.info-hint-body')) {
+            document.querySelectorAll('.info-hint.open').forEach(function (el) { el.classList.remove('open'); });
+        }
+    });
+
+    // Reposition open popovers on resize/scroll so they don't drift off
+    // an anchor that moved (e.g. rotating the phone, or scrolling a
+    // long form with a hint mid-page).
+    window.addEventListener('resize', function () {
+        document.querySelectorAll('.info-hint.open').forEach(positionInfoHintBody);
+    });
+    window.addEventListener('scroll', function () {
+        document.querySelectorAll('.info-hint.open').forEach(positionInfoHintBody);
+    }, true);
+
+    // ---------- Sidebar: collapsible nav groups ----------
+    // .open state was already set server-side (_layout_head.php) for
+    // whichever group contains $activeNav, so the current page's group
+    // is expanded on first paint with no JS flash. This layer only
+    // handles the click-to-toggle + remembering which groups the admin
+    // left open, per group key, same one-key-per-thing convention as
+    // THEME_KEY/SIDEBAR_KEY above.
+    var NAV_GROUPS_KEY = 'anydrop_admin_nav_groups_open';
+
+    function readOpenGroups() {
+        try {
+            return JSON.parse(localStorage.getItem(NAV_GROUPS_KEY) || '{}');
+        } catch (e) {
+            return {};
+        }
+    }
+
+    // Apply any remembered open/closed state on top of the server-side
+    // "open the active group" default — an admin who explicitly closed
+    // a group (even one with no active page in it right now) keeps it
+    // closed on the next page load rather than resetting every nav.
+    var savedGroups = readOpenGroups();
+    document.querySelectorAll('.nav-group').forEach(function (el) {
+        var key = el.getAttribute('data-nav-group');
+        if (key in savedGroups) {
+            el.classList.toggle('open', savedGroups[key]);
+            var toggleBtn = el.querySelector('.nav-group-toggle');
+            if (toggleBtn) toggleBtn.setAttribute('aria-expanded', savedGroups[key] ? 'true' : 'false');
+        }
+    });
+
+    document.addEventListener('click', function (e) {
+        var toggle = e.target.closest('.nav-group-toggle');
+        if (!toggle) return;
+        var group = toggle.closest('.nav-group');
+        if (!group) return;
+        var nowOpen = group.classList.toggle('open');
+        toggle.setAttribute('aria-expanded', nowOpen ? 'true' : 'false');
+        var groups = readOpenGroups();
+        groups[group.getAttribute('data-nav-group')] = nowOpen;
+        localStorage.setItem(NAV_GROUPS_KEY, JSON.stringify(groups));
+    });
+
+    // ---------- Custom select (replaces native OS picker) ----------
+    // Progressive enhancement: every real <select> on the page gets
+    // wrapped in a .cselect with a styled trigger button + floating
+    // panel; the original <select> stays in the DOM (display:none via
+    // CSS, not removed) and is what the surrounding <form> actually
+    // submits — clicking a .cselect-option just sets the real select's
+    // .value and fires a 'change' event, so any page-specific JS
+    // listening for that (auto-submitting filters, etc.) keeps working
+    // unchanged. A <select multiple> or one with zero options is left
+    // completely alone (native picker) — this only wraps the plain
+    // single-choice case admin pages actually use.
+    function enhanceSelects() {
+        document.querySelectorAll('select').forEach(function (sel) {
+            if (sel.multiple) return;
+            if (sel.closest('.cselect')) return; // already enhanced
+            if (sel.options.length === 0) return;
+            buildCselect(sel);
+        });
+    }
+
+    function optionLabel(opt) {
+        return (opt.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function buildCselect(sel) {
+        var wrap = document.createElement('div');
+        wrap.className = 'cselect';
+        sel.parentNode.insertBefore(wrap, sel);
+        wrap.appendChild(sel);
+
+        var trigger = document.createElement('button');
+        trigger.type = 'button';
+        trigger.className = 'cselect-trigger';
+        trigger.innerHTML = '<span class="cselect-trigger-label"></span>' +
+            '<svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+        wrap.appendChild(trigger);
+
+        var panel = document.createElement('div');
+        panel.className = 'cselect-panel';
+
+        var useSearch = sel.options.length > 6;
+        var searchInput = null;
+        if (useSearch) {
+            var searchWrap = document.createElement('div');
+            searchWrap.className = 'cselect-search-wrap';
+            searchInput = document.createElement('input');
+            searchInput.type = 'text';
+            searchInput.className = 'cselect-search';
+            searchInput.placeholder = 'Search...';
+            searchWrap.appendChild(searchInput);
+            panel.appendChild(searchWrap);
+        }
+
+        var optionsList = document.createElement('div');
+        optionsList.className = 'cselect-options';
+        panel.appendChild(optionsList);
+        wrap.appendChild(panel);
+
+        function renderOptions(filter) {
+            optionsList.innerHTML = '';
+            var q = (filter || '').trim().toLowerCase();
+            var shown = 0;
+            Array.prototype.forEach.call(sel.options, function (opt, i) {
+                var label = optionLabel(opt);
+                if (q && label.toLowerCase().indexOf(q) === -1) return;
+                shown++;
+                var row = document.createElement('div');
+                row.className = 'cselect-option' + (opt.selected ? ' selected' : '');
+                row.textContent = label;
+                row.dataset.index = i;
+                optionsList.appendChild(row);
+            });
+            if (shown === 0) {
+                var none = document.createElement('div');
+                none.className = 'cselect-option no-match';
+                none.textContent = 'No matches';
+                optionsList.appendChild(none);
+            }
+        }
+
+        function syncTriggerLabel() {
+            var current = sel.options[sel.selectedIndex];
+            trigger.querySelector('.cselect-trigger-label').textContent = current ? optionLabel(current) : '';
+        }
+
+        function closePanel() {
+            wrap.classList.remove('open');
+        }
+
+        function openPanel() {
+            document.querySelectorAll('.cselect.open').forEach(function (w) { if (w !== wrap) w.classList.remove('open'); });
+            renderOptions('');
+            if (searchInput) searchInput.value = '';
+            wrap.classList.add('open');
+            positionCselectPanel(wrap);
+            if (searchInput) searchInput.focus();
+        }
+
+        trigger.addEventListener('click', function () {
+            if (wrap.classList.contains('open')) closePanel(); else openPanel();
+        });
+
+        optionsList.addEventListener('click', function (e) {
+            var row = e.target.closest('.cselect-option');
+            if (!row || row.classList.contains('no-match')) return;
+            var idx = parseInt(row.dataset.index, 10);
+            if (sel.selectedIndex !== idx) {
+                sel.selectedIndex = idx;
+                sel.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            syncTriggerLabel();
+            closePanel();
+        });
+
+        if (searchInput) {
+            searchInput.addEventListener('input', function () { renderOptions(searchInput.value); });
+            searchInput.addEventListener('click', function (e) { e.stopPropagation(); });
+        }
+
+        // Native <select> changing under us (e.g. another script sets
+        // .value directly, or a page does sel.value = '' on filter
+        // reset) should keep the visible trigger label in sync.
+        sel.addEventListener('change', syncTriggerLabel);
+
+        syncTriggerLabel();
+        wrap._cselectClose = closePanel;
+    }
+
+    function positionCselectPanel(wrap) {
+        var trigger = wrap.querySelector('.cselect-trigger');
+        var panel = wrap.querySelector('.cselect-panel');
+        if (!trigger || !panel) return;
+        var rect = trigger.getBoundingClientRect();
+        var margin = 12;
+        var maxPanelHeight = Math.min(320, window.innerHeight - margin * 2);
+        panel.style.maxHeight = maxPanelHeight + 'px';
+        panel.style.width = rect.width + 'px';
+
+        var left = rect.left;
+        var maxLeft = window.innerWidth - rect.width - margin;
+        if (left > maxLeft) left = Math.max(margin, maxLeft);
+
+        var top = rect.bottom + 6;
+        var estHeight = panel.offsetHeight || maxPanelHeight;
+        if (top + estHeight > window.innerHeight - margin) {
+            var above = rect.top - estHeight - 6;
+            top = above > margin ? above : margin;
+        }
+        panel.style.left = left + 'px';
+        panel.style.top = top + 'px';
+    }
+
+    document.addEventListener('click', function (e) {
+        if (e.target.closest('.cselect')) return;
+        document.querySelectorAll('.cselect.open').forEach(function (w) { w.classList.remove('open'); });
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        document.querySelectorAll('.cselect.open').forEach(function (w) { w.classList.remove('open'); });
+    });
+    window.addEventListener('resize', function () {
+        document.querySelectorAll('.cselect.open').forEach(positionCselectPanel);
+    });
+    window.addEventListener('scroll', function () {
+        document.querySelectorAll('.cselect.open').forEach(positionCselectPanel);
+    }, true);
+
+    document.addEventListener('DOMContentLoaded', enhanceSelects);
 
     // ---------- Toasts ----------
     function ensureToastStack() {

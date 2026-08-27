@@ -1269,10 +1269,13 @@ Financial module now covers:
   directly (matches doc 19 §6 — no separate restaurant-self-report →
   admin-approve flow exists, by design, same as the doc specs it).
 - Today/weekly/monthly earnings, GST/commission analytics breakdown —
-  🔴 still not built — `admin/settlements.php`'s per-restaurant Payout
-  screen doesn't yet compute the Total Orders/Cash Collected/Online
-  Collected/GST columns doc 19 §6 describes; only the ledger statement
-  + Pay Now + bank details landed this session.
+  ✅ built — `admin/settlements.php`'s per-restaurant Payout Analytics
+  card computes Total Orders/Cash Collected (COD)/Online Collected
+  (UPI)/Commission/GST (on commission, `app_settings.gst_percent`)/Net
+  Payable/Already Paid/Pending for a Today · This Week (-6d) · This
+  Month (-29d) toggle, same rolling-window convention as
+  `analytics.php`. See doc 47 handover. Not yet device-verified (no
+  PHP CLI/live DB in this sandbox).
 - Financial audit trail — ✅ every write in this session's new files
   goes through the existing `write_audit_log()`.
 - Platform-wide cash ledger ("total kitna aaya, kaha kaha gaya") — ✅
@@ -1720,32 +1723,45 @@ Refunds must reconcile with payment transactions / platform ledger.
 
 # 20. CUSTOMER SUPPORT / TICKETS
 
-**Status: 🔴 PENDING**
+**Status: 🟡 ADMIN SIDE BUILT 2026-08-27 (doc 48) — app self-service side still 🔴 PENDING**
+
+Migration 52 + `lib/support.php` + `admin/support.php`. Every item
+below is ✅ on the admin side; app-side (Profile → Help & Support
+creating a ticket itself) is NOT built in any app yet — see doc 48 for
+the exact remaining scope.
 
 Profile → Help & Support should support:
 
-- Order issue
-- Missing item
-- Wrong item
-- Food quality
-- Delivery issue
-- Payment issue
-- Refund issue
-- Account issue
-- Coupon issue
-- General issue
+- Order issue — ✅ category enum value (admin-loggable today)
+- Missing item — ✅
+- Wrong item — ✅
+- Food quality — ✅
+- Delivery issue — ✅
+- Payment issue — ✅
+- Refund issue — ✅
+- Account issue — ✅
+- Coupon issue — ✅
+- General issue — ✅
 
 Ticket requirements:
 
-- Ticket ID
-- Order association
-- Conversation/chat
-- Attachment/photo
-- Status
-- Admin assignment
-- Resolution/closure
+- Ticket ID — ✅ `ticket_code` (e.g. `TKT-260827-A1B2C3`)
+- Order association — ✅ optional `order_id`
+- Conversation/chat — ✅ `support_ticket_messages`, admin reply UI
+- Attachment/photo — ✅ one per message (JPG/PNG/WEBP, 5 MB cap, same
+  finfo-sniff pattern as settlements.php's screenshot upload)
+- Status — ✅ open/in_progress/resolved/closed with enforced transitions
+- Admin assignment — ✅ assign-to-active-admin dropdown
+- Resolution/closure — ✅ `resolution_note` required to mark Resolved
 
-**Deep reference:** `docs/21_Production_Feature_Gap_Plan.md` — Customer Support / Ticket System.
+**Not built:** any Customer/Restaurant/Rider App screen that lets the
+raiser create a ticket themselves, or view/reply to their own tickets
+— today every ticket is staff-logged via `admin/support.php`'s "Log a
+Ticket" form. `create_ticket()` in `lib/support.php` is already generic
+across raiser type specifically so whichever app builds this first can
+call straight into it.
+
+**Deep reference:** `docs/21_Production_Feature_Gap_Plan.md` — Customer Support / Ticket System; `docs/48_Handover_2026-08-27_Support_Ticket_System_Admin_Side_Built.md`.
 
 ---
 
@@ -2117,7 +2133,7 @@ Do NOT randomly pick features.
 20. Platform ledger — 🟡 built 2026-08-22, not device-verified (section 13 — `platform_ledger` table + `admin/platform-ledger.php`)
 21. Restaurant due ledger completion — 🟡 built 2026-08-22, not device-verified (section 13 — `write_due_ledger_entry()`, Pay Now flow live; the two order-triggered auto-writers exist but aren't called anywhere yet, see section 13's "NOT WIRED" list)
 22. Restaurant bank details — 🟡 built 2026-08-22, not device-verified (section 13 — `restaurant_bank_details` table + admin-editable UI on `settlements.php`; restaurant App self-submission not built)
-23. Settlement/payout UI — 🟡 built 2026-08-22, not device-verified (section 13 — `admin/settlements.php`: ledger statement + Pay Now + settlement history; the Total Orders/Cash Collected/GST analytics columns doc 19 §6 describes are NOT built yet)
+23. Settlement/payout UI — 🟡 built (ledger statement + Pay Now + settlement history + screenshot upload, 2026-08-22/26), plus Today/Week/Month Payout Analytics card (Total Orders/Cash Collected/Online Collected/Commission/GST/Net Payable/Already Paid/Pending — doc 19 §6's full column list, doc 47) — not device-verified (no PHP CLI/live DB in this sandbox)
 24. Payment transaction architecture — 🟡 built 2026-08-23, not device-verified (`docs/23_Native_UPI_Payment_Gateway_Architecture_2026-08-23.md` — migration 40, `lib/payment/PaymentService.php` + rewritten `UpipeProvider.php` (native UPI-QR, manual-admin verification, no external gateway call), 3 customer APIs under `api/v1/orders/payment-upi-*.php`, `admin/payment-gateways.php` + `admin/payment-pending.php`. `record_paid_order_ledger_entries()` is now actually called — see the item-21 update below.) **Update (same day, follow-up session):** the Android payment screen (`UpiPaymentActivity.kt`) and its "Cancel and pay by COD" button turned out to already be written (contradicting the doc's own §A4 note that customer-app UI wasn't built yet — doc corrected). That button was found to be fake (toast only, never touched the backend) and is now real: new `backend/api/v1/orders/payment-switch-cod.php` (`POST /orders/{id}/payment/switch-to-cod`), reusing `orders/create.php`'s exact payment-restriction + COD-eligibility function pair so the same rules apply. See doc 23's new §A4b for the full detail. Still 🟡 not device/build-verified.
 25. Refund system — 🟡 built 2026-08-23, not device-verified (section 19 — migration 42, `lib/refunds.php`, `admin/refunds.php`; wired into `orders/cancel.php` + `restaurant/orders-reject.php`'s payment_status='paid' gap)
 26. Wallet — 🔴 pending
@@ -2769,3 +2785,152 @@ photos. Not done = the pills themselves on Home/Search, the new
 yet either), and reading the now-ready `CartTotals` offer fields into
 CheckoutActivity's UI (offer strip + B1G1 free-item row). See docs/33
 for the exact next-session order.
+
+**2026-08-27 (session 10) — Restaurant Insights tab built end-to-end,
+closing PENDING.md item 3.** Picked after verifying by reading actual
+code (not trusting old docs) that Review moderation + Support Ticket
+System (admin side) were both already done — Restaurant Insights was
+the confirmed remaining placeholder: `InsightsFragment.kt` was an
+empty shell, no `restaurant/insights.php` existed anywhere.
+
+Built:
+- `backend/api/v1/restaurant/insights.php` (new) — `GET
+  ?range=today|week|month`. Stat cards (total orders, total earnings,
+  AOV, cancellation rate — all computed server-side, same
+  delivered-only revenue rule `dashboard.php` uses), a 7-day orders
+  bar-chart series (always trailing 7 days regardless of selected
+  range — §6 doesn't scope the chart to the range tabs), top-5
+  best-selling items by quantity sold (NOT filtered on
+  `is_bestseller` — that's a separate manual badge, see the file's own
+  header for why), repeat-customer count/percent (full order history,
+  not range-limited). No new migration — every column already
+  existed.
+- `ui/insights/OrdersBarChartView.kt` (new) — small custom
+  canvas-drawn bar chart. No charting library exists anywhere in this
+  project (checked `build.gradle` first); hand-wrote instead of adding
+  a dependency for one "simple bar chart" (plan doc's own word).
+  Zero-order days render as a thin sliver, not a gap.
+- `ui/insights/InsightsFragment.kt` — replaces the placeholder
+  entirely. Same skeleton/load/error shape as `OrdersFragment.kt`, no
+  ViewModel layer (matches the rest of this app).
+- `fragment_insights.xml` rewritten — range toggle reuses the existing
+  `MaterialButtonToggleGroup`/`ToggleButton.Pill` style (same one
+  `dialog_category_icon_picker.xml` already uses), stat cards reuse
+  `bg_stat_chip` (same drawable Orders tab's "Today" strip uses),
+  top-5 list is a plain LinearLayout with rows inflated directly
+  (capped at 5 by the backend query, so no RecyclerView needed).
+- New: `skeleton_insights.xml` (matches §9.2's spec verbatim: 4 stat
+  chips + chart-shaped rectangle, wrapped in the existing
+  `ShimmerFrameLayout`), `item_insight_top_item.xml`,
+  `divider_line.xml` (didn't exist yet, checked before assuming).
+- `Models.kt`/`ApiService.kt` — `InsightsResult` + 4 supporting data
+  classes, `getInsights()` Retrofit method.
+
+**Cross-checked, not assumed:** orders/order_items/menu_items schema
+read directly from `01_schema.sql` + every later `ALTER TABLE orders`
+migration grepped for renamed/dropped columns; `require_auth()`'s
+return shape read directly from `lib/auth.php`; every view ID in the
+new Kotlin cross-checked against both new XML layouts via a script
+diff (all matched); all 4 new/changed XML files parsed with
+`xml.etree.ElementTree` for well-formedness; `insights.php`
+brace/paren/bracket-balanced manually (94/94, 9/9, 30/30) — no PHP CLI
+in this sandbox, same standing limitation as every prior session.
+
+**Deliberately left out (flagged in doc 49, not forgotten):** Peak
+hours (in PENDING.md's original wishlist but NOT in §6's actual UI
+spec — needs its own design decision first), Export PDF/Excel (no
+existing export pattern anywhere in the Restaurant App to extend).
+
+**Not build/device-verified** — no PHP CLI, Android SDK/Gradle, live
+DB, or device in this sandbox. Full verification checklist in
+`docs/49_Handover_2026-08-27_Restaurant_Insights_Tab_Built.md`.
+
+**This closes PENDING.md item 3.** NEXT SESSION recommended: Admin
+Analytics remaining filters (State/District/Restaurant/Category) +
+Rider/Payment/Coupon analytics + Export — the app owner's own framing
+at the top of this session's thread, and a natural pick since it
+extends already-built code (`backend/admin/analytics.php`, doc 44)
+rather than starting from scratch. See doc 49's own "Recommended next
+session" section for the full reasoning and the P1 alternatives if the
+owner wants a different pick.
+
+**2026-08-27 (session 11) — Admin Analytics remaining scope built,
+closing PENDING.md item 2 on the written side. Full detail in
+docs/50_Handover_2026-08-27_Admin_Analytics_Filters_Riders_Payments_Coupons_Export_Built.md
+— this entry was missed from recall.md when it happened and is being
+added retroactively during a later session's doc-audit.** Extended
+`backend/admin/analytics.php` (doc 44's build) with State/District/
+Restaurant/Category filters (all AND-combined with the pre-existing
+Area filter via one shared `$extraWhereSql` reused across every
+section), a new Riders section (delivered-order count/revenue/avg
+delivery time per rider, off `orders.rider_id` — re-derived from
+reading `01_schema.sql` directly that this column is real and
+populated, overriding doc 44's older "no Rider App data" framing which
+didn't hold up against the actual schema), a new Payments section
+(UPI vs COD breakdown), a new Coupons section (usage/unique customers/
+discount per code, off the order's own `discount_amount` snapshot),
+and a CSV Export action gated on the pre-existing `reports_export`
+permission (first export pattern in this codebase — grepped for
+`Content-Disposition` first, found none).
+
+**2026-08-27 (session 12) — Doc-audit corrections + Admin panel:
+Settlements CSV export built. Full detail in
+docs/51_Handover_2026-08-27_Doc_Audit_And_Settlements_Export_Built.md.**
+App owner asked to check recall.md/Status.md's latest entries, then
+find and pick genuinely-pending Admin panel work.
+
+Doc-audit found PENDING.md item 4 ("Full Restaurant Offers Engine")
+still marked `PENDING` with every checklist box unchecked, which was
+wrong — cross-checked against actual code (`lib/offers.php`,
+`OfferManagerActivity.kt`, `CheckoutActivity.kt`,
+`OfferScreenActivity.kt`), confirmed built, matching Status.md's own
+"Combo/Bundle Offer Type — Step 6 done ... closes docs/40's plan,
+Steps 1-6 all done" entry. Also found item 1 (Admin Order Control)
+had the same stale-PENDING problem despite `docs/42` confirming it
+built. Both corrected to 🟡 BUILT — NOT verified.
+
+Then, checking Admin panel side specifically for real remaining gaps:
+item 17 (Restaurant Finance/Payout Analytics, `admin/settlements.php`)
+had no CSV export (grepped for `Content-Disposition` first, found
+none) — same gap `analytics.php` had before doc 50. Built it,
+reusing doc 50's exact export pattern (`reports_export` permission,
+`fputcsv`/`Content-Disposition`): Payout Analytics + Ledger Statement +
+Settlement History, per-restaurant, `settlement_exported` audit log
+entry. No new migration/permission.
+
+**Not build/device-verified** — same standing sandbox limitation.
+Full checklist in doc 51.
+
+**NEXT SESSION:** with PENDING.md now accurate, remaining Admin-panel-
+adjacent P1 items are broad/multi-piece rather than single next steps:
+Payment/Refund Reconciliation (item 24), Email OTP Provider Failover
+(item 25 — confirmed via grep this session that nothing exists for it
+yet), Security Hardening audit (item 26). If a feature pick is wanted
+instead: Restaurant Self Delivery (item 5) is next in PENDING.md's own
+P1 list order.
+
+**2026-08-27 (session 13) — Admin Customer-Feedback view built;
+Customer Complete-Profile backend built (Android side NOT started).**
+Full detail:
+`docs/52_Handover_2026-08-27_Admin_Feedback_View_And_Customer_Complete_Profile_Built.md`.
+Two owner asks: (1) admin screen for customer feedback — this had been
+a TODO sitting in `api/v1/customer/feedback.php`'s own kdoc since
+Phase 3.6 ("Reviewable directly in the `feedback` table, or a future
+Admin Panel screen"), now closed via migration 55 (`feedback_view`
+permission) + `admin/customer-feedback.php` (read-only list, star
+filter chips, message search) + nav entry. Fully built. (2) ask name +
+mobile from the customer right after email-OTP login — backend only
+this session: `api/v1/customer/complete-profile.php` (auth'd, validates
+name + 10-digit mobile, rejects duplicate mobile) + `.htaccess` route.
+**Android side is untouched** — `CompleteProfileActivity` + layout +
+model/ApiService wiring + the `LoginActivity.onVerifyOtp()` routing
+change (send to the new screen instead of `HomeActivity` when
+`customer.name`/`mobile` come back null) all still need building. Full
+step-by-step left in doc 52 for whoever picks this up. New items
+`PENDING.md` §11a (admin view, built) and §11b (customer complete-
+profile, backend built/Android pending) track this.
+
+**NEXT SESSION should finish PENDING.md item 11b's Android side
+first** — it's a single self-contained screen plus one wiring change,
+backend contract is already fixed. Not build/device-verified, same
+standing sandbox limitation as everything else in this file.

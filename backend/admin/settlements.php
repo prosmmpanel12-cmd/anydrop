@@ -21,14 +21,17 @@
  * Gated on payouts_view/payouts_manage (migration 29's existing keys —
  * no new permission needed).
  *
- * NOT WIRED: nothing in the codebase yet automatically writes
- * commission_cod / payout_payable entries when an order is placed or
- * paid (see lib/ledger.php's record_cod_order_ledger_entry() /
- * record_paid_order_ledger_entries() kdocs for why — no 'delivered'
- * transition and no payment-confirmation flow exist yet). Until those
- * land, every restaurant's ledger here will be empty except for
- * whatever Pay Now settlements an admin manually records — that part
- * IS fully live and independent of those two gaps.
+ * PARTIALLY WIRED (updated 2026-08-26, docs/43 — this note was stale):
+ * the online/UPI half now IS live — record_paid_order_ledger_entries()
+ * fires automatically the moment a UPI order's payment confirms (see
+ * lib/ledger.php's own kdoc), so payout_payable entries for online
+ * orders already appear here in real time. The COD half is still the
+ * one real gap: record_cod_order_ledger_entry() is never called,
+ * because no 'delivered' transition exists anywhere yet (no rider-
+ * facing API at all — Phase G, recall.md items 43-48, not built). So
+ * today, a restaurant's ledger here shows online-order payouts +
+ * whatever Pay Now settlements an admin manually records, but NOT COD
+ * commission — that piece stays at ₹0 until the Rider App ships.
  *
  * STATUS: 🆕 BUILT 2026-08-22 — NOT build/device-verified (no PHP CLI
  * or live DB in this sandbox). Needs migration 38 run live, then: save
@@ -41,11 +44,61 @@
 require_once __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../lib/audit.php';
 require_once __DIR__ . '/../lib/ledger.php';
+require_once __DIR__ . '/../lib/settings.php';
 
 $admin = admin_require_login();
 admin_require_permission($admin, 'payouts_view');
 $canEdit = admin_has_permission($admin['id'], 'payouts_manage');
 $db = Database::get();
+
+const MAX_SETTLEMENT_SCREENSHOT_BYTES = 5 * 1024 * 1024; // 5 MB — same cap as banners.php
+const SETTLEMENT_SCREENSHOT_MIME = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+
+/**
+ * Validates and saves an optional Pay Now settlement screenshot/receipt.
+ * Mirrors backend/admin/banners.php's save_banner_image() checks (size
+ * cap, real-content MIME sniff via finfo, never trust the extension) —
+ * no crop support here, a settlement proof should be saved as-is.
+ *
+ * Returns the stored relative path (screenshot_url), or null with
+ * $error set if something's wrong. Returns null with $error left null
+ * when no file was actually chosen — screenshot is optional, this is
+ * not itself a failure.
+ */
+function save_settlement_screenshot(array $file, ?string &$error): ?string {
+    if (!isset($file['error']) || $file['error'] === UPLOAD_ERR_NO_FILE) {
+        return null;
+    }
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        $error = 'Screenshot upload failed.';
+        return null;
+    }
+    if ($file['size'] > MAX_SETTLEMENT_SCREENSHOT_BYTES) {
+        $error = 'Screenshot is too large (max 5 MB).';
+        return null;
+    }
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mime = finfo_file($finfo, $file['tmp_name']);
+    finfo_close($finfo);
+    if (!isset(SETTLEMENT_SCREENSHOT_MIME[$mime])) {
+        $error = 'Unsupported file type — use JPG, PNG, or WEBP.';
+        return null;
+    }
+    $ext = SETTLEMENT_SCREENSHOT_MIME[$mime];
+
+    $uploadDir = __DIR__ . '/../uploads/settlement_screenshots';
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0755, true);
+    }
+    $filename = 'settlement_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+    $destPath = $uploadDir . '/' . $filename;
+
+    if (!move_uploaded_file($file['tmp_name'], $destPath)) {
+        $error = 'Could not save the uploaded screenshot.';
+        return null;
+    }
+    return 'uploads/settlement_screenshots/' . $filename;
+}
 
 $flash = null;
 $flashType = 'success';
@@ -91,20 +144,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $remarks = trim((string) ($_POST['remarks'] ?? '')) ?: null;
             $paymentDate = trim((string) ($_POST['payment_date'] ?? '')) ?: date('Y-m-d');
 
+            $screenshotError = null;
+            $screenshotUrl = isset($_FILES['screenshot'])
+                ? save_settlement_screenshot($_FILES['screenshot'], $screenshotError)
+                : null;
+
             if (!is_numeric($amount) || (float) $amount <= 0) {
                 $flash = 'Enter a valid settlement amount.';
                 $flashType = 'error';
             } elseif (!in_array($direction, ['admin_to_restaurant', 'restaurant_to_admin'], true)) {
                 $flash = 'Invalid settlement direction.';
                 $flashType = 'error';
+            } elseif ($screenshotError !== null) {
+                // A bad screenshot (too large / wrong type) blocks the whole
+                // settlement rather than silently recording it without proof
+                // — same "don't silently drop what the admin thought they
+                // attached" reasoning as any other required-evidence upload.
+                $flash = $screenshotError;
+                $flashType = 'error';
             } else {
                 try {
                     record_settlement(
                         $db, $postRestaurantId, $direction, (float) $amount, (int) $admin['id'],
-                        $utr, null, $remarks, $paymentDate
+                        $utr, $screenshotUrl, $remarks, $paymentDate
                     );
                     write_audit_log('admin', $admin['id'], 'settlement_recorded', [
                         'restaurant_id' => $postRestaurantId, 'direction' => $direction, 'amount' => $amount,
+                        'screenshot' => $screenshotUrl,
                     ]);
                     $flash = 'Settlement recorded and ledger updated.';
                 } catch (Throwable $e) {
@@ -150,6 +216,121 @@ if ($restaurantId !== null) {
     $payments = $paymentsStmt->fetchAll();
 
     $currentDue = (float) $restaurant['current_due'];
+
+    // ---------- Payout Analytics (doc 19 §6's Admin flow breakdown) ----------
+    // Today / This Week / This Month, same rolling-window convention as
+    // analytics.php (today / -6 days / -29 days) so the two ranged admin
+    // screens behave consistently.
+    $payoutRange = $_GET['payout_range'] ?? 'today';
+    if (!in_array($payoutRange, ['today', 'week', 'month'], true)) {
+        $payoutRange = 'today';
+    }
+    $payoutToday = date('Y-m-d');
+    if ($payoutRange === 'week') {
+        $payoutFromDate = date('Y-m-d', strtotime('-6 days'));
+    } elseif ($payoutRange === 'month') {
+        $payoutFromDate = date('Y-m-d', strtotime('-29 days'));
+    } else {
+        $payoutFromDate = $payoutToday;
+    }
+    $payoutFromDateTime = $payoutFromDate . ' 00:00:00';
+    $payoutToDateTime = $payoutToday . ' 23:59:59';
+    $payoutNonRevenueStatuses = "'cancelled','rejected','failed','expired'";
+
+    $payoutOrdersStmt = $db->prepare(
+        'SELECT COUNT(*) AS c FROM orders WHERE restaurant_id = :id AND created_at BETWEEN :f AND :t'
+    );
+    $payoutOrdersStmt->execute(['id' => $restaurantId, 'f' => $payoutFromDateTime, 't' => $payoutToDateTime]);
+    $payoutTotalOrders = (int) $payoutOrdersStmt->fetch()['c'];
+
+    $payoutMoneyStmt = $db->prepare(
+        "SELECT
+            COALESCE(SUM(CASE WHEN payment_method = 'cod' THEN grand_total ELSE 0 END), 0) AS cash_collected,
+            COALESCE(SUM(CASE WHEN payment_method = 'upi' THEN grand_total ELSE 0 END), 0) AS online_collected,
+            COALESCE(SUM(CASE WHEN payment_method = 'upi' THEN platform_fee ELSE 0 END), 0) AS online_platform_fee,
+            COALESCE(SUM(commission_amount), 0) AS commission
+         FROM orders
+         WHERE restaurant_id = :id AND created_at BETWEEN :f AND :t AND status NOT IN ($payoutNonRevenueStatuses)"
+    );
+    $payoutMoneyStmt->execute(['id' => $restaurantId, 'f' => $payoutFromDateTime, 't' => $payoutToDateTime]);
+    $payoutMoney = $payoutMoneyStmt->fetch();
+
+    $payoutCashCollected = (float) $payoutMoney['cash_collected'];
+    $payoutOnlineCollected = (float) $payoutMoney['online_collected'];
+    $payoutOnlinePlatformFee = (float) $payoutMoney['online_platform_fee'];
+    $payoutCommission = (float) $payoutMoney['commission'];
+    $gstPercent = (float) get_setting('gst_percent', 18);
+    $payoutGst = round($payoutCommission * $gstPercent / 100, 2);
+    // Net Payable = what admin owes the restaurant for online orders in this
+    // range: money collected on the restaurant's behalf, minus commission,
+    // minus GST charged on that commission, minus the platform fee (which
+    // was always admin's share, not the restaurant's, even though it rode
+    // in on the same collected grand_total).
+    $payoutNetPayable = $payoutOnlineCollected - $payoutCommission - $payoutGst - $payoutOnlinePlatformFee;
+
+    $payoutPaidStmt = $db->prepare(
+        "SELECT COALESCE(SUM(amount), 0) AS c FROM restaurant_payments
+         WHERE restaurant_id = :id AND status = 'verified'
+           AND COALESCE(payment_date, DATE(created_at)) BETWEEN :f AND :t"
+    );
+    $payoutPaidStmt->execute(['id' => $restaurantId, 'f' => $payoutFromDate, 't' => $payoutToday]);
+    $payoutAlreadyPaid = (float) $payoutPaidStmt->fetch()['c'];
+
+    // ---------- Export CSV (PENDING.md item 17's remaining gap) ----------
+    // Same reports_export permission + Content-Disposition/fputcsv pattern
+    // analytics.php established (doc 50) — this page reuses it rather than
+    // inventing a second export convention. Gated separately from
+    // payouts_view (view alone isn't enough), same "view vs export" split
+    // migration 29 already defines and analytics.php already uses.
+    $canExportSettlement = admin_has_permission((int) $admin['id'], 'reports_export');
+    if ($canExportSettlement && ($_GET['export'] ?? '') === 'csv') {
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="anydrop_settlement_' . $restaurantId . '_' . $payoutFromDate . '_to_' . $payoutToday . '.csv"');
+
+        $out = fopen('php://output', 'w');
+
+        fputcsv($out, ['Anydrop Settlement Export — ' . $restaurant['name']]);
+        fputcsv($out, ['Payout range', $payoutFromDate . ' to ' . $payoutToday]);
+        fputcsv($out, []);
+
+        fputcsv($out, ['Payout Analytics']);
+        fputcsv($out, ['Total Orders', 'Cash Collected (COD)', 'Online Collected (UPI)', 'Commission', 'GST', 'Net Payable (online orders)', 'Already Paid (in range)', 'Pending (live)']);
+        fputcsv($out, [
+            $payoutTotalOrders, $payoutCashCollected, $payoutOnlineCollected, $payoutCommission,
+            $payoutGst, $payoutNetPayable, $payoutAlreadyPaid, $currentDue,
+        ]);
+        fputcsv($out, []);
+
+        fputcsv($out, ['Ledger Statement (most recent 200 entries)']);
+        fputcsv($out, ['Date', 'Type', 'Order', 'Amount', 'Running Balance', 'By', 'Note']);
+        foreach ($ledgerRows as $row) {
+            fputcsv($out, [
+                $row['created_at'], str_replace('_', ' ', $row['entry_type']),
+                $row['order_id'] ? '#' . (int) $row['order_id'] : '',
+                (float) $row['amount'], (float) $row['running_balance'], $row['created_by'], $row['note'] ?? '',
+            ]);
+        }
+        fputcsv($out, []);
+
+        fputcsv($out, ['Settlement History (most recent 50)']);
+        fputcsv($out, ['Date', 'Direction', 'Amount', 'UTR', 'Remarks']);
+        foreach ($payments as $p) {
+            fputcsv($out, [
+                $p['payment_date'] ?? $p['created_at'],
+                $p['direction'] === 'admin_to_restaurant' ? 'Admin to Restaurant' : 'Restaurant to Admin',
+                (float) $p['amount'], $p['utr_number'] ?? '', $p['remarks'] ?? '',
+            ]);
+        }
+
+        write_audit_log('admin', $admin['id'], 'settlement_exported', [
+            'restaurant_id' => $restaurantId, 'payout_range' => $payoutRange,
+            'from' => $payoutFromDate, 'to' => $payoutToday,
+        ]);
+
+        fclose($out);
+        exit;
+    }
+
     $pageTitle = 'Settlement — ' . $restaurant['name'];
     require __DIR__ . '/_layout_head.php';
     ?>
@@ -166,6 +347,32 @@ if ($restaurantId !== null) {
                 <span class="badge active">Fully settled</span>
             <?php endif; ?>
         </p>
+    </div>
+
+    <div class="card">
+        <h2>Payout Analytics</h2>
+        <form method="get" class="filter-row">
+            <input type="hidden" name="restaurant_id" value="<?= (int) $restaurantId ?>">
+            <select name="payout_range" onchange="this.form.submit()">
+                <option value="today" <?= $payoutRange === 'today' ? 'selected' : '' ?>>Today</option>
+                <option value="week" <?= $payoutRange === 'week' ? 'selected' : '' ?>>This Week</option>
+                <option value="month" <?= $payoutRange === 'month' ? 'selected' : '' ?>>This Month</option>
+            </select>
+            <?php if ($canExportSettlement): ?>
+                <a class="btn btn-outline" href="?<?= http_build_query(array_merge($_GET, ['export' => 'csv'])) ?>">Export CSV</a>
+            <?php endif; ?>
+        </form>
+        <p class="muted" style="margin-top:8px;">Showing <?= admin_escape($payoutFromDate) ?> to <?= admin_escape($payoutToday) ?>. GST is calculated on commission at the platform's configured rate (<?= admin_escape(number_format($gstPercent, 2)) ?>%). Pending is the live running balance, not scoped to this range.</p>
+        <div class="grid" style="margin-top:12px;">
+            <div class="card stat"><div class="value"><?= $payoutTotalOrders ?></div><div class="label">Total Orders</div></div>
+            <div class="card stat"><div class="value">₹<?= admin_escape(number_format($payoutCashCollected, 2)) ?></div><div class="label">Cash Collected (COD)</div></div>
+            <div class="card stat"><div class="value">₹<?= admin_escape(number_format($payoutOnlineCollected, 2)) ?></div><div class="label">Online Collected (UPI)</div></div>
+            <div class="card stat"><div class="value">₹<?= admin_escape(number_format($payoutCommission, 2)) ?></div><div class="label">Commission</div></div>
+            <div class="card stat"><div class="value">₹<?= admin_escape(number_format($payoutGst, 2)) ?></div><div class="label">GST (<?= admin_escape(number_format($gstPercent, 2)) ?>% on commission)</div></div>
+            <div class="card stat"><div class="value" style="color:<?= $payoutNetPayable >= 0 ? '#1b8a3c' : '#c0392b' ?>;">₹<?= admin_escape(number_format($payoutNetPayable, 2)) ?></div><div class="label">Net Payable (online orders)</div></div>
+            <div class="card stat"><div class="value">₹<?= admin_escape(number_format($payoutAlreadyPaid, 2)) ?></div><div class="label">Already Paid (in range)</div></div>
+            <div class="card stat"><div class="value">₹<?= admin_escape(number_format(abs($currentDue), 2)) ?></div><div class="label"><?= $currentDue >= 0 ? 'Pending (restaurant owes)' : 'Pending (admin owes)' ?></div></div>
+        </div>
     </div>
 
     <div class="card">
@@ -205,7 +412,7 @@ if ($restaurantId !== null) {
     <div class="card">
         <h2>Pay Now</h2>
         <p class="muted">Records a settlement in whichever direction the current balance needs — admin paying the restaurant its online-order payouts, or the restaurant paying admin its COD commissions.</p>
-        <form method="post">
+        <form method="post" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
             <input type="hidden" name="form_action" value="pay_now">
             <input type="hidden" name="restaurant_id" value="<?= (int) $restaurantId ?>">
@@ -227,6 +434,9 @@ if ($restaurantId !== null) {
                 </label>
                 <label>Remarks <span class="muted">(optional)</span>
                     <input type="text" name="remarks">
+                </label>
+                <label>Payment Screenshot <span class="muted">(optional, JPG/PNG/WEBP, max 5 MB)</span>
+                    <input type="file" name="screenshot" accept="image/jpeg,image/png,image/webp">
                 </label>
             </div>
             <button type="submit" class="btn btn-primary"
@@ -270,7 +480,7 @@ if ($restaurantId !== null) {
         <?php else: ?>
         <div class="table-responsive">
         <table>
-            <tr><th>Date</th><th>Direction</th><th>Amount</th><th>UTR</th><th>Remarks</th></tr>
+            <tr><th>Date</th><th>Direction</th><th>Amount</th><th>UTR</th><th>Remarks</th><th>Screenshot</th></tr>
             <?php foreach ($payments as $p): ?>
             <tr>
                 <td><?= admin_escape($p['payment_date'] ?? $p['created_at']) ?></td>
@@ -278,6 +488,15 @@ if ($restaurantId !== null) {
                 <td>₹<?= admin_escape(number_format((float) $p['amount'], 2)) ?></td>
                 <td><?= admin_escape($p['utr_number'] ?? '—') ?></td>
                 <td class="muted"><?= admin_escape($p['remarks'] ?? '') ?></td>
+                <td>
+                    <?php if (!empty($p['screenshot_url'])): ?>
+                        <a href="../<?= admin_escape($p['screenshot_url']) ?>" target="_blank" rel="noopener">
+                            <img src="../<?= admin_escape($p['screenshot_url']) ?>" alt="Settlement screenshot" style="height:40px;border-radius:4px;vertical-align:middle;">
+                        </a>
+                    <?php else: ?>
+                        <span class="muted">—</span>
+                    <?php endif; ?>
+                </td>
             </tr>
             <?php endforeach; ?>
         </table>

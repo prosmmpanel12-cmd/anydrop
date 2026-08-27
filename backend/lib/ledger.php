@@ -220,16 +220,22 @@ if (!function_exists('record_settlement')) {
 
 if (!function_exists('record_cod_order_ledger_entry')) {
     /**
-     * NOT CALLED ANYWHERE YET. Ready for the moment a COD order reaches
-     * a genuinely-final "restaurant collected the cash" state — the
-     * codebase currently has no such transition at all (order statuses
-     * stop at 'ready'; rider assignment/delivery is Phase G, recall.md
-     * items 43-48, not built). Writing this at order CREATION time
-     * instead would be wrong — a placed COD order can still be
-     * rejected/cancelled before any cash actually changes hands, and
-     * that would leave a ledger entry for an order that never
-     * completed. Call this once a real 'delivered' (or equivalent)
-     * transition exists, from that transition's own transaction.
+     * STILL NOT CALLED ANYWHERE (confirmed again 2026-08-26, docs/43 —
+     * this is the one real remaining gap, unlike
+     * record_paid_order_ledger_entries() below which has since been
+     * wired up). Ready for the moment a COD order reaches a
+     * genuinely-final "restaurant collected the cash" state — the
+     * codebase still has no such transition (no rider-facing API
+     * namespace exists at all yet; nothing ever sets orders.status =
+     * 'delivered' — grepped the whole backend/api tree to confirm).
+     * That's the Rider App, Phase G (recall.md items 43-48) — a
+     * separate, much larger build than a one-line wire-up, so this
+     * stays flagged rather than half-built. Writing this at order
+     * CREATION time instead would be wrong — a placed COD order can
+     * still be rejected/cancelled before any cash actually changes
+     * hands, and that would leave a ledger entry for an order that
+     * never completed. Call this once a real 'delivered' transition
+     * exists, from that transition's own transaction.
      */
     function record_cod_order_ledger_entry(PDO $db, array $order): void
     {
@@ -247,13 +253,15 @@ if (!function_exists('record_cod_order_ledger_entry')) {
 
 if (!function_exists('record_paid_order_ledger_entries')) {
     /**
-     * NOT CALLED ANYWHERE YET, same reason as record_cod_order_ledger_entry()
-     * above but for the online/UPI side — this codebase has no payment
-     * confirmation flow at all yet (recall.md item 24, Payment
-     * Architecture, still a UPIPE stub with no webhook/verify endpoint
-     * that ever sets orders.payment_status = 'paid'). Call this once
-     * that endpoint exists, from its own transaction, the moment a
-     * specific order's payment_status actually flips to 'paid'.
+     * UPDATE (2026-08-26, docs/43): this WAS "not called anywhere yet"
+     * when first written, but the native UPI payment gateway (docs/23,
+     * migrations 40-42) since wired it up — called from both
+     * PaymentService::promoteOrderIfNeeded() (the ordinary poll/webhook
+     * confirmation path) and orders/create.php (the immediate-success
+     * path for a payment that's already confirmed at order-placement
+     * time). Called once, idempotently, the moment a specific order's
+     * payment_status actually flips to 'paid' — see both call sites'
+     * own guards against double-firing.
      */
     function record_paid_order_ledger_entries(PDO $db, array $order): void
     {

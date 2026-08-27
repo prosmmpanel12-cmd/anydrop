@@ -38,26 +38,30 @@ $restaurantFilter = isset($_GET['restaurant_id']) && $_GET['restaurant_id'] !== 
 $where = [];
 $params = [];
 if ($fromDate !== '') {
-    $where[] = 'created_at >= :from';
+    $where[] = 'pl.created_at >= :from';
     $params['from'] = $fromDate . ' 00:00:00';
 }
 if ($toDate !== '') {
-    $where[] = 'created_at <= :to';
+    $where[] = 'pl.created_at <= :to';
     $params['to'] = $toDate . ' 23:59:59';
 }
 if ($restaurantFilter !== null) {
-    $where[] = 'restaurant_id = :rid';
+    $where[] = 'pl.restaurant_id = :rid';
     $params['rid'] = $restaurantFilter;
 }
 $whereSql = empty($where) ? '' : ('WHERE ' . implode(' AND ', $where));
 
 // ---------- Totals (doc 19 §6b's exact four figures) ----------
+// Aliased as 'pl' here (matching the entry-list query below) because
+// $whereSql's conditions are now qualified with pl. — needed since
+// joining restaurants r further down means an unqualified created_at
+// would be ambiguous (both tables have that column).
 $totalsStmt = $db->prepare(
     "SELECT
         COALESCE(SUM(CASE WHEN entry_type IN ('customer_payment_in','restaurant_settlement_in') THEN amount ELSE 0 END), 0) AS total_in,
         COALESCE(SUM(CASE WHEN entry_type IN ('restaurant_payout_out','refund_out') THEN ABS(amount) ELSE 0 END), 0) AS total_out,
         COALESCE(SUM(CASE WHEN entry_type = 'platform_revenue' THEN amount ELSE 0 END), 0) AS total_revenue
-     FROM platform_ledger $whereSql"
+     FROM platform_ledger pl $whereSql"
 );
 $totalsStmt->execute($params);
 $totals = $totalsStmt->fetch();
