@@ -1951,9 +1951,8 @@ provider implementation.
 
 # 28. PAYMENT / REFUND RECONCILIATION
 
-**Status: 🔴 PENDING FOR PRODUCTION**
-
-Need reconciliation between:
+**Status: 🟡 BUILT 2026-08-30 (session 20, doc 76) — NOT device/live-DB
+verified.**
 
 ```text
 Order
@@ -1964,11 +1963,45 @@ Settlement
 Refund
 ```
 
-Future provider webhooks should update the authoritative transaction state.
+Built this session: migration 66, `backend/lib/reconciliation.php` (11
+read-only checks — both directions of payment-confirmed-vs-order-paid,
+double-successful-transaction, both directions of refund-vs-ledger and
+refund-vs-wallet, wallet balance drift against its own transaction
+history, settlement-vs-due-ledger linkage, and the platform-wide
+balance check that `platform-ledger.php` already showed inline, now
+also persisted here), and `backend/admin/reconciliation.php` (run scan
+on demand, Resolve/Ignore each flag with a required note, fully
+audit-logged). New `restaurant_due_ledger.restaurant_payment_id`
+column closes a real gap found while building this — `platform_ledger`
+has had this exact link since migration 38, `restaurant_due_ledger`
+never did, so settlement reconciliation could previously only ever be
+fuzzy amount/timestamp matching.
 
-Do not mark a payment successful solely from a client-side success callback.
+Doc-audit finding, same session: this codebase already has Paytm
+auto-verify + `provider_bank_ref` dedupe (migrations
+41/42-paytm/43-dedupe-providers, `UpipeProvider::tryAutoVerify()`,
+`PaytmStatusClient.php`) that was never written up anywhere in
+`recall.md` or `PENDING.md` before now. It answers most of "provider
+transaction matching" and "duplicate transaction detection" already,
+at the DB-constraint level, independent of this session's build.
 
-**Deep reference:** `docs/19_Admin_Panel_Full_Spec_And_Payment_Email_Architecture_2026-08-14.md` and `docs/21_Production_Feature_Gap_Plan.md`.
+Future provider webhooks should still update the authoritative
+transaction state — that part of doc 21 §5.6's original diagram still
+doesn't apply; there is no live gateway yet, only the manual/auto-
+verify UPIPE stub (see doc 23 §9 for when a real gateway lands).
+
+Do not mark a payment successful solely from a client-side success
+callback — unchanged, still the rule, and now also a standing check
+(`recon_check_paid_upi_order_missing_transaction`) instead of only a
+one-time code-review concern.
+
+Still open: migration 66 not run live (backfill query untested against
+real timestamps), no PHP CLI in this sandbox to `php -l` the new
+files, no live click-through of the scan/resolve/ignore flow, and no
+scheduler/cron exists anywhere in this codebase yet to run the scan
+automatically — it's admin-triggered only for now.
+
+**Deep reference:** `docs/19_Admin_Panel_Full_Spec_And_Payment_Email_Architecture_2026-08-14.md`, `docs/21_Production_Feature_Gap_Plan.md`, `docs/76_Handover_2026-08-30_Payment_Refund_Reconciliation_Built.md`.
 
 ---
 
@@ -2133,7 +2166,15 @@ Do NOT randomly pick features.
 24. Payment transaction architecture — 🟡 built 2026-08-23, not device-verified (`docs/23_Native_UPI_Payment_Gateway_Architecture_2026-08-23.md` — migration 40, `lib/payment/PaymentService.php` + rewritten `UpipeProvider.php` (native UPI-QR, manual-admin verification, no external gateway call), 3 customer APIs under `api/v1/orders/payment-upi-*.php`, `admin/payment-gateways.php` + `admin/payment-pending.php`. `record_paid_order_ledger_entries()` is now actually called — see the item-21 update below.) **Update (same day, follow-up session):** the Android payment screen (`UpiPaymentActivity.kt`) and its "Cancel and pay by COD" button turned out to already be written (contradicting the doc's own §A4 note that customer-app UI wasn't built yet — doc corrected). That button was found to be fake (toast only, never touched the backend) and is now real: new `backend/api/v1/orders/payment-switch-cod.php` (`POST /orders/{id}/payment/switch-to-cod`), reusing `orders/create.php`'s exact payment-restriction + COD-eligibility function pair so the same rules apply. See doc 23's new §A4b for the full detail. Still 🟡 not device/build-verified.
 25. Refund system — 🟡 built 2026-08-23, not device-verified (section 19 — migration 42, `lib/refunds.php`, `admin/refunds.php`; wired into `orders/cancel.php` + `restaurant/orders-reject.php`'s payment_status='paid' gap)
 26. Wallet — 🔴 pending
-27. Reconciliation — 🟡 partially built 2026-08-22 — `platform-ledger.php`'s reconciliation check (Net Balance Held vs `-1×SUM(current_due<0)`) is live per doc 19 §6b, but there's no periodic automated check yet (doc calls for one flagging Super Admin on drift) — only the on-page manual check exists.
+27. Reconciliation — 🟡 built 2026-08-30 (session 20, doc 76) — migration
+    66 + `lib/reconciliation.php` (11 checks) + `admin/reconciliation.php`
+    (scan + Resolve/Ignore queue, audit-logged); new
+    `restaurant_due_ledger.restaurant_payment_id` link closes a real gap
+    (`platform_ledger` had this since migration 38, due-ledger never did).
+    `platform-ledger.php`'s existing inline balance check is now also one
+    of the 11 persisted checks. Still no periodic/automated run (no
+    cron/scheduler exists anywhere in this codebase) — admin-triggered
+    only. Not device/live-DB verified. See section 28 and doc 76.
 
 ## Phase D — Offers
 

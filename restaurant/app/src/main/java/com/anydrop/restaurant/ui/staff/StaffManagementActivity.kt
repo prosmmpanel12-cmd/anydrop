@@ -154,8 +154,8 @@ class StaffManagementActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                val ok = if (existing == null) {
-                    api.createStaff(StaffCreateBody(name = name, username = username, password = password, role = role)).isSuccessful
+                val response = if (existing == null) {
+                    api.createStaff(StaffCreateBody(name = name, username = username, password = password, role = role))
                 } else {
                     api.updateStaff(
                         existing.id,
@@ -165,17 +165,47 @@ class StaffManagementActivity : AppCompatActivity() {
                             isActive = null, // switch handles this independently, see toggleActive()
                             password = password.ifEmpty { null }
                         )
-                    ).isSuccessful
+                    )
                 }
-                if (ok) {
+                if (response.isSuccessful) {
                     InAppNotifier.show(this@StaffManagementActivity, getString(R.string.staff_saved), InAppNotifier.Type.SUCCESS)
                     loadStaff()
                 } else {
-                    InAppNotifier.show(this@StaffManagementActivity, getString(R.string.staff_save_failed), InAppNotifier.Type.ERROR)
+                    // staff-create.php's own validation_error carries a
+                    // {fields:["username"], reason:"username_taken"} data
+                    // payload on non-2xx responses (never populated on
+                    // ApiResponse.data via Retrofit/Gson — only
+                    // response.errorBody() carries it, same reason
+                    // OfferManagerActivity.serverErrorDetail() reads it
+                    // this way instead). Surfacing "username already
+                    // taken" specifically here avoids the confusing
+                    // "why didn't this work" a bare generic failure
+                    // caused when the same username was reused across
+                    // two different restaurant accounts (usernames are
+                    // deliberately global, not per-restaurant — see
+                    // migration 63's own header).
+                    val message = if (usernameTakenError(response.errorBody())) {
+                        getString(R.string.staff_username_taken)
+                    } else {
+                        getString(R.string.staff_save_failed)
+                    }
+                    InAppNotifier.show(this@StaffManagementActivity, message, InAppNotifier.Type.ERROR)
                 }
             } catch (e: Exception) {
                 InAppNotifier.show(this@StaffManagementActivity, getString(R.string.staff_save_failed), InAppNotifier.Type.ERROR)
             }
+        }
+    }
+
+    private fun usernameTakenError(errorBody: okhttp3.ResponseBody?): Boolean {
+        if (errorBody == null) return false
+        return try {
+            val bodyStr = errorBody.string()
+            val map = com.google.gson.Gson().fromJson(bodyStr, Map::class.java)
+            val data = map?.get("data") as? Map<*, *>
+            data?.get("reason") == "username_taken"
+        } catch (e: Exception) {
+            false
         }
     }
 

@@ -4,17 +4,23 @@
  * Request:  { "email": "user@example.com" }
  * Response: { "message": "OTP sent" }
  *
- * NOTE: Actual SMTP sending is stubbed here (logs OTP instead of emailing)
- * until Phase 1 email delivery is wired up with real SMTP credentials.
- * Until then, the OTP itself is only visible in the response when the
- * `debug_otp_enabled` app_settings row is explicitly set to '1' (defaults
- * to off — see bugs.md #2.2) — set it on a dev/staging DB to keep testing
- * the login flow end-to-end without SMTP configured.
+ * Email delivery goes through EmailOtpService (AnyDrop_Email_OTP_
+ * MultiProvider_Plan.md) — 6-provider failover managed entirely from
+ * the Admin Panel's Email Providers screen. If every active provider
+ * fails, this returns a real `email_delivery_unavailable` error rather
+ * than pretending the OTP was sent (plan §3).
+ *
+ * `debug_otp_enabled` (app_settings, defaults '0'/off — bugs.md #2.2)
+ * still gates whether the OTP is echoed back in the response, for
+ * testing the login flow without a real inbox. On a dev/staging DB
+ * with no provider configured yet, delivery will fail every time —
+ * that's expected; debug_otp is what lets you keep testing anyway.
  */
 
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/settings.php';
+require_once __DIR__ . '/../../../lib/email_otp/EmailOtpService.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -67,16 +73,28 @@ $stmt = $db->prepare(
 );
 $stmt->execute(['e' => $email, 'o' => $otp, 'x' => $expiresAt]);
 
+$debugOtpEnabled = get_setting('debug_otp_enabled', '0') === '1';
+
+$deliveryResult = (new EmailOtpService($db))->send($email, $otp, 'customer_login', $expiryMinutes);
+
+if (!$deliveryResult['success'] && !$debugOtpEnabled) {
+    // plan §3 — never claim "OTP sent" when nothing actually accepted
+    // it. On production (debug_otp off) a real delivery failure is a
+    // real error, full stop.
+    respond_error('email_delivery_unavailable', 503, [
+        'message' => 'Unable to send confirmation code right now. Please try again later.',
+    ]);
+}
+
 // bugs.md #2.2 fix — debug_otp used to always be returned in the live
 // response, meaning anyone could log in as any email with zero
-// possession-of-inbox proof. Real SMTP still isn't wired up (see the
-// file header TODO), so this can't just be deleted outright without
-// breaking the ability to test login at all — instead it's now gated
-// behind `debug_otp_enabled` in app_settings, defaulting to OFF ('0')
-// whenever the row doesn't exist. Flip it to '1' only on a dev/staging
-// DB; never set it on production.
+// possession-of-inbox proof. Now gated behind `debug_otp_enabled` in
+// app_settings, defaulting to OFF ('0') whenever the row doesn't
+// exist. Flip it to '1' only on a dev/staging DB; never set it on
+// production. With it on, login stays testable even if no provider is
+// configured yet / a delivery attempt above failed.
 $response = ['message' => 'OTP sent'];
-if (get_setting('debug_otp_enabled', '0') === '1') {
+if ($debugOtpEnabled) {
     $response['debug_otp'] = $otp;
 }
 respond_ok($response);

@@ -154,6 +154,11 @@ $navItems = [
         'icon' => '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/>',
     ],
     [
+    'key' => 'email_providers', 'href' => 'email-providers.php', 'label' => 'Email Providers',
+    'perm' => 'email_providers_manage', 'group' => 'finance',
+    'icon' => '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/>',
+],
+    [
         'key' => 'payment_pending', 'href' => 'payment-pending.php', 'label' => 'Pending UPI Payments',
         'perm' => 'payment_providers_manage', 'group' => 'finance',
         'icon' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',

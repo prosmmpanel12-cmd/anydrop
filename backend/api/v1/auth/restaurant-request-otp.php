@@ -11,14 +11,17 @@
  * of customer login. Reuses the same `email_otps` table (keyed only by
  * email, purpose-agnostic) rather than a parallel restaurant_otps table.
  *
- * NOTE: same as customer-request-otp.php — real SMTP isn't wired up yet
- * (docs/19 §7, Email OTP multi-provider, is planning-only). OTP is only
- * echoed back when `debug_otp_enabled` app_setting is '1' (dev/staging).
+ * NOTE: same as customer-request-otp.php — delivery now goes through
+ * EmailOtpService (docs/19 §7, AnyDrop_Email_OTP_MultiProvider_Plan.md),
+ * 6-provider failover managed from the Admin Panel. OTP is only echoed
+ * back in the response when `debug_otp_enabled` app_setting is '1'
+ * (dev/staging) — otherwise a real delivery failure is a real error.
  */
 
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/settings.php';
+require_once __DIR__ . '/../../../lib/email_otp/EmailOtpService.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -72,8 +75,18 @@ $stmt = $db->prepare(
 );
 $stmt->execute(['e' => $email, 'o' => $otp, 'x' => $expiresAt]);
 
+$debugOtpEnabled = get_setting('debug_otp_enabled', '0') === '1';
+
+$deliveryResult = (new EmailOtpService($db))->send($email, $otp, 'restaurant_signup', $expiryMinutes);
+
+if (!$deliveryResult['success'] && !$debugOtpEnabled) {
+    respond_error('email_delivery_unavailable', 503, [
+        'message' => 'Unable to send confirmation code right now. Please try again later.',
+    ]);
+}
+
 $response = ['message' => 'OTP sent'];
-if (get_setting('debug_otp_enabled', '0') === '1') {
+if ($debugOtpEnabled) {
     $response['debug_otp'] = $otp;
 }
 respond_ok($response);

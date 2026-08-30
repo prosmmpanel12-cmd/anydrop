@@ -801,9 +801,16 @@ Session
 
 ## 24. Payment / Refund Reconciliation
 
-**Status:** PENDING FOR PRODUCTION
+**Status:** 🟡 BUILT 2026-08-30 (session 20, doc 76) — NOT build/device-verified.
 
-Foundation exists, but final reconciliation layer is required.
+Migration 66 + `backend/lib/reconciliation.php` + `backend/admin/reconciliation.php`.
+Doc-audit note (same session): found real, previously-undocumented
+work already in the codebase — Paytm auto-verify + `provider_bank_ref`
+dedupe (migrations 41/42-paytm/43-dedupe-providers,
+`UpipeProvider::tryAutoVerify()`, `PaytmStatusClient.php`) — this
+closes most of "Provider transaction matching" and "Duplicate
+transaction detection" below at the DB-constraint level already; this
+session's build is the detection/queue layer on top of that.
 
 ### Required chain
 
@@ -822,21 +829,73 @@ Refund
 ```
 
 ### Required
-- [ ] Authoritative payment state
-- [ ] Provider transaction matching
-- [ ] Reconciliation job/check
-- [ ] Mismatch detection
-- [ ] Duplicate transaction detection
-- [ ] Refund reconciliation
-- [ ] Settlement reconciliation
-- [ ] Admin mismatch queue
-- [ ] Audit trail
+- [x] Authoritative payment state — verified via
+      `recon_check_payment_confirmed_order_not_paid()` /
+      `recon_check_paid_upi_order_missing_transaction()` (cross-checks
+      `payment_transactions.status` against `orders.payment_status`
+      both directions)
+- [x] Provider transaction matching — already DB-enforced
+      (`uq_ptxn_utr`, `uq_ptxn_provider_bank_ref`, migrations 40/42);
+      `recon_check_order_multiple_successful_transactions()` adds the
+      one gap those constraints don't cover (two distinct successful
+      transactions landing on the same order)
+- [x] Reconciliation job/check — `run_reconciliation_scan()`, 11
+      checks, run on demand from `admin/reconciliation.php` (no cron
+      exists in this codebase to run it automatically yet — flagged as
+      a real gap below, not silently assumed away)
+- [x] Mismatch detection — every check above + `wallet_balance_drift`
+      (stored `customer_wallets.balance` vs its own transaction-history
+      sum) + `platform_balance_mismatch` (pulls in `platform-ledger.php`'s
+      existing inline check as a persisted, resolvable flag)
+- [x] Duplicate transaction detection — DB-enforced (see above) +
+      `order_multiple_successful_transactions`
+- [x] Refund reconciliation — `refund_missing_ledger_entry` (manual
+      transfer), `wallet_refund_missing_credit` /
+      `wallet_refund_unexpected_ledger_entry` (wallet method, both
+      directions), `order_refunded_no_refund_record`
+- [x] Settlement reconciliation — new `restaurant_due_ledger.
+      restaurant_payment_id` column (migration 66 — this link never
+      existed before; `platform_ledger` had it since migration 38 but
+      `restaurant_due_ledger` never did), backfilled best-effort for
+      history, populated going forward by `record_settlement()`;
+      `settlement_missing_ledger_entry` check uses it
+- [x] Admin mismatch queue — `reconciliation_flags` table (migration
+      66), `admin/reconciliation.php` (Resolve/Ignore, both
+      note-required + audit-logged, both gated on
+      `reconciliation_manage`)
+- [x] Audit trail — scan runs + every resolve/ignore go through
+      `write_audit_log()`
+
+### Still open
+- [ ] Migration 66 run on a live DB (including its backfill query —
+      review the backfilled `restaurant_payment_id` links on real
+      historical data once run, the 120-second-window heuristic was
+      never tested against real timestamps)
+- [ ] `php -l` on the 3 touched/new backend files (no PHP CLI in this
+      sandbox — only a manual brace/paren/bracket balance check was
+      possible)
+- [ ] Live click-through: run a scan against a clean DB (expect ~0
+      flags), then deliberately break one invariant by hand (e.g.
+      delete a `platform_ledger` `refund_out` row for a refunded
+      order) and confirm the matching check fires on the next scan;
+      confirm Resolve/Ignore round-trip and that an ignored flag
+      doesn't resurface while a still-broken one does
+- [ ] No scheduler/cron exists anywhere in this codebase (same gap
+      `wallet.php`'s cashback-expiry note already flagged) — this scan
+      is admin-triggered only for now; running it automatically (daily)
+      needs that infrastructure to exist first, out of scope for this
+      session
+- [ ] Webhook-based payment confirmation (doc 21 §5.6's original
+      diagram) doesn't apply yet — there is no live gateway, only the
+      manual/auto-verify UPIPE stub — revisit this doc's diagram once
+      Phase E's real-gateway work happens (doc 23 §9)
 
 ### Main docs
 - `recall.md` §28
 - `docs/19_Admin_Panel_Full_Spec_And_Payment_Email_Architecture_2026-08-14.md`
 - `docs/21_Production_Feature_Gap_Plan.md`
 - `docs/23_Native_UPI_Payment_Gateway_Architecture_2026-08-23.md`
+- `docs/76_Handover_2026-08-30_Payment_Refund_Reconciliation_Built.md`
 
 ---
 
@@ -1035,7 +1094,7 @@ Recommended implementation order:
 
 ### Phase E — Production
 - [ ] Google Login backend
-- [ ] Payment/refund reconciliation
+- [~] Payment/refund reconciliation — built 2026-08-30, not device-verified (§24)
 - [ ] Email OTP provider failover
 - [ ] Security hardening
 - [ ] Full regression/build/device/live DB testing
