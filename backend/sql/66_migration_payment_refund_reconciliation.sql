@@ -36,10 +36,30 @@
 
 -- ---------- Part 1: restaurant_due_ledger settlement linkage ----------
 
-ALTER TABLE restaurant_due_ledger
-    ADD COLUMN restaurant_payment_id BIGINT UNSIGNED NULL AFTER order_id,
-    ADD CONSTRAINT fk_ledger_restaurant_payment FOREIGN KEY (restaurant_payment_id) REFERENCES restaurant_payments(id),
-    ADD INDEX idx_ledger_restaurant_payment (restaurant_payment_id);
+-- Idempotent, same CONTINUE-HANDLER stored-procedure pattern every
+-- other ALTER/CREATE TABLE migration in this project uses (see
+-- migration 58's own header for the fullest explanation) — safe to
+-- re-run. Without this wrapper, re-running this file after a partial
+-- first attempt died here with "Duplicate column" and silently never
+-- reached Part 2's permission seeding below (see 66b_reconciliation
+-- _permissions_only.sql, the recovery script for exactly that case).
+DELIMITER $$
+
+DROP PROCEDURE IF EXISTS anydrop_migration_66_add_ledger_payment_id $$
+CREATE PROCEDURE anydrop_migration_66_add_ledger_payment_id()
+BEGIN
+    DECLARE CONTINUE HANDLER FOR 1060 BEGIN END; -- ER_DUP_FIELDNAME
+    ALTER TABLE restaurant_due_ledger
+        ADD COLUMN restaurant_payment_id BIGINT UNSIGNED NULL AFTER order_id,
+        ADD CONSTRAINT fk_ledger_restaurant_payment FOREIGN KEY (restaurant_payment_id) REFERENCES restaurant_payments(id),
+        ADD INDEX idx_ledger_restaurant_payment (restaurant_payment_id);
+END $$
+
+DELIMITER ;
+
+CALL anydrop_migration_66_add_ledger_payment_id();
+
+DROP PROCEDURE IF EXISTS anydrop_migration_66_add_ledger_payment_id;
 
 -- Best-effort backfill for history written before this column
 -- existed. Matches a settlement-type ledger row to the

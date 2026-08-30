@@ -20,12 +20,18 @@
  * doable with curl + openssl_sign(), both already relied on elsewhere
  * in this codebase (PaytmStatusClient's curl, auth.php's own crypto).
  *
- * SERVICE ACCOUNT FILE: backend/config/firebase-service-account.json
- * (gitignored — see repo root .gitignore's own comment for why, and
- * the rotation procedure if it's ever leaked). This file is never
- * shipped to any Android app — that's what google-services.json is
- * for, a completely different, non-secret file already placed in each
- * app module this same session.
+ * SERVICE ACCOUNT SOURCE: the admin panel's FCM settings screen
+ * (admin/fcm-settings.php) lets the app owner paste the full Firebase
+ * service-account JSON straight into a form, stored as
+ * app_settings.fcm_service_account_json — no physical file needs to
+ * exist on the server for this to work, which matters on hosts where
+ * the admin can't drop an arbitrary file next to the code (shared
+ * hosting, a phone-based PHP server, etc.). fcm_get_service_account()
+ * below reads that DB value first; the old file path,
+ * backend/config/firebase-service-account.json (gitignored — see repo
+ * root .gitignore's own comment for why, and the rotation procedure if
+ * it's ever leaked), is still checked as a fallback for anyone who
+ * already has it deployed that way, but it is no longer required.
  *
  * WHAT THIS FILE DOES NOT DO: decide who to notify, or write the bell
  * row — that's still lib/notifications.php's create_notification(),
@@ -35,6 +41,61 @@
  * split PaymentProviderInterface keeps between "decide what to charge"
  * and "talk to the gateway."
  */
+
+require_once __DIR__ . '/settings.php';
+
+/**
+ * Loads the Firebase service-account credentials, DB setting first
+ * (pasted via admin/fcm-settings.php), falling back to the on-disk
+ * file for backward compatibility. Returns null — and records why, via
+ * fcm_record_status() — if neither source has a usable value, so both
+ * fcm_get_access_token() and fcm_send_to_token() can share one place
+ * that decides "do we even have credentials" instead of duplicating
+ * the DB-then-file-then-validate logic in each.
+ */
+function fcm_get_service_account(): ?array
+{
+    $json = get_setting('fcm_service_account_json', '');
+    if (is_string($json) && trim($json) !== '') {
+        $decoded = json_decode($json, true);
+        if (is_array($decoded) && !empty($decoded['private_key']) && !empty($decoded['client_email'])) {
+            return $decoded;
+        }
+        fcm_record_status(false, 'Saved FCM service-account JSON (Settings → FCM Settings) is malformed — missing private_key or client_email.');
+        return null;
+    }
+
+    $serviceAccountPath = __DIR__ . '/../config/firebase-service-account.json';
+    if (file_exists($serviceAccountPath)) {
+        $decoded = json_decode((string) file_get_contents($serviceAccountPath), true);
+        if (is_array($decoded) && !empty($decoded['private_key']) && !empty($decoded['client_email'])) {
+            return $decoded;
+        }
+        fcm_record_status(false, 'firebase-service-account.json on disk is malformed — missing private_key or client_email.');
+        return null;
+    }
+
+    fcm_record_status(false, 'No FCM service account configured yet — paste it in Settings → FCM Settings.');
+    return null;
+}
+
+/**
+ * Best-effort status recorder so the admin's FCM settings page can
+ * show "last send: ok / failed, reason, when" instead of the admin
+ * only finding out push is broken from a missing notification days
+ * later. Never throws — same push-is-best-effort spirit as everything
+ * else in this file.
+ */
+function fcm_record_status(bool $ok, string $message): void
+{
+    try {
+        set_setting('fcm_last_status', $ok ? 'ok' : 'error');
+        set_setting('fcm_last_message', $message);
+        set_setting('fcm_last_checked_at', date('Y-m-d H:i:s'));
+    } catch (Throwable $e) {
+        error_log('fcm_record_status: failed to write status (non-fatal): ' . $e->getMessage());
+    }
+}
 
 /**
  * Get a valid OAuth2 access token for the FCM v1 API, minting a new one
@@ -73,15 +134,10 @@ function fcm_get_access_token(): ?string
         return $cachedToken;
     }
 
-    $serviceAccountPath = __DIR__ . '/../config/firebase-service-account.json';
-    if (!file_exists($serviceAccountPath)) {
-        error_log('fcm_get_access_token: service account file missing at ' . $serviceAccountPath);
-        return null;
-    }
-
-    $serviceAccount = json_decode((string) file_get_contents($serviceAccountPath), true);
-    if (!is_array($serviceAccount) || empty($serviceAccount['private_key']) || empty($serviceAccount['client_email'])) {
-        error_log('fcm_get_access_token: service account file malformed');
+    $serviceAccount = fcm_get_service_account();
+    if ($serviceAccount === null) {
+        // fcm_get_service_account() already recorded the specific
+        // reason (missing/malformed) — nothing more to log here.
         return null;
     }
 
@@ -102,6 +158,7 @@ function fcm_get_access_token(): ?string
     $signed = openssl_sign($segments, $signature, $serviceAccount['private_key'], OPENSSL_ALGO_SHA256);
     if (!$signed) {
         error_log('fcm_get_access_token: openssl_sign failed — check private_key format in service account file');
+        fcm_record_status(false, 'Could not sign the FCM auth request — the private_key in the service account JSON looks malformed.');
         return null;
     }
 
@@ -126,12 +183,14 @@ function fcm_get_access_token(): ?string
 
     if ($response === false || $response === '') {
         error_log('fcm_get_access_token: token exchange curl failed: ' . $curlErr);
+        fcm_record_status(false, 'Could not reach Google to exchange the FCM auth token: ' . $curlErr);
         return null;
     }
 
     $decoded = json_decode($response, true);
     if (!is_array($decoded) || empty($decoded['access_token'])) {
         error_log('fcm_get_access_token: token exchange returned no access_token: ' . $response);
+        fcm_record_status(false, 'Google rejected the FCM service-account credentials: ' . $response);
         return null;
     }
 
@@ -172,11 +231,17 @@ function fcm_get_access_token(): ?string
  *                           notifications.data_json which allows any
  *                           JSON type; callers must pre-stringify
  *                           (e.g. (string) $orderId, not $orderId).
- * @param string|null $imageUrl Optional image — FCM's own
- *                           notification.image field, renders as a
- *                           big-picture-style image on Android without
- *                           any extra client code (per doc's admin-
- *                           broadcast image requirement).
+ * @param string|null $imageUrl Optional image, passed through as the
+ *                           data payload's `image_url` key (not FCM's
+ *                           own notification.image field — this
+ *                           function sends data-only messages, see the
+ *                           body's own comment for why). The client's
+ *                           own notification code is responsible for
+ *                           actually rendering it (CustomerFirebase
+ *                           MessagingService.onMessageReceived() already
+ *                           reads `data["image_url"]` into
+ *                           NotificationHelper.showOfferNotification()'s
+ *                           BigPictureStyle).
  *
  * Never throws outward — same "a notification is a nice-to-have"
  * philosophy create_notification() already documents. Logs failures,
@@ -190,19 +255,17 @@ function fcm_send_to_token(
     array $data = [],
     ?string $imageUrl = null
 ): bool {
-    $serviceAccountPath = __DIR__ . '/../config/firebase-service-account.json';
-    if (!file_exists($serviceAccountPath)) {
-        // Same silent-skip as a missing/null token — this project has
-        // no Firebase config wired at all until the app owner drops
-        // the real file in, and that shouldn't break anything that
-        // calls this function.
+    $serviceAccount = fcm_get_service_account();
+    if ($serviceAccount === null) {
+        // Same silent-skip as a missing/null token — fcm_get_service_account()
+        // already recorded the specific reason for the settings page.
         return false;
     }
 
-    $serviceAccount = json_decode((string) file_get_contents($serviceAccountPath), true);
     $projectId = $serviceAccount['project_id'] ?? null;
     if (!$projectId) {
         error_log('fcm_send_to_token: service account missing project_id');
+        fcm_record_status(false, 'The saved FCM service-account JSON has no project_id.');
         return false;
     }
 
@@ -217,24 +280,34 @@ function fcm_send_to_token(
     // create_notification()'s own json_encode() of an arbitrary array.
     $stringData = array_map(static fn($v): string => is_string($v) ? $v : (string) $v, $data);
 
-    $notification = ['title' => $title, 'body' => $body];
+    // Deliberately data-only — NO top-level 'notification' block (and
+    // no 'android.notification' either). A message that carries a
+    // 'notification' key makes the OS's own FCM SDK auto-display a
+    // generic system tray notification AND skip
+    // FirebaseMessagingService.onMessageReceived() entirely whenever
+    // the app is backgrounded or killed — the SDK treats that case as
+    // "already handled." That silently broke the one thing this whole
+    // feature exists for: RestaurantFirebaseMessagingService's
+    // onMessageReceived() routes an order push into
+    // OrderNotificationHelper.showNewOrderAlert() (the loud
+    // full-screen ringing alarm), and CustomerFirebaseMessagingService
+    // routes into its own rich order/offer notifications — neither of
+    // which ever ran except while the app happened to be in the
+    // foreground. Folding title/body/image into 'data' instead (both
+    // client services already read title/body/image_url from `data`
+    // as their fallback — see each service's own onMessageReceived())
+    // guarantees onMessageReceived() fires in every app state, so the
+    // client's own notification logic is always the thing that runs.
+    $stringData['title'] = $title;
+    $stringData['body'] = $body;
     if ($imageUrl !== null && $imageUrl !== '') {
-        $notification['image'] = $imageUrl;
+        $stringData['image_url'] = $imageUrl;
     }
 
     $message = [
         'message' => [
             'token' => $token,
-            'notification' => $notification,
             'data' => $stringData,
-            // android.notification.image mirrors the top-level image —
-            // some OEM Android versions only honor the platform-specific
-            // field even though the common one is documented to work
-            // everywhere; setting both is FCM's own recommended
-            // belt-and-suspenders approach for image reliability.
-            'android' => array_filter([
-                'notification' => $imageUrl ? ['image' => $imageUrl] : null,
-            ]),
         ],
     ];
 
@@ -259,6 +332,7 @@ function fcm_send_to_token(
 
     if ($response === false) {
         error_log('fcm_send_to_token: curl failed: ' . $curlErr);
+        fcm_record_status(false, 'Could not reach FCM to send the push: ' . $curlErr);
         return false;
     }
     if ($httpCode !== 200) {
@@ -272,8 +346,10 @@ function fcm_send_to_token(
         // token string, by design (single-responsibility, see file
         // header).
         error_log("fcm_send_to_token: FCM returned HTTP $httpCode: $response");
+        fcm_record_status(false, "FCM returned HTTP $httpCode: $response");
         return false;
     }
 
+    fcm_record_status(true, 'Last push sent successfully.');
     return true;
 }

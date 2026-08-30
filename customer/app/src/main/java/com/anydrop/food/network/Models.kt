@@ -61,7 +61,14 @@ data class AppVersionInfo(
     @SerializedName("latest_version_name") val latestVersionName: String,
     @SerializedName("min_version_code") val minVersionCode: Int,
     @SerializedName("update_message") val updateMessage: String,
-    @SerializedName("update_url") val updateUrl: String?
+    @SerializedName("update_url") val updateUrl: String?,
+    // Set from admin/app-settings.php's Maintenance Mode section (backend
+    // migration 68). Added to this response ahead of any app reading it —
+    // this app is the first to act on it. Defaults keep older/cached
+    // responses (or a field missing entirely) safely interpreted as "not
+    // in maintenance" rather than a crash from a missing required field.
+    @SerializedName("maintenance_mode") val maintenanceMode: Boolean = false,
+    @SerializedName("maintenance_message") val maintenanceMessage: String? = null
 )
 
 // ---- Splash / login config ----

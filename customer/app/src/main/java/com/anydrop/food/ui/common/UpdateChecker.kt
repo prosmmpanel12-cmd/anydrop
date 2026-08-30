@@ -44,6 +44,17 @@ object UpdateChecker {
                     minDelay.await()
                     onDone()
                 }
+                info.maintenanceMode -> {
+                    // Checked ahead of the version-code branches: a
+                    // maintenance window blocks regardless of whether the
+                    // installed build is current, so there's no point
+                    // evaluating min/latest version first.
+                    minDelay.await()
+                    MaintenanceDialogFragment.newInstance(info.maintenanceMessage)
+                        .show(activity.supportFragmentManager, "maintenance")
+                    // Do not call onDone() — app should not proceed while
+                    // in maintenance.
+                }
                 current < info.minVersionCode -> {
                     minDelay.await()
                     UpdateDialogFragment.newInstance(info, forced = true)

@@ -31,6 +31,7 @@
 
 require_once __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../lib/reconciliation.php';
+require_once __DIR__ . '/../lib/audit.php';
 
 $admin = admin_require_login();
 admin_require_permission($admin, 'reconciliation_view');
@@ -93,7 +94,7 @@ $typeFilter = trim($_GET['flag_type'] ?? '');
 $where = [];
 $params = [];
 if ($statusFilter !== 'all') {
-    $where[] = 'status = :status';
+    $where[] = 'f.status = :status';
     $params['status'] = $statusFilter;
 }
 if ($typeFilter !== '') {

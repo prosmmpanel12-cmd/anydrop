@@ -136,6 +136,9 @@
     <string name="update_title">Update available</string>
     <string name="btn_update_now">Update Now</string>
     <string name="btn_update_later">Later</string>
+    <string name="maintenance_title">Down for maintenance</string>
+    <string name="maintenance_message_default">We\'re currently doing scheduled maintenance. Please check back shortly.</string>
+    <string name="btn_maintenance_retry">Retry</string>
 
     <!-- Checkout (Phase 3) -->
     <string name="checkout_title">Checkout</string>

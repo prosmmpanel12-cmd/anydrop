@@ -50,7 +50,7 @@ if (!function_exists('get_or_create_wallet')) {
      */
     function get_or_create_wallet(PDO $db, int $customerId, bool $forUpdate = false): array
     {
-        $sql = 'SELECT * FROM customer_wallets WHERE customer_id = :cid' . ($forUpdate ? ' FOR UPDATE' : '') . ' LIMIT 1';
+        $sql = 'SELECT * FROM customer_wallets WHERE customer_id = :cid LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : '');
         $stmt = $db->prepare($sql);
         $stmt->execute(['cid' => $customerId]);
         $row = $stmt->fetch();

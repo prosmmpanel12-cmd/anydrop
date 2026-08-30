@@ -1,9 +1,50 @@
 Anydrop project zip attached. Unzip it, read `PENDING.md` first (the
 source-checked pending list), then
-`docs/76_Handover_2026-08-30_Payment_Refund_Reconciliation_Built.md`
-for exactly what this session did, why, and what's still missing.
+`docs/77_Handover_2026-08-30_Admin_Panel_Refunds_Calendar_Wallet_AppSettings_FCM.md`
+for the most recent session (an app-owner-requested admin-panel bug
+fix detour), and `docs/76_Handover_2026-08-30_Payment_Refund_Reconciliation_Built.md`
+for the last item on the main priority list before that detour.
 
-## Kiya hua hai (what's done, as of 2026-08-30 session 20 — doc 76)
+## Most recent session (doc 77) — admin panel bug fixes, not on the priority list
+
+The app owner hit live bugs in the admin panel mid-session and asked
+for them fixed directly, ahead of the Rider App / reconciliation
+verification queue below. Doc 77 covers it in full; short version:
+
+1. **Fixed a fatal PDOException** on every wallet-credit / wallet-debit
+   call (`lib/wallet.php` built `FOR UPDATE LIMIT 1` — backwards for
+   MySQL, must be `LIMIT 1 FOR UPDATE`). This was breaking refund-to-
+   wallet, wallet withdrawals, and any admin wallet adjustment.
+2. **Replaced `admin/refunds.php`'s JS `prompt()` popups** (including
+   a plain-text "type a date" box) with real `<dialog>` modals — a
+   native `<input type="date">` calendar, a method dropdown, proper
+   required fields for reject reason / transfer reference.
+3. **Reordered the Finance sidebar group** so Refunds and Wallet
+   Withdrawals sit together right after Pending UPI Payments (all
+   three are the customer-money lifecycle); scanned for duplicate
+   refund/wallet APIs — found none, everything already funnels
+   through the same `lib/wallet.php`/`lib/refunds.php` functions.
+4. **Fixed FCM push notifications being silently broken** — they
+   depended on a physical `firebase-service-account.json` file that
+   was never actually deployable on this project's host. Built
+   `admin/fcm-settings.php`: paste the JSON straight into a form, it's
+   stored in `app_settings` instead, with a live status panel (last
+   send: ok/failed + why) and a test-push button.
+5. **Built `admin/app-settings.php`** — three new sidebar entries
+   (Customer/Restaurant/Rider App, under Settings), each with an
+   Update-Check section (edits the already-existing but
+   previously admin-UI-less `latest_app_version_{platform}` etc. keys)
+   and a new per-app Maintenance Mode toggle, now also exposed in
+   `api/v1/system/app-version.php`'s response for future Android-side
+   use.
+
+**Not done as part of doc 77**: `php -l` on the 8 touched files (no
+PHP CLI in this sandbox), running the new migration 68, live-testing
+any of the above against a real DB/device, or any Android-side change
+to actually show a maintenance screen. See doc 77's own "Still
+pending" section for the full list.
+
+## Kiya hua hai (what's done before that, as of 2026-08-30 session 20 — doc 76)
 
 Session 19 (doc 75) finished §37 (Wallet Withdrawal) code-complete on
 both halves — only live verification left, none of it Claude-
@@ -98,4 +139,5 @@ Same standing constraint as every session: no PHP CLI, Android
 SDK/Gradle, or live DB in this sandbox. Run the brace/paren + XML
 well-formedness Python checkers over every new/edited file, and update
 `PENDING.md` checkboxes / `recall.md` once work is actually done — not
-before.
+before. Don't forget migration 68 (doc 77) is also unrun, in addition
+to migration 66 (doc 76) above.

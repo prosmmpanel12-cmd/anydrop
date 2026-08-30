@@ -16,7 +16,7 @@
  * Expects, from the including page:
  *   $admin       — array from admin_require_login()
  *   $pageTitle   — string, shown in <title> and the topbar
- *   $activeNav   — one of 'dashboard' | 'approvals' | 'orders' | 'analytics' | 'support' | 'review_moderation' | 'customer_feedback' | 'areas' | 'cod_rules' | 'pricing_rules' | 'payment_restrictions' | 'categories' | 'banners' | 'roles' | 'commission_rules' | 'settlements' | 'rider_settlements' | 'platform_ledger' | 'payment_gateways' | 'payment_pending' | 'refunds' | 'wallet_withdrawals' | 'offers' | 'broadcast'
+ *   $activeNav   — one of 'dashboard' | 'approvals' | 'orders' | 'analytics' | 'support' | 'review_moderation' | 'customer_feedback' | 'areas' | 'cod_rules' | 'pricing_rules' | 'payment_restrictions' | 'categories' | 'banners' | 'roles' | 'commission_rules' | 'settlements' | 'rider_settlements' | 'platform_ledger' | 'payment_gateways' | 'email_providers' | 'payment_pending' | 'refunds' | 'wallet_withdrawals' | 'reconciliation' | 'offers' | 'broadcast' | 'app_settings_customer' | 'app_settings_restaurant' | 'app_settings_rider' | 'fcm_settings'
  *   $flash       — string|null, shown once as a toast (not a static banner)
  *   $flashType   — 'success' | 'error'
  */
@@ -129,6 +129,38 @@ $navItems = [
         'icon' => '<path d="M20.59 13.41L11 3.83A2 2 0 0 0 9.59 3.24H4a1 1 0 0 0-1 1v5.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.82 0l4.6-4.6a2 2 0 0 0 0-2.82z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
     ],
     [
+        'key' => 'payment_gateways', 'href' => 'payment-gateways.php', 'label' => 'Payment Gateways',
+        'perm' => 'payment_providers_manage', 'group' => 'finance',
+        'icon' => '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/>',
+    ],
+    [
+        'key' => 'email_providers', 'href' => 'email-providers.php', 'label' => 'Email Providers',
+        'perm' => 'email_providers_manage', 'group' => 'finance',
+        'icon' => '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/>',
+    ],
+    [
+        'key' => 'payment_pending', 'href' => 'payment-pending.php', 'label' => 'Pending UPI Payments',
+        'perm' => 'payment_providers_manage', 'group' => 'finance',
+        'icon' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
+    ],
+    // Refunds and Wallet Withdrawals are grouped back-to-back here on
+    // purpose — both are "money OUT to the customer" flows (the
+    // former reactive/admin-initiated after a cancelled order, the
+    // latter customer-initiated out of their wallet balance), and sit
+    // right after Pending UPI Payments (money IN) so this whole block
+    // reads top-to-bottom as the customer-side money lifecycle before
+    // the restaurant/rider payout block below.
+    [
+        'key' => 'refunds', 'href' => 'refunds.php', 'label' => 'Refunds',
+        'perm' => 'refunds_view', 'group' => 'finance',
+        'icon' => '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 5v5h5"/>',
+    ],
+    [
+        'key' => 'wallet_withdrawals', 'href' => 'wallet-withdrawals.php', 'label' => 'Wallet Withdrawals',
+        'perm' => 'wallet_withdrawals_view', 'group' => 'finance',
+        'icon' => '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M16 12h.01"/>',
+    ],
+    [
         'key' => 'commission_rules', 'href' => 'commission-rules.php', 'label' => 'Commission Rules',
         'perm' => 'payouts_view', 'group' => 'finance',
         'icon' => '<circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/>',
@@ -149,34 +181,39 @@ $navItems = [
         'icon' => '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/><circle cx="7" cy="15" r="1"/>',
     ],
     [
-        'key' => 'payment_gateways', 'href' => 'payment-gateways.php', 'label' => 'Payment Gateways',
-        'perm' => 'payment_providers_manage', 'group' => 'finance',
-        'icon' => '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/>',
-    ],
-    [
-    'key' => 'email_providers', 'href' => 'email-providers.php', 'label' => 'Email Providers',
-    'perm' => 'email_providers_manage', 'group' => 'finance',
-    'icon' => '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/>',
-],
-    [
-        'key' => 'payment_pending', 'href' => 'payment-pending.php', 'label' => 'Pending UPI Payments',
-        'perm' => 'payment_providers_manage', 'group' => 'finance',
-        'icon' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
-    ],
-    [
-        'key' => 'refunds', 'href' => 'refunds.php', 'label' => 'Refunds',
-        'perm' => 'refunds_view', 'group' => 'finance',
-        'icon' => '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 5v5h5"/>',
-    ],
-    [
-        'key' => 'wallet_withdrawals', 'href' => 'wallet-withdrawals.php', 'label' => 'Wallet Withdrawals',
-        'perm' => 'wallet_withdrawals_view', 'group' => 'finance',
-        'icon' => '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M16 12h.01"/>',
+        'key' => 'reconciliation', 'href' => 'reconciliation.php', 'label' => 'Reconciliation',
+        'perm' => 'reconciliation_view', 'group' => 'finance',
+        'icon' => '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
     ],
     [
         'key' => 'roles', 'href' => 'roles.php', 'label' => 'Roles & Admins',
         'perm' => 'roles_manage', 'group' => 'settings',
         'icon' => '<path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/>',
+    ],
+    // App Settings is one shared file (admin/app-settings.php) with a
+    // tab per app, but rendered here as three separate sidebar entries
+    // (person-requested this session) so Restaurant/Customer/Rider
+    // each read as their own category rather than one page you have to
+    // already be on to discover the other two apps' settings.
+    [
+        'key' => 'app_settings_customer', 'href' => 'app-settings.php?app=customer', 'label' => 'Customer App',
+        'perm' => 'app_version_manage', 'group' => 'settings',
+        'icon' => '<path d="M20 21a8 8 0 1 0-16 0"/><circle cx="12" cy="8" r="5"/>',
+    ],
+    [
+        'key' => 'app_settings_restaurant', 'href' => 'app-settings.php?app=restaurant', 'label' => 'Restaurant App',
+        'perm' => 'app_version_manage', 'group' => 'settings',
+        'icon' => '<path d="M4 3v18M4 3c0 3 3 3 3 6s-3 3-3 6M20 3v18M20 8h-4a2 2 0 0 0 0 4h4"/>',
+    ],
+    [
+        'key' => 'app_settings_rider', 'href' => 'app-settings.php?app=rider', 'label' => 'Rider App',
+        'perm' => 'app_version_manage', 'group' => 'settings',
+        'icon' => '<circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 0 1 1 1v5l3.5 4"/><path d="M9 17.5H5.5L8 10h6"/>',
+    ],
+    [
+        'key' => 'fcm_settings', 'href' => 'fcm-settings.php', 'label' => 'FCM Settings',
+        'perm' => 'settings_manage', 'group' => 'settings',
+        'icon' => '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
     ],
     [
         'key' => 'broadcast', 'href' => 'broadcast.php', 'label' => 'Push Notifications',

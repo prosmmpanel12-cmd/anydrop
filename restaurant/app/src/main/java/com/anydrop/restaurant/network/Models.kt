@@ -959,5 +959,10 @@ data class AppVersionInfo(
     @SerializedName("latest_version_name") val latestVersionName: String,
     @SerializedName("min_version_code") val minVersionCode: Int,
     @SerializedName("update_message") val updateMessage: String,
-    @SerializedName("update_url") val updateUrl: String?
+    @SerializedName("update_url") val updateUrl: String?,
+    // Same maintenance fields as the Customer App's AppVersionInfo — see
+    // that file's kdoc. Defaults keep this safely "not in maintenance" if
+    // the field is ever missing from the response.
+    @SerializedName("maintenance_mode") val maintenanceMode: Boolean = false,
+    @SerializedName("maintenance_message") val maintenanceMessage: String? = null
 )

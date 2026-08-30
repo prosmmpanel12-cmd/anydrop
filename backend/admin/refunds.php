@@ -17,9 +17,12 @@
  * the one exception — crediting the wallet IS the actual refund
  * action, performed inside Anydrop, not tracked after the fact.
  *
- * Method is chosen at Approve time (see promptApprove()'s JS prompt) —
- * defaults to manual_upi_bank_transfer if left blank, matching
- * migration 42's own column default.
+ * Method is chosen at Approve time, in the Approve dialog's method
+ * dropdown (a real <select>, not a JS prompt) — defaults to
+ * manual_upi_bank_transfer if left blank, matching migration 42's own
+ * column default. Expected-by date uses a native <input type="date">
+ * (calendar picker), same pattern as analytics.php/orders.php date
+ * filters elsewhere in this admin panel.
  *
  * Gated on `refunds_view` (list) / `refunds_manage` (act) — new
  * permission pair from migration 42, deliberately separate from
@@ -141,21 +144,8 @@ require __DIR__ . '/_layout_head.php';
             <?php if ($canManage): ?>
             <td class="row-actions">
                 <?php if (in_array($r['status'], ['requested', 'under_review'], true)): ?>
-                <form method="post" style="display:inline;" onsubmit="return promptApprove(this);">
-                    <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
-                    <input type="hidden" name="form_action" value="approve">
-                    <input type="hidden" name="refund_id" value="<?= (int) $r['id'] ?>">
-                    <input type="hidden" name="expected_by_date" class="expected-date-field">
-                    <input type="hidden" name="approve_method" class="approve-method-field">
-                    <button type="submit" class="btn btn-primary">Approve</button>
-                </form>
-                <form method="post" style="display:inline;" onsubmit="return promptRejectReason(this);">
-                    <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
-                    <input type="hidden" name="form_action" value="reject">
-                    <input type="hidden" name="refund_id" value="<?= (int) $r['id'] ?>">
-                    <input type="hidden" name="reject_reason" class="reject-reason-field">
-                    <button type="submit" class="btn btn-outline danger">Reject</button>
-                </form>
+                <button type="button" class="btn btn-primary" data-open-dialog="approve-<?= (int) $r['id'] ?>">Approve</button>
+                <button type="button" class="btn btn-outline danger" data-open-dialog="reject-<?= (int) $r['id'] ?>">Reject</button>
                 <?php elseif ($r['status'] === 'approved' && $r['method'] === 'wallet'): ?>
                 <!-- item 15 — wallet-method refunds skip "Mark Processing"
                      entirely (see complete_refund_to_wallet()'s kdoc: a
@@ -168,28 +158,10 @@ require __DIR__ . '/_layout_head.php';
                     <input type="hidden" name="refund_id" value="<?= (int) $r['id'] ?>">
                     <button type="submit" class="btn btn-primary">Credit to Wallet</button>
                 </form>
-                <form method="post" style="display:inline;" onsubmit="return promptRejectReason(this);">
-                    <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
-                    <input type="hidden" name="form_action" value="reject">
-                    <input type="hidden" name="refund_id" value="<?= (int) $r['id'] ?>">
-                    <input type="hidden" name="reject_reason" class="reject-reason-field">
-                    <button type="submit" class="btn btn-outline danger">Reject</button>
-                </form>
+                <button type="button" class="btn btn-outline danger" data-open-dialog="reject-<?= (int) $r['id'] ?>">Reject</button>
                 <?php elseif ($r['status'] === 'approved'): ?>
-                <form method="post" style="display:inline;" onsubmit="return promptRefundReference(this);">
-                    <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
-                    <input type="hidden" name="form_action" value="processing">
-                    <input type="hidden" name="refund_id" value="<?= (int) $r['id'] ?>">
-                    <input type="hidden" name="refund_reference" class="refund-reference-field">
-                    <button type="submit" class="btn btn-primary">Mark Processing</button>
-                </form>
-                <form method="post" style="display:inline;" onsubmit="return promptRejectReason(this);">
-                    <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
-                    <input type="hidden" name="form_action" value="reject">
-                    <input type="hidden" name="refund_id" value="<?= (int) $r['id'] ?>">
-                    <input type="hidden" name="reject_reason" class="reject-reason-field">
-                    <button type="submit" class="btn btn-outline danger">Reject</button>
-                </form>
+                <button type="button" class="btn btn-primary" data-open-dialog="reference-<?= (int) $r['id'] ?>">Mark Processing</button>
+                <button type="button" class="btn btn-outline danger" data-open-dialog="reject-<?= (int) $r['id'] ?>">Reject</button>
                 <?php elseif ($r['status'] === 'processing'): ?>
                 <form method="post" style="display:inline;" onsubmit="return confirm('Confirm the transfer (ref: <?= admin_escape($r['refund_reference'] ?? '') ?>) actually landed in the customer\'s account before marking this Refunded — this writes the platform ledger entry.');">
                     <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
@@ -208,30 +180,68 @@ require __DIR__ . '/_layout_head.php';
 </div>
 </div>
 
-<script>
-function promptApprove(form) {
-    var d = prompt('Expected refund-by date (YYYY-MM-DD), or leave blank to keep the default:');
-    if (d === null) { return false; }
-    form.querySelector('.expected-date-field').value = d.trim();
-
-    var methodChoice = prompt('Refund method — type "wallet" to credit the customer\'s Anydrop Wallet instantly, or leave blank for the default manual bank/UPI transfer:');
-    if (methodChoice === null) { return false; }
-    var normalized = methodChoice.trim().toLowerCase();
-    form.querySelector('.approve-method-field').value = normalized === 'wallet' ? 'wallet' : '';
-    return true;
-}
-function promptRejectReason(form) {
-    var reason = prompt('Reason for rejecting this refund request:');
-    if (!reason) { return false; }
-    form.querySelector('.reject-reason-field').value = reason;
-    return true;
-}
-function promptRefundReference(form) {
-    var ref = prompt('Enter the reference/UTR of the transfer you just sent back to the customer:');
-    if (!ref) { return false; }
-    form.querySelector('.refund-reference-field').value = ref;
-    return true;
-}
-</script>
+<?php if ($canManage): foreach ($refunds as $r): $rid = (int) $r['id']; ?>
+    <?php if (in_array($r['status'], ['requested', 'under_review'], true)): ?>
+    <dialog class="modal" id="approve-<?= $rid ?>">
+        <form method="post">
+            <div class="modal-body">
+                <h3 class="modal-title">Approve refund — order <?= admin_escape($r['order_code']) ?></h3>
+                <p class="modal-text">₹<?= admin_escape((string) $r['amount']) ?> to <?= admin_escape($r['customer_name'] ?: $r['customer_phone']) ?></p>
+                <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
+                <input type="hidden" name="form_action" value="approve">
+                <input type="hidden" name="refund_id" value="<?= $rid ?>">
+                <label class="field-label" for="expected-by-<?= $rid ?>">Expected refund-by date</label>
+                <input type="date" id="expected-by-<?= $rid ?>" name="expected_by_date" style="margin-bottom:14px;">
+                <label class="field-label" for="approve-method-<?= $rid ?>">Refund method</label>
+                <select id="approve-method-<?= $rid ?>" name="approve_method">
+                    <option value="">Manual bank/UPI transfer (default)</option>
+                    <option value="wallet">Credit to Anydrop Wallet instantly</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-outline" data-close-dialog>Cancel</button>
+                <button type="submit" class="btn btn-primary">Approve</button>
+            </div>
+        </form>
+    </dialog>
+    <?php endif; ?>
+    <?php if (in_array($r['status'], ['requested', 'under_review', 'approved'], true)): ?>
+    <dialog class="modal" id="reject-<?= $rid ?>">
+        <form method="post">
+            <div class="modal-body">
+                <h3 class="modal-title">Reject refund — order <?= admin_escape($r['order_code']) ?></h3>
+                <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
+                <input type="hidden" name="form_action" value="reject">
+                <input type="hidden" name="refund_id" value="<?= $rid ?>">
+                <label class="field-label" for="reject-reason-<?= $rid ?>">Reason for rejecting</label>
+                <textarea id="reject-reason-<?= $rid ?>" name="reject_reason" required rows="3"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-outline" data-close-dialog>Cancel</button>
+                <button type="submit" class="btn btn-outline danger">Reject</button>
+            </div>
+        </form>
+    </dialog>
+    <?php endif; ?>
+    <?php if ($r['status'] === 'approved' && $r['method'] !== 'wallet'): ?>
+    <dialog class="modal" id="reference-<?= $rid ?>">
+        <form method="post">
+            <div class="modal-body">
+                <h3 class="modal-title">Mark processing — order <?= admin_escape($r['order_code']) ?></h3>
+                <p class="modal-text">Enter the reference/UTR of the transfer you just sent back to the customer.</p>
+                <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
+                <input type="hidden" name="form_action" value="processing">
+                <input type="hidden" name="refund_id" value="<?= $rid ?>">
+                <label class="field-label" for="refund-ref-<?= $rid ?>">Reference / UTR</label>
+                <input type="text" id="refund-ref-<?= $rid ?>" name="refund_reference" required>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-outline" data-close-dialog>Cancel</button>
+                <button type="submit" class="btn btn-primary">Mark Processing</button>
+            </div>
+        </form>
+    </dialog>
+    <?php endif; ?>
+<?php endforeach; endif; ?>
 
 <?php require __DIR__ . '/_layout_foot.php'; ?>

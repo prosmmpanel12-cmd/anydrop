@@ -55,6 +55,16 @@ object UpdateChecker {
                     minDelay.await()
                     onDone()
                 }
+                info.maintenanceMode -> {
+                    // Checked ahead of the version-code branches — see
+                    // Customer App's UpdateChecker for the same ordering
+                    // rationale.
+                    minDelay.await()
+                    MaintenanceDialogFragment.newInstance(info.maintenanceMessage)
+                        .show(activity.supportFragmentManager, "maintenance")
+                    // Do not call onDone() — app should not proceed while
+                    // in maintenance.
+                }
                 current < info.minVersionCode -> {
                     minDelay.await()
                     UpdateDialogFragment.newInstance(info, forced = true)
