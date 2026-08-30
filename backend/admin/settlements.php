@@ -126,16 +126,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $flash = 'Account holder name, bank name, account number, and IFSC are all required.';
                 $flashType = 'error';
             } else {
+                // migration 59 — an admin typing these in directly is
+                // already supervised entry (unlike a restaurant
+                // self-submitting via bank-details-save.php, which
+                // always resets to 'pending'), so this path saves
+                // straight as 'verified' and stamps who/when, same
+                // shape restaurant_payments.settled_by_admin_id uses
+                // for the equivalent "who actioned this" need.
                 $db->prepare(
-                    'INSERT INTO restaurant_bank_details (restaurant_id, account_holder_name, bank_name, account_number, ifsc_code, upi_id)
-                     VALUES (:rid, :holder, :bank, :acc, :ifsc, :upi)
-                     ON DUPLICATE KEY UPDATE account_holder_name = :holder2, bank_name = :bank2, account_number = :acc2, ifsc_code = :ifsc2, upi_id = :upi2'
+                    'INSERT INTO restaurant_bank_details (restaurant_id, account_holder_name, bank_name, account_number, ifsc_code, upi_id, verification_status, admin_remarks, verified_by_admin_id, verified_at)
+                     VALUES (:rid, :holder, :bank, :acc, :ifsc, :upi, \'verified\', NULL, :admin_id, NOW())
+                     ON DUPLICATE KEY UPDATE account_holder_name = :holder2, bank_name = :bank2, account_number = :acc2, ifsc_code = :ifsc2, upi_id = :upi2,
+                        verification_status = \'verified\', admin_remarks = NULL, verified_by_admin_id = :admin_id2, verified_at = NOW()'
                 )->execute([
                     'rid' => $postRestaurantId, 'holder' => $holder, 'bank' => $bank, 'acc' => $accNum, 'ifsc' => $ifsc, 'upi' => $upi !== '' ? $upi : null,
+                    'admin_id' => $admin['id'],
                     'holder2' => $holder, 'bank2' => $bank, 'acc2' => $accNum, 'ifsc2' => $ifsc, 'upi2' => $upi !== '' ? $upi : null,
+                    'admin_id2' => $admin['id'],
                 ]);
                 write_audit_log('admin', $admin['id'], 'restaurant_bank_details_saved', ['restaurant_id' => $postRestaurantId]);
                 $flash = 'Bank details saved.';
+            }
+        } elseif ($formAction === 'verify_bank_details' || $formAction === 'reject_bank_details') {
+            // migration 59 — the review action for a restaurant's own
+            // self-submission (bank-details-save.php, always starts
+            // 'pending'). Distinct from save_bank_details above,
+            // which is the admin *entering values on the restaurant's
+            // behalf* and never needs a separate review step.
+            $newStatus = $formAction === 'verify_bank_details' ? 'verified' : 'rejected';
+            $remarks = trim((string) ($_POST['admin_remarks'] ?? ''));
+            if ($newStatus === 'rejected' && $remarks === '') {
+                $flash = 'A remark is required when rejecting bank details, so the restaurant knows what to fix.';
+                $flashType = 'error';
+            } else {
+                $updated = $db->prepare(
+                    'UPDATE restaurant_bank_details
+                     SET verification_status = :status, admin_remarks = :remarks, verified_by_admin_id = :admin_id, verified_at = NOW()
+                     WHERE restaurant_id = :rid'
+                );
+                $updated->execute([
+                    'status' => $newStatus,
+                    'remarks' => $remarks !== '' ? $remarks : null,
+                    'admin_id' => $admin['id'],
+                    'rid' => $postRestaurantId,
+                ]);
+                write_audit_log('admin', $admin['id'], 'restaurant_bank_details_' . $newStatus, [
+                    'restaurant_id' => $postRestaurantId,
+                    'admin_remarks' => $remarks !== '' ? $remarks : null,
+                ]);
+                $flash = $newStatus === 'verified' ? 'Bank details verified.' : 'Bank details rejected.';
             }
         } elseif ($formAction === 'pay_now') {
             $direction = $_POST['direction'] ?? '';
@@ -377,6 +416,28 @@ if ($restaurantId !== null) {
 
     <div class="card">
         <h2>Bank Details</h2>
+        <?php if ($bank):
+            // migration 59 — status badge shown above both the
+            // editable form and the read-only fallback below, so an
+            // admin without $canEdit still sees it.
+            $statusLabel = ['pending' => 'Pending Review', 'verified' => 'Verified', 'rejected' => 'Rejected'][$bank['verification_status'] ?? 'verified'] ?? 'Verified';
+            $statusColor = ['pending' => '#b8860b', 'verified' => '#1b8a3c', 'rejected' => '#c0392b'][$bank['verification_status'] ?? 'verified'] ?? '#1b8a3c';
+        ?>
+        <p><strong style="color:<?= $statusColor ?>;">● <?= admin_escape($statusLabel) ?></strong>
+            <?php if (!empty($bank['admin_remarks'])): ?> — <span class="muted"><?= admin_escape($bank['admin_remarks']) ?></span><?php endif; ?>
+        </p>
+        <?php if ($canEdit && ($bank['verification_status'] ?? 'verified') === 'pending'): ?>
+        <form method="post" style="margin-bottom:16px;">
+            <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
+            <input type="hidden" name="restaurant_id" value="<?= (int) $restaurantId ?>">
+            <label>Remarks <span class="muted">(required to reject, optional to verify)</span>
+                <input type="text" name="admin_remarks">
+            </label>
+            <button type="submit" name="form_action" value="verify_bank_details" class="btn btn-primary">Verify</button>
+            <button type="submit" name="form_action" value="reject_bank_details" class="btn btn-outline">Reject</button>
+        </form>
+        <?php endif; ?>
+        <?php endif; ?>
         <?php if ($canEdit): ?>
         <form method="post">
             <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">

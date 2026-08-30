@@ -14,8 +14,16 @@ const TOKEN_LIFETIME_DAYS = 30;
 /**
  * Creates a new auth token for the given owner and stores its hash.
  * Returns the raw token (only shown once to the client).
+ *
+ * @param int|null $staffId Migration 63 (Restaurant Staff/RBAC) — set
+ *                  only for a staff login (`owner_type = 'restaurant'`,
+ *                  `owner_id` still the restaurant's own id, never the
+ *                  staff row's id — see migration 63's own header for
+ *                  why). NULL for every other login, including a
+ *                  restaurant owner's own login, unchanged from before
+ *                  this parameter existed.
  */
-function create_auth_token(string $ownerType, int $ownerId): string
+function create_auth_token(string $ownerType, int $ownerId, ?int $staffId = null): string
 {
     $db = Database::get();
     $rawToken = bin2hex(random_bytes(32));
@@ -23,11 +31,12 @@ function create_auth_token(string $ownerType, int $ownerId): string
     $expiresAt = date('Y-m-d H:i:s', strtotime('+' . TOKEN_LIFETIME_DAYS . ' days'));
 
     $stmt = $db->prepare(
-        'INSERT INTO auth_tokens (owner_type, owner_id, token_hash, expires_at) VALUES (:t, :id, :h, :e)'
+        'INSERT INTO auth_tokens (owner_type, owner_id, staff_id, token_hash, expires_at) VALUES (:t, :id, :sid, :h, :e)'
     );
     $stmt->execute([
         't' => $ownerType,
         'id' => $ownerId,
+        'sid' => $staffId,
         'h' => $tokenHash,
         'e' => $expiresAt,
     ]);
@@ -37,7 +46,9 @@ function create_auth_token(string $ownerType, int $ownerId): string
 
 /**
  * Reads the Authorization: Bearer <token> header, validates it,
- * and returns ['owner_type' => ..., 'owner_id' => ...] or null if invalid/expired.
+ * and returns ['owner_type' => ..., 'owner_id' => ..., 'staff_id' => ...]
+ * or null if invalid/expired. `staff_id` (migration 63) is null for
+ * every non-staff token, unchanged from before that column existed.
  */
 function get_authenticated_owner(): ?array
 {
@@ -56,7 +67,7 @@ function get_authenticated_owner(): ?array
     $tokenHash = hash('sha256', $rawToken);
     $db = Database::get();
     $stmt = $db->prepare(
-        'SELECT owner_type, owner_id, expires_at FROM auth_tokens WHERE token_hash = :h LIMIT 1'
+        'SELECT owner_type, owner_id, staff_id, expires_at FROM auth_tokens WHERE token_hash = :h LIMIT 1'
     );
     $stmt->execute(['h' => $tokenHash]);
     $row = $stmt->fetch();
@@ -68,7 +79,11 @@ function get_authenticated_owner(): ?array
         return null;
     }
 
-    return ['owner_type' => $row['owner_type'], 'owner_id' => (int) $row['owner_id']];
+    return [
+        'owner_type' => $row['owner_type'],
+        'owner_id' => (int) $row['owner_id'],
+        'staff_id' => $row['staff_id'] !== null ? (int) $row['staff_id'] : null,
+    ];
 }
 
 /**
@@ -84,6 +99,19 @@ function get_authenticated_owner(): ?array
  * until their token's TOKEN_LIFETIME_DAYS expiry. This re-checks on
  * every authenticated request instead — one indexed lookup by primary
  * key, kept deliberately minimal since it runs on every call.
+ *
+ * Migration 63 (Restaurant Staff/RBAC): for `owner_type = 'restaurant'`,
+ * the returned array now always includes a `role` key — `'owner'` for
+ * the restaurant's own login (`staff_id` null, the original/unchanged
+ * case), or the logged-in staff member's `restaurant_staff.role`
+ * (`manager`/`kitchen`/`cashier`). A staff token whose
+ * `restaurant_staff` row has since been deactivated (owner turned them
+ * off) or soft-deleted is rejected here with 403 `staff_disabled` —
+ * same "re-check every request, don't wait for token expiry" principle
+ * already applied to `restaurants.status` above, extended to the new
+ * staff layer. `owner_id` is unaffected either way — see migration
+ * 63's own header for why it's always the restaurant id, never the
+ * staff row's id.
  */
 function require_auth(string $expectedOwnerType): array
 {
@@ -109,6 +137,20 @@ function require_auth(string $expectedOwnerType): array
         // pending/rejected — see doc 25.
         if (!$row || $row['status'] === 'suspended') {
             respond_error('account_suspended', 403, ['reason' => $row['rejection_reason'] ?? null]);
+        }
+
+        if ($owner['staff_id'] === null) {
+            $owner['role'] = 'owner';
+        } else {
+            $staffStmt = $db->prepare(
+                'SELECT role, is_active FROM restaurant_staff WHERE id = :id AND restaurant_id = :rid AND deleted_at IS NULL LIMIT 1'
+            );
+            $staffStmt->execute(['id' => $owner['staff_id'], 'rid' => $owner['owner_id']]);
+            $staffRow = $staffStmt->fetch();
+            if (!$staffRow || !$staffRow['is_active']) {
+                respond_error('staff_disabled', 403);
+            }
+            $owner['role'] = $staffRow['role'];
         }
     } elseif ($expectedOwnerType === 'customer') {
         $stmt = $db->prepare(

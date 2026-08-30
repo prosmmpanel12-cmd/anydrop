@@ -1,5 +1,6 @@
 package com.anydrop.restaurant.ui.menu
 
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -19,6 +20,8 @@ import androidx.recyclerview.widget.RecyclerView
 import coil.load
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.timepicker.MaterialTimePicker
+import com.google.android.material.timepicker.TimeFormat
 import com.anydrop.restaurant.R
 import com.anydrop.restaurant.databinding.DialogAddCategoryBinding
 import com.anydrop.restaurant.databinding.DialogAddMenuItemBinding
@@ -42,6 +45,8 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
 import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 /**
  * Menu tab (§5 of the UI plan) — formerly its own pushed screen
@@ -914,6 +919,36 @@ class MenuFragment : Fragment() {
 
         loadFoodTagsIntoDialog(dialogBinding, existingItem?.tags ?: emptyList())
 
+        // Item availability timing (today.md §1, migration 62). Same
+        // "set up listeners first, then apply an existing value on top"
+        // order OfferManagerActivity's own start/end time pair uses —
+        // setUpItemTimePicker() reads field.tag (null at this point) to
+        // set the clear icon's initial visibility, so it must run before
+        // applyItemTimeValue() populates it for an edit.
+        setUpItemTimePicker(dialogBinding.itemAvailableFromLayout, dialogBinding.inputItemAvailableFrom, "item_available_from_picker")
+        setUpItemTimePicker(dialogBinding.itemAvailableUntilLayout, dialogBinding.inputItemAvailableUntil, "item_available_until_picker")
+        existingItem?.availableFrom?.let {
+            applyItemTimeValue(dialogBinding.itemAvailableFromLayout, dialogBinding.inputItemAvailableFrom, it)
+        }
+        existingItem?.availableUntil?.let {
+            applyItemTimeValue(dialogBinding.itemAvailableUntilLayout, dialogBinding.inputItemAvailableUntil, it)
+        }
+
+        // §1, today.md 2026-08-28 — only shown when editing an existing
+        // item, which has an id groups can attach to; a brand-new item
+        // doesn't yet.
+        if (existingItem != null) {
+            dialogBinding.rowManageAddons.visibility = View.VISIBLE
+            dialogBinding.rowManageAddons.setOnClickListener {
+                val intent = Intent(requireContext(), AddonGroupsActivity::class.java)
+                intent.putExtra(AddonGroupsActivity.EXTRA_ITEM_ID, existingItem.id)
+                intent.putExtra(AddonGroupsActivity.EXTRA_ITEM_NAME, existingItem.name)
+                startActivity(intent)
+            }
+        } else {
+            dialogBinding.rowManageAddons.visibility = View.GONE
+        }
+
         // doc 22 item 2 follow-up — bottom sheet instead of a centered
         // MaterialAlertDialogBuilder (app-owner-confirmed split: add-coupon
         // + add-menu-item are the two "complex" dialogs that get bottom
@@ -941,10 +976,67 @@ class MenuFragment : Fragment() {
                 .map { dialogBinding.itemTagsGroup.getChildAt(it) as com.google.android.material.chip.Chip }
                 .filter { it.isChecked }
                 .map { it.tag as String }
-            saveItem(existingItem, targetCategoryId, name, price, description, isVeg, pickedItemPhotoUri, selectedTags)
+            // Item availability timing (today.md §1, migration 62) —
+            // field.tag holds the "HH:mm:ss" wire value set by
+            // applyItemTimeValue(), or null if never set / cleared via
+            // the end icon. See saveItem()'s kdoc for why a null tag is
+            // resolved differently for create vs. update.
+            val availableFrom = dialogBinding.inputItemAvailableFrom.tag as? String
+            val availableUntil = dialogBinding.inputItemAvailableUntil.tag as? String
+            saveItem(existingItem, targetCategoryId, name, price, description, isVeg, pickedItemPhotoUri, selectedTags, availableFrom, availableUntil)
             itemDialog.dismiss()
         }
         itemDialog.show()
+    }
+
+    /** Same start/end TIME-picker pair OfferManagerActivity's happy-hour
+     * fields already use (setUpTimePicker()/applyTimeValue() there) —
+     * copied here rather than shared, since that pair is currently
+     * private to that Activity, not a common util. */
+    private val itemTimeWireFormat = SimpleDateFormat("HH:mm:ss", Locale.US)
+    private val itemTimeDisplayFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
+
+    private fun setUpItemTimePicker(
+        layout: com.google.android.material.textfield.TextInputLayout,
+        field: com.google.android.material.textfield.TextInputEditText,
+        fragmentTag: String
+    ) {
+        layout.setEndIconOnClickListener {
+            field.tag = null
+            field.text = null
+            layout.isEndIconVisible = false
+        }
+        layout.isEndIconVisible = field.tag != null
+
+        field.setOnClickListener {
+            // Same double-tap guard OfferManagerActivity's own picker
+            // uses — a second tap before the first picker's show()
+            // transaction commits throws IllegalStateException.
+            if (parentFragmentManager.findFragmentByTag(fragmentTag) != null) return@setOnClickListener
+            val timePicker = MaterialTimePicker.Builder()
+                .setTimeFormat(TimeFormat.CLOCK_12H)
+                .build()
+            timePicker.addOnPositiveButtonClickListener {
+                val wire = String.format(Locale.US, "%02d:%02d:00", timePicker.hour, timePicker.minute)
+                applyItemTimeValue(layout, field, wire)
+            }
+            timePicker.show(parentFragmentManager, fragmentTag)
+        }
+    }
+
+    private fun applyItemTimeValue(
+        layout: com.google.android.material.textfield.TextInputLayout,
+        field: com.google.android.material.textfield.TextInputEditText,
+        wireValue: String
+    ) {
+        field.tag = wireValue
+        val display = try {
+            itemTimeDisplayFormat.format(itemTimeWireFormat.parse(wireValue)!!)
+        } catch (e: Exception) {
+            wireValue
+        }
+        field.setText(display)
+        layout.isEndIconVisible = true
     }
 
     /** Populates itemTagsGroup with one checkable Chip per active
@@ -1007,6 +1099,28 @@ class MenuFragment : Fragment() {
         }
     }
 
+    /**
+     * [availableFrom]/[availableUntil] (today.md §1, migration 62): the
+     * dialog's field.tag value, or null if never set / cleared via the
+     * end icon. Resolved differently for create vs. update:
+     * - **Create**: passed straight through as-is. A new item has
+     *   nothing to "clear," so null (→ omitted by Gson, same as any
+     *   other optional create field) and an actual clear are the same
+     *   thing.
+     * - **Update**: null is turned into `""` (explicit clear) rather
+     *   than left out of the request entirely. This endpoint's `""` vs.
+     *   omitted-field distinction only matters when a field might need
+     *   to stay *unchanged* from some value the dialog itself doesn't
+     *   know about — but the dialog always fully re-populates both
+     *   fields from the existing item before showing (see
+     *   showItemDialog()), so their on-save state is always the
+     *   complete, definitive desired value. Always sending `""` for
+     *   "no window" needlessly clearing an already-null column is a
+     *   harmless no-op, so there's no need to track "touched vs.
+     *   untouched" separately for just these two fields, unlike image_url
+     *   above (which only becomes non-null when a *new* photo was
+     *   actually picked this session).
+     */
     private fun saveItem(
         existing: MenuItem?,
         categoryId: Int,
@@ -1015,7 +1129,9 @@ class MenuFragment : Fragment() {
         description: String?,
         isVeg: Boolean,
         photoUri: Uri?,
-        tags: List<String>
+        tags: List<String>,
+        availableFrom: String?,
+        availableUntil: String?
     ) {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
@@ -1040,7 +1156,9 @@ class MenuFragment : Fragment() {
                             description = description,
                             isVeg = isVeg,
                             imageUrl = imageUrlToSave,
-                            tags = tags
+                            tags = tags,
+                            availableFrom = availableFrom,
+                            availableUntil = availableUntil
                         )
                     ).isSuccessful
                 } else {
@@ -1053,7 +1171,9 @@ class MenuFragment : Fragment() {
                             description = description,
                             isVeg = isVeg,
                             imageUrl = imageUrlToSave,
-                            tags = tags
+                            tags = tags,
+                            availableFrom = availableFrom ?: "",
+                            availableUntil = availableUntil ?: ""
                         )
                     ).isSuccessful
                 }

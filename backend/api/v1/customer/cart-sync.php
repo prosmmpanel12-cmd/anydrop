@@ -25,6 +25,7 @@
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
+require_once __DIR__ . '/../../../lib/menu_item_availability.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -42,7 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 mi.price AS item_price, mi.discount_percent AS item_discount_percent,
                 mi.is_veg AS item_is_veg, mi.image_url AS item_image_url,
                 mi.is_recommended AS item_is_recommended, mi.is_bestseller AS item_is_bestseller,
-                mi.prep_time_minutes AS item_prep_time_minutes, mi.is_available AS item_is_available
+                mi.prep_time_minutes AS item_prep_time_minutes, mi.is_available AS item_is_available,
+                mi.available_from AS item_available_from, mi.available_until AS item_available_until
          FROM customer_cart_items cci
          JOIN restaurants r ON r.id = cci.restaurant_id
          JOIN menu_items mi ON mi.id = cci.menu_item_id
@@ -80,7 +82,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     foreach ($rows as $row) {
         // Deleted rows (soft-delete via deleted_at) or unavailable items
         // don't get restored into the cart — same reasoning as validate.php.
-        if ($row['item_is_available'] == 0) {
+        // today.md §1 / migration 62: "unavailable" now also covers a
+        // time-windowed item outside its available_from/available_until
+        // range, not just the manual is_available toggle — a customer
+        // shouldn't come back to a breakfast item still sitting in their
+        // saved cart at 3pm.
+        if (!is_menu_item_available_now([
+            'is_available' => $row['item_is_available'],
+            'available_from' => $row['item_available_from'],
+            'available_until' => $row['item_available_until'],
+        ])) {
             continue;
         }
         $rid = (int) $row['restaurant_id'];

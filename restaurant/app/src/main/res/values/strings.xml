@@ -13,6 +13,51 @@
     <string name="btn_login">Log In</string>
     <string name="login_no_account">New restaurant partner?</string>
     <string name="login_go_signup">Sign up</string>
+    <string name="login_staff_instead">Login as staff member instead</string>
+    <string name="staff_login_title">Staff Login</string>
+    <string name="staff_login_subtitle">Sign in with the username your restaurant gave you</string>
+    <string name="hint_username">Username</string>
+    <string name="staff_login_back_to_owner">Restaurant owner? Log in here</string>
+
+    <!-- Staff Management screen (doc 71, migration 63, PENDING.md item 3) -->
+    <string name="account_row_staff_management">Staff Management</string>
+    <string name="staff_management_title">Staff Management</string>
+    <string name="empty_staff">No staff accounts yet. Tap + Add Staff to give someone their own login.</string>
+    <string name="staff_load_failed">Couldn\'t load staff</string>
+    <string name="staff_save_failed">Couldn\'t save staff details</string>
+    <string name="staff_saved">Staff saved</string>
+    <string name="staff_deleted">Staff removed</string>
+    <string name="staff_delete_confirm_title">Remove this staff member?</string>
+    <string name="staff_delete_confirm_message">They\'ll no longer be able to log in. This can\'t be undone from the app.</string>
+    <string name="dialog_add_staff_title">Add staff</string>
+    <string name="dialog_edit_staff_title">Edit staff</string>
+    <string name="hint_staff_name">Full name</string>
+    <string name="hint_staff_password">Password</string>
+    <string name="hint_staff_password_optional">New password (leave blank to keep current)</string>
+    <string name="label_staff_role">Role</string>
+    <string name="staff_role_manager">Manager</string>
+    <string name="staff_role_kitchen">Kitchen</string>
+    <string name="staff_role_cashier">Cashier</string>
+    <string name="staff_username_role_format">%1$s · %2$s</string>
+
+    <!-- Staff Audit Trail (migration 64, PENDING.md §7's last checkbox) -->
+    <string name="account_row_staff_audit_log">Staff Activity Log</string>
+    <string name="staff_audit_log_title">Staff Activity Log</string>
+    <string name="empty_staff_audit_log">No staff activity yet</string>
+    <string name="staff_audit_log_load_failed">Couldn\'t load staff activity</string>
+    <string name="audit_by_owner">By you (Owner)</string>
+    <string name="audit_by_staff">By staff (%1$s)</string>
+    <string name="audit_staff_created">%1$s added as %2$s</string>
+    <string name="audit_staff_role_changed">%1$s\'s role changed from %2$s to %3$s</string>
+    <string name="audit_staff_activated">%1$s re-enabled</string>
+    <string name="audit_staff_deactivated">%1$s disabled</string>
+    <string name="audit_staff_deleted">%1$s removed</string>
+    <string name="audit_staff_updated">%1$s\'s details updated</string>
+
+    <!-- App update (§9, 2026-08-28) -->
+    <string name="update_title">Update Available</string>
+    <string name="btn_update_later">Later</string>
+    <string name="btn_update_now">Update Now</string>
 
     <!-- Splash -->
     <string name="splash_tagline">Partner Dashboard</string>
@@ -34,6 +79,9 @@
     <string name="error_invalid_email">Enter a valid email address</string>
     <string name="error_password_short">Password must be at least 6 characters</string>
     <string name="error_email_registered">This email is already registered — try logging in</string>
+    <string name="row_set_service_area_location">Set restaurant location (optional)</string>
+    <string name="row_service_area_location_set">Location set — %1$s</string>
+    <string name="signup_area_not_covered">We don\'t serve your area yet — we\'ll reach out once we do. You can still continue and finish signing up.</string>
 
     <!-- OTP verify -->
     <string name="otp_title">Verify your email</string>
@@ -123,6 +171,17 @@
     <string name="insights_repeat_customers_title">Repeat customers</string>
     <string name="insights_repeat_customers_body">%1$d of %2$d customers this range have ordered from you before</string>
     <string name="insights_load_error">Couldn\'t load insights</string>
+    <string name="insights_export_button">Export insights as CSV</string>
+    <string name="insights_export_choice_title">Export insights</string>
+    <string name="insights_export_choice_current_range">Current range (%1$s)</string>
+    <string name="insights_export_choice_custom_range">Choose a custom date range</string>
+    <string name="insights_export_range_picker_title">Select export range</string>
+    <string name="insights_export_preparing">Preparing export…</string>
+    <string name="insights_export_failed">Couldn\'t export insights</string>
+    <string name="insights_export_share_title">Share insights export</string>
+    <string name="insights_peak_hours_title">Peak hours (last 30 days)</string>
+    <string name="insights_peak_hours_caption">Busiest: %1$s %2$s — %3$d orders</string>
+    <string name="insights_peak_hours_empty">Not enough orders yet to show a pattern.</string>
 
     <!-- Account tab (docs/restorent/19 §7, §10 item 5) -->
     <string name="account_edit_profile_row">Edit profile</string>
@@ -321,6 +380,113 @@
 
     <string name="btn_change_logo">Change logo</string>
     <string name="hint_cuisine_tags">Cuisine tags (comma separated)</string>
+    <string name="label_business_details">Business Details</string>
+    <string name="hint_gst_number">GST number (optional)</string>
+    <string name="hint_fssai_number">FSSAI license number (optional)</string>
+    <string name="error_invalid_gst_number">Enter a valid 15-character GST number</string>
+    <string name="error_invalid_fssai_number">Enter a valid 14-digit FSSAI number</string>
+
+    <!-- Item Customization / Add-on Groups (§1, today.md 2026-08-28) -->
+    <string name="addon_groups_title">Manage Add-ons</string>
+    <string name="btn_manage_addons">Manage Add-ons</string>
+    <string name="btn_add_addon_group">+ Add Group</string>
+    <string name="btn_add_addon">+ Add add-on</string>
+    <string name="hint_addon_group_name">Group name (e.g. Choose Size)</string>
+    <string name="label_addon_group_required">Required</string>
+    <string name="label_addon_group_max_select">Maximum selections allowed</string>
+    <string name="hint_addon_group_max_select">Max select (e.g. 1)</string>
+    <string name="hint_addon_name">Add-on name (e.g. Large)</string>
+    <string name="hint_addon_price">Extra price (₹, optional)</string>
+    <string name="addon_price_prefix">+ ₹%1$s</string>
+    <string name="label_addon_group_required_badge">Required</string>
+    <string name="label_addon_group_optional_badge">Optional</string>
+    <string name="label_addon_group_pick_one">Pick 1</string>
+    <string name="label_addon_group_pick_up_to">Pick up to %1$d</string>
+    <string name="other_addons_section_title">Other add-ons</string>
+    <string name="dialog_add_addon_group_title">Add group</string>
+    <string name="dialog_edit_addon_group_title">Edit group</string>
+    <string name="dialog_add_addon_title">Add add-on</string>
+    <string name="dialog_edit_addon_title">Edit add-on</string>
+    <string name="addon_group_save_failed">Couldn\'t save the group</string>
+    <string name="addon_save_failed">Couldn\'t save the add-on</string>
+    <string name="addon_group_delete_confirm_title">Delete this group?</string>
+    <string name="addon_group_delete_confirm_message">Its add-ons will be removed too. This can\'t be undone from the app.</string>
+    <string name="addon_remove_confirm_title">Remove this add-on?</string>
+    <string name="addon_remove_confirm_message">This add-on will no longer show for customers. This can\'t be undone from the app.</string>
+    <string name="empty_addon_groups">No add-on groups yet. Tap + Add Group to create one (e.g. \"Choose Size\").</string>
+    <string name="addon_group_saved">Group saved</string>
+    <string name="addon_group_deleted">Group deleted</string>
+    <string name="addon_saved">Add-on saved</string>
+    <string name="addon_removed">Add-on removed</string>
+    <string name="addon_groups_load_failed">Couldn\'t load add-ons</string>
+
+    <!-- Temp Closure/Holiday Scheduling (§3, today.md 2026-08-28, doc
+         60/61) — ClosureScheduleActivity + its list row/dialog, plus
+         the resume-time prompt on AccountFragment's existing
+         switchTempClosed. Naming follows the addon_group_* pattern
+         above. -->
+    <string name="closure_schedule_title">Closure Schedule</string>
+    <string name="btn_add_closure">+ Add Closure</string>
+    <string name="closure_type_date_range">Date range</string>
+    <string name="closure_type_weekly_recurring">Weekly</string>
+    <string name="hint_closure_start_date">Start date</string>
+    <string name="hint_closure_end_date">End date</string>
+    <string name="label_closure_day_of_week">Day of week</string>
+    <string name="hint_closure_reason">Reason (optional)</string>
+    <string name="closure_summary_weekly">Every %1$s</string>
+    <string name="closure_summary_date_range">%1$s \u2013 %2$s</string>
+    <string name="dialog_add_closure_title">Add closure</string>
+    <string name="dialog_edit_closure_title">Edit closure</string>
+    <string name="closure_save_failed">Couldn\'t save the closure</string>
+    <string name="closure_saved">Closure saved</string>
+    <string name="closure_deleted">Closure deleted</string>
+    <string name="closures_load_failed">Couldn\'t load closures</string>
+    <string name="closure_delete_confirm_title">Delete this closure?</string>
+    <string name="closure_delete_confirm_message">This can\'t be undone from the app.</string>
+    <string name="empty_closures">No scheduled closures yet. Tap + Add Closure to plan a holiday or weekly off day.</string>
+    <string name="account_row_closures">Closure Schedule</string>
+    <string name="closure_resume_time_title">When will you reopen?</string>
+    <string name="btn_skip">Skip</string>
+
+    <!-- 0=Monday..6=Sunday, matching dialog_add_closure.xml's
+         spinnerDayOfWeek index convention (see ClosureAdapter.kt /
+         ClosureScheduleActivity.kt for the -1/+1 conversion against
+         the day_of_week 1=Mon..7=Sun column convention). -->
+    <string-array name="day_names_full">
+        <item>Monday</item>
+        <item>Tuesday</item>
+        <item>Wednesday</item>
+        <item>Thursday</item>
+        <item>Friday</item>
+        <item>Saturday</item>
+        <item>Sunday</item>
+    </string-array>
+
+    <!-- Restaurant Bank Details (PENDING.md §15, migration 59) -->
+    <string name="account_row_bank_details">Bank Details</string>
+    <string name="bank_details_title">Bank Details</string>
+    <string name="label_account_holder_name">Account Holder Name</string>
+    <string name="hint_account_holder_name">As per bank records</string>
+    <string name="label_bank_name">Bank Name</string>
+    <string name="hint_bank_name">e.g. State Bank of India</string>
+    <string name="label_account_number">Account Number</string>
+    <string name="hint_account_number">Enter your account number</string>
+    <string name="label_ifsc_code">IFSC Code</string>
+    <string name="hint_ifsc_code">e.g. SBIN0001234</string>
+    <string name="label_upi_id_optional">UPI ID (optional)</string>
+    <string name="hint_upi_id">e.g. name@bank</string>
+    <string name="btn_save_bank_details">Save Bank Details</string>
+    <string name="error_invalid_account_number">Enter a valid account number (9\u201318 digits)</string>
+    <string name="error_invalid_ifsc_code">Enter a valid IFSC code, e.g. SBIN0001234</string>
+    <string name="error_invalid_upi_id">Enter a valid UPI ID, e.g. name@bank</string>
+    <string name="bank_details_saved">Bank details submitted for verification</string>
+    <string name="bank_details_save_failed">Couldn\'t save bank details</string>
+    <string name="bank_details_load_failed">Couldn\'t load bank details</string>
+    <string name="bank_status_pending">Pending Review</string>
+    <string name="bank_status_verified">Verified</string>
+    <string name="bank_status_rejected">Rejected</string>
+    <string name="bank_details_empty_state">No bank details on file yet. Add your account details so we can pay you out.</string>
+    <string name="bank_account_number_masked_label">Current account on file</string>
     <string name="hint_min_order_amount">Minimum order amount (₹)</string>
     <string name="hint_profile_description">Description (optional)</string>
     <string name="label_hours">Hours</string>
@@ -393,6 +559,10 @@
     <string name="hint_item_price">Price (₹)</string>
     <string name="hint_item_description">Description (optional)</string>
     <string name="label_veg">Veg</string>
+    <string name="label_item_availability_timing">Availability timing (optional)</string>
+    <string name="label_item_availability_timing_hint">Leave blank for always-available. Set both to limit ordering to a daily window (e.g. a breakfast item, 7:00-11:00).</string>
+    <string name="hint_item_available_from">Available from</string>
+    <string name="hint_item_available_until">Available until</string>
     <string name="label_item_tags">Tags</string>
     <string name="label_item_tags_hint">Pick tags so this dish shows up under matching Home categories (Pizza, Onion, Capsicum…)</string>
     <string name="label_item_tags_loading">Loading tags…</string>
@@ -475,5 +645,15 @@
     <string name="review_reply_sent">Reply sent</string>
     <string name="review_reply_failed">Couldn\'t send reply</string>
     <string name="review_reply_empty">Write something before sending</string>
+
+    <!-- Restaurant-side "Report review" (§7, today.md 2026-08-28) -->
+    <string name="review_report">Report</string>
+    <string name="review_reported">Reported</string>
+    <string name="review_report_title">Report this review</string>
+    <string name="review_report_hint">Why are you reporting this review?</string>
+    <string name="review_report_confirm">Submit report</string>
+    <string name="review_report_sent">Review reported — our team will take a look</string>
+    <string name="review_report_failed">Couldn\'t submit report</string>
+    <string name="review_report_reason_required">Add a reason before submitting</string>
     <string name="account_row_reviews">Reviews</string>
 </resources>

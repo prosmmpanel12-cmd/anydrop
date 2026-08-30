@@ -250,6 +250,58 @@
                     android:inputType="text" />
             </com.google.android.material.textfield.TextInputLayout>
 
+            <!-- GST/FSSAI — today.md §3. Columns already existed on
+                 `restaurants`, just never had a form field. Both optional
+                 (a lot of small restaurants genuinely don't have a GST
+                 registration), so no asterisk/required styling — same
+                 look as cuisine tags / description above, not the
+                 required-field look inputName gets. -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/label_business_details"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.05"
+                android:layout_marginBottom="10dp" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                app:boxCornerRadiusTopStart="12dp" app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp" app:boxCornerRadiusBottomEnd="12dp"
+                app:boxStrokeColor="@color/anydrop_primary">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputGstNumber"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/hint_gst_number"
+                    android:inputType="textCapCharacters"
+                    android:maxLength="15" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                app:boxCornerRadiusTopStart="12dp" app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp" app:boxCornerRadiusBottomEnd="12dp"
+                app:boxStrokeColor="@color/anydrop_primary">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputFssaiNumber"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/hint_fssai_number"
+                    android:inputType="number"
+                    android:maxLength="14" />
+            </com.google.android.material.textfield.TextInputLayout>
+
             <!-- recall.md Phase B item 13 / migration 36 — restaurant's own
                  minimum order amount. Server-enforced floor per the area
                  admin assigned this restaurant to (profile-update.php

@@ -4,7 +4,8 @@
  * Auth: Restaurant token
  * Request: any subset of { name, address, cuisine_tags, opening_time,
  *                           closing_time, working_days, description,
- *                           logo_url, cover_url, latitude, longitude }
+ *                           logo_url, cover_url, latitude, longitude,
+ *                           gst_number, fssai_number }
  * Response: { "restaurant": {...full row, minus password_hash} }
  *
  * docs/restorent/19 §7 (Account tab) / §10 item 5. Partial update, same
@@ -33,6 +34,7 @@
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
+require_once __DIR__ . '/../../../lib/permissions.php';
 require_once __DIR__ . '/../../../lib/delivery_pricing.php';
 
 header('Access-Control-Allow-Origin: *');
@@ -42,6 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $owner = require_auth('restaurant');
+require_restaurant_permission($owner, 'manage_restaurant_profile');
 $restaurantId = $owner['owner_id'];
 
 $body = get_json_body();
@@ -79,6 +82,32 @@ if (array_key_exists('description', $body)) {
     $description = trim((string) $body['description']);
     $fields[] = 'description = :description';
     $params['description'] = $description !== '' ? $description : null;
+}
+
+// gst_number / fssai_number — today.md §3, columns already existed
+// (VARCHAR(20)/VARCHAR(30) per 01_schema.sql) but were never wired into
+// this endpoint. Both optional/nullable, same "empty string clears it"
+// convention as cuisine_tags/description above. Loosely format-checked
+// (not a full GSTIN/FSSAI checksum validation — restaurants in the wild
+// have composition-scheme/UIN variants that don't all fit one regex) so
+// a restaurant can't save an obviously wrong value (wrong length, wrong
+// character set) but isn't blocked by an over-strict pattern.
+if (array_key_exists('gst_number', $body)) {
+    $gst = strtoupper(trim((string) $body['gst_number']));
+    if ($gst !== '' && !preg_match('/^[0-9A-Z]{15}$/', $gst)) {
+        respond_error('validation_error', 422, ['fields' => ['gst_number']]);
+    }
+    $fields[] = 'gst_number = :gst_number';
+    $params['gst_number'] = $gst !== '' ? $gst : null;
+}
+
+if (array_key_exists('fssai_number', $body)) {
+    $fssai = trim((string) $body['fssai_number']);
+    if ($fssai !== '' && !preg_match('/^[0-9]{14}$/', $fssai)) {
+        respond_error('validation_error', 422, ['fields' => ['fssai_number']]);
+    }
+    $fields[] = 'fssai_number = :fssai_number';
+    $params['fssai_number'] = $fssai !== '' ? $fssai : null;
 }
 
 // opening_time / closing_time — TIME columns, compared as plain "H:i:s"

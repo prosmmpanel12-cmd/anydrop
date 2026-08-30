@@ -14,6 +14,7 @@ require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/favorites.php';
+require_once __DIR__ . '/../../../lib/menu_item_availability.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -98,6 +99,16 @@ $currentDow = (int) $now->format('N');
 
 $items = [];
 foreach ($rows as $it) {
+    // doc 68's "Explicitly known, NOT fixed this session" follow-up —
+    // the SQL `$where` above only filters `is_available = 1`, missing
+    // the available_from/available_until time window (migration 62).
+    // This grid never shows unavailable items at all, so an item
+    // currently outside its window is excluded here too, same as an
+    // is_available = 0 item already was.
+    if (!is_menu_item_available_now($it)) {
+        continue;
+    }
+
     $isOpenNow = false;
     if ($it['r_operational_status'] === 'open' && $it['r_opening_time'] && $it['r_closing_time']) {
         $days = explode(',', (string) $it['r_working_days']);

@@ -265,6 +265,28 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
+                <!-- Closure Schedule row (§3, today.md 2026-08-28; doc
+                     60/61) — opens ClosureScheduleActivity. Placed
+                     right after the temp-closed switch card since
+                     they're related concepts: the switch above is
+                     "closed right now, resume whenever", this row is
+                     "closed on specific future dates/every week". Same
+                     row style as the rows above. -->
+                <TextView
+                    android:id="@+id/btnClosuresRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_card_rounded"
+                    android:padding="16dp"
+                    android:text="@string/account_row_closures"
+                    android:textColor="@color/anydrop_primary"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground" />
+
                 <!-- Payout — view-only. -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
@@ -345,6 +367,71 @@
                         </LinearLayout>
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
+
+                <!-- Bank Details submission (PENDING.md §15, migration
+                     59) — placed directly after the view-only Payout
+                     card above: that card is where a restaurant sees
+                     its UPI ID and running balance with no way to
+                     *set* the UPI ID itself; this row is where it
+                     actually gets set/submitted for verification. Same
+                     row style as btnClosuresRow above. -->
+                <TextView
+                    android:id="@+id/btnBankDetailsRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_card_rounded"
+                    android:padding="16dp"
+                    android:text="@string/account_row_bank_details"
+                    android:textColor="@color/anydrop_primary"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground" />
+
+                <!-- Staff Management (doc 71, migration 63, PENDING.md
+                     item 3) — owner-only row, visibility set from
+                     AccountFragment.kt via tokenManager.canManageStaff()
+                     since a staff-role session has no business seeing
+                     this even though the backend's own 403 would catch
+                     it regardless. Same row style as btnBankDetailsRow
+                     above. -->
+                <TextView
+                    android:id="@+id/btnStaffManagementRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_card_rounded"
+                    android:padding="16dp"
+                    android:text="@string/account_row_staff_management"
+                    android:textColor="@color/anydrop_primary"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:visibility="gone"
+                    android:foreground="?attr/selectableItemBackground" />
+
+                <!-- Staff Audit Trail (migration 64, PENDING.md §7's last
+                     checkbox) — same owner-only visibility guard as
+                     btnStaffManagementRow above, set from
+                     AccountFragment.kt via tokenManager.canManageStaff(). -->
+                <TextView
+                    android:id="@+id/btnStaffAuditLogRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_card_rounded"
+                    android:padding="16dp"
+                    android:text="@string/account_row_staff_audit_log"
+                    android:textColor="@color/anydrop_primary"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:visibility="gone"
+                    android:foreground="?attr/selectableItemBackground" />
 
                 <TextView
                     android:id="@+id/btnLogout"

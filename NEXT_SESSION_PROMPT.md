@@ -1,97 +1,93 @@
 Anydrop project zip attached. Unzip it, read `PENDING.md` first (the
-source-checked pending list), then
-`docs/52_Handover_2026-08-27_Admin_Feedback_View_And_Customer_Complete_Profile_Built.md`
-for exactly what the last session did and why.
+source-checked pending list, §37 especially), then
+`docs/75_Handover_2026-08-30_Wallet_Withdrawal_Endpoints_AdminPage_And_Android_Built.md`
+for exactly what this session did, why, and what's still missing.
 
-## Kiya hua hai (what's done, as of 2026-08-27 session 13)
+## Kiya hua hai (what's done, as of 2026-08-30 session 19 — doc 75)
 
-- **Admin Panel — Customer Feedback view. Fully built.** Migration 55
-  (`feedback_view` permission) + `admin/customer-feedback.php`
-  (read-only list of `feedback` table rows — customer name/email/
-  mobile, star rating, message, timestamp — with star-rating filter
-  chips and a message search box) + a new sidebar nav entry under
-  Operations. This closes the TODO that had been sitting in
-  `api/v1/customer/feedback.php`'s own kdoc since Phase 3.6
-  ("Reviewable directly in the `feedback` table, or a future Admin
-  Panel screen, Phase 5").
-- **Customer App — Complete Profile after OTP login. Backend built,
-  Android NOT started.** New `api/v1/customer/complete-profile.php`
-  (auth'd, validates `name` + 10-digit `mobile`, rejects a mobile
-  already used by another customer row, updates `customers.name`/
-  `customers.mobile` — both nullable columns that email-OTP signup has
-  always left blank). `.htaccess` route added too. **Nothing on the
-  Android side has been touched yet** — see PENDING.md item 11b for
-  the full remaining checklist (new `CompleteProfileActivity` +
-  layout, `Models.kt`/`ApiService.kt` wiring, and the
-  `LoginActivity.onVerifyOtp()` routing change to send a customer with
-  no `name`/`mobile` to the new screen instead of straight to
-  `HomeActivity`).
-- **Nothing in this project has ever been build/device-verified.**
-  No PHP CLI, Android SDK/Gradle, live DB, or physical device exists
-  in the sandbox any session has run in so far, including this one.
+Session 18 (doc 74) built the backend LIBRARY foundation for two
+app-owner requests (prepaid-cancel auto-refund-to-wallet, and wallet
+withdrawal) but wired nothing to an HTTP endpoint. **This session (19)
+finished the entire "wire it up" layer for both:**
 
-## Kiya pending hai (what's still pending — see PENDING.md for the full list)
+1. **Customer API endpoints — built.** `api/v1/customer/wallet-bank-
+   details-get.php` / `wallet-bank-details-save.php` /
+   `wallet-withdrawal.php` (GET history / POST request), all thin
+   wrappers around session 18's `lib/customer_wallet_withdrawal.php`.
+   3 new `.htaccess` routes.
+2. **Admin review page — built.** `admin/wallet-withdrawals.php`,
+   mirrors `admin/refunds.php`'s exact shape (list + Approve/Mark
+   Processing/Complete/Reject, CSRF), shows the admin the FULL
+   unmasked payout details (same as `admin/settlements.php` does for
+   restaurants). Nav entry added.
+3. **Android — built.** New `WithdrawActivity` (bank/UPI form +
+   withdrawal history list) reachable from a new "Withdraw" button on
+   `WalletActivity`. New `WalletWithdrawalAdapter` + layouts + status-
+   pill drawable. 7 new Retrofit models, 4 new `ApiService` methods.
+   `WalletActivity` also fixed to refresh on `onResume()` (previously
+   only loaded once) so returning from a withdrawal shows the updated
+   balance.
 
-Top of the list, roughly in priority order:
+Full detail, every file touched, and the precise "what's built vs
+what still needs a live DB/device" line is all in doc 75 — read it
+before writing any new code here.
 
-1. **PENDING.md item 11b — Customer Complete-Profile, Android side.**
-   This is the very next thing to build: a single self-contained
-   screen (`CompleteProfileActivity` + layout, same visual language as
-   `activity_login.xml`) plus one wiring change in
-   `LoginActivity.onVerifyOtp()`. The backend contract is already
-   fixed and documented in doc 52 — this is pure Android work, no new
-   migration, no backend changes needed.
-2. **PENDING.md item 11a — run migration 55 + browser-verify the new
-   Customer Feedback admin page** once a live DB/browser is available.
-3. **Restaurant Self Delivery** (PENDING.md item 5) — admin control
-   for Anydrop-delivery vs. restaurant-self-delivery eligibility, not
-   started. Next unstarted P1 feature in PENDING.md's own list order,
-   if the owner wants a bigger feature pick instead of #1 above.
-4. **Payment/Refund Reconciliation** (PENDING.md item 24) — foundation
-   exists, final reconciliation layer (provider transaction matching,
-   mismatch detection, admin mismatch queue) is not built.
-5. **Email OTP Provider Failover** (PENDING.md item 25) — confirmed via
-   grep in an earlier session that no `email_otp_providers`-shaped
-   table/file exists anywhere; genuinely not started.
-6. **Security Hardening** (PENDING.md item 26) — final audit across
-   OTP rate limiting, coupon race conditions, server-side price/state
-   validation, RBAC audit, secret management. Needs a real machine to
-   actually test rate limits/race conditions, not just read code.
-7. **Machine verification** — every "BUILT" item across this entire
-   project is written but completely unverified. Whenever real PHP
-   CLI/Android SDK/live DB/device access becomes available, running
-   through the accumulated checklists (docs 42, 44, 48, 49, 50, 51, 52)
-   is higher value than more feature work on an ever-growing
-   unverified surface.
-8. Everything else in PENDING.md's P1/P2 lists below these.
+## Kiya pending hai (what's still pending)
+
+**PENDING.md §37 is now code-complete on both halves.** What remains
+is verification, not new code:
+
+1. Get the exact PHP syntax error text from the app owner (admin
+   Refunds page) — still unresolved since session 18, still a quick
+   win once the real error text is in hand. Do this first if the app
+   owner is available to ask.
+2. Run migration 65 on a live DB.
+3. Live end-to-end test — auto-refund half: cancel a UPI order within
+   the window, confirm wallet balance up + one `refunds` row
+   `refunded`/`wallet`. Withdrawal half: request → balance drops
+   immediately → Approve → Mark Processing (reference) → Mark
+   Completed → confirm `platform_ledger` gets a `wallet_withdrawal_out`
+   row; separately test Reject from both `requested` and `approved` →
+   balance credited back exactly.
+4. Real Android Studio/Gradle build + device click-through — confirm
+   view-binding classes generate as assumed (they follow this
+   project's existing naming convention but were not Gradle-confirmed
+   this session), the bank/UPI toggle behaves correctly on-device, and
+   the status pill colors render as intended.
+
+Once all four are done, §37 moves to `done.md` per the project's own
+completion rule.
+
+After §37 is actually complete end-to-end, the prior priority order
+from session 17/18 still applies:
+
+5. **Rider App** (PENDING.md item 18) — still fully untouched, largest
+   remaining phase.
+6. Payment/Refund Reconciliation (item 24).
+7. Email OTP Provider Failover (item 25).
+8. Security Hardening (item 26).
+9. A real machine build/device/live-DB verification pass — every
+   "BUILT" item across this project is still unverified in-container;
+   check `today.md`/`recall.md` for the latest confirmed-through
+   point.
 
 ## Next session should start here
 
-**Recommended: finish PENDING.md item 11b (Customer Complete-Profile,
-Android side).** It's small, self-contained, and the backend is
-already done and waiting — the fastest way to actually close out a
-full feature this session instead of leaving another half-built item.
+**If the app owner can run things on a real machine:** get the PHP
+syntax error text, run migration 65, then live-test §37 end-to-end
+(steps above) and Gradle-build the Android app. That closes out §37
+completely.
 
-Steps:
-1. Read `docs/52_Handover_2026-08-27_Admin_Feedback_View_And_Customer_Complete_Profile_Built.md`
-   section 2 for the exact backend contract
-   (`api/v1/customer/complete-profile.php`'s request/response shape)
-   and the numbered Android to-do list already written out there.
-2. Read `customer/app/src/main/java/com/anydrop/food/ui/login/LoginActivity.kt`
-   and `customer/app/src/main/res/layout/activity_login.xml` first —
-   don't guess at the existing patterns (TokenManager, ApiClient,
-   InAppNotifier, view-binding usage), copy them.
-3. Add the `mobile` field to `Customer` in `Models.kt`, add
-   `CompleteProfileBody`/result models, add the `ApiService.kt` call.
-4. Build `CompleteProfileActivity.kt` + `activity_complete_profile.xml`
-   (name + mobile fields; a new `ic_phone.xml` vector drawable is
-   needed — copy `ic_mail.xml`'s shape as a template).
-5. Register the activity in `AndroidManifest.xml`.
-6. Wire the routing change in `LoginActivity.onVerifyOtp()`.
-7. Same standing rule as every session in this project: read the
-   actual current code before assuming what's there, don't rely on
-   older docs' framing alone.
+**If no live environment is available yet:** there is no more
+Claude-actionable code work left in §37 — everything that could be
+built without a PHP CLI/Android SDK/live DB has been built. Either
+wait for the app owner to run the verification steps, or, if they
+want forward progress instead, move to Rider App (item 18) or another
+item from the priority list above.
 
-If the app owner instead wants machine verification before more
-feature work, docs 42/44/48/49/50/51/52's checklists are all ready and
-waiting — see "Kiya pending hai" item 7 above.
+Same standing constraint as every session: no PHP CLI, Android
+SDK/Gradle, or live DB in this sandbox. Run the brace/paren + XML
+well-formedness Python checkers over every new/edited file (same
+script shape as recent handovers' "Verification done this session"),
+and update `PENDING.md` checkboxes / `recall.md` once work is actually
+done — not before.

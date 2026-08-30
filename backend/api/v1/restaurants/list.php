@@ -35,6 +35,7 @@ require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/favorites.php';
 require_once __DIR__ . '/../../../lib/geo.php';
 require_once __DIR__ . '/../../../lib/restaurant_status.php';
+require_once __DIR__ . '/../../../lib/restaurant_closures.php';
 require_once __DIR__ . '/../../../lib/settings.php';
 
 header('Access-Control-Allow-Origin: *');
@@ -131,6 +132,19 @@ if (!empty($all)) {
 $now = new DateTime();
 $currentTime = $now->format('H:i:s');
 $currentDow = (int) $now->format('N'); // 1 (Mon) - 7 (Sun)
+$currentDate = $now->format('Y-m-d');
+
+// Scheduled closures (§3, today.md 2026-08-28, migration 58) — one
+// batched IN(...) lookup for every restaurant in $all, same
+// avoids-N+1 reasoning as tagsByRestaurant above. Folded into
+// compute_restaurant_status() below so a restaurant on a scheduled
+// holiday shows Closed here exactly the same way search.php and
+// restaurants/menu.php will (all three read the same helper).
+$closedByClosureSet = [];
+if (!empty($all)) {
+    $ids = $ids ?? array_map(fn($r) => (int) $r['id'], $all);
+    $closedByClosureSet = get_restaurants_with_active_closure($db, $ids, $currentDate, $currentDow);
+}
 
 // Gallery photos for the auto-advancing card carousel (§2.7), same
 // batched-then-grouped-in-PHP pattern as the tags query above — avoids
@@ -200,7 +214,12 @@ foreach ($all as $r) {
     // Consolidated into compute_restaurant_status() (bugs.md §6.3
     // follow-up) — was inline here and duplicated separately in
     // search.php; restaurants/menu.php now uses the same function too.
-    $statusFlags = compute_restaurant_status($r, $currentTime, $currentDow);
+    $statusFlags = compute_restaurant_status(
+        $r,
+        $currentTime,
+        $currentDow,
+        isset($closedByClosureSet[(int) $r['id']])
+    );
     $isOpenNow = $statusFlags['is_open_now'];
     $isPaused = $statusFlags['is_paused'];
 

@@ -9,6 +9,7 @@
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
+require_once __DIR__ . '/../../../lib/permissions.php';
 require_once __DIR__ . '/../../../lib/orders.php';
 require_once __DIR__ . '/../../../lib/notifications.php';
 require_once __DIR__ . '/../../../lib/refunds.php';
@@ -20,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $owner = require_auth('restaurant');
+require_restaurant_permission($owner, 'manage_orders');
 $orderId = (int) ($_GET['id'] ?? 0);
 $body = get_json_body();
 require_fields($body, ['reason']);

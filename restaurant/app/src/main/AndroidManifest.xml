@@ -54,6 +54,25 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="@string/google_maps_key" />
 
+        <!-- FileProvider — first use in this app (Insights CSV export,
+             PENDING.md's "Export PDF/Excel" item). Needed to hand a
+             cache-dir file to another app (WhatsApp/Gmail/Drive/etc)
+             via the Android share-sheet without exposing a raw file://
+             Uri, which FLAG_GRANT_READ_URI_PERMISSION + newer Android
+             versions both reject. authority follows the standard
+             "${applicationId}.fileprovider" convention so it can never
+             collide with another installed app's provider. Paths
+             defined in res/xml/file_paths.xml. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- Launcher moved here from LoginActivity this session — plays the
              brand entrance animation, then routes to Dashboard or Login. -->
         <activity
@@ -68,6 +87,20 @@
 
         <activity
             android:name=".ui.login.LoginActivity"
+            android:exported="false" />
+
+        <!-- Migration 63 (Restaurant Staff/RBAC, PENDING.md item 3). -->
+        <activity
+            android:name=".ui.staff.StaffLoginActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.staff.StaffManagementActivity"
+            android:exported="false" />
+
+        <!-- Migration 64 (Staff Audit Trail, PENDING.md §7's last checkbox). -->
+        <activity
+            android:name=".ui.staff.StaffAuditLogActivity"
             android:exported="false" />
 
         <activity
@@ -104,6 +137,24 @@
         <!-- Reviews reply (docs/restorent/00_Status.md, this session). -->
         <activity
             android:name=".ui.reviews.ReviewListActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Add-on Group management (§1, today.md 2026-08-28; doc 58). -->
+        <activity
+            android:name=".ui.menu.AddonGroupsActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Closure Schedule (§3, today.md 2026-08-28; doc 60/61). -->
+        <activity
+            android:name=".ui.account.ClosureScheduleActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Restaurant Bank Details (PENDING.md §15, migration 59, doc 63). -->
+        <activity
+            android:name=".ui.account.BankDetailsActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
@@ -176,6 +227,30 @@
         <receiver
             android:name=".service.DismissOrderAlertReceiver"
             android:exported="false" />
+
+        <!-- FCM (this session) — see RestaurantFirebaseMessagingService's
+             kdoc for how a push routes into the existing
+             OrderNotificationHelper. Not exported: only the OS's own FCM
+             plumbing is meant to bind to this. -->
+        <service
+            android:name=".service.RestaurantFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Default small icon + notification color for a push that
+             arrives while the app is fully killed (no code running to
+             build a NotificationCompat.Builder at all) — FCM's own
+             system tray auto-display uses these meta-data values in
+             that case. Reuses the same ic_notification drawable
+             OrderNotificationHelper already builds every other
+             notification with, so a cold-start push looks identical to
+             every other notification this app posts. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
 
     </application>
 

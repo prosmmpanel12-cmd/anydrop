@@ -57,4 +57,12 @@
         android:layout_height="140dp"
         android:background="@drawable/bg_skeleton_bar" />
 
+    <!-- Peak-hours heatmap-shaped gray rectangle (7 rows × 20dp + a
+         16dp label row, matching PeakHoursHeatmapView's own onMeasure) -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="156dp"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bg_skeleton_bar" />
+
 </LinearLayout>

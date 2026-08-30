@@ -27,7 +27,9 @@ require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/favorites.php';
 require_once __DIR__ . '/../../../lib/restaurant_status.php';
+require_once __DIR__ . '/../../../lib/restaurant_closures.php';
 require_once __DIR__ . '/../../../lib/offers.php';
+require_once __DIR__ . '/../../../lib/menu_item_availability.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -155,6 +157,18 @@ if (!empty($restaurantIds)) {
 $now = new DateTime();
 $currentTime = $now->format('H:i:s');
 $currentDow = (int) $now->format('N');
+$currentDate = $now->format('Y-m-d');
+
+// Scheduled closures (§3, today.md 2026-08-28, migration 58) — same
+// batched IN(...) lookup as restaurants/list.php, folded into
+// compute_restaurant_status() below so a restaurant on a scheduled
+// holiday shows Closed here exactly the same way list.php already
+// does (doc 60's "still open" gap — this closes it for the
+// restaurant-results block; the items sub-block below is separate).
+$closedByClosureSet = [];
+if (!empty($restaurantIds)) {
+    $closedByClosureSet = get_restaurants_with_active_closure($db, $restaurantIds, $currentDate, $currentDow);
+}
 
 $restaurantResults = [];
 foreach ($mergedRestaurants as $r) {
@@ -162,7 +176,12 @@ foreach ($mergedRestaurants as $r) {
     // follow-up) — this file's own local compute_open_now() is gone;
     // restaurants/list.php and restaurants/menu.php use the same
     // function now, so all three surfaces can't drift apart.
-    $statusFlags = compute_restaurant_status($r, $currentTime, $currentDow);
+    $statusFlags = compute_restaurant_status(
+        $r,
+        $currentTime,
+        $currentDow,
+        isset($closedByClosureSet[(int) $r['id']])
+    );
     $isOpenNow = $statusFlags['is_open_now'];
     $isPaused = $statusFlags['is_paused'];
 
@@ -218,7 +237,8 @@ $itemStmt = $db->prepare(
     "SELECT mi.*, r.id AS r_id, r.name AS r_name, r.logo_url AS r_logo_url,
             r.rating_avg AS r_rating_avg, r.latitude AS r_lat, r.longitude AS r_lng,
             r.operational_status AS r_operational_status, r.opening_time AS r_opening_time,
-            r.closing_time AS r_closing_time, r.working_days AS r_working_days
+            r.closing_time AS r_closing_time, r.working_days AS r_working_days,
+            r.temp_closed_until AS r_temp_closed_until
      FROM menu_items mi
      INNER JOIN restaurants r ON r.id = mi.restaurant_id
      WHERE r.status = 'approved' AND r.deleted_at IS NULL
@@ -244,15 +264,46 @@ foreach ($rawItems as $it) {
     }
 }
 
+// Scheduled closures (§3, today.md 2026-08-28, migration 58) — same
+// batched IN(...) lookup as the restaurant-results block above, keyed
+// off the distinct restaurant ids actually present in $rawItems (not
+// $restaurantIds — a cross-restaurant dish match can surface a
+// restaurant that never matched by name/cuisine/dish directly above).
+// Closes the other half of doc 60's "still open" gap for search.php.
+$itemRestaurantIds = array_values(array_unique(array_map(fn($it) => (int) $it['r_id'], $rawItems)));
+$closedByClosureSetForItems = [];
+if (!empty($itemRestaurantIds)) {
+    $closedByClosureSetForItems = get_restaurants_with_active_closure($db, $itemRestaurantIds, $currentDate, $currentDow);
+}
+
 $items = [];
 foreach ($rawItems as $it) {
+    // doc 68's own "Explicitly known, NOT fixed this session" follow-up:
+    // the SQL above only filters `is_available = 1`, so an item outside
+    // its `available_from`/`available_until` window (migration 62) still
+    // reached this point and would have shown as a normal, orderable
+    // result — checkout still blocked it via price_cart(), but the
+    // search card itself lied. This endpoint never surfaces unavailable
+    // items at all (unlike restaurants/menu.php's grey-out treatment),
+    // so a currently-out-of-window item is simply excluded here too,
+    // same as an is_available = 0 item already was by the SQL filter.
+    if (!is_menu_item_available_now($it)) {
+        continue;
+    }
+
     $rArr = [
         'operational_status' => $it['r_operational_status'],
         'opening_time' => $it['r_opening_time'],
         'closing_time' => $it['r_closing_time'],
         'working_days' => $it['r_working_days'],
+        'temp_closed_until' => $it['r_temp_closed_until'],
     ];
-    $isOpenNow = compute_restaurant_status($rArr, $currentTime, $currentDow)['is_open_now'];
+    $isOpenNow = compute_restaurant_status(
+        $rArr,
+        $currentTime,
+        $currentDow,
+        isset($closedByClosureSetForItems[(int) $it['r_id']])
+    )['is_open_now'];
 
     $distanceKm = null;
     if ($lat !== null && $lng !== null && $it['r_lat'] !== null && $it['r_lng'] !== null) {

@@ -1,5 +1,6 @@
 package com.anydrop.food.ui.profile
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
@@ -42,6 +43,18 @@ class WalletActivity : AppCompatActivity() {
 
         binding.swipeRefresh.setOnRefreshListener { loadWallet() }
 
+        // PENDING.md §37 — Withdraw entry point. WithdrawActivity does
+        // its own balance debit server-side on submit, so this screen's
+        // balance/history needs a refresh on return, not just on
+        // pull-to-refresh (same reasoning any "went off, changed
+        // something, came back" screen in this app re-loads onResume).
+        binding.btnWithdraw.setOnClickListener {
+            startActivity(Intent(this, WithdrawActivity::class.java))
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
         loadWallet()
     }
 

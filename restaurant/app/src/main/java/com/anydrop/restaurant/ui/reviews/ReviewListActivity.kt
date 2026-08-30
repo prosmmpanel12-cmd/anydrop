@@ -1,7 +1,9 @@
 package com.anydrop.restaurant.ui.reviews
 
 import android.os.Bundle
+import android.text.InputType
 import android.view.View
+import android.widget.EditText
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -9,9 +11,11 @@ import androidx.recyclerview.widget.RecyclerView
 import com.anydrop.restaurant.R
 import com.anydrop.restaurant.databinding.ActivityNotificationListBinding
 import com.anydrop.restaurant.network.ApiClient
+import com.anydrop.restaurant.network.ReportReviewBody
 import com.anydrop.restaurant.network.Review
 import com.anydrop.restaurant.network.ReviewReplyBody
 import com.anydrop.restaurant.ui.common.InAppNotifier
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.launch
 
 /**
@@ -51,7 +55,8 @@ class ReviewListActivity : AppCompatActivity() {
 
         adapter = ReviewAdapter(
             onSendReply = { review, text -> sendReply(review, text) },
-            onEditReply = { review -> adapter.startEditing(review.id) }
+            onEditReply = { review -> adapter.startEditing(review.id) },
+            onReportReview = { review -> promptReportReview(review) }
         )
         val layoutManager = LinearLayoutManager(this)
         binding.contentList.layoutManager = layoutManager
@@ -92,6 +97,48 @@ class ReviewListActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 InAppNotifier.show(this@ReviewListActivity, getString(R.string.review_reply_failed), InAppNotifier.Type.ERROR)
+            }
+        }
+    }
+
+    /** §7, today.md 2026-08-28. Same reason-input confirm-dialog shape as
+     * OrderAdapter.promptRejectReason — plain EditText in a
+     * MaterialAlertDialogBuilder, no custom dialog class needed for
+     * something this simple. */
+    private fun promptReportReview(review: Review) {
+        val input = EditText(this).apply {
+            hint = getString(R.string.review_report_hint)
+            inputType = InputType.TYPE_CLASS_TEXT
+            val padding = (16 * resources.displayMetrics.density).toInt()
+            setPadding(padding, padding / 2, padding, padding / 2)
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.review_report_title)
+            .setView(input)
+            .setPositiveButton(R.string.review_report_confirm) { _, _ ->
+                val reason = input.text?.toString()?.trim().orEmpty()
+                if (reason.isEmpty()) {
+                    InAppNotifier.show(this, getString(R.string.review_report_reason_required), InAppNotifier.Type.INFO)
+                } else {
+                    reportReview(review, reason)
+                }
+            }
+            .setNegativeButton(R.string.btn_cancel, null)
+            .show()
+    }
+
+    private fun reportReview(review: Review, reason: String) {
+        lifecycleScope.launch {
+            try {
+                val result = api.reportReview(ReportReviewBody(reviewId = review.id, reason = reason)).body()?.data
+                if (result?.reported == true) {
+                    adapter.markReported(review.id)
+                    InAppNotifier.show(this@ReviewListActivity, getString(R.string.review_report_sent), InAppNotifier.Type.SUCCESS)
+                } else {
+                    InAppNotifier.show(this@ReviewListActivity, getString(R.string.review_report_failed), InAppNotifier.Type.ERROR)
+                }
+            } catch (e: Exception) {
+                InAppNotifier.show(this@ReviewListActivity, getString(R.string.review_report_failed), InAppNotifier.Type.ERROR)
             }
         }
     }

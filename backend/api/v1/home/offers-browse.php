@@ -39,6 +39,7 @@ require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/offers.php';
+require_once __DIR__ . '/../../../lib/menu_item_availability.php';
 
 header('Access-Control-Allow-Origin: *');
 header('Cache-Control: max-age=60');
@@ -94,7 +95,13 @@ foreach ($rStmt->fetchAll() as $r) {
 }
 
 $miStmt = $db->prepare(
-    "SELECT id, name, image_url, price, is_veg, restaurant_id
+    // is_available/available_from/available_until pulled in alongside the
+    // existing columns (doc 68's own "Explicitly known, NOT fixed this
+    // session" follow-up) so is_menu_item_available_now() has what it
+    // needs below — the WHERE clause itself only filters the raw
+    // is_available = 1 toggle, not the migration 62 time window.
+    "SELECT id, name, image_url, price, is_veg, restaurant_id,
+            is_available, available_from, available_until
      FROM menu_items
      WHERE restaurant_id IN ($placeholders) AND deleted_at IS NULL AND is_available = 1"
 );
@@ -131,6 +138,15 @@ foreach ($restaurantIds as $rid) {
 
     $items = [];
     foreach ($menuItemsByRestaurant[$rid] ?? [] as $mi) {
+        // Same follow-up as the other three surfaces — an item currently
+        // outside its available_from/available_until window is excluded
+        // here too, same as an is_available = 0 item already was by the
+        // SQL filter above. This screen only ever lists specific items
+        // (never a "greyed out" state), so exclusion is the right call.
+        if (!is_menu_item_available_now($mi)) {
+            continue;
+        }
+
         $badgeOffer = pick_item_badge_offer($browsableOffers, (int) $mi['id'], null, $comboIndex['index']);
         if ($badgeOffer === null) {
             continue;

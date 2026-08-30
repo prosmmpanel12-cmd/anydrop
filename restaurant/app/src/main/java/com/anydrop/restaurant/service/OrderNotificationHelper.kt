@@ -142,12 +142,31 @@ object OrderNotificationHelper {
      * Tapping it opens [NotificationListActivity] directly (not a specific
      * order screen) — the bell list itself handles the deep-link once
      * opened, same as tapping a row there does, so there's no need to
-     * duplicate that per-type routing logic here. */
-    fun showBellNotification(context: Context, item: com.anydrop.restaurant.network.NotificationItem) {
-        val contentIntent = Intent(
-            context,
-            com.anydrop.restaurant.ui.notifications.NotificationListActivity::class.java
-        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+     * duplicate that per-type routing logic here.
+     *
+     * Exception: [linkUrl], when present, overrides that and opens the
+     * link in an external browser instead — this is how an admin
+     * broadcast's `link_url` (rides in the FCM `data` payload as
+     * `data.link`, see `backend/admin/broadcast.php`'s kdoc) does
+     * something on tap, closing the gap flagged in doc 66's "still open"
+     * list. External browser was chosen over an in-app WebView since this
+     * app has no generic "open arbitrary URL" screen and standing one up
+     * just for this is more than the feature needs. Only `http`/`https`
+     * is honored — a malformed/unexpected scheme (`intent://`,
+     * `market://`, `file://`) falls back to the bell-list intent above. */
+    fun showBellNotification(context: Context, item: com.anydrop.restaurant.network.NotificationItem, linkUrl: String? = null) {
+        val validatedLink = linkUrl?.trim()?.takeIf {
+            it.isNotEmpty() && (it.startsWith("http://") || it.startsWith("https://"))
+        }
+        val contentIntent = if (validatedLink != null) {
+            Intent(Intent.ACTION_VIEW, android.net.Uri.parse(validatedLink))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        } else {
+            Intent(
+                context,
+                com.anydrop.restaurant.ui.notifications.NotificationListActivity::class.java
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
 
         val pendingIntent = PendingIntent.getActivity(
             context,

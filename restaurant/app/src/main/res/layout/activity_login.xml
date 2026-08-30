@@ -188,11 +188,30 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- Migration 63 (Restaurant Staff/RBAC, PENDING.md item 3) —
+             separate entry point to StaffLoginActivity rather than a
+             toggle on this same screen, so the owner's own email/
+             password form above stays exactly as it was. -->
+        <TextView
+            android:id="@+id/btnStaffLogin"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="18dp"
+            android:text="@string/login_staff_instead"
+            android:textColor="@color/anydrop_primary"
+            android:textStyle="bold"
+            android:textSize="13sp"
+            android:padding="6dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="10dp"
             android:layout_marginBottom="24dp"
             android:text="Powered by Anydrop"
             android:textColor="@color/text_secondary"

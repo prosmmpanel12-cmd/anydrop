@@ -39,6 +39,23 @@
         android:textColor="@color/text_secondary"
         android:gravity="center" />
 
+    <!-- Service-area notice (§0, 2026-08-28) — shown only when the owner
+         picked a location on signup but it didn't resolve to any known
+         service area (area_resolved: false). Informational only, never
+         blocks signup — the row above already confirms submission. -->
+    <TextView
+        android:id="@+id/areaNoticeText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bg_input_outline"
+        android:padding="14dp"
+        android:text="@string/signup_area_not_covered"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp"
+        android:gravity="center"
+        android:visibility="gone" />
+
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnBackToLogin"
         android:layout_width="match_parent"

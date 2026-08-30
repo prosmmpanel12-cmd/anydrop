@@ -122,7 +122,7 @@ if (!function_exists('credit_wallet')) {
         if ($amount <= 0) {
             throw new InvalidArgumentException('amount_must_be_positive');
         }
-        if (!in_array($reason, ['refund', 'admin_adjustment', 'cashback', 'order_payment'], true)) {
+        if (!in_array($reason, ['refund', 'admin_adjustment', 'cashback', 'order_payment', 'withdrawal'], true)) {
             throw new InvalidArgumentException('invalid_reason');
         }
         if (!in_array($createdBy, ['system', 'admin'], true)) {
@@ -205,7 +205,7 @@ if (!function_exists('debit_wallet')) {
         if ($amount <= 0) {
             throw new InvalidArgumentException('amount_must_be_positive');
         }
-        if (!in_array($reason, ['refund', 'admin_adjustment', 'cashback', 'order_payment'], true)) {
+        if (!in_array($reason, ['refund', 'admin_adjustment', 'cashback', 'order_payment', 'withdrawal'], true)) {
             throw new InvalidArgumentException('invalid_reason');
         }
 

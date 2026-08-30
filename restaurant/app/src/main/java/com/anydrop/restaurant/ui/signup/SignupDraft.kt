@@ -15,5 +15,11 @@ data class SignupDraft(
     val ownerMobile: String,
     val email: String,
     val password: String,
-    val address: String?
+    val address: String?,
+    // Optional service-area pin (§0, 2026-08-28) — null when the owner
+    // skipped the "Set restaurant location" row on SignupActivity. Carried
+    // through OTP verify the same way the rest of the form is, only ever
+    // sent to the backend in the final /auth/restaurant-signup.php call.
+    val latitude: Double? = null,
+    val longitude: Double? = null
 ) : Parcelable

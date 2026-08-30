@@ -96,17 +96,28 @@ if ($tab === 'hidden') {
     )->fetchAll();
 
     // Pull every report reason for the reviews on this page in one query
-    // rather than one query per row.
+    // rather than one query per row. Migration 56: a report row now has
+    // either customer_id or restaurant_id set (never both) — the reporter
+    // label reflects whichever one is present, so a restaurant's
+    // self-report on its own review reads "Restaurant (self-report)"
+    // instead of a customer name.
     $reasonsByReview = [];
     if (!empty($rows)) {
         $ids = array_column($rows, 'id');
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
         $reasonStmt = $db->prepare(
-            "SELECT review_id, reason, created_at FROM review_reports WHERE review_id IN ($placeholders) ORDER BY created_at"
+            "SELECT rr.review_id, rr.reason, rr.created_at, rr.restaurant_id, c.name AS reporter_customer_name
+             FROM review_reports rr
+             LEFT JOIN customers c ON c.id = rr.customer_id
+             WHERE rr.review_id IN ($placeholders)
+             ORDER BY rr.created_at"
         );
         $reasonStmt->execute($ids);
         foreach ($reasonStmt->fetchAll() as $r) {
-            $reasonsByReview[(int) $r['review_id']][] = $r['reason'];
+            $reporterLabel = $r['restaurant_id'] !== null
+                ? 'Restaurant (self-report)'
+                : ($r['reporter_customer_name'] ?? 'Customer');
+            $reasonsByReview[(int) $r['review_id']][] = $reporterLabel . ': ' . $r['reason'];
         }
     }
 }

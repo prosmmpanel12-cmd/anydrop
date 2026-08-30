@@ -2,13 +2,12 @@ package com.anydrop.restaurant.ui.splash
 
 import android.content.Intent
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.View
 import android.view.animation.AnimationUtils
 import androidx.appcompat.app.AppCompatActivity
 import com.anydrop.restaurant.R
 import com.anydrop.restaurant.data.TokenManager
+import com.anydrop.restaurant.ui.common.UpdateChecker
 import com.anydrop.restaurant.ui.login.LoginActivity
 import com.anydrop.restaurant.ui.main.MainActivity
 
@@ -20,10 +19,19 @@ import com.anydrop.restaurant.ui.main.MainActivity
  * MainActivity's bottom-nav shell (already logged in) or Login, exactly
  * like LoginActivity's old isLoggedIn() check used to, just one hop
  * earlier.
+ *
+ * 2026-08-28 (§9) — also runs UpdateChecker here now. Previously this
+ * screen was logo-animation-only with no version-check code at all, so
+ * `force_update`/`min_app_version_restaurant` (already wired for the
+ * Customer App, already have live backend support) had zero effect on
+ * this app — an admin flipping force-update on would do nothing here.
+ * UpdateChecker.check() replaces the old fixed-delay Handler.postDelayed
+ * proceed() call below: it still honours the same holdMillis via its own
+ * MIN_SPLASH_MILLIS, then either proceeds normally, shows a dismissible
+ * "Later" popup, or — if below min_version_code — shows a forced,
+ * non-dismissible popup and never calls proceed() at all.
  */
 class SplashActivity : AppCompatActivity() {
-
-    private val holdMillis = 900L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,7 +54,7 @@ class SplashActivity : AppCompatActivity() {
         title.startAnimation(textAnim)
         tagline.startAnimation(taglineAnim)
 
-        Handler(Looper.getMainLooper()).postDelayed({ proceed() }, holdMillis)
+        UpdateChecker.check(this) { proceed() }
     }
 
     private fun proceed() {

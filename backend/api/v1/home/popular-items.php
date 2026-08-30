@@ -16,6 +16,7 @@ require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/favorites.php';
 require_once __DIR__ . '/../../../lib/offers.php';
+require_once __DIR__ . '/../../../lib/menu_item_availability.php';
 
 header('Access-Control-Allow-Origin: *');
 header('Cache-Control: max-age=60');
@@ -69,6 +70,16 @@ foreach ($rows as $it) {
 
 $items = [];
 foreach ($rows as $it) {
+    // doc 68's "Explicitly known, NOT fixed this session" follow-up —
+    // the SQL above only filters `is_available = 1`, missing the
+    // available_from/available_until time window (migration 62). This
+    // row never shows unavailable items at all, so an item currently
+    // outside its window is excluded here too, same as an
+    // is_available = 0 item already was.
+    if (!is_menu_item_available_now($it)) {
+        continue;
+    }
+
     $distanceKm = null;
     if ($lat !== null && $lng !== null && $it['r_lat'] !== null && $it['r_lng'] !== null) {
         $distanceKm = round(haversine_km($lat, $lng, (float) $it['r_lat'], (float) $it['r_lng']), 2);

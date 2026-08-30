@@ -22,6 +22,31 @@
  *                 since the chart itself isn't range-scoped in the
  *                 plan doc, only the stat cards are)
  * range=month  -> stats for the last 30 days (today inclusive)
+ * range=custom -> requires from=YYYY-MM-DD&to=YYYY-MM-DD, for the CSV
+ *                 export's date-range picker (PENDING.md's "Export
+ *                 PDF/Excel" item) — not used by the normal Insights
+ *                 tab UI, which only ever sends today/week/month.
+ *
+ * ---------------------------------------------------------------------
+ * CSV export (?export=csv) — added alongside custom range, same session.
+ * Same Content-Disposition/fputcsv convention backend/admin/settlements.php
+ * already established — no new library, this is a real CSV file (opens
+ * fine in Excel/Sheets), not a real .xlsx/.pdf. Unlike the admin export,
+ * there's no separate reports_export permission gate here — a restaurant
+ * owner exporting their own restaurant's own data needs no extra
+ * permission beyond the restaurant auth token itself, same as viewing
+ * the Insights tab in the first place.
+ *
+ * Sections: header (restaurant name + range), Summary stats (same 4
+ * cards the UI shows), Top 5 items, 7-day daily chart, and a new
+ * order-by-order ledger — this last one didn't exist in the JSON
+ * response at all (insights.php only ever aggregated), so the CSV path
+ * runs one extra raw-rows query no other caller needs. Capped at the
+ * most recent 500 orders in range, same "cap it, don't paginate a CSV"
+ * spirit as settlements.php's 200/50 caps — a restaurant reviewing a
+ * month of orders in a spreadsheet is well served by 500 rows; anyone
+ * needing more should narrow the date range instead.
+ * ---------------------------------------------------------------------
  *
  * "Total orders"/"Total earnings"/"Average order value"/"Cancellation
  * rate" (§6's four cards) are computed over ALL orders placed in the
@@ -51,12 +76,54 @@
  * today is still a repeat customer today), reported as a count and a
  * percentage of the range's distinct customers.
  *
+ * ---------------------------------------------------------------------
+ * Peak hours heatmap (today.md §1 wishlist item / PENDING.md item 3's
+ * "Peak hours" line, deliberately left out of doc 49's original build —
+ * see that doc's own "What stays out of scope" note: needed a design
+ * decision, heatmap vs. single busiest-hour stat, that hadn't been made
+ * yet). App owner has now chosen the full hour × day-of-week heatmap.
+ *
+ * Independent of `$range`, same reasoning `daily_chart` above already
+ * documents for its own always-7-days window, one level further: a
+ * `range=today` heatmap would have data for exactly one weekday, and
+ * even `range=week` gives only one sample per weekday-hour cell — too
+ * thin to show a real pattern. Fixed at the last 30 days (today
+ * inclusive) instead, regardless of which range tab is selected, so
+ * every cell has roughly 4 weeks of samples to draw a pattern from.
+ *
+ * Counts ALL orders placed in the window regardless of final status —
+ * same "all statuses" choice `daily_chart` and the `total_orders` stat
+ * already make. This is about *when demand arrives* (when customers are
+ * placing orders), not revenue, so there's no reason to exclude a
+ * cancelled or rejected order the way the earnings/AOV stats correctly
+ * do.
+ *
+ * Day-of-week uses this project's existing ISO convention (1 = Monday
+ * .. 7 = Sunday — same as `restaurants.working_days` and every
+ * `$currentDow` in `restaurant_status.php`/`orders.php`/`offers.php`),
+ * not MySQL's native `DAYOFWEEK()` (1 = Sunday .. 7 = Saturday) — the
+ * query below explicitly remaps so this endpoint doesn't introduce a
+ * second, conflicting day-numbering convention into the codebase.
+ *
+ * Returns all 168 cells (7 days × 24 hours) every time, zero-filled,
+ * rather than only the non-zero ones — the heatmap needs the full grid
+ * to draw empty cells correctly, and 168 small integers is negligible
+ * payload. `max_count` is included so the client can normalize color
+ * intensity without a second pass over the cells. `peak_slot` is the
+ * single highest-count cell (null only if every cell is zero, i.e. no
+ * orders at all in the window) — a convenience for a "Busiest: Fri
+ * 7-8 PM" caption above the grid, since the app owner may still want
+ * that alongside the heatmap even though the single-stat design was not
+ * chosen as the *primary* display.
+ * ---------------------------------------------------------------------
+ *
  * Auth: Restaurant token.
  */
 
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
+require_once __DIR__ . '/../../../lib/permissions.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -65,24 +132,44 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 $owner = require_auth('restaurant');
+require_restaurant_permission($owner, 'view_insights');
 $restaurantId = (int) $owner['owner_id'];
 $db = Database::get();
 
 $range = $_GET['range'] ?? 'week';
-if (!in_array($range, ['today', 'week', 'month'], true)) {
+if (!in_array($range, ['today', 'week', 'month', 'custom'], true)) {
     $range = 'week';
 }
 
 $today = date('Y-m-d');
-if ($range === 'today') {
-    $fromDate = $today;
-} elseif ($range === 'week') {
-    $fromDate = date('Y-m-d', strtotime('-6 days'));
-} else { // month
-    $fromDate = date('Y-m-d', strtotime('-29 days'));
+
+// Custom range validation happens before $toDate is decided, since a
+// bad/missing from|to should fall back to 'week' entirely rather than
+// silently mixing a valid $fromDate with today's date — same
+// fail-closed spirit auth.php uses elsewhere in this codebase.
+if ($range === 'custom') {
+    $customFrom = $_GET['from'] ?? '';
+    $customTo = $_GET['to'] ?? '';
+    $validFormat = static fn(string $d): bool => (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) && strtotime($d) !== false;
+    if ($validFormat($customFrom) && $validFormat($customTo) && $customFrom <= $customTo) {
+        $fromDate = $customFrom;
+        $toDate = $customTo;
+    } else {
+        $range = 'week';
+    }
+}
+if ($range !== 'custom') {
+    $toDate = $today;
+    if ($range === 'today') {
+        $fromDate = $today;
+    } elseif ($range === 'week') {
+        $fromDate = date('Y-m-d', strtotime('-6 days'));
+    } else { // month
+        $fromDate = date('Y-m-d', strtotime('-29 days'));
+    }
 }
 $fromDateTime = $fromDate . ' 00:00:00';
-$toDateTime = $today . ' 23:59:59';
+$toDateTime = $toDate . ' 23:59:59';
 
 // ---------- Stat cards ----------
 // Placed counts (all statuses) + delivered-only earnings, same
@@ -187,10 +274,142 @@ $repeatCustomerPercent = $distinctCustomerCount > 0
     ? round(($repeatCount / $distinctCustomerCount) * 100, 1)
     : 0.0;
 
+// ---------- Peak hours heatmap (always last 30 days, independent of $range) ----------
+// See file header for the full window/day-numbering/status rationale.
+$peakFromDate = date('Y-m-d', strtotime('-29 days'));
+// MySQL DAYOFWEEK(): 1 (Sun) .. 7 (Sat). Remapped to this project's own
+// ISO convention (1 Mon .. 7 Sun) with ((DAYOFWEEK()+5) % 7) + 1 —
+// Sun(1)->7, Mon(2)->1, Tue(3)->2 ... Sat(7)->6.
+$peakStmt = $db->prepare(
+    "SELECT
+        ((DAYOFWEEK(created_at) + 5) % 7) + 1 AS dow_iso,
+        HOUR(created_at) AS hr,
+        COUNT(*) AS order_count
+     FROM orders
+     WHERE restaurant_id = :rid AND created_at BETWEEN :f AND :t
+     GROUP BY dow_iso, hr"
+);
+$peakStmt->execute([
+    'rid' => $restaurantId,
+    'f' => $peakFromDate . ' 00:00:00',
+    't' => $today . ' 23:59:59',
+]);
+$peakCountByCell = [];
+foreach ($peakStmt->fetchAll() as $row) {
+    $peakCountByCell[(int) $row['dow_iso']][(int) $row['hr']] = (int) $row['order_count'];
+}
+
+$dayNames = [1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday', 7 => 'Sunday'];
+
+$peakCells = [];
+$maxCellCount = 0;
+$peakSlot = null;
+for ($dow = 1; $dow <= 7; $dow++) {
+    for ($hr = 0; $hr <= 23; $hr++) {
+        $count = $peakCountByCell[$dow][$hr] ?? 0;
+        $peakCells[] = [
+            'day_of_week' => $dow,
+            'hour' => $hr,
+            'order_count' => $count,
+        ];
+        if ($count > $maxCellCount) {
+            $maxCellCount = $count;
+            $peakSlot = [
+                'day_of_week' => $dow,
+                'day_name' => $dayNames[$dow],
+                'hour' => $hr,
+                'order_count' => $count,
+            ];
+        }
+    }
+}
+
+// ---------- CSV export ----------
+// See file header for the full rationale. Runs only when explicitly
+// asked for — every normal Insights-tab load skips this whole block.
+if (($_GET['export'] ?? '') === 'csv') {
+    // Restaurant name for the CSV header line — insights.php never
+    // needed this for the JSON response (the app already knows who's
+    // logged in), so this is a new small lookup only the export path
+    // pays for.
+    $nameStmt = $db->prepare('SELECT name FROM restaurants WHERE id = :id LIMIT 1');
+    $nameStmt->execute(['id' => $restaurantId]);
+    $restaurantName = $nameStmt->fetch()['name'] ?? ('Restaurant #' . $restaurantId);
+
+    // Order-by-order ledger — the one thing the JSON response never
+    // returns (it only ever aggregates). Capped at 500 most-recent
+    // orders in range; see file header for why.
+    $ordersStmt = $db->prepare(
+        "SELECT order_code, created_at, status, payment_method, item_total, grand_total
+         FROM orders
+         WHERE restaurant_id = :rid AND created_at BETWEEN :f AND :t
+         ORDER BY created_at DESC
+         LIMIT 500"
+    );
+    $ordersStmt->execute(['rid' => $restaurantId, 'f' => $fromDateTime, 't' => $toDateTime]);
+    $orderRows = $ordersStmt->fetchAll();
+
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="anydrop_insights_' . $restaurantId . '_' . $fromDate . '_to_' . $toDate . '.csv"');
+
+    $out = fopen('php://output', 'w');
+
+    fputcsv($out, ['Anydrop Insights Export — ' . $restaurantName]);
+    fputcsv($out, ['Range', $fromDate . ' to ' . $toDate]);
+    fputcsv($out, []);
+
+    fputcsv($out, ['Summary']);
+    fputcsv($out, ['Total Orders', 'Total Earnings', 'Average Order Value', 'Cancellation Rate %']);
+    fputcsv($out, [$totalOrders, $totalEarnings, $avgOrderValue, $cancellationRate]);
+    fputcsv($out, []);
+
+    fputcsv($out, ['Top 5 Items (by quantity sold)']);
+    fputcsv($out, ['Item', 'Quantity Sold', 'Revenue']);
+    foreach ($topItems as $item) {
+        fputcsv($out, [$item['name'], $item['quantity_sold'], $item['revenue']]);
+    }
+    fputcsv($out, []);
+
+    fputcsv($out, ['Daily Orders (last 7 days)']);
+    fputcsv($out, ['Date', 'Order Count']);
+    foreach ($dailyChart as $day) {
+        fputcsv($out, [$day['date'], $day['order_count']]);
+    }
+    fputcsv($out, []);
+
+    // Peak hours — always the fixed last-30-days window (see file
+    // header), independent of the export's own from/to range, same as
+    // the JSON response. Flagged with its own from/to line in the CSV
+    // so this doesn't read as if it were scoped to the export range.
+    fputcsv($out, ['Peak Hours (orders placed, last 30 days: ' . $peakFromDate . ' to ' . $today . ')']);
+    fputcsv($out, array_merge(['Day / Hour'], array_map(fn($h) => sprintf('%02d:00', $h), range(0, 23))));
+    foreach ($dayNames as $dow => $dayName) {
+        $rowValues = array_map(fn($h) => $peakCountByCell[$dow][$h] ?? 0, range(0, 23));
+        fputcsv($out, array_merge([$dayName], $rowValues));
+    }
+    if ($peakSlot !== null) {
+        fputcsv($out, []);
+        fputcsv($out, ['Busiest slot', $peakSlot['day_name'] . ' ' . sprintf('%02d:00', $peakSlot['hour']), $peakSlot['order_count'] . ' orders']);
+    }
+    fputcsv($out, []);
+
+    fputcsv($out, ['Orders (most recent 500 in range)']);
+    fputcsv($out, ['Order Code', 'Date', 'Status', 'Payment Method', 'Item Total', 'Grand Total']);
+    foreach ($orderRows as $row) {
+        fputcsv($out, [
+            $row['order_code'], $row['created_at'], $row['status'], $row['payment_method'],
+            (float) $row['item_total'], (float) $row['grand_total'],
+        ]);
+    }
+
+    fclose($out);
+    exit;
+}
+
 respond_ok([
     'range' => $range,
     'from_date' => $fromDate,
-    'to_date' => $today,
+    'to_date' => $toDate,
     'stats' => [
         'total_orders' => $totalOrders,
         'total_earnings' => $totalEarnings,
@@ -203,5 +422,12 @@ respond_ok([
         'count' => $repeatCount,
         'distinct_customers_in_range' => $distinctCustomerCount,
         'percent' => $repeatCustomerPercent,
+    ],
+    'peak_hours' => [
+        'from_date' => $peakFromDate,
+        'to_date' => $today,
+        'max_count' => $maxCellCount,
+        'peak_slot' => $peakSlot,
+        'cells' => $peakCells,
     ],
 ]);

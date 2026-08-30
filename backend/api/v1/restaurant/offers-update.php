@@ -43,6 +43,7 @@
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
+require_once __DIR__ . '/../../../lib/permissions.php';
 require_once __DIR__ . '/../../../lib/offers.php';
 
 header('Access-Control-Allow-Origin: *');
@@ -52,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $owner = require_auth('restaurant');
+require_restaurant_permission($owner, 'manage_offers_coupons');
 $restaurantId = $owner['owner_id'];
 
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;

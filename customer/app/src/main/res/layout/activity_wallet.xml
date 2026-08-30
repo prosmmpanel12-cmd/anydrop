@@ -73,6 +73,16 @@
                 android:textColor="@android:color/white"
                 tools:text="₹250.00" />
 
+            <Button
+                android:id="@+id/btnWithdraw"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="@string/wallet_withdraw_button"
+                android:textColor="@android:color/white"
+                app:strokeColor="@android:color/white" />
+
         </LinearLayout>
 
     </androidx.cardview.widget.CardView>

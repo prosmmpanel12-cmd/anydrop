@@ -10,6 +10,7 @@ import com.anydrop.restaurant.R
 import com.anydrop.restaurant.data.TokenManager
 import com.anydrop.restaurant.databinding.ActivityLoginBinding
 import com.anydrop.restaurant.network.ApiClient
+import com.anydrop.restaurant.network.FcmTokenBody
 import com.anydrop.restaurant.network.LoginBody
 import com.anydrop.restaurant.ui.common.InAppNotifier
 import com.anydrop.restaurant.ui.main.MainActivity
@@ -45,6 +46,11 @@ class LoginActivity : AppCompatActivity() {
         binding.btnLogin.setOnClickListener { attemptLogin() }
         binding.btnGoSignup.setOnClickListener {
             startActivity(Intent(this, SignupActivity::class.java))
+            overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        }
+        // Migration 63 (Restaurant Staff/RBAC, PENDING.md item 3).
+        binding.btnStaffLogin.setOnClickListener {
+            startActivity(Intent(this, com.anydrop.restaurant.ui.staff.StaffLoginActivity::class.java))
             overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
         }
 
@@ -94,6 +100,7 @@ class LoginActivity : AppCompatActivity() {
                 val result = response.body()?.data
                 if (response.isSuccessful && result?.token != null && result.restaurant != null) {
                     tokenManager.saveSession(result.token, result.restaurant.id, result.restaurant.name)
+                    registerFcmTokenAfterLogin()
                     goToDashboard()
                 } else {
                     val error = response.body()?.error ?: "login_failed"
@@ -122,5 +129,32 @@ class LoginActivity : AppCompatActivity() {
     private fun goToDashboard() {
         startActivity(Intent(this, MainActivity::class.java))
         finish()
+    }
+
+    /** Sends this device's current FCM token right after a successful
+     * login — covers the case RestaurantFirebaseMessagingService.onNewToken()
+     * itself can't: a token FCM already minted before login has no
+     * restaurant_id to register against at the time, so that callback
+     * silently skips it (see its own kdoc). This is the other half —
+     * fired once, right when a restaurant_id first becomes available.
+     * Best-effort: a failure here isn't shown to the user at all (same
+     * "push is a nice-to-have, never blocks the real action" spirit as
+     * every other part of this feature) — worst case, the next natural
+     * onNewToken() firing (or the next login) catches it instead. */
+    private fun registerFcmTokenAfterLogin() {
+        // Plain listener callback, not the coroutine .await() extension —
+        // that needs the kotlinx-coroutines-play-services artifact, which
+        // isn't already a dependency here and isn't worth adding for this
+        // one call.
+        com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+            .addOnSuccessListener { token ->
+                lifecycleScope.launch {
+                    try {
+                        api.updateFcmToken(FcmTokenBody(token))
+                    } catch (e: Exception) {
+                        // Non-fatal — see kdoc above.
+                    }
+                }
+            }
     }
 }

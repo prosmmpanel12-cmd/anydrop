@@ -54,14 +54,25 @@ insert_status_history($db, $orderId, 'cancelled', 'customer', $owner['owner_id']
 
 // This order already has real money sitting with admin (a UPI payment
 // that was confirmed BEFORE the cancel window closed) — cancelling
-// the order must not silently leave that unresolved. Previously this
-// endpoint didn't check payment_status at all: a paid order could be
-// cancelled and the customer's money just... stayed with admin, with
-// no record anywhere that anything was owed back. Auto-creates a
-// 'requested' refund (recall.md item 25 / migration 42) so it lands
-// in admin/refunds.php's queue instead of getting lost.
+// the order must not silently leave that unresolved. Migration 65:
+// a customer cancelling their OWN order, inside the cancel window
+// that was just checked above ("jab tak time ho"), is a policy-safe
+// refund with no judgement call for an admin to make — so this
+// credits the customer's Anydrop Wallet instantly instead of landing
+// in admin/refunds.php's manual review queue. Restaurant-rejected and
+// admin-force-cancelled orders are UNCHANGED by this — see
+// orders-reject.php / admin/orders.php, both still call
+// create_refund_request() and go through manual review, since those
+// genuinely are judgement calls (the customer didn't choose to
+// cancel).
 if ($order['payment_status'] === 'paid') {
-    create_refund_request($db, $order, 'Order cancelled by customer: ' . $reason, 'customer');
+    auto_wallet_refund_on_cancel($db, $order, 'Order cancelled by customer: ' . $reason);
+    // auto_wallet_refund_on_cancel() deliberately doesn't touch
+    // orders.payment_status itself (see its own kdoc) — this endpoint
+    // owns that flip since it's already the one writer touching this
+    // order row in this transaction.
+    $db->prepare("UPDATE orders SET payment_status = 'refunded' WHERE id = :id")
+        ->execute(['id' => $orderId]);
 }
 
 $db->commit();

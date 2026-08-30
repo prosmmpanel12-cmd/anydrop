@@ -70,6 +70,10 @@ $items = array_map(fn($item) => [
     'is_recommended' => (bool) $item['is_recommended'],
     'is_bestseller' => (bool) $item['is_bestseller'],
     'prep_time_minutes' => (int) $item['prep_time_minutes'],
+    // today.md §1, migration 62 — raw "HH:MM:SS"/null, same shape as
+    // restaurants.opening_time/closing_time elsewhere in this API.
+    'available_from' => $item['available_from'] ?? null,
+    'available_until' => $item['available_until'] ?? null,
     'tags' => $tagsByItemId[(int) $item['id']] ?? [],
 ], $rows);
 

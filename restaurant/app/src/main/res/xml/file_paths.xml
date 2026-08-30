@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Paths this app's FileProvider is allowed to expose via content://
+    Uris. Only cache-path is needed right now — Insights CSV exports are
+    written to context.cacheDir (a temp file, not something the app
+    needs to keep around after the share-sheet closes), same "write to
+    cache, not files/, for a share-and-forget download" convention most
+    Android apps use for exports. Add another <files-path>/<external-path>
+    entry here only if a future export needs to persist beyond one share.
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="exports" path="exports/" />
+</paths>

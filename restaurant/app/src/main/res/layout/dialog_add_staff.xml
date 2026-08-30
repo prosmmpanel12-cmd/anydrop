@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Add/edit staff dialog (doc 71, migration 63, PENDING.md item 3).
+    Plain MaterialAlertDialogBuilder + this view, same one-form-handles-
+    both shape as dialog_add_closure.xml.
+
+    inputPassword is shown for both create and edit, but its hint/
+    required-ness differs by mode (set from
+    StaffManagementActivity.showStaffDialog(), same way that Activity
+    already varies dialog title): on create it's required, on edit it's
+    optional and left blank means "unchanged" — matching
+    staff-update.php's own "only changes it if provided" partial-update
+    convention already noted for StaffUpdateBody in Models.kt.
+
+    roleGroup is a RadioGroup of the three real role values — no
+    "owner" entry, same as migration 63's own ENUM deliberately
+    excluding it.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/inputStaffName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/hint_staff_name"
+            android:inputType="textCapWords"
+            android:maxLength="60" />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/inputStaffUsername"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/hint_username"
+            android:inputType="text"
+            android:maxLength="40" />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/staffPasswordLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        app:passwordToggleEnabled="true">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/inputStaffPassword"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/hint_staff_password"
+            android:inputType="textPassword"
+            android:maxLength="72" />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:text="@string/label_staff_role"
+        android:textSize="12sp"
+        android:textColor="@color/text_secondary" />
+
+    <RadioGroup
+        android:id="@+id/roleGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:orientation="vertical">
+
+        <RadioButton
+            android:id="@+id/radioRoleManager"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:text="@string/staff_role_manager" />
+
+        <RadioButton
+            android:id="@+id/radioRoleKitchen"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/staff_role_kitchen" />
+
+        <RadioButton
+            android:id="@+id/radioRoleCashier"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/staff_role_cashier" />
+
+    </RadioGroup>
+
+</LinearLayout>

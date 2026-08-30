@@ -288,6 +288,32 @@
     <string name="wallet_reason_admin_adjustment">Adjustment</string>
     <string name="wallet_reason_cashback">Cashback</string>
     <string name="wallet_reason_order_payment">Order payment</string>
+
+    <!-- PENDING.md §37 — Wallet Withdrawal (migration 65, 2026-08-30) -->
+    <string name="wallet_withdraw_button">Withdraw</string>
+    <string name="withdraw_title">Withdraw to Bank/UPI</string>
+    <string name="withdraw_available_balance_format">Available: ₹%1$s</string>
+    <string name="withdraw_amount_hint">Amount to withdraw</string>
+    <string name="withdraw_method_bank">Bank Transfer</string>
+    <string name="withdraw_method_upi">UPI</string>
+    <string name="withdraw_holder_name_hint">Account holder name</string>
+    <string name="withdraw_bank_name_hint">Bank name</string>
+    <string name="withdraw_account_number_hint">Account number</string>
+    <string name="withdraw_ifsc_hint">IFSC code</string>
+    <string name="withdraw_upi_id_hint">UPI ID</string>
+    <string name="withdraw_submit_button">Request Withdrawal</string>
+    <string name="withdraw_success_message">Withdrawal request submitted</string>
+    <string name="withdraw_failed_generic">Couldn\'t submit withdrawal request</string>
+    <string name="withdraw_insufficient_balance">Not enough wallet balance</string>
+    <string name="withdraw_below_minimum_format">Minimum withdrawal amount is ₹%1$s</string>
+    <string name="withdraw_history_title">Withdrawal History</string>
+    <string name="withdraw_empty_history">No withdrawal requests yet</string>
+    <string name="withdraw_status_requested">Requested</string>
+    <string name="withdraw_status_approved">Approved</string>
+    <string name="withdraw_status_processing">Processing</string>
+    <string name="withdraw_status_completed">Completed</string>
+    <string name="withdraw_status_rejected">Rejected</string>
+    <string name="withdraw_load_failed">Couldn\'t load withdrawal history</string>
     <string name="hint_delivery_instructions">Delivery instructions (optional)</string>
     <string name="bill_details">Bill details</string>
     <string name="lbl_item_total">Item total</string>

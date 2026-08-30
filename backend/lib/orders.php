@@ -13,6 +13,7 @@ require_once __DIR__ . '/settings.php';
 require_once __DIR__ . '/delivery_pricing.php';
 require_once __DIR__ . '/commission.php';
 require_once __DIR__ . '/offers.php';
+require_once __DIR__ . '/menu_item_availability.php';
 
 /** Generates a unique order code like QRX-8F3K9A. Retries on the rare collision. */
 function generate_order_code(PDO $db): string
@@ -174,6 +175,20 @@ function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCod
 
         if (!$item || !$item['is_available']) {
             $invalid[] = ['menu_item_id' => $menuItemId, 'reason' => !$item ? 'not_found' : 'unavailable'];
+            continue;
+        }
+        // today.md §1 / migration 62 — server-authoritative time-window
+        // check, same "never trust the client, price_cart() is the one
+        // place that decides what's actually orderable" reasoning this
+        // function already applies to the raw is_available toggle above.
+        // NOTE: checked against the real current time, not $scheduledForRaw
+        // — a "schedule for later" order placed now for an item's
+        // available window later today isn't accounted for. Flagged as a
+        // known follow-up gap (see docs/68_...md), same pattern this
+        // codebase already uses for other partially-covered interactions
+        // (e.g. docs/PENDING.md item 27's delivery-radius/search gap).
+        if (!is_menu_item_available_now($item)) {
+            $invalid[] = ['menu_item_id' => $menuItemId, 'reason' => 'unavailable'];
             continue;
         }
 

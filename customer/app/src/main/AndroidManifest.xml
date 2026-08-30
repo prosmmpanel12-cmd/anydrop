@@ -129,6 +129,11 @@
             android:name=".ui.profile.WalletActivity"
             android:exported="false" />
 
+        <!-- PENDING.md §37 — Wallet → Withdraw -->
+        <activity
+            android:name=".ui.profile.WithdrawActivity"
+            android:exported="false" />
+
         <activity
             android:name=".ui.notifications.NotificationListActivity"
             android:exported="false" />
@@ -166,6 +171,28 @@
         <activity
             android:name=".ui.offers.OfferScreenActivity"
             android:exported="false" />
+
+        <!-- FCM (this session) — see CustomerFirebaseMessagingService's
+             kdoc for how a push routes into the existing
+             NotificationHelper. Not exported: only the OS's own FCM
+             plumbing is meant to bind to this. -->
+        <service
+            android:name=".notifications.CustomerFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Default small icon for a push that arrives while the app is
+             fully killed (no code running to build a
+             NotificationCompat.Builder at all) — FCM's own system tray
+             auto-display uses this meta-data in that case. Same
+             drawable NotificationHelper already uses for every other
+             notification. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
 
     </application>
 

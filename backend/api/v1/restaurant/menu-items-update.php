@@ -3,7 +3,8 @@
  * POST /api/v1/restaurant/menu-items-update.php?id={item_id}
  * Auth: Restaurant token (must own the item)
  * Request: any subset of { category_id, name, description, price, is_veg,
- *                           is_available, prep_time_minutes, image_url }
+ *                           is_available, prep_time_minutes, image_url,
+ *                           available_from, available_until }
  * Response: { "item": {...} }
  *
  * Partial update, same pattern as categories-update.php. Doubles as the
@@ -15,11 +16,21 @@
  * image_url: same upload-then-save split as menu-items-create.php — the
  * client uploads via menu-item-photo-upload.php first, then sends the
  * returned path here alongside whatever else is being edited.
+ *
+ * available_from/available_until (today.md §1, migration 62): sending
+ * either key with an empty string ("") explicitly clears that column to
+ * NULL — this is the one field pair on this endpoint where an empty
+ * string is a meaningful "remove the restriction" value rather than
+ * "leave unchanged," since the edit-item dialog needs a way to turn a
+ * previously-set time window back off. `null` sent from the client
+ * (rather than "") is treated as "field not touched," same convention
+ * every other field on this endpoint already uses.
  */
 
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
+require_once __DIR__ . '/../../../lib/permissions.php';
 require_once __DIR__ . '/../../../lib/menu_item_tags.php';
 
 header('Access-Control-Allow-Origin: *');
@@ -29,6 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $owner = require_auth('restaurant');
+require_restaurant_permission($owner, 'manage_menu');
 $restaurantId = $owner['owner_id'];
 $itemId = (int) ($_GET['id'] ?? 0);
 
@@ -90,6 +102,16 @@ if (array_key_exists('prep_time_minutes', $body) && $body['prep_time_minutes'] !
     $fields[] = 'prep_time_minutes = :prep_time_minutes';
     $params['prep_time_minutes'] = (int) $body['prep_time_minutes'];
 }
+if (array_key_exists('available_from', $body)) {
+    $fields[] = 'available_from = :available_from';
+    $params['available_from'] = $body['available_from'] !== '' && $body['available_from'] !== null
+        ? (string) $body['available_from'] : null;
+}
+if (array_key_exists('available_until', $body)) {
+    $fields[] = 'available_until = :available_until';
+    $params['available_until'] = $body['available_until'] !== '' && $body['available_until'] !== null
+        ? (string) $body['available_until'] : null;
+}
 if (array_key_exists('image_url', $body) && $body['image_url'] !== null) {
     // Same null-skip convention as every other field on this endpoint.
     // A true explicit-clear isn't reachable from this app today anyway —
@@ -132,6 +154,8 @@ respond_ok([
         'is_recommended' => (bool) $row['is_recommended'],
         'is_bestseller' => (bool) $row['is_bestseller'],
         'prep_time_minutes' => (int) $row['prep_time_minutes'],
+        'available_from' => $row['available_from'],
+        'available_until' => $row['available_until'],
         'tags' => get_menu_item_tags($itemId),
     ],
 ]);

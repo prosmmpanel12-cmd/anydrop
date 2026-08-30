@@ -2,6 +2,9 @@ plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
     id 'kotlin-parcelize'
+    // FCM push + Analytics (this session) — must come after the Android/
+    // Kotlin plugins per Google's own setup docs; reads app/google-services.json.
+    id 'com.google.gms.google-services'
 }
 
 android {
@@ -81,4 +84,12 @@ dependencies {
     // 2026-08-16, docs/restorent/00_Status.md item 3) — reuses the Customer
     // app's H6 pin-drop pattern/dependency, same version.
     implementation 'com.google.android.gms:play-services-maps:19.1.0'
+
+    // ---- FCM push + Analytics (this session) ----
+    // BoM pins every com.google.firebase:* artifact below to mutually
+    // compatible versions — no version number needed on the individual
+    // firebase-* lines, same convention Firebase's own setup docs use.
+    implementation platform('com.google.firebase:firebase-bom:33.1.2')
+    implementation 'com.google.firebase:firebase-messaging-ktx'
+    implementation 'com.google.firebase:firebase-analytics'
 }

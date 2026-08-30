@@ -1171,22 +1171,11 @@ line item, not per order, once that lands.
 
 ---
 
-# 10. DELIVERY RESPONSIBILITY / SELF DELIVERY
+# 10. DELIVERY RESPONSIBILITY / SELF DELIVERY — REMOVED
 
-**Status: 🔴 PENDING**
-
-Restaurant delivery mode should support:
-
-```text
-Anydrop Delivery
-Restaurant Self Delivery
-```
-
-Admin controls whether a restaurant is allowed to use self delivery.
-
-This becomes important when Rider App is implemented.
-
-**Deep reference:** `docs/20_Offers_Pricing_UI_Polish_Notes.md` — Section 3 `Delivery Responsibility`.
+**Status: ❌ DROPPED (2026-08-30)** — decided not to build. All
+delivery stays Anydrop-only (platform-assigned riders), no restaurant
+self-delivery mode. Do not re-add unless explicitly requested again.
 
 ---
 
@@ -1212,7 +1201,7 @@ The schema already reserves `reviews.restaurant_reply` and `reviews.is_reported`
 
 # 12. RESTAURANT TEMPORARY CLOSURE / HOLIDAY
 
-**Status: 🟡 PENDING**
+**Status: 🟡 BUILT 2026-08-28 (doc 60/61/62), NOT build/device-verified**
 
 Existing Open/Close is not enough for:
 
@@ -1224,9 +1213,16 @@ Closed for 3 days
 Recurring weekly closure
 ```
 
-Need proper temporary closure / holiday scheduling.
+All of the above are now built — `restaurant_closures` table
+(date_range/weekly_recurring), `resume_at`/`temp_closed_until` on the
+existing on-demand switch, 4 restaurant-facing endpoints, all three
+customer-facing surfaces wired consistently, and a full
+`ClosureScheduleActivity` on the Android side (see `PENDING.md` §6 for
+the itemized checklist). Still open: `php -l` + a real Gradle
+build/device pass, same standing container gap as everything else in
+this project.
 
-**Deep reference:** `docs/18_Restaurant_App_Full_Scope_And_Rating_System.md` — Tier 1 / Restaurant Management.
+**Deep reference:** `docs/18_Restaurant_App_Full_Scope_And_Rating_System.md` — Tier 1 / Restaurant Management. `docs/60_...md`/`docs/61_...md`/`docs/62_...md`.
 
 ---
 
@@ -2132,7 +2128,7 @@ Do NOT randomly pick features.
 
 20. Platform ledger — 🟡 built 2026-08-22, not device-verified (section 13 — `platform_ledger` table + `admin/platform-ledger.php`)
 21. Restaurant due ledger completion — 🟡 built 2026-08-22, not device-verified (section 13 — `write_due_ledger_entry()`, Pay Now flow live; the two order-triggered auto-writers exist but aren't called anywhere yet, see section 13's "NOT WIRED" list)
-22. Restaurant bank details — 🟡 built 2026-08-22, not device-verified (section 13 — `restaurant_bank_details` table + admin-editable UI on `settlements.php`; restaurant App self-submission not built)
+22. Restaurant bank details — 🟡 backend complete 2026-08-29 (migration 59 adds verification workflow: pending/verified/rejected + admin remarks + who/when; new restaurant-side `bank-details-get.php`/`bank-details-save.php`, self-submission always resets to pending; `admin/settlements.php` admin-entry now auto-verified + new verify/reject actions — doc 63). Android: `Models.kt`/`ApiService.kt`/strings wired, screen (`BankDetailsActivity`) not yet built. Not device-verified (no PHP CLI/live DB/Android SDK in this sandbox).
 23. Settlement/payout UI — 🟡 built (ledger statement + Pay Now + settlement history + screenshot upload, 2026-08-22/26), plus Today/Week/Month Payout Analytics card (Total Orders/Cash Collected/Online Collected/Commission/GST/Net Payable/Already Paid/Pending — doc 19 §6's full column list, doc 47) — not device-verified (no PHP CLI/live DB in this sandbox)
 24. Payment transaction architecture — 🟡 built 2026-08-23, not device-verified (`docs/23_Native_UPI_Payment_Gateway_Architecture_2026-08-23.md` — migration 40, `lib/payment/PaymentService.php` + rewritten `UpipeProvider.php` (native UPI-QR, manual-admin verification, no external gateway call), 3 customer APIs under `api/v1/orders/payment-upi-*.php`, `admin/payment-gateways.php` + `admin/payment-pending.php`. `record_paid_order_ledger_entries()` is now actually called — see the item-21 update below.) **Update (same day, follow-up session):** the Android payment screen (`UpiPaymentActivity.kt`) and its "Cancel and pay by COD" button turned out to already be written (contradicting the doc's own §A4 note that customer-app UI wasn't built yet — doc corrected). That button was found to be fake (toast only, never touched the backend) and is now real: new `backend/api/v1/orders/payment-switch-cod.php` (`POST /orders/{id}/payment/switch-to-cod`), reusing `orders/create.php`'s exact payment-restriction + COD-eligibility function pair so the same rules apply. See doc 23's new §A4b for the full detail. Still 🟡 not device/build-verified.
 25. Refund system — 🟡 built 2026-08-23, not device-verified (section 19 — migration 42, `lib/refunds.php`, `admin/refunds.php`; wired into `orders/cancel.php` + `restaurant/orders-reject.php`'s payment_status='paid' gap)
@@ -2934,3 +2930,143 @@ profile, backend built/Android pending) track this.
 first** — it's a single self-contained screen plus one wiring change,
 backend contract is already fixed. Not build/device-verified, same
 standing sandbox limitation as everything else in this file.
+
+**2026-08-28 — Full build + device verification pass confirmed, whole project.**
+App owner ran a full build and on-device test across Restaurant App,
+Customer App, and Admin Panel. Every "🟡 NOT build/device-verified" /
+"not tested" caveat logged up through session 14 (docs/29-53) is now
+resolved/superseded — do not reopen for verification reasons alone.
+Also corrected this session (doc-audit): `PENDING.md` items 12
+(Customer Wallet Checkout Integration) and 13 (Wallet Refund
+Integration) were stale-marked PENDING despite being fully built back
+on 2026-08-23 (see this file's own follow-up sessions #4-#9 above) —
+now marked ✅ BUILT & VERIFIED.
+
+Genuinely still-pending work (unchanged by this verification pass):
+Rider App + dependent systems, Restaurant Self Delivery, Restaurant
+Staff/RBAC, full Temp Closure/Holiday scheduling, Restaurant Bank
+Details form, Cashback/Reward Engine, Support AI, Google Login backend
+verification, Payment/Refund Reconciliation (production layer), Email
+OTP Provider Failover, Security Hardening audit. See `PENDING.md` for
+the full current list.
+
+**2026-08-30 (session 17, doc 73) — Restaurant Staff Audit Trail
+built; PENDING.md §7 (Restaurant Staff/RBAC) now fully closed.**
+Migration 64 (no schema change — reuses the existing `audit_logs`
+table, same call migration 59 made for bank-details verification).
+New `write_staff_audit_log()` helper in `lib/permissions.php`, wired
+into `staff-create.php`/`staff-update.php`/`staff-delete.php`
+(logs staff_created/staff_role_changed/staff_activated/
+staff_deactivated/staff_updated/staff_deleted — one action, one log
+row, so a request changing both role and is_active produces two
+rows). New owner-only `staff-audit-list.php` endpoint. Android: new
+`StaffAuditLogActivity` + `StaffAuditLogAdapter` (read-only screen,
+reuses the same shell as `StaffManagementActivity`/
+`ClosureScheduleActivity`), reachable from a new "Staff Activity Log"
+row in the Account tab (`AccountFragment.kt`, same
+`canManageStaff()` guard as the Staff Management row above it). Not
+build/device-verified — same standing sandbox constraint (no PHP
+CLI/Android SDK here). Also earlier this session (before the audit
+trail work): Self Delivery (item 5, never actually coded — only ever
+a planned pending item) was permanently dropped from scope at the
+app owner's request; removed from PENDING.md/today.md/
+NEXT_SESSION_PROMPT.md's active tracking, historical session-log
+mentions left as-is.
+
+**NEXT SESSION:** Rider App (PENDING.md item 4) is now the largest
+remaining untouched phase — see `NEXT_SESSION_PROMPT.md` for the full
+current-priority list (Payment Reconciliation, Email OTP Failover,
+Security Hardening, and a real machine-verification pass are the
+other live candidates).
+
+**2026-08-30 (session 18, doc 74) — Wallet Withdrawal + Prepaid-Cancel
+Auto-Refund-to-Wallet: backend library foundation only, session ended
+mid-work.** New app-owner request. (1) `lib/refunds.php`'s new
+`auto_wallet_refund_on_cancel()` — wired into `orders/cancel.php`'s
+customer-self-cancel-within-window path only; instantly credits the
+Anydrop Wallet instead of landing in admin/refunds.php's manual queue.
+Restaurant-reject/admin-force-cancel unchanged (still manual review).
+(2) Wallet withdrawal: migration 65 (new `customer_bank_details` +
+`wallet_withdrawals` tables, `wallet_transactions.reason`/
+`platform_ledger.entry_type` ENUMs widened, new
+`wallet_withdrawals_view`/`wallet_withdrawals_manage` permissions) and
+new `lib/customer_wallet_withdrawal.php` (full validate/save/request/
+approve/processing/complete/reject lifecycle, mirrors
+`lib/refunds.php`'s shape). Security-critical design: wallet balance
+is debited UP FRONT at request time via the existing row-locked
+`debit_wallet()`, not at admin-approval time — closes a double-spend
+window. **NONE of the withdrawal library is wired to an HTTP endpoint
+yet** — no customer API routes, no admin review page, no Android work.
+Also investigated a reported PHP syntax error on admin Refunds page —
+full-project brace-balance check (170 files) + manual read found
+nothing; needs the app owner's actual error text next session, not
+another blind re-hunt. New `PENDING.md` §37 tracks the exact remaining
+checklist. Full detail:
+`docs/74_Handover_2026-08-30_Wallet_Withdrawal_And_AutoRefund_Backend_Partial.md`.
+
+**NEXT SESSION: finish PENDING.md §37** (customer endpoints → admin
+page → Android → run migration 65 → live test) before picking up
+Rider App or anything else — see `NEXT_SESSION_PROMPT.md`.
+
+**2026-08-30 (session 19, doc 75) — Wallet Withdrawal: customer
+endpoints + admin page + Android all built. PENDING.md §37 now
+code-complete on both halves — only migration-run + live/device
+testing + the PHP syntax error remain.** Picked up exactly where
+session 18 (doc 74) left off — the backend library foundation from
+that session needed nothing changed, this session was purely the
+"wire it up" layer doc 74 had explicitly deferred.
+
+Backend: `api/v1/customer/wallet-bank-details-get.php` /
+`wallet-bank-details-save.php` / `wallet-withdrawal.php` (GET history
+/ POST request) — thin wrappers around `lib/customer_wallet_
+withdrawal.php`, 3 new `.htaccess` routes. `admin/wallet-
+withdrawals.php` — mirrors `admin/refunds.php`'s exact shape (list +
+Approve/Mark Processing/Complete/Reject, CSRF), shows the admin FULL
+unmasked payout details (same as `admin/settlements.php` does for
+restaurant payouts) since they're the one sending the transfer; nav
+entry added.
+
+Android (customer app): new `WithdrawActivity` (bank/UPI form +
+withdrawal history in one screen, reachable from a new "Withdraw"
+button on `WalletActivity`'s balance card), new
+`WalletWithdrawalAdapter` + `item_withdrawal.xml` + new
+`bg_status_pill.xml` drawable (tinted per status at bind time — this
+project had no existing status-chip drawable to reuse). 7 new
+Retrofit models + 4 new `ApiService` methods, all field-for-field
+mirrors of the actual PHP response shapes (confirmed by reading the
+files, not assumed). Bank details pre-fill on load from the new GET
+endpoint — account number deliberately NOT pre-filled (comes back
+masked, same "never echo a full saved account number into an editable
+field" principle the restaurant side already follows), only holder
+name/bank name/IFSC/UPI ID are. Also fixed a real gap while wiring
+this in: `WalletActivity` previously only called `loadWallet()` once
+from `onCreate()`, so a customer returning from a withdrawal would see
+a stale balance until a manual pull-to-refresh — moved the load into
+`onResume()` instead.
+
+Verification: recreated the project's brace-balance checker
+(`check_php.py`) and ran it on all 9 backend files touched across
+sessions 18+19 — all balanced. Wrote an equivalent Kotlin-aware
+checker (`check_kt.py`) and ran it on all 5 new/edited Kotlin files —
+all balanced. XML well-formedness checked on all 6 new/edited XML
+files — all clean. **Not build/device-verified** — same standing
+sandbox limitation (no PHP CLI/Android SDK/live DB here); the
+view-binding class names Android code assumes
+(`ActivityWithdrawBinding`, `ItemWithdrawalBinding`) follow this
+project's existing naming convention but were not Gradle-confirmed.
+
+**Genuinely still open:** migration 65 has not been run on any DB; the
+reported PHP syntax error on the admin Refunds page is still
+unresolved (needs the app owner's actual error text, not another
+blind re-hunt — doc 74's full 170-file sweep already came up empty);
+live end-to-end test of both halves; a real Android Studio/Gradle
+build + device click-through. Full detail in doc 75.
+
+**NEXT SESSION:** if the app owner can run things on a real machine —
+get the PHP error text, run migration 65, live-test §37 end-to-end,
+Gradle-build Android — that closes §37 out completely (moves to
+`done.md` per the project's own completion rule). If no live
+environment is available, there is no more Claude-actionable code
+work left in §37; move to Rider App (item 18, largest remaining
+phase) or another item from the standing priority list instead. See
+`NEXT_SESSION_PROMPT.md`.

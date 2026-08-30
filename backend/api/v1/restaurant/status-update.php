@@ -2,8 +2,21 @@
 /**
  * POST /api/v1/restaurant/status-update.php
  * Auth: Restaurant token
- * Request: { "operational_status": "open" | "busy" | "temp_closed" }
- * Response: { "operational_status": "..." }
+ * Request: { "operational_status": "open" | "busy" | "temp_closed",
+ *            "resume_at"?: "YYYY-MM-DD HH:mm:ss" }
+ * Response: { "operational_status": "...", "temp_closed_until": "..."|null }
+ *
+ * §3, today.md 2026-08-28 / migration 58 — `resume_at` is the optional
+ * "closed until [date/time]" piece of the full closure-scheduling ask.
+ * Only meaningful (and only accepted) alongside operational_status =
+ * "temp_closed"; a future timestamp is stored as temp_closed_until and
+ * read back by compute_restaurant_status() (lib/restaurant_status.php)
+ * to auto-stop showing the pause as active once it lapses. Omitting it
+ * keeps the exact pre-migration-58 behavior — indefinite pause until
+ * manually resumed. Switching to "open"/"busy" always clears
+ * temp_closed_until, even if the caller didn't ask — a resume-time
+ * belonging to a pause that's no longer active would be stale data with
+ * no meaning.
  *
  * docs/16_Handover_I4_Followups_And_Order_Toggle.md Part B — lets a
  * restaurant pause/resume accepting new orders on demand, independent of
@@ -28,6 +41,7 @@
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
+require_once __DIR__ . '/../../../lib/permissions.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -36,6 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $owner = require_auth('restaurant');
+require_restaurant_permission($owner, 'manage_restaurant_profile');
 $restaurantId = $owner['owner_id'];
 
 $body = get_json_body();
@@ -47,8 +62,26 @@ if (!in_array($newStatus, $allowedStatuses, true)) {
     respond_error('invalid_operational_status', 422, ['allowed' => $allowedStatuses]);
 }
 
-$db = Database::get();
-$upd = $db->prepare('UPDATE restaurants SET operational_status = :s WHERE id = :id');
-$upd->execute(['s' => $newStatus, 'id' => $restaurantId]);
+$resumeAt = null;
+if ($newStatus === 'temp_closed' && !empty($body['resume_at'])) {
+    $parsed = DateTime::createFromFormat('Y-m-d H:i:s', (string) $body['resume_at']);
+    if (!$parsed) {
+        respond_error('validation_error', 422, ['fields' => ['resume_at']]);
+    }
+    if ($parsed <= new DateTime()) {
+        // A resume time in the past isn't a "closed until" at all —
+        // rejecting rather than silently accepting it and immediately
+        // auto-expiring, which would look like the toggle just didn't
+        // work.
+        respond_error('validation_error', 422, ['fields' => ['resume_at']]);
+    }
+    $resumeAt = $parsed->format('Y-m-d H:i:s');
+}
 
-respond_ok(['operational_status' => $newStatus]);
+$db = Database::get();
+$upd = $db->prepare(
+    'UPDATE restaurants SET operational_status = :s, temp_closed_until = :until WHERE id = :id'
+);
+$upd->execute(['s' => $newStatus, 'until' => $resumeAt, 'id' => $restaurantId]);
+
+respond_ok(['operational_status' => $newStatus, 'temp_closed_until' => $resumeAt]);

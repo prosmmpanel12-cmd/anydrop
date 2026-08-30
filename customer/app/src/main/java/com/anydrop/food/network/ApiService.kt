@@ -262,4 +262,26 @@ interface ApiService {
 
     @GET("customer/wallet.php")
     suspend fun getWallet(): Response<ApiResponse<WalletResult>>
+
+    // ---- PENDING.md §37 — Wallet Withdrawal (migration 65, 2026-08-30).
+    // Direct-hit .php filenames, same convention as every endpoint
+    // above (the .htaccess pretty routes exist for completeness but
+    // the app talks to the file itself). ----
+
+    @GET("customer/wallet-bank-details-get.php")
+    suspend fun getWalletBankDetails(): Response<ApiResponse<BankDetailsResult>>
+
+    @POST("customer/wallet-bank-details-save.php")
+    suspend fun saveWalletBankDetails(@Body body: SaveBankDetailsBody): Response<ApiResponse<BankDetailsResult>>
+
+    @GET("customer/wallet-withdrawal.php")
+    suspend fun getWalletWithdrawalHistory(): Response<ApiResponse<WalletWithdrawalHistoryResult>>
+
+    @POST("customer/wallet-withdrawal.php")
+    suspend fun requestWalletWithdrawal(@Body body: RequestWithdrawalBody): Response<ApiResponse<RequestWithdrawalResult>>
+
+    // ---- FCM push token registration (this session) ----
+
+    @POST("customer/fcm-token-update.php")
+    suspend fun updateFcmToken(@Body body: FcmTokenBody): Response<ApiResponse<FcmTokenResult>>
 }

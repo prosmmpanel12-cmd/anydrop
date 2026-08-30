@@ -56,6 +56,11 @@ RewriteRule ^api/v1/home/offers-browse/?$ api/v1/home/offers-browse.php [L,QSA]
 # Item 26 — Customer Wallet (recall.md section 18)
 RewriteRule ^api/v1/customer/wallet/?$ api/v1/customer/wallet.php [L,QSA]
 
+# PENDING.md §37 — Wallet Withdrawal (migration 65, 2026-08-30)
+RewriteRule ^api/v1/customer/wallet/bank-details/?$ api/v1/customer/wallet-bank-details-get.php [L,QSA]
+RewriteRule ^api/v1/customer/wallet/bank-details/save/?$ api/v1/customer/wallet-bank-details-save.php [L,QSA]
+RewriteRule ^api/v1/customer/wallet/withdrawal/?$ api/v1/customer/wallet-withdrawal.php [L,QSA]
+
 # Part 13 — Rating system
 RewriteRule ^api/v1/customer/reviews/?$ api/v1/customer/reviews.php [L,QSA]
 

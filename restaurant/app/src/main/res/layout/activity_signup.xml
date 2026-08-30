@@ -123,6 +123,44 @@
                         android:minLines="2" />
                 </com.google.android.material.textfield.TextInputLayout>
 
+                <!-- Service area location (§0, 2026-08-28) — optional, skip-able,
+                     reuses the same LocationPickerActivity (GPS button + map
+                     pin-drop) EditProfileActivity's "Choose on map" row already
+                     uses. Never blocks Continue either way: signup proceeds
+                     with or without a pin, backend treats missing lat/lng the
+                     same as "no service-area match yet". -->
+                <LinearLayout
+                    android:id="@+id/rowSetLocation"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/bg_input_outline"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="14dp"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:src="@drawable/ic_map_center_pin"
+                        app:tint="@color/text_secondary"
+                        android:contentDescription="@null" />
+
+                    <TextView
+                        android:id="@+id/locationRowText"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="10dp"
+                        android:text="@string/row_set_service_area_location"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp" />
+
+                </LinearLayout>
+
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"

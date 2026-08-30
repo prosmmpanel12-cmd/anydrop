@@ -1,6 +1,8 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    // FCM push + Analytics (this session) — reads app/google-services.json.
+    id 'com.google.gms.google-services'
 }
 
 android {
@@ -98,4 +100,11 @@ dependencies {
     // be fake/unscannable). ZXing is offline, no network call, and is
     // what most production UPI-collection apps already use for this.
     implementation 'com.google.zxing:core:3.5.3'
+
+    // ---- FCM push + Analytics (this session) ----
+    // Same BoM version as the Restaurant app — keep these two in sync on
+    // future bumps, they talk to the same backend/lib/fcm.php.
+    implementation platform('com.google.firebase:firebase-bom:33.1.2')
+    implementation 'com.google.firebase:firebase-messaging-ktx'
+    implementation 'com.google.firebase:firebase-analytics'
 }

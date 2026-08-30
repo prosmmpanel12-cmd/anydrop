@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="@color/text_secondary" />
+<!--
+    PENDING.md §37 — status pill background for item_withdrawal.xml's
+    withdrawalStatus label. Solid color is set programmatically per-
+    status in WalletWithdrawalAdapter via setBackgroundTintList — one
+    drawable, tinted at bind time, since this project has no existing
+    status-chip drawable to reuse.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/anydrop_primary_container" />
     <corners android:radius="20dp" />
 </shape>

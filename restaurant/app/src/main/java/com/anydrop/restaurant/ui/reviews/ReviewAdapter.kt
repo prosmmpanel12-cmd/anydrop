@@ -15,13 +15,15 @@ import com.anydrop.restaurant.network.Review
  * kept consistent with that screen's already-established pattern in this
  * app rather than inventing a new one.
  *
- * Two callbacks instead of one onClick, because a review row has two
- * distinct actions (send a reply / start editing an existing one) rather
- * than the single "tap the row" action notifications have.
+ * Three callbacks instead of one onClick, because a review row has
+ * distinct actions (send a reply / start editing an existing one /
+ * report the review, §7 today.md 2026-08-28) rather than the single
+ * "tap the row" action notifications have.
  */
 class ReviewAdapter(
     private val onSendReply: (Review, String) -> Unit,
-    private val onEditReply: (Review) -> Unit
+    private val onEditReply: (Review) -> Unit,
+    private val onReportReview: (Review) -> Unit
 ) : RecyclerView.Adapter<ReviewAdapter.VH>() {
 
     private val items = mutableListOf<Review>()
@@ -29,6 +31,14 @@ class ReviewAdapter(
     // tracked by id so re-binding (e.g. after scroll recycle) keeps the
     // input open instead of snapping back to the read-only display.
     private val editingIds = mutableSetOf<Int>()
+    // §7, today.md 2026-08-28: reviews reported this session. This is a
+    // client-side, in-memory flag only — the backend has no
+    // `is_reported_by_me`-style field yet (today.md §7 step 6 flags this
+    // as an open decision), so a fresh screen load won't remember it.
+    // Good enough to stop an accidental double-tap in the same session;
+    // the DB-level unique constraint (migration 56) is the real abuse
+    // protection regardless of what this set remembers.
+    private val reportedIds = mutableSetOf<Int>()
 
     fun submit(list: List<Review>) {
         items.clear()
@@ -60,6 +70,14 @@ class ReviewAdapter(
         if (index != -1) notifyItemChanged(index)
     }
 
+    /** §7, today.md 2026-08-28: called after a successful report so the
+     * row flips to the disabled "Reported" state without a full reload. */
+    fun markReported(reviewId: Int) {
+        reportedIds.add(reviewId)
+        val index = items.indexOfFirst { it.id == reviewId }
+        if (index != -1) notifyItemChanged(index)
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val binding = ItemReviewBinding.inflate(LayoutInflater.from(parent.context), parent, false)
         return VH(binding)
@@ -82,6 +100,7 @@ class ReviewAdapter(
             }
 
             bindStars(item.restaurantRating ?: 0)
+            bindReportButton(item)
 
             val isEditing = editingIds.contains(item.id)
             val hasReply = !item.restaurantReply.isNullOrBlank()
@@ -103,6 +122,19 @@ class ReviewAdapter(
                     val text = binding.replyInput.text?.toString()?.trim().orEmpty()
                     onSendReply(item, text)
                 }
+            }
+        }
+
+        /** §7, today.md 2026-08-28: independent of the reply state above —
+         * a review can be reported whether or not it's been replied to. */
+        private fun bindReportButton(item: Review) {
+            val isReported = reportedIds.contains(item.id)
+            binding.btnReportReview.isEnabled = !isReported
+            binding.btnReportReview.text = binding.root.context.getString(
+                if (isReported) R.string.review_reported else R.string.review_report
+            )
+            binding.btnReportReview.setOnClickListener {
+                if (!isReported) onReportReview(item)
             }
         }
 

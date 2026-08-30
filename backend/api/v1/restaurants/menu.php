@@ -13,7 +13,9 @@ require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/favorites.php';
 require_once __DIR__ . '/../../../lib/geo.php';
 require_once __DIR__ . '/../../../lib/restaurant_status.php';
+require_once __DIR__ . '/../../../lib/restaurant_closures.php';
 require_once __DIR__ . '/../../../lib/offers.php';
+require_once __DIR__ . '/../../../lib/menu_item_availability.php';
 
 header('Access-Control-Allow-Origin: *');
 header('Cache-Control: max-age=300');
@@ -131,7 +133,27 @@ foreach ($items as $item) {
         'is_bestseller' => (bool) $item['is_bestseller'],
         // bugs.md §6.3 follow-up — out-of-stock flag, see the item query
         // comment above for why unavailable items are included at all now.
-        'is_available' => (bool) $item['is_available'],
+        // today.md §1 / migration 62: this is now the *effective*
+        // right-now availability — the manual owner toggle AND the
+        // optional available_from/available_until time window both have
+        // to pass (is_menu_item_available_now()) — not just the raw
+        // is_available column. Deliberately reuses this same field/key
+        // (rather than adding a parallel is_available_now) so the
+        // existing "grey out + Out of stock badge" UI in MenuAdapter.kt
+        // covers a time-window closure for free, with no Android change
+        // needed; a manually-off item and a currently-out-of-window item
+        // look the same to the customer today (both simply "not
+        // orderable right now"), same as compute_restaurant_status()
+        // doesn't distinguish "manually paused" from "outside opening
+        // hours" for the restaurant-level is_open_now flag either.
+        'is_available' => is_menu_item_available_now($item),
+        // Raw scheduling fields (today.md §1, migration 62) — "HH:MM:SS"
+        // or null. Not required for the greyed-out display above (that's
+        // fully covered by the computed is_available already), but
+        // surfaced so a future "available 7:00-11:00" caption on the
+        // item card has what it needs without a second call.
+        'available_from' => $item['available_from'] ?? null,
+        'available_until' => $item['available_until'] ?? null,
         // features.md §1 dietary-preference chips — see
         // 13_migration_menu_item_dietary_flags.sql. Default 0/false on
         // rows created before that migration ran.
@@ -206,7 +228,25 @@ if (!empty($itemsByCategory[0])) {
 // (which already had it). Same compute_restaurant_status() helper those
 // two use, so all three surfaces can never show contradictory status for
 // the same restaurant.
-$statusFlags = compute_restaurant_status($restaurant);
+// Scheduled closures (§3, today.md 2026-08-28, migration 58) — single-
+// restaurant case, so a 1-element array into the same batch lookup
+// list.php/search.php use rather than a separate single-id variant
+// (same query shape, trivial N=1 IN(...) — not worth a second helper
+// function). Closes doc 60's last "still open" backend gap: the
+// restaurant-detail screen now agrees with Home/Search instead of
+// showing a contradictory status for a restaurant on a scheduled
+// holiday.
+$now = new DateTime();
+$currentTime = $now->format('H:i:s');
+$currentDow = (int) $now->format('N');
+$currentDate = $now->format('Y-m-d');
+$closedByClosureSet = get_restaurants_with_active_closure($db, [(int) $restaurant['id']], $currentDate, $currentDow);
+$statusFlags = compute_restaurant_status(
+    $restaurant,
+    $currentTime,
+    $currentDow,
+    isset($closedByClosureSet[(int) $restaurant['id']])
+);
 
 // Restaurant banners (app-owner feedback item #3, 2026-08-17) — owner-
 // curated promotional images shown as a carousel at the top of the

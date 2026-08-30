@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Add/edit add-on group dialog (§1, today.md 2026-08-28). Plain
+    MaterialAlertDialogBuilder + this view, same shape as
+    dialog_add_category.xml — no bottom sheet needed, this is a short
+    form (name + 2 numbers + a switch).
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:startIconDrawable="@drawable/ic_tag">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/inputGroupName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/hint_addon_group_name"
+            android:inputType="textCapWords"
+            android:maxLength="100" />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="12dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/label_addon_group_required"
+            android:textColor="@color/text_primary" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchGroupRequired"
+            style="@style/Widget.AnydropRestaurant.Switch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="@string/label_addon_group_max_select"
+        android:textColor="@color/text_secondary"
+        android:textSize="12sp" />
+
+    <!-- Plain number field rather than a stepper widget — matches
+         inputMinOrderAmount / inputFssaiNumber elsewhere in this app,
+         no new stepper component introduced for one dialog. min_select
+         is deliberately NOT exposed here — validate_addon_group_selection_rules
+         (backend) derives it from the Required switch (required => at
+         least 1) rather than asking a restaurant owner to reason about
+         two separate numbers; "pick between 1 and 3" is expressible by
+         a future edit if ever needed, but isn't in this pass's scope
+         (today.md only asked for group creation, not a min/max range
+         picker UI). -->
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/inputGroupMaxSelect"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/hint_addon_group_max_select"
+            android:inputType="number"
+            android:maxLength="2" />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+</LinearLayout>

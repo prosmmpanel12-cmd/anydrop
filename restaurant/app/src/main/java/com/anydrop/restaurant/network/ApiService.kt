@@ -1,6 +1,7 @@
 package com.anydrop.restaurant.network
 
 import okhttp3.MultipartBody
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -8,11 +9,36 @@ import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
 import retrofit2.http.Query
+import retrofit2.http.Streaming
 
 interface ApiService {
 
     @POST("auth/restaurant-login.php")
     suspend fun login(@Body body: LoginBody): Response<ApiResponse<LoginResult>>
+
+    // Migration 63 (Restaurant Staff/RBAC, PENDING.md item 3) — sibling
+    // login for a named staff account rather than the owner. See
+    // backend/api/v1/auth/restaurant-staff-login.php's own kdoc for why
+    // this is a separate endpoint rather than a flag on login() above.
+    @POST("auth/restaurant-staff-login.php")
+    suspend fun staffLogin(@Body body: StaffLoginBody): Response<ApiResponse<StaffLoginResult>>
+
+    @GET("restaurant/staff-list.php")
+    suspend fun listStaff(): Response<ApiResponse<StaffListResult>>
+
+    @POST("restaurant/staff-create.php")
+    suspend fun createStaff(@Body body: StaffCreateBody): Response<ApiResponse<StaffResult>>
+
+    @POST("restaurant/staff-update.php")
+    suspend fun updateStaff(@Query("id") staffId: Int, @Body body: StaffUpdateBody): Response<ApiResponse<StaffResult>>
+
+    @POST("restaurant/staff-delete.php")
+    suspend fun deleteStaff(@Query("id") staffId: Int): Response<ApiResponse<Map<String, Any>>>
+
+    // Migration 64 — Staff Audit Trail (PENDING.md §7's last checkbox).
+    // Same manage_staff gate as the CRUD endpoints above.
+    @GET("restaurant/staff-audit-list.php")
+    suspend fun listStaffAuditLog(): Response<ApiResponse<StaffAuditLogListResult>>
 
     @POST("auth/restaurant-request-otp.php")
     suspend fun requestSignupOtp(@Body body: RequestOtpBody): Response<ApiResponse<RequestOtpResult>>
@@ -49,6 +75,19 @@ interface ApiService {
 
     @GET("restaurant/insights.php")
     suspend fun getInsights(@Query("range") range: String = "week"): Response<ApiResponse<InsightsResult>>
+
+    // First @Streaming/raw-ResponseBody call in this app — every other
+    // endpoint returns JSON wrapped in ApiResponse<T>, but a CSV export
+    // is a raw file download, not a JSON envelope. @Streaming stops
+    // Retrofit/OkHttp from buffering the whole body into memory before
+    // handing it back, same reason any file-download call needs it.
+    @Streaming
+    @GET("restaurant/insights.php?export=csv")
+    suspend fun exportInsightsCsv(
+        @Query("range") range: String,
+        @Query("from") from: String? = null,
+        @Query("to") to: String? = null
+    ): Response<ResponseBody>
 
     // ---- Menu Management (Tier 1, docs/18) ----
 
@@ -88,6 +127,49 @@ interface ApiService {
     // same food_categories table the Customer app's Home chip row reads.
     @GET("restaurant/food-tags-list.php")
     suspend fun getFoodTags(): Response<ApiResponse<FoodTagsListResult>>
+
+    // ---- Item Customization / Add-on Groups (§1, today.md 2026-08-28) ----
+
+    @GET("restaurant/addon-groups-list.php")
+    suspend fun getAddonGroups(@Query("item_id") itemId: Int): Response<ApiResponse<AddonGroupsListResult>>
+
+    @POST("restaurant/addon-groups-create.php")
+    suspend fun createAddonGroup(@Body body: AddonGroupCreateBody): Response<ApiResponse<AddonGroupResult>>
+
+    @POST("restaurant/addon-groups-update.php")
+    suspend fun updateAddonGroup(@Query("id") groupId: Int, @Body body: AddonGroupUpdateBody): Response<ApiResponse<AddonGroupResult>>
+
+    @POST("restaurant/addon-groups-delete.php")
+    suspend fun deleteAddonGroup(@Query("id") groupId: Int): Response<ApiResponse<Map<String, Any>>>
+
+    @POST("restaurant/addons-create.php")
+    suspend fun createAddon(@Body body: AddonCreateBody): Response<ApiResponse<AddonResult>>
+
+    @POST("restaurant/addons-update.php")
+    suspend fun updateAddon(@Query("id") addonId: Int, @Body body: AddonUpdateBody): Response<ApiResponse<AddonResult>>
+
+    // ---- Temp Closure / Holiday Scheduling (§3, today.md 2026-08-28,
+    // doc 60/61) ----
+
+    @GET("restaurant/closures-list.php")
+    suspend fun getClosures(): Response<ApiResponse<ClosuresListResult>>
+
+    @POST("restaurant/closures-create.php")
+    suspend fun createClosure(@Body body: ClosureCreateBody): Response<ApiResponse<ClosureResult>>
+
+    @POST("restaurant/closures-update.php")
+    suspend fun updateClosure(@Query("id") closureId: Int, @Body body: ClosureUpdateBody): Response<ApiResponse<ClosureResult>>
+
+    @POST("restaurant/closures-delete.php")
+    suspend fun deleteClosure(@Query("id") closureId: Int): Response<ApiResponse<Map<String, Any>>>
+
+    // ---- Restaurant Bank Details (PENDING.md §15, migration 59) ----
+
+    @GET("restaurant/bank-details-get.php")
+    suspend fun getBankDetails(): Response<ApiResponse<BankDetailsResult>>
+
+    @POST("restaurant/bank-details-save.php")
+    suspend fun saveBankDetails(@Body body: BankDetailsSaveBody): Response<ApiResponse<BankDetailsResult>>
 
     @Multipart
     @POST("restaurant/category-photo-upload.php")
@@ -181,4 +263,20 @@ interface ApiService {
         @Query("id") id: Int,
         @Body body: ReviewReplyBody
     ): Response<ApiResponse<ReviewReplyResult>>
+
+    // ---- Restaurant-side "Report review" (§7, today.md 2026-08-28). ----
+
+    @POST("restaurant/report-review.php")
+    suspend fun reportReview(@Body body: ReportReviewBody): Response<ApiResponse<ReportReviewResult>>
+
+    // ---- App version / update check (§9, 2026-08-28). Mirrors the
+    // Customer App's ApiService entry of the same name/signature. ----
+
+    @GET("system/app-version.php")
+    suspend fun getAppVersion(@Query("platform") platform: String = "restaurant"): Response<ApiResponse<AppVersionInfo>>
+
+    // ---- FCM push token registration (this session) ----
+
+    @POST("restaurant/fcm-token-update.php")
+    suspend fun updateFcmToken(@Body body: FcmTokenBody): Response<ApiResponse<FcmTokenResult>>
 }

@@ -169,6 +169,80 @@
                 android:checked="true" />
         </LinearLayout>
 
+        <!-- Item availability timing (today.md §1, migration 62) — optional
+             daily recurring window, e.g. a breakfast item only orderable
+             7:00-11:00. Both fields optional/independent; leaving both
+             blank (the default for every existing item) means no
+             restriction, same as before this existed. Same start/end
+             TIME-picker field pair OfferManagerActivity's happy-hour
+             fields already use (dialog_add_offer.xml's startTimeLayout/
+             endTimeLayout) — copied rather than re-invented. -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/label_item_availability_timing"
+            android:textColor="@color/text_primary"
+            android:textStyle="bold"
+            android:textSize="13sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/label_item_availability_timing_hint"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/itemAvailableFromLayout"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                app:startIconDrawable="@drawable/ic_clock"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_close">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputItemAvailableFrom"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/hint_item_available_from"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:cursorVisible="false" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/itemAvailableUntilLayout"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                app:startIconDrawable="@drawable/ic_clock"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_close">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputItemAvailableUntil"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/hint_item_available_until"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:cursorVisible="false" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+        </LinearLayout>
+
         <!-- Item tags (Pizza / Onion / Capsicum / ...) — 2026-08-20 ask.
              Chips populated at runtime from food-tags-list.php (see
              MenuFragment.loadFoodTagsIfNeeded()); multi-select, no
@@ -209,6 +283,44 @@
             android:textColor="@color/text_secondary"
             android:textSize="12sp"
             android:visibility="gone" />
+
+        <!-- Manage Add-ons entry point (§1, today.md 2026-08-28; doc 58).
+             Visible only when existingItem != null — MenuFragment.
+             showItemDialog() sets this GONE for a brand-new item, which
+             has no id yet to attach addon groups to. Same click-row
+             shape as activity_signup.xml's rowSetLocation. -->
+        <LinearLayout
+            android:id="@+id/rowManageAddons"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_input_outline"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="14dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:src="@drawable/ic_tag"
+                app:tint="@color/text_secondary"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="10dp"
+                android:text="@string/btn_manage_addons"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"

@@ -1,3 +1,24 @@
+## 🎉 2026-08-28 — Full build + device verification pass confirmed (Restaurant App, and Customer/Admin too)
+
+App owner confirmed a full build and on-device test pass covering the
+Restaurant App end to end, alongside the Customer App and Admin Panel.
+Every "not build/device-verified" / "NOT tested" caveat logged in this
+file up through the 2026-08-21 Reviews-reply entry (and everything
+built since, per `docs/Status.md` and `PENDING.md`, through session
+14 / docs/29-53) is now resolved — treat those as closed unless a
+specific bug is separately logged in `docs/bugs.md`.
+
+Still genuinely pending on the Restaurant App side (not a verification
+gap, actually not built): Self Delivery, Staff/RBAC, item add-on group
+creation UI, item availability timing (`available_from`/`until`), full
+Temp Closure/Holiday scheduling (multi-day/recurring), GST/FSSAI
+profile fields (columns exist, not wired into `EditProfileActivity`),
+Bank Details submission form, pre-order "impression" star rating,
+per-category notification settings, language picker. See `PENDING.md`
+for the authoritative current list.
+
+---
+
 ## 2026-08-21 (even later) — Reviews reply: backend + Restaurant App UI built — NOT DB/build-verified
 
 Starting the next queued feature (doc 18's queue, item after notification

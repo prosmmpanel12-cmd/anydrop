@@ -51,6 +51,23 @@
                 android:textColor="@color/text_secondary"
                 tools:text="18 Aug, 7:40 pm" />
 
+            <!-- §7, today.md 2026-08-28: report a suspected fake review.
+                 Plain clickable TextView, same styling as btnEditReply
+                 below — no new drawable needed. Text/enabled state flips
+                 to "Reported" after a successful call (ReviewAdapter). -->
+            <TextView
+                android:id="@+id/btnReportReview"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:text="@string/review_report"
+                android:textSize="11sp"
+                android:textColor="@color/text_secondary"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
+                android:padding="4dp" />
+
         </LinearLayout>
 
         <LinearLayout

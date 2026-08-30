@@ -44,12 +44,30 @@ data class SignupBody(
     @SerializedName("owner_mobile") val ownerMobile: String,
     @SerializedName("owner_email") val ownerEmail: String,
     val password: String,
-    val address: String? = null
+    val address: String? = null,
+    // Optional — service-area auto-resolution (§0, 2026-08-28). Only sent
+    // when the owner actually picked a pin on the signup screen; an old
+    // client (or a skipped location step) simply omits these and the
+    // backend falls back to admin-assigned area_id exactly as before.
+    val latitude: Double? = null,
+    val longitude: Double? = null
 )
 
 data class SignupResult(
     val restaurant: RestaurantProfile,
-    val status: String
+    val status: String,
+    // area_id resolved automatically at signup time from the lat/lng above
+    // (backend/lib/geo.php's resolve_service_area()). false is a normal,
+    // expected outcome (new launch city not in service_areas yet) — not
+    // an error, and never blocks the signup itself.
+    @SerializedName("area_resolved") val areaResolved: Boolean = false,
+    val area: ResolvedArea? = null
+)
+
+data class ResolvedArea(
+    val id: Int,
+    val name: String,
+    val level: String
 )
 
 data class RestaurantProfile(
@@ -63,6 +81,74 @@ data class LoginResult(
     val restaurant: RestaurantProfile?,
     val token: String?
 )
+
+// ---- Restaurant Staff / RBAC (migration 63, PENDING.md item 3) ----
+
+data class StaffLoginBody(val username: String, val password: String)
+
+data class StaffProfile(
+    val id: Int,
+    val name: String,
+    val username: String,
+    // "manager" | "kitchen" | "cashier" — never "owner"; see migration
+    // 63's own header for why the owner isn't represented here.
+    val role: String,
+    @SerializedName("is_active") val isActive: Boolean = true,
+    @SerializedName("created_at") val createdAt: String? = null
+)
+
+data class StaffLoginResult(
+    val restaurant: RestaurantProfile?,
+    val staff: StaffProfile?,
+    val token: String?
+)
+
+data class StaffListResult(val staff: List<StaffProfile>)
+
+data class StaffResult(val staff: StaffProfile)
+
+data class StaffCreateBody(
+    val name: String,
+    val username: String,
+    val password: String,
+    val role: String
+)
+
+/** All fields optional — only ones provided are changed, same partial-
+ * update convention `staff-update.php` documents in its own kdoc.
+ * Gson serializes an unset property here as JSON `null` rather than
+ * omitting the key — that's fine: `staff-update.php`'s own `isset()`
+ * checks treat an explicit `null` the same as a missing key, so no
+ * special "omit nulls" Gson configuration is needed for this to work
+ * correctly. */
+data class StaffUpdateBody(
+    val name: String? = null,
+    val role: String? = null,
+    @SerializedName("is_active") val isActive: Boolean? = null,
+    val password: String? = null
+)
+
+// ---- Staff Audit Trail (migration 64, PENDING.md §7's last checkbox) ----
+
+/** One row from staff-audit-list.php. [action] is one of
+ * staff_created/staff_updated/staff_role_changed/staff_activated/
+ * staff_deactivated/staff_deleted — see migration 64's own header.
+ * [details] is the raw details_json map (name/username/role/
+ * old_role/new_role/etc, varies per action) — kept as a generic map
+ * rather than a per-action sealed class since this screen only ever
+ * needs to read a couple of keys out of it for display, not branch
+ * heavily on shape. */
+data class StaffAuditLogEntry(
+    val id: Int,
+    val action: String,
+    @SerializedName("target_staff_id") val targetStaffId: Int?,
+    @SerializedName("acting_role") val actingRole: String,
+    @SerializedName("acting_staff_id") val actingStaffId: Int?,
+    val details: Map<String, Any?> = emptyMap(),
+    @SerializedName("created_at") val createdAt: String? = null
+)
+
+data class StaffAuditLogListResult(val entries: List<StaffAuditLogEntry>)
 
 // ---- Account tab / Edit Profile (docs/restorent/19 §7, §10 item 5) ----
 
@@ -89,6 +175,12 @@ data class RestaurantProfileDetail(
     @SerializedName("closing_time") val closingTime: String? = null,
     @SerializedName("working_days") val workingDays: String? = null,
     val description: String? = null,
+    // today.md §3 — columns already existed on `restaurants`
+    // (gst_number VARCHAR(20), fssai_number VARCHAR(30)) but were never
+    // read here; profile-get.php does SELECT *, so these were always in
+    // the response, just silently dropped by Gson until this field existed.
+    @SerializedName("gst_number") val gstNumber: String? = null,
+    @SerializedName("fssai_number") val fssaiNumber: String? = null,
     @SerializedName("upi_id") val upiId: String? = null,
     @SerializedName("current_due") val currentDue: Double = 0.0,
     val status: String? = null,
@@ -117,6 +209,12 @@ data class ProfileUpdateBody(
     @SerializedName("closing_time") val closingTime: String? = null,
     @SerializedName("working_days") val workingDays: String? = null,
     val description: String? = null,
+    // today.md §3 — see matching kdoc on RestaurantProfileDetail. Blank
+    // string clears the field server-side (profile-update.php), same
+    // convention as cuisine_tags/description above; null (omitted) means
+    // "leave unchanged".
+    @SerializedName("gst_number") val gstNumber: String? = null,
+    @SerializedName("fssai_number") val fssaiNumber: String? = null,
     @SerializedName("logo_url") val logoUrl: String? = null,
     // recall.md Phase B item 13 / migration 36 — omitted (null) means
     // "don't change" per profile-update.php's array_key_exists check,
@@ -439,8 +537,20 @@ data class DashboardResult(
 
 // ---- Part B — "Accepting orders" toggle (docs/16 Part B) ----
 
-data class OperationalStatusUpdateBody(@SerializedName("operational_status") val operationalStatus: String)
-data class OperationalStatusResult(@SerializedName("operational_status") val operationalStatus: String)
+/** [resumeAt] is only meaningful (and only accepted server-side)
+ * alongside operationalStatus = "temp_closed" — a "YYYY-MM-DD HH:mm:ss"
+ * wire string, same format CouponManagerActivity's valid-until picker
+ * already produces. Added §3 (today.md 2026-08-28, doc 60) so
+ * AccountFragment's temp-closed switch can send an optional reopen
+ * time instead of only ever sending resume_at: null. */
+data class OperationalStatusUpdateBody(
+    @SerializedName("operational_status") val operationalStatus: String,
+    @SerializedName("resume_at") val resumeAt: String? = null
+)
+data class OperationalStatusResult(
+    @SerializedName("operational_status") val operationalStatus: String,
+    @SerializedName("temp_closed_until") val tempClosedUntil: String? = null
+)
 
 // ---- Insights tab (docs/restorent/19 §6) — backend: insights.php ----
 
@@ -469,6 +579,40 @@ data class InsightRepeatCustomers(
     val percent: Double
 )
 
+// Peak hours heatmap (today.md §1 wishlist / PENDING.md item 3's own
+// "Peak hours" line — held out of doc 49's original build pending a
+// design decision; app owner chose the full hour × day-of-week
+// heatmap over a single busiest-hour stat). Always the last 30 days,
+// independent of InsightsResult's own `range`/`fromDate`/`toDate` —
+// see insights.php's header for why. `dayOfWeek` is this project's
+// existing ISO convention (1 Mon .. 7 Sun), same as every other
+// day-of-week value already flowing through this codebase.
+data class InsightPeakHourCell(
+    @SerializedName("day_of_week") val dayOfWeek: Int,
+    val hour: Int,
+    @SerializedName("order_count") val orderCount: Int
+)
+
+data class InsightPeakSlot(
+    @SerializedName("day_of_week") val dayOfWeek: Int,
+    @SerializedName("day_name") val dayName: String,
+    val hour: Int,
+    @SerializedName("order_count") val orderCount: Int
+)
+
+data class InsightPeakHours(
+    @SerializedName("from_date") val fromDate: String,
+    @SerializedName("to_date") val toDate: String,
+    @SerializedName("max_count") val maxCount: Int,
+    // Null only when every cell is zero (no orders at all in the
+    // window) — Gson leaves this null on a JSON `null` value fine,
+    // no default needed since insights.php always sends the key.
+    @SerializedName("peak_slot") val peakSlot: InsightPeakSlot?,
+    // Always all 168 cells (7 days × 24 hours), zero-filled — see
+    // insights.php's header for why the full grid is sent every time.
+    val cells: List<InsightPeakHourCell>
+)
+
 data class InsightsResult(
     val range: String,
     @SerializedName("from_date") val fromDate: String,
@@ -476,7 +620,8 @@ data class InsightsResult(
     val stats: InsightStats,
     @SerializedName("daily_chart") val dailyChart: List<InsightDailyChartPoint>,
     @SerializedName("top_items") val topItems: List<InsightTopItem>,
-    @SerializedName("repeat_customers") val repeatCustomers: InsightRepeatCustomers
+    @SerializedName("repeat_customers") val repeatCustomers: InsightRepeatCustomers,
+    @SerializedName("peak_hours") val peakHours: InsightPeakHours
 )
 
 // ---- Menu Management (Tier 1, docs/18) ----
@@ -530,6 +675,13 @@ data class MenuItem(
     @SerializedName("is_recommended") val isRecommended: Boolean,
     @SerializedName("is_bestseller") val isBestseller: Boolean,
     @SerializedName("prep_time_minutes") val prepTimeMinutes: Int,
+    // Item availability timing (today.md §1, migration 62) — optional
+    // daily recurring window, "HH:MM:SS" or null (no restriction), same
+    // raw-TIME-string convention as restaurants.opening_time/closing_time
+    // elsewhere in this API. Both null on every item that predates this
+    // migration and any item that never sets a window.
+    @SerializedName("available_from") val availableFrom: String? = null,
+    @SerializedName("available_until") val availableUntil: String? = null,
     // Food-category tags (Pizza / Onion / Capsicum / ...) — slugs, same
     // ones the Customer app's Home chip row filters by. Defaults to empty
     // list for backward-compat with any cached/older response shape.
@@ -547,6 +699,8 @@ data class MenuItemCreateBody(
     @SerializedName("is_veg") val isVeg: Boolean = true,
     @SerializedName("prep_time_minutes") val prepTimeMinutes: Int? = null,
     @SerializedName("image_url") val imageUrl: String? = null,
+    @SerializedName("available_from") val availableFrom: String? = null,
+    @SerializedName("available_until") val availableUntil: String? = null,
     val tags: List<String>? = null
 )
 
@@ -559,6 +713,16 @@ data class MenuItemUpdateBody(
     @SerializedName("is_available") val isAvailable: Boolean? = null,
     @SerializedName("prep_time_minutes") val prepTimeMinutes: Int? = null,
     @SerializedName("image_url") val imageUrl: String? = null,
+    // Item availability timing (today.md §1, migration 62). Unlike every
+    // other field here, an empty string "" is meaningful — it explicitly
+    // clears a previously-set window to NULL (see
+    // menu-items-update.php's kdoc) — while leaving the field null/absent
+    // means "not touched," same convention as every other field on this
+    // body. MenuFragment.showItemDialog()'s clear ("X") icon must send
+    // "" here, not leave the field null, or a previously-set window would
+    // never be removable.
+    @SerializedName("available_from") val availableFrom: String? = null,
+    @SerializedName("available_until") val availableUntil: String? = null,
     val tags: List<String>? = null
 )
 
@@ -574,6 +738,139 @@ data class FoodTagsListResult(val tags: List<FoodTag>)
 
 /** menu-item-photo-upload.php's response shape, mirrors LogoUploadResult. */
 data class MenuItemPhotoUploadResult(@SerializedName("image_url") val imageUrl: String)
+
+// ---- Item Customization / Add-on Groups (§1, today.md 2026-08-28,
+// migration 57). See AddonGroupsActivity.kt's kdoc for the full picture —
+// short version: menu_item_addons already existed (flat, ungrouped), this
+// adds an optional group wrapper (min/max-select + required) a restaurant
+// can create per menu item. addon_group_id null on an Addon means
+// "ungrouped", same flat-checkbox behavior every addon already had. ----
+
+data class Addon(
+    val id: Int,
+    @SerializedName("addon_group_id") val addonGroupId: Int? = null,
+    val name: String,
+    val price: Double,
+    @SerializedName("is_active") val isActive: Boolean
+)
+
+data class AddonGroup(
+    val id: Int,
+    val name: String,
+    @SerializedName("min_select") val minSelect: Int,
+    @SerializedName("max_select") val maxSelect: Int,
+    @SerializedName("is_required") val isRequired: Boolean,
+    @SerializedName("sort_order") val sortOrder: Int,
+    @SerializedName("is_active") val isActive: Boolean,
+    val addons: List<Addon> = emptyList()
+)
+
+data class AddonGroupsListResult(
+    val groups: List<AddonGroup>,
+    @SerializedName("ungrouped_addons") val ungroupedAddons: List<Addon> = emptyList()
+)
+data class AddonGroupResult(val group: AddonGroup)
+data class AddonResult(val addon: Addon)
+
+data class AddonGroupCreateBody(
+    @SerializedName("item_id") val itemId: Int,
+    val name: String,
+    @SerializedName("min_select") val minSelect: Int? = null,
+    @SerializedName("max_select") val maxSelect: Int? = null,
+    @SerializedName("is_required") val isRequired: Boolean? = null
+)
+
+data class AddonGroupUpdateBody(
+    val name: String? = null,
+    @SerializedName("min_select") val minSelect: Int? = null,
+    @SerializedName("max_select") val maxSelect: Int? = null,
+    @SerializedName("is_required") val isRequired: Boolean? = null
+)
+
+data class AddonCreateBody(
+    @SerializedName("item_id") val itemId: Int,
+    @SerializedName("addon_group_id") val addonGroupId: Int? = null,
+    val name: String,
+    val price: Double
+)
+
+/** Also doubles as this addon's remove/restore action — see
+ * addons-update.php's kdoc — AddonGroupsActivity's "Remove" tap just
+ * sends `AddonUpdateBody(isActive = false)`. */
+data class AddonUpdateBody(
+    val name: String? = null,
+    val price: Double? = null,
+    @SerializedName("is_active") val isActive: Boolean? = null
+)
+
+// ---- Temp Closure / Holiday Scheduling (§3, today.md 2026-08-28,
+// migration 58, doc 60/61). Backs ClosureScheduleActivity — a
+// restaurant's own list of scheduled multi-day/recurring closures,
+// distinct from the plain on-demand "temp closed" switch above
+// (OperationalStatusUpdateBody/-Result), which stays a single
+// resume_at/temp_closed_until pair on the restaurant row itself. ----
+
+data class Closure(
+    val id: Int,
+    @SerializedName("closure_type") val closureType: String, // "date_range" | "weekly_recurring"
+    @SerializedName("start_date") val startDate: String? = null,
+    @SerializedName("end_date") val endDate: String? = null,
+    @SerializedName("day_of_week") val dayOfWeek: Int? = null, // 1=Mon..7=Sun
+    val reason: String? = null,
+    @SerializedName("is_active") val isActive: Boolean = true
+)
+
+data class ClosuresListResult(val closures: List<Closure>)
+data class ClosureResult(val closure: Closure)
+
+/** Shared by create and update — closures-update.php is a full
+ * replace of the type-specific fields, not a partial patch, so both
+ * endpoints take the same body shape (see that endpoint's kdoc). */
+data class ClosureCreateBody(
+    @SerializedName("closure_type") val closureType: String,
+    @SerializedName("start_date") val startDate: String? = null,
+    @SerializedName("end_date") val endDate: String? = null,
+    @SerializedName("day_of_week") val dayOfWeek: Int? = null,
+    val reason: String? = null
+)
+
+data class ClosureUpdateBody(
+    @SerializedName("closure_type") val closureType: String,
+    @SerializedName("start_date") val startDate: String? = null,
+    @SerializedName("end_date") val endDate: String? = null,
+    @SerializedName("day_of_week") val dayOfWeek: Int? = null,
+    val reason: String? = null
+)
+
+// ---- Restaurant Bank Details (PENDING.md §15, migration 59). Backs
+// BankDetailsActivity — a restaurant's own submission of its payout
+// account, separate from the admin-entered version admin/settlements.php
+// has had since migration 38. account_number never comes back from the
+// server in full (bank-details-get.php/-save.php both mask it to last
+// 4 digits, see lib/restaurant_bank.php's kdoc) — the model reflects
+// that with accountNumberMasked, not accountNumber, so there's no
+// field here a screen could mistakenly display expecting a full value. ----
+
+data class BankDetails(
+    @SerializedName("account_holder_name") val accountHolderName: String,
+    @SerializedName("bank_name") val bankName: String,
+    @SerializedName("account_number_masked") val accountNumberMasked: String,
+    @SerializedName("ifsc_code") val ifscCode: String,
+    @SerializedName("upi_id") val upiId: String? = null,
+    @SerializedName("verification_status") val verificationStatus: String, // "pending" | "verified" | "rejected"
+    @SerializedName("admin_remarks") val adminRemarks: String? = null,
+    @SerializedName("updated_at") val updatedAt: String? = null
+)
+
+data class BankDetailsResult(@SerializedName("bank_details") val bankDetails: BankDetails?)
+
+data class BankDetailsSaveBody(
+    @SerializedName("account_holder_name") val accountHolderName: String,
+    @SerializedName("bank_name") val bankName: String,
+    @SerializedName("account_number") val accountNumber: String,
+    @SerializedName("ifsc_code") val ifscCode: String,
+    @SerializedName("upi_id") val upiId: String? = null
+)
 
 // ---- Notification bell (Type 1 — system-generated, docs/Status.md
 // 2026-08-20). Mirrors the Customer App's network/Models.kt entry of the
@@ -631,3 +928,36 @@ data class ReviewsResult(
 
 data class ReviewReplyBody(val reply: String)
 data class ReviewReplyResult(val review: Review)
+
+// ---- Restaurant-side "Report review" (§7, today.md 2026-08-28).
+// Mirrors backend/api/v1/customer/report-review.php's shape (same
+// SignupBody/etc @SerializedName convention this app follows elsewhere) —
+// backend/api/v1/restaurant/report-review.php is the mirror endpoint,
+// auth + ownership-check are the only difference from the customer path. ----
+
+data class ReportReviewBody(
+    @SerializedName("review_id") val reviewId: Int,
+    val reason: String
+)
+data class ReportReviewResult(val reported: Boolean)
+
+// ---- FCM push token registration (this session). Mirrors
+// backend/api/v1/restaurant/fcm-token-update.php's request shape. ----
+
+data class FcmTokenBody(@SerializedName("fcm_token") val fcmToken: String)
+data class FcmTokenResult(val ok: Boolean)
+
+// ---- App version / update check (§9, 2026-08-28) — Restaurant App had no
+// version-check code at all (SplashActivity was logo-animation-only), so
+// force-update never worked here even though the backend endpoint
+// (/system/app-version.php?platform=restaurant) and app_settings keys
+// already existed and are already used by the Customer App. Same shape
+// as the Customer App's AppVersionInfo, copied field-for-field. ----
+
+data class AppVersionInfo(
+    @SerializedName("latest_version_code") val latestVersionCode: Int,
+    @SerializedName("latest_version_name") val latestVersionName: String,
+    @SerializedName("min_version_code") val minVersionCode: Int,
+    @SerializedName("update_message") val updateMessage: String,
+    @SerializedName("update_url") val updateUrl: String?
+)

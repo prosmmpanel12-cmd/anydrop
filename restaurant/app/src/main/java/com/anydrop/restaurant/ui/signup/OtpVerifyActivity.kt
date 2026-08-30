@@ -161,11 +161,20 @@ class OtpVerifyActivity : AppCompatActivity() {
                         ownerMobile = draft.ownerMobile,
                         ownerEmail = draft.email,
                         password = draft.password,
-                        address = draft.address
+                        address = draft.address,
+                        latitude = draft.latitude,
+                        longitude = draft.longitude
                     )
                 )
                 if (signupResponse.isSuccessful && signupResponse.body()?.success == true) {
-                    goToSuccess()
+                    // Only flag "area not covered" when the owner actually
+                    // picked a pin (draft.latitude != null) — if they skipped
+                    // the location step entirely, area_resolved is false too
+                    // but that's just "not provided", not "not covered", and
+                    // showing the notice there would be misleading.
+                    val areaResolved = signupResponse.body()?.data?.areaResolved ?: true
+                    val areaNotCovered = draft.latitude != null && !areaResolved
+                    goToSuccess(areaNotCovered)
                 } else {
                     val error = signupResponse.body()?.error ?: "signup_failed"
                     InAppNotifier.show(this@OtpVerifyActivity, friendlySignupError(error), InAppNotifier.Type.ERROR)
@@ -231,9 +240,12 @@ class OtpVerifyActivity : AppCompatActivity() {
         else -> "Couldn't submit your application — please try again"
     }
 
-    private fun goToSuccess() {
+    private fun goToSuccess(areaNotCovered: Boolean) {
         setLoading(false)
-        startActivity(Intent(this, SignupSuccessActivity::class.java))
+        val intent = Intent(this, SignupSuccessActivity::class.java).apply {
+            putExtra(SignupSuccessActivity.EXTRA_AREA_NOT_COVERED, areaNotCovered)
+        }
+        startActivity(intent)
         overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
         finish()
     }

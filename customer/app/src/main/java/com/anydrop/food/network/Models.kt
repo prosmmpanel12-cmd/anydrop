@@ -973,3 +973,72 @@ data class WalletResult(
     val balance: Double,
     val transactions: List<WalletTransaction> = emptyList()
 )
+
+// ---- PENDING.md §37 — Wallet Withdrawal (migration 65, 2026-08-30).
+// Field-for-field mirrors of backend/api/v1/customer/wallet-bank-
+// details-get.php / wallet-bank-details-save.php / wallet-withdrawal.php's
+// response shapes (confirmed by reading those files, not assumed) —
+// same discipline WalletTransaction above follows. status is left as
+// raw String rather than a Kotlin enum for the same "render
+// defensively, backend ENUM may grow" reasoning. ----
+
+data class CustomerBankDetails(
+    @SerializedName("account_holder_name") val accountHolderName: String,
+    @SerializedName("bank_name") val bankName: String?,
+    @SerializedName("account_number_masked") val accountNumberMasked: String?,
+    @SerializedName("ifsc_code") val ifscCode: String?,
+    @SerializedName("upi_id") val upiId: String?,
+    @SerializedName("updated_at") val updatedAt: String?
+)
+
+data class BankDetailsResult(
+    @SerializedName("bank_details") val bankDetails: CustomerBankDetails?
+)
+
+data class SaveBankDetailsBody(
+    @SerializedName("payout_method") val payoutMethod: String, // "bank" | "upi"
+    @SerializedName("account_holder_name") val accountHolderName: String,
+    @SerializedName("bank_name") val bankName: String? = null,
+    @SerializedName("account_number") val accountNumber: String? = null,
+    @SerializedName("ifsc_code") val ifscCode: String? = null,
+    @SerializedName("upi_id") val upiId: String? = null
+)
+
+data class WalletWithdrawal(
+    val id: Int,
+    val amount: Double,
+    @SerializedName("payout_method") val payoutMethod: String, // "bank" | "upi"
+    val status: String, // "requested" | "approved" | "processing" | "completed" | "rejected"
+    @SerializedName("payout_reference") val payoutReference: String?,
+    @SerializedName("reject_reason") val rejectReason: String?,
+    @SerializedName("requested_at") val requestedAt: String,
+    @SerializedName("approved_at") val approvedAt: String?,
+    @SerializedName("processing_at") val processingAt: String?,
+    @SerializedName("completed_at") val completedAt: String?,
+    @SerializedName("rejected_at") val rejectedAt: String?
+)
+
+data class WalletWithdrawalHistoryResult(
+    val withdrawals: List<WalletWithdrawal> = emptyList()
+)
+
+data class RequestWithdrawalBody(
+    val amount: Double,
+    @SerializedName("payout_method") val payoutMethod: String,
+    @SerializedName("account_holder_name") val accountHolderName: String,
+    @SerializedName("bank_name") val bankName: String? = null,
+    @SerializedName("account_number") val accountNumber: String? = null,
+    @SerializedName("ifsc_code") val ifscCode: String? = null,
+    @SerializedName("upi_id") val upiId: String? = null
+)
+
+data class RequestWithdrawalResult(
+    @SerializedName("withdrawal_id") val withdrawalId: Int,
+    val balance: Double
+)
+
+// ---- FCM push token registration (this session). Mirrors
+// backend/api/v1/customer/fcm-token-update.php's request shape. ----
+
+data class FcmTokenBody(@SerializedName("fcm_token") val fcmToken: String)
+data class FcmTokenResult(val ok: Boolean)

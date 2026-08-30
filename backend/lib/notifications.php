@@ -17,17 +17,27 @@
  * attached to" spirit as write_audit_log() — call this *after* the
  * triggering DB write/transaction has already committed, never inside it,
  * so a notification-insert failure can never roll back a real order.
+ *
+ * FCM PUSH (this session): after the bell-row insert, this function also
+ * looks up the recipient's fcm_token (customers/restaurants/riders — see
+ * migration 60 for the first two, riders already had it) and fires a
+ * real push via lib/fcm.php if one exists. This is why every existing
+ * Type 1 call site (order accept/reject, new order, review reply, etc)
+ * gets real push for free with zero call-site changes — the fan-out
+ * point was always this one function.
  */
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/fcm.php';
 
 /**
  * Write one notification for one recipient.
  *
  * @param string $recipientType 'customer' | 'restaurant' | 'rider' | 'admin'
  * @param int    $recipientId   The customer_id / restaurant_id / rider_id / admin_id
- * @param string $title         Short heading, shown in the bell list and (later) as
- *                               the push title once FCM exists — keep it short.
+ * @param string $title         Short heading, shown in the bell list and as
+ *                               the push notification title (FCM, this
+ *                               session) — keep it short.
  * @param string|null $body     Optional longer text.
  * @param string $type          'order' | 'promo' | 'system' | 'security' — matches
  *                               the schema's ENUM; used for icon/filtering client-side.
@@ -65,6 +75,39 @@ function create_notification(
         ]);
     } catch (Throwable $e) {
         error_log('create_notification failed: ' . $e->getMessage());
+    }
+
+    // FCM push (this session) — fires after the bell-row insert above,
+    // never inside its try/catch: a push failure must never look like
+    // a bell-write failure, and a bell-write failure must never skip
+    // the push attempt (independent failure domains, same "record it,
+    // don't let a failure here break the real action" spirit as the
+    // rest of this file). Only customers/restaurants/riders can ever
+    // have a real device token — 'admin' recipients never do, so this
+    // silently no-ops for those without an extra branch.
+    if (in_array($recipientType, ['customer', 'restaurant', 'rider'], true)) {
+        try {
+            $tokenColumn = 'fcm_token';
+            $tableMap = ['customer' => 'customers', 'restaurant' => 'restaurants', 'rider' => 'riders'];
+            $table = $tableMap[$recipientType];
+            $db = Database::get();
+            $tokenStmt = $db->prepare("SELECT $tokenColumn FROM $table WHERE id = :id LIMIT 1");
+            $tokenStmt->execute(['id' => $recipientId]);
+            $token = $tokenStmt->fetch()[$tokenColumn] ?? null;
+
+            if ($token) {
+                // FCM data payload requires string values; deep-link
+                // fields (screen/*_id) come through as-is from callers
+                // (mostly already strings/ints) — fcm_send_to_token()
+                // itself stringifies defensively too, this cast is just
+                // the first line of that same defense.
+                $fcmData = array_map(static fn($v): string => (string) $v, $data);
+                $fcmData['notification_type'] = $type;
+                fcm_send_to_token($token, $title, $body ?? '', $fcmData);
+            }
+        } catch (Throwable $e) {
+            error_log('create_notification: FCM push step failed (non-fatal): ' . $e->getMessage());
+        }
     }
 }
 

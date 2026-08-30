@@ -16,7 +16,7 @@
  * Expects, from the including page:
  *   $admin       — array from admin_require_login()
  *   $pageTitle   — string, shown in <title> and the topbar
- *   $activeNav   — one of 'dashboard' | 'approvals' | 'orders' | 'analytics' | 'support' | 'review_moderation' | 'customer_feedback' | 'areas' | 'cod_rules' | 'pricing_rules' | 'payment_restrictions' | 'categories' | 'banners' | 'roles' | 'commission_rules' | 'settlements' | 'rider_settlements' | 'platform_ledger' | 'payment_gateways' | 'payment_pending' | 'refunds' | 'offers'
+ *   $activeNav   — one of 'dashboard' | 'approvals' | 'orders' | 'analytics' | 'support' | 'review_moderation' | 'customer_feedback' | 'areas' | 'cod_rules' | 'pricing_rules' | 'payment_restrictions' | 'categories' | 'banners' | 'roles' | 'commission_rules' | 'settlements' | 'rider_settlements' | 'platform_ledger' | 'payment_gateways' | 'payment_pending' | 'refunds' | 'wallet_withdrawals' | 'offers' | 'broadcast'
  *   $flash       — string|null, shown once as a toast (not a static banner)
  *   $flashType   — 'success' | 'error'
  */
@@ -164,9 +164,19 @@ $navItems = [
         'icon' => '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 5v5h5"/>',
     ],
     [
+        'key' => 'wallet_withdrawals', 'href' => 'wallet-withdrawals.php', 'label' => 'Wallet Withdrawals',
+        'perm' => 'wallet_withdrawals_view', 'group' => 'finance',
+        'icon' => '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M16 12h.01"/>',
+    ],
+    [
         'key' => 'roles', 'href' => 'roles.php', 'label' => 'Roles & Admins',
         'perm' => 'roles_manage', 'group' => 'settings',
         'icon' => '<path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/>',
+    ],
+    [
+        'key' => 'broadcast', 'href' => 'broadcast.php', 'label' => 'Push Notifications',
+        'perm' => 'notifications_send', 'group' => 'catalog',
+        'icon' => '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
     ],
 ];
 

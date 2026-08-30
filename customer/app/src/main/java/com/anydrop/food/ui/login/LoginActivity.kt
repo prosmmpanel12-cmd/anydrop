@@ -177,6 +177,7 @@ class LoginActivity : AppCompatActivity() {
                         customerId = body.data.customer?.id ?: 0,
                         email = currentEmail
                     )
+                    registerFcmTokenAfterLogin()
                     InAppNotifier.show(this@LoginActivity, "Welcome to Anydrop!", InAppNotifier.Type.SUCCESS)
 
                     // Doc 52 — brand-new email-OTP signups have null
@@ -212,5 +213,24 @@ class LoginActivity : AppCompatActivity() {
         binding.loginProgress.visibility = if (loading) android.view.View.VISIBLE else android.view.View.GONE
         binding.btnSendOtp.isEnabled = !loading
         binding.btnVerifyOtp.isEnabled = !loading
+    }
+
+    /** Sends this device's current FCM token right after a successful
+     * login — same reasoning as the Restaurant app's identically-named
+     * method: CustomerFirebaseMessagingService.onNewToken() alone can't
+     * cover a token minted before login (no customer_id to attach to
+     * yet), so this fires once, right when one first becomes available.
+     * Best-effort, no user-visible failure — see that method's kdoc. */
+    private fun registerFcmTokenAfterLogin() {
+        com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+            .addOnSuccessListener { token ->
+                lifecycleScope.launch {
+                    try {
+                        api.updateFcmToken(com.anydrop.food.network.FcmTokenBody(token))
+                    } catch (e: Exception) {
+                        // Non-fatal — see kdoc above.
+                    }
+                }
+            }
     }
 }

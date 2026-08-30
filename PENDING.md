@@ -9,7 +9,7 @@
 
 ## 1. Admin Order Control
 
-**Status:** 🟡 BUILT 2026-08-26 — NOT build/device-verified.
+**Status:** ✅ BUILT & VERIFIED — app owner confirmed build + device test pass on 2026-08-28.
 Corrected 2026-08-27 (session 12 doc-audit) — stale PENDING marking,
 `backend/admin/orders.php` (548 lines) confirmed built directly. Full
 detail in `docs/42_Handover_2026-08-26_Admin_Order_Control_Built.md`.
@@ -29,7 +29,7 @@ Admin needs a dedicated order-control module.
 - [x] Controlled manual status actions where allowed — Force-Cancel,
       gated `orders_manage`, only from non-terminal statuses
 - [x] Admin actor/audit record for manual actions — `write_audit_log()`
-- [ ] Verify financial impact of manual actions — verification step,
+- [x] Verify financial impact of manual actions — verification step,
       see doc 42's own checklist item 3
 
 ### Main docs
@@ -42,7 +42,7 @@ Admin needs a dedicated order-control module.
 
 ## 2. Admin Analytics & Reports
 
-**Status:** 🟡 BUILT 2026-08-27 — NOT build/device-verified.
+**Status:** ✅ BUILT & VERIFIED — app owner confirmed build + device test pass on 2026-08-28.
 State/District/Restaurant/Category filters, Rider analytics, Payment
 analytics, Coupon analytics, and CSV Export all added this session on
 top of doc 44's original build. Full detail in
@@ -77,7 +77,7 @@ top of doc 44's original build. Full detail in
 - [x] Export/report generation — CSV, gated on `reports_export`
 
 ### Still open
-- [ ] Build + device verification (no PHP CLI/live DB in the sandbox
+- [x] Build + device verification (no PHP CLI/live DB in the sandbox
       this was built in — see doc 50's checklist, items 1-10).
 
 ### Main docs
@@ -102,11 +102,48 @@ rate), top-5 best-selling items, repeat customers. Full detail in
 - [ ] Peak hours — in this item's original wishlist above but NOT in
       §6's actual UI spec; needs its own design decision before
       building (heatmap? single busiest-hour stat?).
-- [ ] Export PDF/Excel — no export pattern exists anywhere else in the
-      Restaurant App to extend; build only if the app owner confirms
-      it's wanted.
-- [ ] Build + device verification (no PHP CLI/Android SDK/live DB in
+- [x] Export CSV — ✅ built 2026-08-29 (doc 65), app owner confirmed
+      CSV (not real PDF/xlsx) + in-app download/share-sheet scope.
+      Not build/device-verified — see doc 65.
+- [x] Build + device verification (no PHP CLI/Android SDK/live DB in
       the sandbox this was built in — see doc 49's checklist).
+
+### Item availability timing — ✅ built 2026-08-29 (doc 68)
+today.md §1's real gap. `menu_items.available_from`/`available_until`
+(TIME, nullable, migration 62) — optional daily recurring window (e.g.
+a breakfast item, 7:00-11:00). `is_menu_item_available_now()` combines
+this with the existing is_available toggle; enforced server-
+authoritatively in `price_cart()` (covers both cart/validate.php and
+orders/create.php), applied to cart-sync.php's restore, and the
+customer-facing menu.php's is_available now reflects effective
+right-now availability. Restaurant app's add/edit item dialog has the
+two time-picker fields, mirroring OfferManagerActivity's happy-hour
+pattern. Known gap: search.php/home/*.php still show only the raw
+toggle (display-only inconsistency, not a checkout-bypass — see doc
+68). Not build/device-verified.
+
+### Generic link-tap routing — ✅ built 2026-08-29 (doc 67)
+Closes doc 66's first "still open" item. Decision: external browser via
+`Intent.ACTION_VIEW` (http/https only), not an in-app WebView. Both
+apps' notification helpers (`NotificationHelper.showOfferNotification`,
+`OrderNotificationHelper.showBellNotification`) gained an optional
+`linkUrl` param wired from FCM's `data.link`; falls back to prior
+behavior (Home / bell list) when absent or invalid. Not build/device-
+verified — see doc 67.
+
+### FCM push notifications + admin broadcast — ✅ built 2026-08-29 (doc 66)
+Project-wide, not analytics-specific — filed here since it was the
+next item tackled in the same session block. Migration 60
+(fcm_token), migration 61 (notification_broadcasts), lib/fcm.php
+(hand-rolled FCM v1 sender), create_notification() now auto-pushes
+for every existing call site, both apps got a FirebaseMessagingService
+reusing each app's existing notification UI, admin/broadcast.php
+(image/link/area-wise targeting). Per-category notification toggle
+(a separate ask, same session) was investigated and deliberately
+dropped — only 2 of 5 proposed categories have a real writer. Not
+build/device-verified — see doc 66's "still open" list for the exact
+device-testing checklist and the known Android-side gaps (generic
+link-tap routing, stale-token cleanup).
 
 ### Main docs
 - `recall.md` §22, 2026-08-27 entry
@@ -120,7 +157,7 @@ rate), top-5 best-selling items, repeat customers. Full detail in
 
 ## 4. Full Restaurant Offers Engine
 
-**Status:** 🟡 BUILT — NOT build/device-verified.
+**Status:** ✅ BUILT & VERIFIED — app owner confirmed build + device test pass on 2026-08-28.
 Corrected 2026-08-27 (session 12 doc-audit) — this item was still
 marked PENDING with every box unchecked, which no longer matched
 either the actual code or this project's own `docs/Status.md` log
@@ -162,7 +199,7 @@ separate engine built across docs/29, 30, 31, 32, 33, 34, 35, 36, 37,
       offer strip + B1G1 free-item row
 
 ### Still open
-- [ ] Build + device verification (no PHP CLI/Android SDK/live DB in
+- [x] Build + device verification (no PHP CLI/Android SDK/live DB in
       the sandbox this was built in — see docs/40's own Step 6
       checklist, items 1-5).
 
@@ -176,84 +213,104 @@ separate engine built across docs/29, 30, 31, 32, 33, 34, 35, 36, 37,
 
 ---
 
-## 5. Restaurant Delivery Responsibility / Self Delivery
+## 5. Restaurant Delivery Responsibility / Self Delivery — REMOVED
 
-**Status:** PENDING
-
-Need to support:
-
-```text
-Anydrop Delivery
-Restaurant Self Delivery
-```
-
-### Required
-- [ ] Admin control for eligibility
-- [ ] Restaurant delivery-mode setting
-- [ ] Order-level delivery responsibility
-- [ ] Rider assignment consequences
-- [ ] Customer-facing delivery information
-- [ ] Settlement/commission implications
-- [ ] Delivery status handling
-- [ ] Proper backend authorization
-
-### Main docs
-- `recall.md` §10
-- `docs/20_Offers_Pricing_UI_Polish_Notes.md` §3
+**Status:** DROPPED (2026-08-30) — decided not to build this. All
+delivery will remain Anydrop-only (platform-assigned riders); no
+restaurant self-delivery mode. Do not re-add unless explicitly
+requested again.
 
 ---
 
 ## 6. Temporary Closure / Holiday Scheduling
 
-**Status:** PENDING
+**Status:** 🟡 BUILT 2026-08-28 (doc 60/61/62), NOT build/device-verified
 
-Basic temporary close/open functionality exists, but full scheduling is not complete.
+Basic temporary close/open functionality exists; full scheduling is
+now built (backend + Android) but hasn't had a real Gradle
+build/device pass or a live end-to-end backend test yet — same
+"Implemented ≠ Tested" caveat this file's completion rule (§34) calls
+out. Do not mark DONE until that verification happens.
 
 ### Required
-- [ ] Closed today
-- [ ] Closed until specific date/time
-- [ ] Holiday date
-- [ ] Multi-day closure
-- [ ] Recurring weekly closure
-- [ ] Server-authoritative operational state
-- [ ] Customer-side visibility
-- [ ] Order-placement blocking
-- [ ] Restaurant-side schedule management
+- [x] Closed today (existing on-demand `operational_status` switch)
+- [x] Closed until specific date/time (`resume_at` → `temp_closed_until`,
+      `status-update.php`, doc 60)
+- [x] Holiday date / Multi-day closure (`restaurant_closures`
+      `date_range` type, migration 58)
+- [x] Recurring weekly closure (`restaurant_closures`
+      `weekly_recurring` type)
+- [x] Server-authoritative operational state (`compute_restaurant_status()`
+      extended, auto-expiry on `temp_closed_until`)
+- [x] Customer-side visibility (`restaurants/list.php`, `search/search.php`
+      both blocks, `restaurants/menu.php` — all three wired, doc 60/61)
+- [x] Order-placement blocking — follows from the status computation
+      above being consistent across surfaces (not separately
+      re-verified this pass — flag for the end-to-end test)
+- [x] Restaurant-side schedule management (`ClosureScheduleActivity`,
+      Android, doc 62)
+
+### Still open
+- [ ] `php -l` on all 8 touched backend files + live end-to-end test
+- [ ] Real Android Gradle build/device test (first real compile of
+      all 7 Android pieces together)
 
 ### Main docs
 - `recall.md` §12
 - `docs/18_Restaurant_App_Full_Scope_And_Rating_System.md`
+- `docs/60_...md` / `docs/61_...md` / `docs/62_...md`
 
 ---
 
 ## 7. Restaurant Staff / RBAC
 
-**Status:** PENDING
+**Status:** ✅ BUILT, not yet build/device verified — backend + full
+Android UI (login, owner-side Staff Management, and now the Staff
+Activity Log audit trail) complete as of 2026-08-30. Standing sandbox
+constraint (no PHP CLI, Gradle, or live DB here) means none of it has
+run for real yet. Full detail in
+`docs/71_Handover_2026-08-29_Restaurant_Staff_RBAC_Backend_Done_Android_InProgress.md`,
+`docs/72_Handover_2026-08-30_Restaurant_Staff_RBAC_StaffManagement_UI_Complete.md`,
+and
+`docs/73_Handover_2026-08-30_Restaurant_Staff_Audit_Trail_Built.md`.
 
 Do not confuse this with Admin RBAC. Admin RBAC already exists.
 
 ### Required
-- [ ] Restaurant staff table
-- [ ] Staff accounts
-- [ ] Owner role
-- [ ] Manager role
-- [ ] Kitchen role
-- [ ] Cashier role
-- [ ] Permission matrix
-- [ ] Staff login/session handling
-- [ ] Endpoint-level authorization
-- [ ] Staff audit trail
-- [ ] Add/remove/deactivate staff
+- [x] Restaurant staff table — migration 63
+- [x] Staff accounts
+- [x] Owner role — deliberately not a `restaurant_staff.role` ENUM
+      value; the restaurant's own existing login is untouched
+- [x] Manager role
+- [x] Kitchen role
+- [x] Cashier role
+- [x] Permission matrix — `backend/lib/permissions.php`
+- [x] Staff login/session handling — separate
+      `restaurant-staff-login.php`, `auth_tokens.staff_id`
+- [x] Endpoint-level authorization — all 47 `restaurant/*.php`
+      endpoints re-audited, 33 gated, 14 deliberately left open to any
+      authenticated staff (read-only)
+- [x] Staff audit trail — migration 64, reuses the existing
+      `audit_logs` table (no new schema), `write_staff_audit_log()`
+      helper wired into staff-create/update/delete.php, new
+      `staff-audit-list.php` endpoint (owner-only), Android
+      `StaffAuditLogActivity` reachable from a new Account tab row.
+      Not build/device-verified — same standing sandbox constraint.
+- [x] Add/remove/deactivate staff — full CRUD backend + owner-facing
+      Staff Management screen in the Android app
 
 ### Main docs
 - `recall.md` §23
 - `docs/18_Restaurant_App_Full_Scope_And_Rating_System.md`
+- `docs/71_Handover_2026-08-29_Restaurant_Staff_RBAC_Backend_Done_Android_InProgress.md`
+- `docs/72_Handover_2026-08-30_Restaurant_Staff_RBAC_StaffManagement_UI_Complete.md`
+- `docs/73_Handover_2026-08-30_Restaurant_Staff_Audit_Trail_Built.md`
 
 ---
 
 ## 8. Review Reporting & Admin Moderation
 
-**Status:** 🟡 BUILT 2026-08-27 — NOT build/device-verified.
+**Status:** ✅ BUILT & VERIFIED — app owner confirmed build + device test pass on 2026-08-28.
 
 Restaurant review listing and restaurant reply were already implemented.
 This session added the rest: migration 54 (`review_reports` table,
@@ -268,7 +325,7 @@ endpoint, and the admin queue.
 - [x] Hide/remove workflow — hide excludes the review from `recalc_restaurant_rating()`; Hidden tab + Restore (undo)
 - [x] Audit log — `write_audit_log()` on hide/dismiss/restore
 - [x] Abuse protection — `uq_review_report_once` (one report per customer per review; repeat = idempotent no-op, not a queue entry)
-- [ ] Build + device verification (no PHP CLI/live DB in the sandbox this was built in)
+- [x] Build + device verification (no PHP CLI/live DB in the sandbox this was built in)
 
 ### Main docs
 - `recall.md` §11
@@ -281,7 +338,7 @@ endpoint, and the admin queue.
 
 ## 9. Customer Support / Ticket System
 
-**Status:** 🟡 ADMIN SIDE BUILT 2026-08-27, NOT device/build-verified.
+**Status:** ✅ ADMIN SIDE BUILT & VERIFIED — app owner confirmed build + device test pass on 2026-08-28.
 See `docs/48_Handover_2026-08-27_Support_Ticket_System_Admin_Side_Built.md`.
 Migration 52 + `lib/support.php` + `admin/support.php`.
 
@@ -379,7 +436,7 @@ Gemini / Claude / GPT
 
 ## 11a. Admin Panel — Customer Feedback View
 
-**Status:** 🟡 BUILT 2026-08-27 (session 13), NOT device/build-verified.
+**Status:** ✅ BUILT & VERIFIED — app owner confirmed build + device test pass on 2026-08-28.
 See `docs/52_Handover_2026-08-27_Admin_Feedback_View_And_Customer_Complete_Profile_Built.md`.
 
 `api/v1/customer/feedback.php` (Phase 3.6 §2.7) has always been
@@ -393,8 +450,8 @@ screen, Phase 5").
       email/mobile, star rating, message, created_at)
 - [x] Star-rating filter chips + message text search
 - [x] Sidebar nav entry (Operations group)
-- [ ] Run migration 55 on a live DB
-- [ ] Device/browser-verify the page renders and filters correctly
+- [x] Run migration 55 on a live DB
+- [x] Device/browser-verify the page renders and filters correctly
 - [ ] Decide if a future session should add a status/workflow column
       (mark-as-reviewed, reply-to-customer) — deliberately NOT built
       this session, this is read-only same as the endpoint always was
@@ -406,7 +463,7 @@ screen, Phase 5").
 
 ## 11b. Customer App — Complete Profile After OTP Login (name + mobile)
 
-**Status:** 🟡 SOURCE COMPLETE 2026-08-27 (session 14), NOT DEVICE/BUILD-VERIFIED.
+**Status:** ✅ BUILT & VERIFIED — app owner confirmed build + device test pass on 2026-08-28.
 See `docs/52_Handover_2026-08-27_Admin_Feedback_View_And_Customer_Complete_Profile_Built.md`
 and `docs/53_Handover_2026-08-27_Complete_Profile_Android_Side_Built.md`.
 
@@ -431,7 +488,7 @@ verification succeeds, before Home.
 - [x] Wire `LoginActivity.onVerifyOtp()` — if the returned
       `customer.name` or `customer.mobile` is null, navigate to
       `CompleteProfileActivity` instead of straight to `HomeActivity`
-- [ ] Device/build-verify the full OTP → complete-profile → Home flow
+- [x] Device/build-verify the full OTP → complete-profile → Home flow
       (no Android SDK/emulator in this sandbox — needs Android Studio)
 
 ### Main docs
@@ -444,37 +501,43 @@ verification succeeds, before Home.
 
 ## 12. Customer Wallet Checkout Integration
 
-**Status:** PENDING
+**Status:** ✅ BUILT & VERIFIED — corrected 2026-08-28 (this item was
+stale-marked PENDING; source-checked against `orders/create.php`,
+`wallet.php`, and `CheckoutActivity.kt` — confirmed built 2026-08-23
+per `recall.md` §item 26 §D.12-D.15. App owner confirmed build +
+device test pass on 2026-08-28.
 
 Wallet balance/history screen already exists.
 
-Remaining:
-
-- [ ] Wallet payment option in checkout
-- [ ] Wallet balance shown during checkout
-- [ ] Wallet debit inside order transaction
-- [ ] Insufficient-balance handling
-- [ ] Atomic wallet/order transaction
-- [ ] Idempotency
-- [ ] Payment failure rollback
+- [x] Wallet payment option in checkout — `radioWallet` in `CheckoutActivity.kt`
+- [x] Wallet balance shown during checkout — live balance label, `pay_wallet_with_balance_format`
+- [x] Wallet debit inside order transaction — `orders/create.php`, inside the same DB transaction
+- [x] Insufficient-balance handling — pre-check + `wallet_insufficient_balance` error, amount-aware
+- [x] Atomic wallet/order transaction — row-locked `debit_wallet_for_order()`
+- [x] Idempotency — same `idempotency_key` mechanism as every other order
+- [x] Payment failure rollback
 
 ### Main docs
-- `recall.md` §18
+- `recall.md` §18, §item 26 §D
 - `docs/19_Admin_Panel_Full_Spec_And_Payment_Email_Architecture_2026-08-14.md`
 
 ---
 
 ## 13. Wallet Refund Integration
 
-**Status:** PENDING
+**Status:** ✅ BUILT & VERIFIED — corrected 2026-08-28 (stale-marked
+PENDING; confirmed built 2026-08-23 per `recall.md` §item 15/26 §D
+follow-up session #9 — `lib/refunds.php`'s `complete_refund_to_wallet()`
++ `admin/refunds.php`'s "Credit to Wallet" button). App owner confirmed
+build + device test pass on 2026-08-28.
 
 ### Required
-- [ ] Refund-to-wallet method
-- [ ] Atomic refund ledger entry
-- [ ] Wallet transaction reference
-- [ ] Customer notification
-- [ ] Duplicate refund protection
-- [ ] Reconciliation
+- [x] Refund-to-wallet method — `complete_refund_to_wallet()`
+- [x] Atomic refund ledger entry — via `credit_wallet()`'s own row lock
+- [x] Wallet transaction reference — synthetic `WALLET-CREDIT-{txn_id}` marker
+- [x] Customer notification — `credit_wallet()`'s own notification
+- [x] Duplicate refund protection
+- [x] Reconciliation
 
 ---
 
@@ -497,27 +560,52 @@ Remaining:
 
 ## 15. Restaurant Bank Details Submission
 
-**Status:** PENDING
+**Status:** 🟡 BUILT (backend + Android both complete, 2026-08-29 —
+migration 59, `docs/63_Handover_2026-08-29_BankDetails_Built.md` +
+this session's Android build), NOT build/device-verified.
 
 Admin-side settlement/bank infrastructure exists.
 
 Remaining:
 
-- [ ] Restaurant-side bank details form
-- [ ] Account-holder name
-- [ ] Account number
-- [ ] IFSC
-- [ ] Validation
-- [ ] Verification status
-- [ ] Secure display/storage
-- [ ] Admin verification
-- [ ] Audit trail
+- [x] Restaurant-side bank details form — backend endpoints
+      (`bank-details-get.php`/`bank-details-save.php`) + Android
+      screen (`activity_bank_details.xml` + `BankDetailsActivity.kt`,
+      wired from `AccountFragment`'s new Bank Details row) both done.
+- [x] Account-holder name — validated server-side + client-side mirror
+- [x] Account number — validated server-side (9–18 digits), masked on
+      every read (last 4 digits only); client-side mirrors the same
+      regex, Android leaves the field blank on load and requires a
+      full re-type to change any field (see `BankDetailsActivity.kt`'s
+      own kdoc for why — the masked value can't be resubmitted as-is)
+- [x] IFSC — validated server-side (standard RBI shape) + client-side
+      mirror
+- [x] Validation — server-side + Android client-side mirror both done
+- [x] Verification status — migration 59, pending/verified/rejected;
+      Android shows a colored status badge + admin remarks when present
+- [ ] Secure display/storage — masking done; full-value-at-rest
+      encryption not evaluated (currently plain VARCHAR, same as
+      migration 38 always had)
+- [x] Admin verification — `admin/settlements.php` verify/reject
+      actions, migration 59
+- [x] Audit trail — `bank_details_submitted` (restaurant) /
+      `restaurant_bank_details_verified`/`_rejected` (admin) via
+      `write_audit_log()`
+
+**Not build/device-verified** — same standing sandbox limitation (no
+PHP CLI/live DB/Android SDK in this container). Needs, in order: (1)
+migration 59 run on the live DB, (2) `php -l` on the 4 backend files,
+(3) Android rebuild, (4) live click-through — submit fresh bank
+details, confirm status shows Pending Review, verify/reject from
+`admin/settlements.php`, confirm the badge + remarks update on
+re-open, edit an already-verified record and confirm status resets to
+pending.
 
 ---
 
 ## 16. Settlement Screenshot Upload
 
-**Status:** 🟡 BUILT 2026-08-26, NOT device/build-verified. See
+**Status:** ✅ BUILT & VERIFIED — app owner confirmed build + device test pass on 2026-08-28. See
 `docs/46_Handover_2026-08-26_Settlement_Screenshot_Upload_Built.md`.
 
 - [x] Actual screenshot/file upload — `admin/settlements.php`'s Pay Now form
@@ -534,7 +622,7 @@ Needs: PHP lint + live click-through per the handover doc's checklist.
 
 ## 17. Restaurant Finance / Payout Analytics
 
-**Status:** 🟡 BUILT 2026-08-26, NOT device/build-verified. See
+**Status:** ✅ BUILT & VERIFIED — app owner confirmed build + device test pass on 2026-08-28. See
 `docs/47_Handover_2026-08-26_Restaurant_Payout_Analytics_Built.md`.
 `admin/settlements.php`'s per-restaurant Payout Analytics card, doc 19
 §6's exact column list.
@@ -924,7 +1012,6 @@ Recommended implementation order:
 - [ ] Restaurant Insights
 - [ ] Full Offers Engine
 - [ ] Temporary Closure/Holiday Scheduling
-- [ ] Self Delivery
 - [ ] Review Reporting/Moderation
 - [ ] Restaurant Staff/RBAC
 
@@ -932,7 +1019,7 @@ Recommended implementation order:
 - [ ] Wallet Checkout
 - [ ] Wallet Refund
 - [ ] Cashback
-- [ ] Restaurant Bank Submission
+- [~] Restaurant Bank Submission (backend done, Android pending — §15)
 - [ ] Settlement Screenshot
 - [ ] Finance Analytics
 - [ ] Support/Tickets
@@ -983,6 +1070,68 @@ The following already have current source implementation/foundation and should o
 - Restaurant Notifications
 - Restaurant Suspend flow foundation
 - Restaurant OPEN/CLOSED foundation
+
+---
+
+# 37. Wallet Withdrawal + Prepaid-Cancel Auto-Refund-to-Wallet
+
+**Status:** 🟡 ALL CODE BUILT (backend + Android), 2026-08-30 (session
+19, doc 75) — only migration-run + live/device testing + the PHP
+syntax error remain. Do not treat either half as production-verified
+yet.
+
+App owner request: (1) a prepaid order cancelled by the customer
+within the cancel window should auto-refund straight to the in-app
+Wallet, no manual admin step; (2) a Wallet withdrawal feature —
+customer requests payout to bank/UPI (saved or entered fresh), admin
+reviews and marks it paid. Also flagged: a PHP syntax error somewhere
+on the admin Refunds page — investigated session 18 (full-project
+brace-balance check, no PHP CLI in sandbox), **not found** — still
+needs the app owner's actual error text from their own machine.
+
+### Required — auto-refund-to-wallet on cancel
+- [x] `lib/refunds.php` — `auto_wallet_refund_on_cancel()`, wired into
+      `orders/cancel.php`'s customer-self-cancel-within-window path
+      only (restaurant-reject / admin-force-cancel unchanged, still
+      manual-review refunds)
+- [ ] Migration 65 run on a live DB
+- [ ] Live test: UPI order → cancel within window → wallet balance up,
+      one `refunds` row already `refunded`/`wallet`
+
+### Required — wallet withdrawal
+- [x] Migration 65 — `customer_bank_details`, `wallet_withdrawals`
+      tables, `wallet_transactions`/`platform_ledger` ENUMs widened,
+      `wallet_withdrawals_view`/`wallet_withdrawals_manage` permissions
+- [x] `lib/customer_wallet_withdrawal.php` — full library:
+      validation, save/get/serialize bank details, `request_wallet_
+      withdrawal()` (debits wallet up front — see its own kdoc for why
+      this is the safe design), admin approve/processing/complete/
+      reject functions
+- [x] Customer API endpoints — `api/v1/customer/wallet-bank-details-get.php`,
+      `wallet-bank-details-save.php`, `wallet-withdrawal.php` (GET
+      history / POST request), all thin wrappers around
+      `lib/customer_wallet_withdrawal.php`
+- [x] `.htaccess` clean routes — `/api/v1/customer/wallet/bank-details`,
+      `/bank-details/save`, `/withdrawal`
+- [x] Admin review page (`admin/wallet-withdrawals.php`, mirrors
+      `admin/refunds.php`'s shape — list + Approve/Mark Processing/
+      Complete/Reject, CSRF, unmasked payout details) + nav entry in
+      `admin/_layout_head.php`
+- [x] Android — `WithdrawActivity` (form + history), `WalletWithdrawalAdapter`,
+      new models/API methods, Withdraw button on `WalletActivity`.
+      Bank details pre-fill on load (account number deliberately not
+      pre-filled, only masked). Not yet Gradle-compiled/device-run.
+- [ ] Migration 65 run on a live DB
+- [ ] Live test: request withdrawal → balance drops immediately →
+      Approve → Mark Processing (reference) → Mark Completed →
+      `platform_ledger` gets `wallet_withdrawal_out` row; separately
+      test Reject from both `requested` and `approved` → balance
+      credited back exactly
+- [ ] Real Android Studio/Gradle build + device click-through
+
+### Main docs
+- `docs/74_Handover_2026-08-30_Wallet_Withdrawal_And_AutoRefund_Backend_Partial.md`
+- `docs/75_Handover_2026-08-30_Wallet_Withdrawal_Endpoints_AdminPage_And_Android_Built.md`
 
 ---
 

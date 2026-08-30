@@ -135,11 +135,47 @@ object NotificationHelper {
     }
 
     /**
+     * Generic link-tap routing (closes the gap flagged in doc 66's "still
+     * open" list). Admin broadcasts (and any future promo push) may carry
+     * a `link_url` — see `backend/admin/broadcast.php`'s kdoc, which rides
+     * in the FCM `data` payload as `data.link`. Decision made here:
+     * **external browser via `Intent.ACTION_VIEW`**, not an in-app WebView
+     * — this app has no generic "open this arbitrary URL" screen, and
+     * standing one up just for this is more than the feature needs.
+     *
+     * Only `http`/`https` schemes are honored — a push payload is
+     * server-controlled today (admin-only), but treating it as arbitrary
+     * external input and restricting the scheme costs nothing and avoids
+     * a malformed/malicious `link` value resolving to an unexpected
+     * intent (e.g. `intent://`, `market://`, `file://`).
+     *
+     * Falls back to [openHomeIntent] when [linkUrl] is null, blank, or
+     * fails validation — same behavior as before this existed.
+     */
+    private fun openLinkOrHomeIntent(context: Context, linkUrl: String?): PendingIntent {
+        val validated = linkUrl?.trim()?.takeIf {
+            it.isNotEmpty() && (it.startsWith("http://") || it.startsWith("https://"))
+        }
+        if (validated == null) return openHomeIntent(context)
+
+        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(validated)).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+            (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
+        return PendingIntent.getActivity(context, 0, intent, flags)
+    }
+
+    /**
      * Shows an offer/discount notification. If [imageUrl] is null or fails to
      * load, falls back to a plain text notification — this is what covers
      * the "with image, without image" requirement.
+     *
+     * [linkUrl] is optional (present for an admin broadcast's `link_url` —
+     * see [openLinkOrHomeIntent]'s kdoc). When absent, tapping opens Home,
+     * same as before this parameter existed.
      */
-    fun showOfferNotification(context: Context, title: String, message: String, imageUrl: String?) {
+    fun showOfferNotification(context: Context, title: String, message: String, imageUrl: String?, linkUrl: String? = null) {
         if (!hasPermission(context)) return
         ensureChannels(context)
 
@@ -150,7 +186,7 @@ object NotificationHelper {
             .setContentTitle(title)
             .setContentText(message)
             .setAutoCancel(true)
-            .setContentIntent(openHomeIntent(context))
+            .setContentIntent(openLinkOrHomeIntent(context, linkUrl))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
 
         if (bigPicture != null) {

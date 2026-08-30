@@ -1,5 +1,35 @@
 # Anydrop — Project Status
 
+## 🎉 2026-08-28 — Full build + device verification pass confirmed, whole project (Restaurant + Customer + Admin)
+
+App owner confirmed a full build and on-device test pass across **all
+three apps** — Restaurant App, Customer App, and Admin Panel. Every
+entry in this file, `PENDING.md`, `recall.md`, and
+`docs/restorent/00_Status.md` marked "🟡 NOT build/device-verified" /
+"NOT tested" / "not build-verified" as of 2026-08-27 (through session
+14 / docs/29-53) is now **superseded and resolved** — treat those
+caveats as closed unless a specific bug is separately logged in
+`docs/bugs.md`. This includes: Admin Order Control, Admin Analytics,
+Restaurant Insights, Full Offers Engine, Review Moderation, Support
+Ticket System (admin side), Admin Feedback View, Customer
+Complete-Profile flow (both backend and Android), Settlement CSV
+Export, Restaurant Payout Analytics, Settlement Screenshot Upload,
+Customer Wallet Checkout Integration, and Wallet Refund Integration
+(the latter two were also found mis-marked as "PENDING" in
+`PENDING.md` during this same session's doc-audit — corrected to
+built-and-verified, having actually been built back on 2026-08-23).
+
+**Not covered by this pass** (still genuinely not built, not a
+verification gap): Rider App and its dependent systems, Restaurant
+Self Delivery, Restaurant Staff/RBAC, Temporary Closure/Holiday full
+scheduling, Restaurant Bank Details submission form, Cashback/Reward
+Engine, Support AI, Google Login backend verification, Payment/Refund
+Reconciliation (production layer), Email OTP Provider Failover,
+Security Hardening audit. These remain on `PENDING.md` as before —
+this session confirmed *tested*, not *built new features*.
+
+---
+
 **Last Updated:** 2026-08-25 (session 14) — Restaurant App offer create/
 edit screen now has UI for `apply_mode` (Default vs Coupon Based),
 `code`, and `is_public` — the one gap docs/35's coupon-based-offers

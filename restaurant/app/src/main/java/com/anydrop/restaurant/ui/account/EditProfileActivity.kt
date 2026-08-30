@@ -296,6 +296,8 @@ class EditProfileActivity : AppCompatActivity() {
         binding.inputName.setText(profile.name)
         binding.inputAddress.setText(profile.address.orEmpty())
         binding.inputCuisineTags.setText(profile.cuisineTags.orEmpty())
+        binding.inputGstNumber.setText(profile.gstNumber.orEmpty())
+        binding.inputFssaiNumber.setText(profile.fssaiNumber.orEmpty())
         // recall.md Phase B item 13 / migration 36 — show the owner's
         // current value, blank if it's 0/never set, so an empty field
         // doesn't silently look like a real "₹0 minimum" to the owner.
@@ -420,6 +422,21 @@ class EditProfileActivity : AppCompatActivity() {
             return
         }
 
+        // today.md §3 — same shape as profile-update.php's server-side
+        // check (15 alnum chars for GST, 14 digits for FSSAI); done here
+        // too so a typo shows inline instantly instead of round-tripping
+        // to the server first. Blank is always fine (optional fields).
+        val gstNumber = binding.inputGstNumber.text?.toString()?.trim().orEmpty().uppercase(Locale.US)
+        if (gstNumber.isNotEmpty() && !gstNumber.matches(Regex("^[0-9A-Z]{15}$"))) {
+            binding.inputGstNumber.error = getString(R.string.error_invalid_gst_number)
+            return
+        }
+        val fssaiNumber = binding.inputFssaiNumber.text?.toString()?.trim().orEmpty()
+        if (fssaiNumber.isNotEmpty() && !fssaiNumber.matches(Regex("^[0-9]{14}$"))) {
+            binding.inputFssaiNumber.error = getString(R.string.error_invalid_fssai_number)
+            return
+        }
+
         val selectedDays = dayChips.filter { it.value.isChecked }.keys.sorted()
         if (selectedDays.isEmpty()) {
             InAppNotifier.show(this, getString(R.string.error_working_days_required), InAppNotifier.Type.ERROR)
@@ -453,6 +470,8 @@ class EditProfileActivity : AppCompatActivity() {
                     latitude = pickedLat,
                     longitude = pickedLng,
                     cuisineTags = binding.inputCuisineTags.text?.toString()?.trim().orEmpty(),
+                    gstNumber = gstNumber,
+                    fssaiNumber = fssaiNumber,
                     openingTime = String.format(Locale.US, "%02d:%02d", openingHour, openingMinute),
                     closingTime = String.format(Locale.US, "%02d:%02d", closingHour, closingMinute),
                     workingDays = selectedDays.joinToString(","),

@@ -5,12 +5,14 @@ import android.os.Bundle
 import android.util.Patterns
 import android.view.View
 import android.view.animation.AnimationUtils
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.anydrop.restaurant.R
 import com.anydrop.restaurant.databinding.ActivitySignupBinding
 import com.anydrop.restaurant.network.ApiClient
 import com.anydrop.restaurant.network.RequestOtpBody
+import com.anydrop.restaurant.ui.account.LocationPickerActivity
 import com.anydrop.restaurant.ui.common.InAppNotifier
 import kotlinx.coroutines.launch
 
@@ -27,6 +29,30 @@ class SignupActivity : AppCompatActivity() {
     private lateinit var binding: ActivitySignupBinding
     private val api by lazy { ApiClient.create(this) }
 
+    // Service-area pin (§0, 2026-08-28) — null until/unless the owner taps
+    // rowSetLocation and confirms a pin; stays null if skipped, exactly
+    // like the optional address field above it.
+    private var pickedLat: Double? = null
+    private var pickedLng: Double? = null
+
+    private val pickLocationLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                val data = result.data ?: return@registerForActivityResult
+                val lat = data.getDoubleExtra(LocationPickerActivity.EXTRA_RESULT_LAT, Double.NaN)
+                val lng = data.getDoubleExtra(LocationPickerActivity.EXTRA_RESULT_LNG, Double.NaN)
+                if (!lat.isNaN() && !lng.isNaN()) {
+                    pickedLat = lat
+                    pickedLng = lng
+                    val addressLine = data.getStringExtra(LocationPickerActivity.EXTRA_RESULT_ADDRESS_LINE)
+                    binding.locationRowText.text = getString(
+                        R.string.row_service_area_location_set,
+                        addressLine ?: getString(R.string.location_picker_geocode_failed)
+                    )
+                }
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivitySignupBinding.inflate(layoutInflater)
@@ -37,6 +63,9 @@ class SignupActivity : AppCompatActivity() {
         binding.btnBack.setOnClickListener { finishWithSlide() }
         binding.btnGoLogin.setOnClickListener { finishWithSlide() }
         binding.btnContinue.setOnClickListener { attemptContinue() }
+        binding.rowSetLocation.setOnClickListener {
+            pickLocationLauncher.launch(Intent(this, LocationPickerActivity::class.java))
+        }
     }
 
     override fun onBackPressed() {
@@ -54,7 +83,7 @@ class SignupActivity : AppCompatActivity() {
             binding.signupTitle, binding.signupSubtitle, binding.inputRestaurantName,
             binding.inputOwnerName, binding.inputOwnerMobile, binding.inputEmail,
             binding.inputPassword, binding.inputConfirmPassword, binding.inputAddress,
-            binding.btnContinue
+            binding.rowSetLocation, binding.btnContinue
         )
         views.forEachIndexed { index, view ->
             val anim = AnimationUtils.loadAnimation(this, R.anim.form_field_in).apply {
@@ -109,7 +138,9 @@ class SignupActivity : AppCompatActivity() {
                             ownerMobile = ownerMobile,
                             email = email,
                             password = password,
-                            address = address.ifEmpty { null }
+                            address = address.ifEmpty { null },
+                            latitude = pickedLat,
+                            longitude = pickedLng
                         ),
                         debugOtp
                     )

@@ -14,7 +14,10 @@ import com.anydrop.restaurant.R
 import com.anydrop.restaurant.data.TokenManager
 import com.anydrop.restaurant.databinding.FragmentAccountBinding
 import com.anydrop.restaurant.databinding.DialogLogoutConfirmBinding
+import com.google.android.material.datepicker.MaterialDatePicker
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.timepicker.MaterialTimePicker
+import com.google.android.material.timepicker.TimeFormat
 import com.anydrop.restaurant.network.ApiClient
 import com.anydrop.restaurant.network.OperationalStatusUpdateBody
 import com.anydrop.restaurant.network.RestaurantProfileDetail
@@ -22,7 +25,10 @@ import com.anydrop.restaurant.service.OrderPollingService
 import com.anydrop.restaurant.ui.common.InAppNotifier
 import com.anydrop.restaurant.ui.login.LoginActivity
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
+import java.util.TimeZone
 
 /**
  * Account tab (docs/restorent/19 §7, §10 item 5,
@@ -99,9 +105,49 @@ class AccountFragment : Fragment() {
             startActivity(Intent(requireContext(), com.anydrop.restaurant.ui.reviews.ReviewListActivity::class.java))
         }
 
+        // Closure Schedule (§3, today.md 2026-08-28; doc 60/61) — same
+        // row style/placement as the rows above, launched right after
+        // the temp-closed switch card in fragment_account.xml.
+        binding.btnClosuresRow.setOnClickListener {
+            startActivity(Intent(requireContext(), ClosureScheduleActivity::class.java))
+        }
+
+        // Bank Details submission (PENDING.md §15, migration 59, doc 63)
+        // — same one-line row-launch pattern as btnClosuresRow above.
+        binding.btnBankDetailsRow.setOnClickListener {
+            startActivity(Intent(requireContext(), BankDetailsActivity::class.java))
+        }
+
+        // Staff Management (doc 71, migration 63, PENDING.md item 3) —
+        // row is gone by default in fragment_account.xml and only shown
+        // here for an owner session; canManageStaff() is the same
+        // client-side-convenience check StaffManagementActivity itself
+        // re-checks on launch (the backend's own 403 is what actually
+        // enforces this either way).
+        if (tokenManager.canManageStaff()) {
+            binding.btnStaffManagementRow.visibility = View.VISIBLE
+            binding.btnStaffManagementRow.setOnClickListener {
+                startActivity(Intent(requireContext(), com.anydrop.restaurant.ui.staff.StaffManagementActivity::class.java))
+            }
+        }
+
+        // Staff Audit Trail (migration 64, PENDING.md §7's last
+        // checkbox) — same owner-only guard/pattern as
+        // btnStaffManagementRow immediately above.
+        if (tokenManager.canManageStaff()) {
+            binding.btnStaffAuditLogRow.visibility = View.VISIBLE
+            binding.btnStaffAuditLogRow.setOnClickListener {
+                startActivity(Intent(requireContext(), com.anydrop.restaurant.ui.staff.StaffAuditLogActivity::class.java))
+            }
+        }
+
         binding.switchTempClosed.setOnCheckedChangeListener { _, isChecked ->
             if (suppressTempClosedListener) return@setOnCheckedChangeListener
-            setTempClosed(isChecked)
+            if (isChecked) {
+                promptResumeTime()
+            } else {
+                setTempClosed(turningOn = false, resumeAt = null)
+            }
         }
 
         binding.btnLogout.setOnClickListener {
@@ -214,16 +260,77 @@ class AccountFragment : Fragment() {
         return String.format(Locale.US, "%d:%02d %s", hour12, minute, amPm)
     }
 
+    /** Turning the switch on offers an optional reopen-time prompt
+     * (§3, today.md 2026-08-28; doc 60/61 — this is what actually lets
+     * a restaurant send the resume_at field status-update.php has
+     * accepted since doc 60; before this nothing in the app sent it).
+     * "Skip" keeps today's exact behavior (resume_at: null). */
+    private fun promptResumeTime() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.closure_resume_time_title)
+            .setPositiveButton(R.string.btn_save) { _, _ -> showResumeTimePicker() }
+            .setNegativeButton(R.string.btn_skip) { _, _ -> setTempClosed(turningOn = true, resumeAt = null) }
+            .setOnCancelListener { setTempClosed(turningOn = true, resumeAt = null) }
+            .show()
+    }
+
+    /** MaterialDatePicker → MaterialTimePicker chain, copied from
+     * CouponManagerActivity.setUpValidUntilPicker() — same double-tap
+     * guard against two overlapping picker fragments, and the same
+     * post() trick to show the time picker only after the date
+     * picker's own dismiss transaction has committed (both were real
+     * bugs fixed there, not defensive-for-no-reason code). */
+    private fun showResumeTimePicker() {
+        if (childFragmentManager.findFragmentByTag("resume_at_date_picker") != null) return
+        val datePicker = MaterialDatePicker.Builder.datePicker()
+            .setTitleText(getString(R.string.closure_resume_time_title))
+            .build()
+        datePicker.addOnPositiveButtonClickListener { utcMillis ->
+            val utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+            utcCal.timeInMillis = utcMillis
+
+            val timePicker = MaterialTimePicker.Builder()
+                .setTimeFormat(TimeFormat.CLOCK_12H)
+                .setHour(9)
+                .setMinute(0)
+                .build()
+            timePicker.addOnPositiveButtonClickListener {
+                val local = Calendar.getInstance()
+                local.set(
+                    utcCal.get(Calendar.YEAR),
+                    utcCal.get(Calendar.MONTH),
+                    utcCal.get(Calendar.DAY_OF_MONTH),
+                    timePicker.hour,
+                    timePicker.minute,
+                    0
+                )
+                val wireFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+                setTempClosed(turningOn = true, resumeAt = wireFormat.format(local.time))
+            }
+            binding.root.post {
+                val hostActivity = activity
+                if (hostActivity != null && !hostActivity.isFinishing && !hostActivity.isDestroyed) {
+                    timePicker.show(childFragmentManager, "resume_at_time_picker")
+                }
+            }
+        }
+        // Dismissing the date picker (back press) leaves the switch on
+        // with no resume time set, same as an explicit Skip, rather
+        // than silently reverting the switch.
+        datePicker.addOnCancelListener { setTempClosed(turningOn = true, resumeAt = null) }
+        datePicker.show(childFragmentManager, "resume_at_date_picker")
+    }
+
     /** Same call MainActivity.setOperationalStatus() uses, distinct
      * status value ("temp_closed" vs "busy") — see fragment_account.xml's
      * comment on why these are kept separate. Reverts the switch on
      * failure rather than leaving it showing a state that didn't
      * actually save. */
-    private fun setTempClosed(turningOn: Boolean) {
+    private fun setTempClosed(turningOn: Boolean, resumeAt: String?) {
         val newStatus = if (turningOn) "temp_closed" else "open"
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                val response = api.updateOperationalStatus(OperationalStatusUpdateBody(newStatus))
+                val response = api.updateOperationalStatus(OperationalStatusUpdateBody(newStatus, resumeAt))
                 if (!response.isSuccessful || response.body()?.data == null) {
                     revertTempClosedSwitch(!turningOn)
                     InAppNotifier.show(activity, getString(R.string.status_update_failed), InAppNotifier.Type.ERROR)

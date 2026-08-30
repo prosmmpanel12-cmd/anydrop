@@ -110,6 +110,102 @@ if (!function_exists('create_refund_request')) {
     }
 }
 
+if (!function_exists('auto_wallet_refund_on_cancel')) {
+    /**
+     * Migration 65 — self-service cancellation within the allowed
+     * cancel window (orders/cancel.php's own `order_cancel_window_
+     * minutes` check happens BEFORE this is ever called, so "jab tak
+     * time ho" is already guaranteed by the caller) is a policy-safe,
+     * no-judgement-call refund: unlike a restaurant-rejected or
+     * admin-force-cancelled order, there's no reason for an admin to
+     * review it first. This skips the manual requested ->
+     * under_review -> approved queue entirely and credits the
+     * customer's Anydrop Wallet instantly.
+     *
+     * MUST be called inside the SAME transaction as the caller's
+     * order-status UPDATE (orders/cancel.php does this) so a failure
+     * anywhere in here rolls the cancellation back too, rather than
+     * leaving a cancelled order with no refund at all.
+     *
+     * Deliberately does NOT reuse create_refund_request() — that
+     * function's own "Refund requested" notification would fire a
+     * split-second before credit_wallet()'s own "Wallet credited"
+     * notification here, two notifications for what the customer
+     * experiences as one instant event. Same "no redundant second
+     * notification" call complete_refund_to_wallet() already makes.
+     *
+     * Still writes exactly one `refunds` row (migration 42's
+     * UNIQUE(order_id) is respected) so this order's refund history
+     * looks the same to any future query/report as a manually-
+     * completed wallet refund would — it's just already in its
+     * terminal 'refunded' state when the row is first created, and
+     * actor is 'system' (no admin acted here), not 'admin'.
+     */
+    function auto_wallet_refund_on_cancel(PDO $db, array $order, string $reason): array
+    {
+        $txnStmt = $db->prepare(
+            "SELECT id FROM payment_transactions WHERE order_id = :oid AND status = 'success' ORDER BY id DESC LIMIT 1"
+        );
+        $txnStmt->execute(['oid' => $order['id']]);
+        $txnRow = $txnStmt->fetch();
+
+        $ins = $db->prepare(
+            'INSERT INTO refunds
+                (order_id, payment_transaction_id, customer_id, amount, reason, initiated_by, status, method, approved_at)
+             VALUES
+                (:oid, :txnid, :cid, :amount, :reason, \'customer\', \'approved\', \'wallet\', NOW())'
+        );
+        $ins->execute([
+            'oid' => $order['id'],
+            'txnid' => $txnRow ? (int) $txnRow['id'] : null,
+            'cid' => $order['customer_id'],
+            'amount' => $order['grand_total'],
+            'reason' => $reason,
+        ]);
+        $refundId = (int) $db->lastInsertId();
+
+        $creditResult = credit_wallet(
+            $db,
+            (int) $order['customer_id'],
+            (float) $order['grand_total'],
+            'refund',
+            (int) $order['id'],
+            'Refund for cancelled order ' . $order['order_code'],
+            'system',
+            null
+        );
+        $reference = 'WALLET-CREDIT-' . $creditResult['txn_id'];
+
+        $db->prepare(
+            "UPDATE refunds SET status = 'refunded', refunded_at = NOW(), refund_reference = :ref WHERE id = :id"
+        )->execute(['ref' => $reference, 'id' => $refundId]);
+
+        if ($txnRow) {
+            $db->prepare("UPDATE payment_transactions SET status = 'refunded' WHERE id = :id AND status = 'success'")
+                ->execute(['id' => (int) $txnRow['id']]);
+        }
+
+        // orders.payment_status is intentionally left to the caller
+        // (orders/cancel.php) — that same transaction is already
+        // issuing its own UPDATE against this exact order row for the
+        // cancellation itself; a second, separate UPDATE ... WHERE
+        // id=:id here would just be two statements racing to touch
+        // the same row for no reason. complete_refund()/complete_
+        // refund_to_wallet() flip it themselves because an admin
+        // action is the ONLY writer touching that order at that
+        // moment — not the case here.
+
+        write_audit_log('system', null, 'refund_auto_completed_to_wallet', [
+            'refund_id' => $refundId,
+            'order_id' => (int) $order['id'],
+            'amount' => (float) $order['grand_total'],
+            'wallet_txn_id' => $creditResult['txn_id'],
+        ]);
+
+        return ['ok' => true, 'refund_id' => $refundId, 'wallet_txn_id' => $creditResult['txn_id']];
+    }
+}
+
 if (!function_exists('get_refund_for_order')) {
     function get_refund_for_order(PDO $db, int $orderId): ?array
     {
