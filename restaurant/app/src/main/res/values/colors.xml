@@ -1,22 +1,22 @@
 <resources>
-    <!-- Brand — reverted 2026-08-16 to pre-refresh orange+white (docs/
-         restorent/19 §8.1.1): app owner's call after real-device testing
-         was that this original combo read better than the 2026-08-16
-         orange+ink refresh. See 00_Status.md's "App owner feedback from
-         real-device testing" entry and §8.2 of the plan doc for the
-         original rationale/table this restores. -->
-    <color name="anydrop_primary">#E64A19</color>
-    <color name="anydrop_primary_dark">#B23C14</color>
-    <color name="anydrop_primary_container">#FFE0D3</color>
-    <color name="anydrop_secondary">#2E7D32</color>
+    <!-- Brand — switched 2026-08-31 to a monochrome black &amp; white
+         theme, matching the app owner's new UI kit reference (black
+         primary, white/light-grey surfaces, black text). Replaces the
+         orange+white brand restored on 2026-08-16 — this is a deliberate
+         follow-up change per the app owner's explicit new instruction, not
+         a reversion of that earlier call. -->
+    <color name="anydrop_primary">#000000</color>
+    <color name="anydrop_primary_dark">#000000</color>
+    <color name="anydrop_primary_container">#EAEAEA</color>
+    <color name="anydrop_secondary">#000000</color>
 
     <!-- Surfaces -->
-    <color name="background">#FAFAFA</color>
+    <color name="background">#F5F5F5</color>
     <color name="surface">#FFFFFF</color>
-    <color name="outline">#E0E0E0</color>
+    <color name="outline">#EAEAEA</color>
 
     <!-- Text -->
-    <color name="text_primary">#1A1A1A</color>
+    <color name="text_primary">#000000</color>
     <color name="text_secondary">#6E6E6E</color>
     <color name="white">#FFFFFF</color>
 
@@ -55,7 +55,8 @@
          green/red on/off scheme; every switch in the app is now orange
          (ON) / this grey (OFF) instead. -->
     <color name="switch_track_off">#D6D6D6</color>
-    <!-- 2026-08-20 — thumb now solid black (was white) per app-owner
-         reference: a small black-knob-on-orange-track pill. -->
-    <color name="switch_thumb_color">#1A1A1A</color>
+    <!-- Thumb stays white now that the ON track itself is solid black
+         (2026-08-31 monochrome change) — a black knob on a black track
+         would be invisible. -->
+    <color name="switch_thumb_color">#FFFFFF</color>
 </resources>

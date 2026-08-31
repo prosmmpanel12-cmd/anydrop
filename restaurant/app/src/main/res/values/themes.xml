@@ -35,11 +35,21 @@
         <item name="colorOnSurface">@color/text_primary</item>
         <item name="colorOnSurfaceVariant">@color/text_secondary</item>
         <item name="colorOutline">@color/outline</item>
+        <!-- 2026-08-31 monochrome pass: most ic_*.xml vectors tint
+             themselves via android:tint="?attr/colorControlNormal" rather
+             than a fixed fillColor. Left unset, Material3 resolves that to
+             its own default (a mid-grey), which reads muddy against the
+             new pure black/white kit. Pinning it to text_primary makes
+             every one of those icons solid black, matching the kit's
+             icon set without touching 100+ individual vector files. -->
+        <item name="colorControlNormal">@color/text_primary</item>
         <item name="android:windowBackground">@color/background</item>
-        <!-- Reverted 2026-08-16 (§8.1.1) back to the flat orange status bar,
-             matching activity_main.xml's top-bar revert. -->
-        <item name="android:statusBarColor">@color/anydrop_primary</item>
-        <item name="android:windowLightStatusBar">false</item>
+        <!-- 2026-08-31 monochrome change: the top bar itself is
+             @color/surface (white), not colorPrimary — a solid black
+             status bar would clash with it, so this now matches the
+             surface color with dark (light-status-bar) icons instead. -->
+        <item name="android:statusBarColor">@color/surface</item>
+        <item name="android:windowLightStatusBar">true</item>
         <item name="android:textColorPrimary">@color/text_primary</item>
         <item name="android:textColorSecondary">@color/text_secondary</item>
         <!-- Stops Android 10+'s OS-level "force dark" auto-inversion from
@@ -75,6 +85,23 @@
              style="@style/Widget.AnydropRestaurant.Switch" on each
              layout usage below) — see that style's own comment. -->
         <item name="switchStyle">@style/Widget.AnydropRestaurant.Switch</item>
+        <!-- 2026-08-31 monochrome pass: every plain MaterialButton in the
+             app (dialog_confirm_delete, dialog_logout_confirm, etc. — the
+             ones that don't already use @drawable/bg_button_primary's own
+             12dp radius) previously fell back to Material3's default
+             near-pill corner radius, which reads rounder than the kit's
+             buttons. This pins the same 12dp radius app-wide via the
+             shape system instead of touching every dialog layout. -->
+        <item name="shapeAppearanceCornerExtraSmall">@style/ShapeAppearance.AnydropRestaurant.Button</item>
+        <item name="materialButtonStyle">@style/Widget.AnydropRestaurant.Button</item>
+    </style>
+
+    <style name="ShapeAppearance.AnydropRestaurant.Button" parent="ShapeAppearance.Material3.Corner.Full">
+        <item name="cornerSize">12dp</item>
+    </style>
+
+    <style name="Widget.AnydropRestaurant.Button" parent="Widget.Material3.Button">
+        <item name="shapeAppearance">@style/ShapeAppearance.AnydropRestaurant.Button</item>
     </style>
 
     <!-- Shared rounded-card look for every AlertDialog/MaterialAlertDialog
