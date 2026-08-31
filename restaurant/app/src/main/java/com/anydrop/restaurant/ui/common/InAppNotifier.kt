@@ -26,11 +26,17 @@ object InAppNotifier {
         val icon = view.findViewById<ImageView>(R.id.toastIcon)
         view.findViewById<TextView>(R.id.toastMessage).text = message
 
+        // 2026-08-31 monochrome brand update — the error/warning glyphs
+        // (the "!" icon shown in create/login failure toasts) are now
+        // black instead of red/amber, matching the rest of the app's
+        // black & white theme. Chip backgrounds stay lightly tinted so
+        // success/error/warning/info toasts remain visually distinct at
+        // a glance, but the icon itself is monochrome across all types.
         val (iconRes, tintColor) = when (type) {
-            Type.SUCCESS -> R.drawable.ic_check_circle to R.color.success_fg
-            Type.ERROR -> R.drawable.ic_error to R.color.error_fg
-            Type.WARNING -> R.drawable.ic_warning to R.color.warning_amber
-            Type.INFO -> R.drawable.ic_info to R.color.info_fg
+            Type.SUCCESS -> R.drawable.ic_check_circle to R.color.anydrop_primary
+            Type.ERROR -> R.drawable.ic_error to R.color.anydrop_primary
+            Type.WARNING -> R.drawable.ic_warning to R.color.anydrop_primary
+            Type.INFO -> R.drawable.ic_info to R.color.anydrop_primary
         }
         val bgColor = when (type) {
             Type.SUCCESS -> R.color.success_bg

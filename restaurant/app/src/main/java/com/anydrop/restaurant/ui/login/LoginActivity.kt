@@ -103,7 +103,12 @@ class LoginActivity : AppCompatActivity() {
                     registerFcmTokenAfterLogin()
                     goToDashboard()
                 } else {
-                    val error = response.body()?.error ?: "login_failed"
+                    // response.body() is always null on a non-2xx HTTP
+                    // response (401/403/...) — the real error code only
+                    // ever lives in errorBody(). See ErrorParsing.kt's
+                    // own kdoc for why this was silently always falling
+                    // back to the generic message before.
+                    val error = com.anydrop.restaurant.network.parseApiError(response.errorBody()).code ?: "login_failed"
                     InAppNotifier.show(this@LoginActivity, friendlyError(error), InAppNotifier.Type.ERROR)
                     setLoading(false)
                 }

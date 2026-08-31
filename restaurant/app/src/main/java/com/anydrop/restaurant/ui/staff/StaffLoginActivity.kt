@@ -68,7 +68,18 @@ class StaffLoginActivity : AppCompatActivity() {
                     registerFcmTokenAfterLogin()
                     goToDashboard()
                 } else {
-                    val error = response.body()?.error ?: "login_failed"
+                    // response.body() is always null on a non-2xx HTTP
+                    // response (401/403/...) — restaurant-staff-login.php's
+                    // actual error code (invalid_credentials,
+                    // staff_disabled, account_suspended,
+                    // pending_approval) only ever lives in errorBody().
+                    // Reading response.body()?.error here always
+                    // returned null, so every one of those distinct
+                    // failures was silently showing the exact same
+                    // generic "Couldn't log in" message — indistinguishable
+                    // from a wrong password, a disabled account, or a
+                    // suspended restaurant. See ErrorParsing.kt's kdoc.
+                    val error = com.anydrop.restaurant.network.parseApiError(response.errorBody()).code ?: "login_failed"
                     InAppNotifier.show(this@StaffLoginActivity, friendlyError(error), InAppNotifier.Type.ERROR)
                     setLoading(false)
                 }
@@ -84,6 +95,7 @@ class StaffLoginActivity : AppCompatActivity() {
         "staff_disabled" -> "This staff account has been disabled — contact your restaurant owner"
         "account_suspended" -> "This restaurant's account is suspended — contact support"
         "pending_approval" -> "This restaurant is pending admin approval"
+        "validation_error" -> "Enter both username and password"
         else -> "Couldn't log in — please try again"
     }
 

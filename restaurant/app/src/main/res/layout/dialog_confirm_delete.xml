@@ -25,7 +25,7 @@
         android:layout_height="72dp"
         android:layout_marginBottom="16dp"
         android:background="@drawable/bg_icon_circle"
-        android:backgroundTint="@color/error_bg">
+        android:backgroundTint="@color/outline">
 
         <ImageView
             android:layout_width="40dp"
@@ -42,7 +42,7 @@
         android:layout_height="wrap_content"
         android:textSize="18sp"
         android:textStyle="bold"
-        android:textColor="@color/nonveg_red"
+        android:textColor="@color/anydrop_primary"
         android:gravity="center"
         tools:text="Delete this item?" />
 
@@ -76,7 +76,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="10dp"
-            android:backgroundTint="@color/nonveg_red"
+            android:backgroundTint="@color/anydrop_primary"
             android:text="@string/btn_delete" />
 
     </LinearLayout>

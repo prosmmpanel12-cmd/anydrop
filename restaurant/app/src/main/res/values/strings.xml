@@ -26,6 +26,13 @@
     <string name="staff_load_failed">Couldn\'t load staff</string>
     <string name="staff_save_failed">Couldn\'t save staff details</string>
     <string name="staff_username_taken">That username is already taken — usernames must be unique across all restaurants. Try another.</string>
+    <string name="staff_error_name_required">Enter a name</string>
+    <string name="staff_error_username_short">Username must be at least 3 characters</string>
+    <string name="staff_error_password_required">Enter a password</string>
+    <string name="staff_error_password_short">Password must be at least 6 characters</string>
+    <string name="staff_error_username_password_same">Username and password can\'t be the same — pick a different password</string>
+    <string name="staff_error_invalid_role">Select a valid role</string>
+    <string name="staff_error_forbidden">Only the restaurant owner can manage staff</string>
     <string name="staff_saved">Staff saved</string>
     <string name="staff_deleted">Staff removed</string>
     <string name="staff_delete_confirm_title">Remove this staff member?</string>

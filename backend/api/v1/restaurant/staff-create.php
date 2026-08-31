@@ -46,6 +46,14 @@ if (mb_strlen($username) < 3) {
 if (mb_strlen($password) < 6) {
     respond_error('validation_error', 422, ['fields' => ['password']]);
 }
+// Explicit product ask: a staff account created with username ===
+// password is technically valid but trivially guessable — reject it
+// the same way the Android client already does client-side, so a
+// request that bypasses the app (or an older client build) can't
+// slip one through.
+if (strcasecmp($username, $password) === 0) {
+    respond_error('validation_error', 422, ['fields' => ['password'], 'reason' => 'username_password_same']);
+}
 
 $db = Database::get();
 

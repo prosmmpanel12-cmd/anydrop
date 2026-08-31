@@ -143,12 +143,40 @@ class StaffManagementActivity : AppCompatActivity() {
             else -> "manager"
         }
 
-        if (name.isEmpty() || (existing == null && username.isEmpty())) {
-            InAppNotifier.show(this, getString(R.string.staff_save_failed), InAppNotifier.Type.ERROR)
+        // Client-side validation mirrors staff-create.php's own checks
+        // (name/username/password required, username >= 3 chars,
+        // password >= 6 chars) so an obviously-invalid submission gets
+        // a specific message immediately instead of a round-trip to
+        // the server just to learn the same thing. Every one of these
+        // used to fall through to the same generic staff_save_failed
+        // string regardless of which field was actually the problem —
+        // that's the "sirf ek generic error, kaunsa field galat hai
+        // pata nahi chalta" bug being fixed here.
+        if (name.isEmpty()) {
+            InAppNotifier.show(this, getString(R.string.staff_error_name_required), InAppNotifier.Type.ERROR)
+            return
+        }
+        if (existing == null && username.length < 3) {
+            InAppNotifier.show(this, getString(R.string.staff_error_username_short), InAppNotifier.Type.ERROR)
             return
         }
         if (existing == null && password.isEmpty()) {
-            InAppNotifier.show(this, getString(R.string.staff_save_failed), InAppNotifier.Type.ERROR)
+            InAppNotifier.show(this, getString(R.string.staff_error_password_required), InAppNotifier.Type.ERROR)
+            return
+        }
+        if (password.isNotEmpty() && password.length < 6) {
+            InAppNotifier.show(this, getString(R.string.staff_error_password_short), InAppNotifier.Type.ERROR)
+            return
+        }
+        // Explicit ask: username and password being identical was
+        // previously allowed all the way to the server with no
+        // specific feedback — the create would sometimes still
+        // succeed (a weak-but-technically-valid account) leaving the
+        // owner unsure whether it actually worked. Caught here with a
+        // clear message before it ever reaches the network.
+        val usernameForCompare = if (existing == null) username else existing.username
+        if (password.isNotEmpty() && password.equals(usernameForCompare, ignoreCase = true)) {
+            InAppNotifier.show(this, getString(R.string.staff_error_username_password_same), InAppNotifier.Type.ERROR)
             return
         }
 
@@ -171,24 +199,18 @@ class StaffManagementActivity : AppCompatActivity() {
                     InAppNotifier.show(this@StaffManagementActivity, getString(R.string.staff_saved), InAppNotifier.Type.SUCCESS)
                     loadStaff()
                 } else {
-                    // staff-create.php's own validation_error carries a
-                    // {fields:["username"], reason:"username_taken"} data
-                    // payload on non-2xx responses (never populated on
-                    // ApiResponse.data via Retrofit/Gson — only
-                    // response.errorBody() carries it, same reason
-                    // OfferManagerActivity.serverErrorDetail() reads it
-                    // this way instead). Surfacing "username already
-                    // taken" specifically here avoids the confusing
-                    // "why didn't this work" a bare generic failure
-                    // caused when the same username was reused across
-                    // two different restaurant accounts (usernames are
-                    // deliberately global, not per-restaurant — see
-                    // migration 63's own header).
-                    val message = if (usernameTakenError(response.errorBody())) {
-                        getString(R.string.staff_username_taken)
-                    } else {
-                        getString(R.string.staff_save_failed)
-                    }
+                    // response.body() is always null on a non-2xx HTTP
+                    // response — staff-create.php/staff-update.php's
+                    // actual validation_error ({fields:[...],
+                    // reason:...}) only ever lives in errorBody(). This
+                    // used to only special-case username_taken and
+                    // silently collapse every other validation failure
+                    // (password too short, username too short, invalid
+                    // role, ...) into the same generic "couldn't save"
+                    // message — see com.anydrop.restaurant.network.ErrorParsing's
+                    // own kdoc for the underlying Retrofit behavior.
+                    val parsed = com.anydrop.restaurant.network.parseApiError(response.errorBody())
+                    val message = staffErrorMessage(parsed)
                     InAppNotifier.show(this@StaffManagementActivity, message, InAppNotifier.Type.ERROR)
                 }
             } catch (e: Exception) {
@@ -197,16 +219,37 @@ class StaffManagementActivity : AppCompatActivity() {
         }
     }
 
-    private fun usernameTakenError(errorBody: okhttp3.ResponseBody?): Boolean {
-        if (errorBody == null) return false
-        return try {
-            val bodyStr = errorBody.string()
-            val map = com.google.gson.Gson().fromJson(bodyStr, Map::class.java)
-            val data = map?.get("data") as? Map<*, *>
-            data?.get("reason") == "username_taken"
-        } catch (e: Exception) {
-            false
+    /** Maps staff-create.php/staff-update.php's specific validation_error
+     * `reason`/`fields` payload to a message that actually says what
+     * was wrong, instead of one generic string for every possible
+     * cause. Falls back to the generic message only when the server
+     * didn't send anything more specific (a genuine 500, dropped
+     * connection during parse, etc.). */
+    private fun staffErrorMessage(parsed: com.anydrop.restaurant.network.ParsedApiError): String {
+        // Order matters: check the specific `reason` values before
+        // falling back to the generic per-field message, otherwise
+        // e.g. username_password_same (which also reports
+        // fields=["password"]) would incorrectly show "password too
+        // short" instead of its own clearer message.
+        if (parsed.reason == "username_password_same") {
+            return getString(R.string.staff_error_username_password_same)
         }
+        if (parsed.reason == "username_taken") {
+            return getString(R.string.staff_username_taken)
+        }
+        if (parsed.code == "validation_error" && parsed.fields != null) {
+            return when {
+                parsed.fields.contains("username") -> getString(R.string.staff_error_username_short)
+                parsed.fields.contains("password") -> getString(R.string.staff_error_password_short)
+                parsed.fields.contains("role") -> getString(R.string.staff_error_invalid_role)
+                parsed.fields.contains("name") -> getString(R.string.staff_error_name_required)
+                else -> getString(R.string.staff_save_failed)
+            }
+        }
+        if (parsed.code == "forbidden") {
+            return getString(R.string.staff_error_forbidden)
+        }
+        return getString(R.string.staff_save_failed)
     }
 
     /** Quick is_active toggle straight from the roster row's switch —

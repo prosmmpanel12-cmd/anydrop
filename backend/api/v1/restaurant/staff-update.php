@@ -74,6 +74,11 @@ if (isset($body['password'])) {
     if (mb_strlen($password) < 6) {
         respond_error('validation_error', 422, ['fields' => ['password']]);
     }
+    // Same check as staff-create.php — username isn't editable here,
+    // so compare against the existing row's own username.
+    if (strcasecmp($staff['username'], $password) === 0) {
+        respond_error('validation_error', 422, ['fields' => ['password'], 'reason' => 'username_password_same']);
+    }
     $updates[] = 'password_hash = :hash';
     $params['hash'] = password_hash($password, PASSWORD_DEFAULT);
 }
