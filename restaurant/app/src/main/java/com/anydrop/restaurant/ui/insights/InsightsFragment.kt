@@ -73,14 +73,22 @@ class InsightsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.rangeToggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked) return@addOnButtonCheckedListener
-            currentRange = when (checkedId) {
-                R.id.rangeToday -> "today"
-                R.id.rangeMonth -> "month"
-                else -> "week"
+        // Rebuilt as a plain 3-TextView segmented control (see
+        // fragment_insights.xml's comment) — MaterialButtonToggleGroup's
+        // checked-listener API no longer applies, so selection is
+        // handled directly via View.isSelected.
+        val rangeSegments = listOf(
+            binding.rangeToday to "today",
+            binding.rangeWeek to "week",
+            binding.rangeMonth to "month"
+        )
+        rangeSegments.forEach { (segment, rangeKey) ->
+            segment.setOnClickListener {
+                if (currentRange == rangeKey) return@setOnClickListener
+                currentRange = rangeKey
+                rangeSegments.forEach { (v, key) -> v.isSelected = (key == rangeKey) }
+                loadInsights()
             }
-            loadInsights()
         }
 
         binding.swipeRefresh.setOnRefreshListener { loadInsights() }

@@ -1,13 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 2026-08-31: enlarged 16dp -> 20dp to match switch_track_pill.xml's
-     bigger 46x26dp track, plus a thin outline border so the white thumb
-     still reads as a distinct disc even against a light background
-     behind the switch, not just a soft blur. -->
+<!-- 2026-08-31 (later same day): switch_track_pill.xml came back down
+     from 46x26dp to 40x22dp, so the thumb is resized to match — 20dp ->
+     18dp — keeping the same ~2dp margin top/bottom inside the track
+     that the original 38x20dp/16dp pairing had, plus the thin outline
+     border from the previous pass so the thumb still reads as a
+     distinct disc against a light background. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="oval">
     <solid android:color="@color/switch_thumb_color" />
     <stroke android:width="0.5dp" android:color="@color/outline" />
     <size
-        android:width="20dp"
-        android:height="20dp" />
+        android:width="18dp"
+        android:height="18dp" />
 </shape>
