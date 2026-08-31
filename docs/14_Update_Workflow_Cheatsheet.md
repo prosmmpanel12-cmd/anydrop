@@ -32,12 +32,24 @@ ZIPFILE=$(ls -t /storage/emulated/0/Download/*.zip | head -1)
 echo "Using zip: $ZIPFILE"
 rm -rf ~/anydrop_extracted
 unzip -o "$ZIPFILE" -d ~/anydrop_extracted
-cp -rf ~/anydrop_extracted/anydrop_project/* ~/anydrop_project/
+cp -rf ~/anydrop_extracted/* ~/anydrop_project/
 cd ~/anydrop_project
-git add .
+git add -A
 git commit -m "Update from Claude zip: $(date +%Y-%m-%d)"
 git push
 ```
+
+**Note on the zip structure:** Claude's zips have `customer/`, `restaurant/`,
+`backend/`, etc. directly at the zip root — there is **no** wrapper folder
+(not `anydrop_project/`, not the zip's own filename). So the copy step is
+`cp -rf ~/anydrop_extracted/* ~/anydrop_project/`, not
+`~/anydrop_extracted/<some-folder>/*`. If Claude ever changes this and
+wraps everything in a subfolder again, it'll say so explicitly — otherwise
+assume root-level, like above.
+
+Also note `git add -A` (not plain `git add .`) — `-A` is required so
+**deletions** are staged too (see the dedicated section below on why this
+matters).
 
 3. Watch the Termux output — confirm no errors on the `unzip`, `cp`, or
    `git push` lines.
@@ -55,14 +67,52 @@ just say "here's the new zip" and paste the block above.
 - `git status` (inside `~/anydrop_project`) shows exactly which files
   changed — useful to sanity-check before committing if a merge ever looks
   suspicious.
-- The `cp -rf` step **overwrites** existing files with the zip's version
-  but does **not** delete files that exist locally and aren't in the new
-  zip. If Claude ever removes a file on purpose (rare), mention it and
-  we'll add an explicit `rm` step for that file before running the block.
 - `config.php` (backend secrets) is **not** git-ignored yet per
   `docs/security.md`'s TODO list — double check it hasn't drifted from
   your local KS Web copy before blindly overwriting, since the zip's
   version may have placeholder values.
+
+---
+
+## When Claude deletes a file or folder — read this every time
+
+**The `cp -rf` step only ever overwrites or adds files. It never deletes
+anything on its own.** If Claude removes a file/folder from the project
+(e.g. deleting `mipmap-anydpi-v26` to fix the round-icon bug on
+2026-08-31), that folder simply isn't inside the new zip — but `cp -rf`
+has no way to know it should be gone from `~/anydrop_project` too, so it
+silently stays behind, stale, forever. This already happened once (the
+adaptive-icon folder kept surviving three zips in a row until it was
+caught manually via `git log -- <path>` and `ls`).
+
+**Two ways to handle it, in order of preference:**
+
+1. **Preferred — Claude tells you exactly what to delete.** When a fix
+   involves removing something, Claude will give you an explicit `rm -rf`
+   (or `rm`) line to run **before** the `cp -rf` step, e.g.:
+   ```bash
+   rm -rf ~/anydrop_project/restaurant/app/src/main/res/mipmap-anydpi-v26
+   ```
+   Run that first, then the normal update block above.
+
+2. **Fallback — you suspect something wasn't cleaned up.** If a bug you
+   reported as fixed keeps coming back after a push+build, it's often a
+   leftover file `cp -rf` never removed. Check with:
+   ```bash
+   cd ~/anydrop_project
+   git log --oneline -5 -- <path/you/suspect>
+   ls <path/you/suspect> 2>&1
+   ```
+   If `ls` finds the file/folder even though Claude said it was deleted,
+   remove it manually (`rm -rf <path>`), then `git add -A`, commit, push.
+
+**Why `git add -A` and not `git add .`:** plain `git add .` only stages
+new/modified files in and below the current folder — it does **not**
+stage deletions in all cases depending on git version/config. `-A` always
+stages everything: adds, modifications, **and** deletions. Always use
+`-A` for this project so a manual `rm` you ran actually gets committed as
+a deletion instead of just vanishing from your working folder while
+GitHub still has the old copy.
 
 ---
 

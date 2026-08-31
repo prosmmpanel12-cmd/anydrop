@@ -33,9 +33,11 @@
                     android:layout_height="66dp"
                     android:background="@drawable/bg_splash_logo_circle">
 
+                    <!-- 2026-08-31 (continued 3): matches Login screen's
+                         edge-to-edge sizing (62dp inside 66dp). -->
                     <ImageView
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
+                        android:layout_width="62dp"
+                        android:layout_height="62dp"
                         android:layout_gravity="center"
                         android:src="@mipmap/ic_launcher"
                         android:contentDescription="@null" />

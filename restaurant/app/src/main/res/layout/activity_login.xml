@@ -31,16 +31,13 @@
                     android:layout_height="66dp"
                     android:background="@drawable/bg_splash_logo_circle">
 
-                    <!-- 2026-08-31 (continued): icon shrunk 56dp -> 46dp.
-                         At 56dp the white circle backdrop only had a
-                         thin ~5dp ring showing, and the app-icon glyph's
-                         bottom edge (the "Dr🍴p" row) sat close enough to
-                         that ring that the margin read as uneven/broken
-                         rather than a clean badge. 46dp gives a full,
-                         consistent 10dp ring all the way round. -->
+                    <!-- 2026-08-31 (continued 3): icon grown to fill the
+                         backdrop almost edge-to-edge (62dp inside 66dp)
+                         instead of floating small inside a mostly-empty
+                         box — matches a normal app-icon look. -->
                     <ImageView
-                        android:layout_width="46dp"
-                        android:layout_height="46dp"
+                        android:layout_width="62dp"
+                        android:layout_height="62dp"
                         android:layout_gravity="center"
                         android:src="@mipmap/ic_launcher"
                         android:contentDescription="@null" />

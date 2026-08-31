@@ -8,10 +8,10 @@
     android:background="@color/anydrop_primary"
     android:gravity="center">
 
-    <!-- 2026-08-31 (continued): icon shrunk 96dp -> 80dp for the same
-         reason as the login screen's badge — the old 8dp ring read as
-         thin/uneven next to the logo's own artwork. 80dp inside this
-         112dp backdrop gives a full, consistent 16dp ring. -->
+    <!-- 2026-08-31 (continued 3): logo grown to fill the backdrop almost
+         edge-to-edge (108dp inside 112dp — just enough margin for the
+         2dp stroke), matching a normal app-icon look (like Amazon's)
+         instead of a small icon floating in a mostly-empty box. -->
     <FrameLayout
         android:layout_width="112dp"
         android:layout_height="112dp"
@@ -19,8 +19,8 @@
 
         <ImageView
             android:id="@+id/splashLogo"
-            android:layout_width="80dp"
-            android:layout_height="80dp"
+            android:layout_width="108dp"
+            android:layout_height="108dp"
             android:layout_gravity="center"
             android:src="@mipmap/ic_launcher"
             android:contentDescription="@string/app_name"
