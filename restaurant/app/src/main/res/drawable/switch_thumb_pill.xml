@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Companion thumb for switch_track_pill.xml — 2026-08-20: switched from
-     a big white circle to a smaller solid-black one (@color/switch_thumb_color)
-     per the app-owner's second reference image (black knob, orange track
-     when ON). Sized just under the 20dp track height (16dp, leaving a
-     ~2dp ring of track color on every side) to match that pill's new
-     compact size. -->
+<!-- 2026-08-31: enlarged 16dp -> 20dp to match switch_track_pill.xml's
+     bigger 46x26dp track, plus a thin outline border so the white thumb
+     still reads as a distinct disc even against a light background
+     behind the switch, not just a soft blur. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="oval">
     <solid android:color="@color/switch_thumb_color" />
+    <stroke android:width="0.5dp" android:color="@color/outline" />
     <size
-        android:width="16dp"
-        android:height="16dp" />
+        android:width="20dp"
+        android:height="20dp" />
 </shape>

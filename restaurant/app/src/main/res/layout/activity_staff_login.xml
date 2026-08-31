@@ -28,11 +28,19 @@
                 android:orientation="vertical"
                 android:gravity="center">
 
-                <ImageView
-                    android:layout_width="56dp"
-                    android:layout_height="56dp"
-                    android:src="@mipmap/ic_launcher_round"
-                    android:contentDescription="@null" />
+                <FrameLayout
+                    android:layout_width="66dp"
+                    android:layout_height="66dp"
+                    android:background="@drawable/bg_splash_logo_circle">
+
+                    <ImageView
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:layout_gravity="center"
+                        android:src="@mipmap/ic_launcher_round"
+                        android:contentDescription="@null" />
+
+                </FrameLayout>
 
                 <TextView
                     android:layout_width="wrap_content"

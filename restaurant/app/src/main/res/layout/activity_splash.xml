@@ -8,13 +8,21 @@
     android:background="@color/anydrop_primary"
     android:gravity="center">
 
-    <ImageView
-        android:id="@+id/splashLogo"
-        android:layout_width="96dp"
-        android:layout_height="96dp"
-        android:src="@mipmap/ic_launcher"
-        android:contentDescription="@string/app_name"
-        android:visibility="invisible" />
+    <FrameLayout
+        android:layout_width="112dp"
+        android:layout_height="112dp"
+        android:background="@drawable/bg_splash_logo_circle">
+
+        <ImageView
+            android:id="@+id/splashLogo"
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:layout_gravity="center"
+            android:src="@mipmap/ic_launcher"
+            android:contentDescription="@string/app_name"
+            android:visibility="invisible" />
+
+    </FrameLayout>
 
     <TextView
         android:id="@+id/splashTitle"

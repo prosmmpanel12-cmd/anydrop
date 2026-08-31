@@ -30,6 +30,15 @@
         <item name="colorPrimaryContainer">@color/anydrop_primary_container</item>
         <item name="colorOnPrimaryContainer">@color/anydrop_primary_dark</item>
         <item name="colorSecondary">@color/anydrop_secondary</item>
+        <!-- 2026-08-31: BottomNavigationView's selected-item pill indicator
+             (Material3's itemActiveIndicatorStyle) draws in
+             colorSecondaryContainer by default. Left unset, that resolved
+             to Material3's own default — a light purple/lavender — which
+             clashed badly with the monochrome black/white kit (visible
+             behind the Insights tab icon). Pinning it to a neutral light
+             grey keeps the pill but makes it match the rest of the app. -->
+        <item name="colorSecondaryContainer">@color/anydrop_primary_container</item>
+        <item name="colorOnSecondaryContainer">@color/text_primary</item>
         <item name="colorSurface">@color/surface</item>
         <item name="colorSurfaceVariant">@color/background</item>
         <item name="colorOnSurface">@color/text_primary</item>

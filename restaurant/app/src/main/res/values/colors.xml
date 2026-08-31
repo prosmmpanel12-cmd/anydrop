@@ -54,7 +54,7 @@
          "off" pill color for switch_track_pill.xml. Replaces the old
          green/red on/off scheme; every switch in the app is now orange
          (ON) / this grey (OFF) instead. -->
-    <color name="switch_track_off">#D6D6D6</color>
+    <color name="switch_track_off">#BDBDBD</color>
     <!-- Thumb stays white now that the ON track itself is solid black
          (2026-08-31 monochrome change) — a black knob on a black track
          would be invisible. -->

@@ -10,23 +10,28 @@
      of drawables drives all of them. Fixed intrinsic size (38dp x 20dp)
      so the pill always renders at the same size regardless of where
      it's used. -->
+<!-- 2026-08-31: resized 38x20dp -> 46x26dp and darkened the OFF track
+     (switch_track_off #D6D6D6 -> #BDBDBD) — the old pairing of a white
+     thumb on a very light grey track had almost no visible contrast, so
+     the switch read as flat/unclear at a glance regardless of state. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_checked="true">
         <shape android:shape="rectangle">
             <solid android:color="@color/anydrop_primary" />
-            <corners android:radius="10dp" />
+            <corners android:radius="13dp" />
             <size
-                android:width="38dp"
-                android:height="20dp" />
+                android:width="46dp"
+                android:height="26dp" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
+            <stroke android:width="1dp" android:color="@color/outline" />
             <solid android:color="@color/switch_track_off" />
-            <corners android:radius="10dp" />
+            <corners android:radius="13dp" />
             <size
-                android:width="38dp"
-                android:height="20dp" />
+                android:width="46dp"
+                android:height="26dp" />
         </shape>
     </item>
 </selector>
