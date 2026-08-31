@@ -82,6 +82,14 @@ class InsightsFragment : Fragment() {
             binding.rangeWeek to "week",
             binding.rangeMonth to "month"
         )
+        // Default-selected segment set here in code instead of a static
+        // android:selected="true" in the XML — that attribute isn't a
+        // valid layout-XML attribute for a plain TextView and broke the
+        // AAPT2 resource link (build error: "attribute android:selected
+        // not found" in fragment_insights.xml). isSelected is a runtime
+        // View property, so it has to be set from code either way.
+        rangeSegments.forEach { (v, key) -> v.isSelected = (key == currentRange) }
+
         rangeSegments.forEach { (segment, rangeKey) ->
             segment.setOnClickListener {
                 if (currentRange == rangeKey) return@setOnClickListener

@@ -8,6 +8,26 @@ Session date: 31 Aug 2026 (continued, same day)
 > No DONE mark"), none of this is added to `done.md` — treat everything
 > below as `🟡 IMPLEMENTED — TEST PENDING` until you've built and run it.
 
+## 🔧 Build fix (from your CI logs, 31 Aug)
+
+The restaurant-app CI build (`Build restaurant debug APK`) failed with:
+```
+app-mergeDebugResources-50:/layout/fragment_insights.xml:114: error: attribute android:selected not found.
+error: failed linking file resources.
+```
+Cause: `fragment_insights.xml` had a static `android:selected="true"` on
+the `rangeWeek` segment (from this session's segmented-control rebuild).
+`isSelected` is a runtime `View` property, not a valid static layout-XML
+attribute here, and AAPT2 rejected it — that's what broke resource
+linking. Fixed by removing it from the XML and setting the default
+selected segment in `InsightsFragment.kt`'s `onViewCreated` instead,
+right where the click handler already flips `isSelected` on selection
+changes. The customer-app CI build in the same log bundle passed clean
+(`BUILD SUCCESSFUL in 2m 12s`) — untouched.
+
+**Still not verified by an actual CI run** — please re-trigger the
+restaurant build workflow to confirm this clears it.
+
 This zip contains the **restaurant app source** with the fixes below already
 applied, plus a `reference_images/` folder with everything you shared this
 session so the next session doesn't need you to re-upload anything.
@@ -136,19 +156,20 @@ asset the login screen already used), which at 96dp sits with a clean
 
 ## Folder guide in this zip
 
-```
-restaurant/                  ← the Android Studio project, fixes applied
-reference_images/
-  01_app_drawer_icon_issue.jpg          ← your annotated screenshot, icon bug
-  02_insights_toggle_switch_issue.jpg   ← your annotated screenshot, toggle bug
-  03_restaurant_login_current.jpg       ← current login screen (before polish)
-  04_ui_kit_reference_part1.png         ← target UI kit, screens 1–12
-  05_ui_kit_reference_part3.png         ← target UI kit, screens 29–44
-  06_ui_kit_reference_part2.png         ← target UI kit, screens 13–28
-  07_ui_kit_reference_part4.png         ← target UI kit, screens 45–70
-  08_ui_kit_reference_part5_final.png   ← target UI kit, screens 71–85
-HANDOVER.md                  ← this file
-```
+This is the **full project** (`restaurant/`, `customer/`, `backend/`,
+`docs/`, plus `done.md`/`recall.md`/`PENDING.md`), not just the
+restaurant app.
 
-Just re-upload this zip in the next session and point to this file — no
-need to re-share the screenshots or explain the context again.
+`reference_images/` has been **removed** from this zip — the icon,
+toggle, login, and splash issues those screenshots documented are all
+implemented now (see above), so there's nothing left in this session's
+scope that still needs them.
+
+⚠️ One thing to flag: item 3 below (**full app re-theme**) still leans on
+the 5 UI-kit reference images (`04_ui_kit_reference_part1.png` →
+`08_ui_kit_reference_part5_final.png`) that lived in that folder. If
+that re-theme work is genuinely still on the table for a future session,
+you'll want to re-share those 5 specifically when you get to it — I
+can't reconstruct them from memory.
+
+Just re-upload this zip in the next session and point to this file.
