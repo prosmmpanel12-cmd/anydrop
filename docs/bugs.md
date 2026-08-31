@@ -54,19 +54,33 @@ all today) — but it's a real bug waiting for either switch to flip.
 (i.e., "was one actually generated for this order"), not re-derive
 `payment_method === 'upi'` independently.
 
-### 1.3 🟡 Coupon usage-limit check has a race condition (TOCTOU)
-**Where:** `price_cart()` checks `usage_limit_per_user` /
-`usage_limit_total` via a `SELECT COUNT(*)` *before* the order transaction
-opens, and `coupon_usages` is inserted later inside `orders/create.php`'s
-transaction — but there's no `SELECT ... FOR UPDATE` lock and no unique
-constraint on `coupon_usages(coupon_id, customer_id)`. Two near-simultaneous
-requests (double-tap "Place Order", or the same user on two devices) can
-both pass the count check before either insert lands, both succeed, and a
-`usage_limit_per_user = 1` coupon gets used twice by the same customer.
-Low real-world likelihood (needs near-exact timing) but a genuine gap.
-**Fix needed:** add a `UNIQUE KEY (coupon_id, customer_id)` to
-`coupon_usages` when `usage_limit_per_user = 1` is the common case, or
-wrap the check+insert in `SELECT ... FOR UPDATE` inside the transaction.
+### 1.3 🟢 FIXED — Coupon usage-limit check race condition (TOCTOU)
+**Was:** `price_cart()` checks `usage_limit_per_user` / `usage_limit_total`
+via a `SELECT COUNT(*)` *before* the order transaction opens, and
+`coupon_usages` is inserted later inside `orders/create.php`'s
+transaction, with no lock and no unique constraint in between — two
+near-simultaneous requests (double-tap "Place Order", same user on two
+devices) could both pass the count check before either insert landed,
+both succeed, and a `usage_limit_per_user = 1` coupon get used twice.
+
+**Fix (already in the code, this doc just wasn't updated to say so):**
+`api/v1/orders/create.php`'s coupon block re-checks both limits *inside*
+the transaction, immediately before the `coupon_usages` insert, guarded
+by `SELECT ... FROM coupons WHERE id = :cid FOR UPDATE` — locking the
+`coupons` row (not `coupon_usages`) serializes any two concurrent orders
+against the *same coupon*, so the second one to reach the lock sees the
+first's already-committed-or-pending usage and fails cleanly with
+`coupon_usage_limit_reached` instead of both slipping through. A blanket
+`UNIQUE KEY (coupon_id, customer_id)` was deliberately not used since
+`usage_limit_per_user` can legitimately be `>1` or `NULL` (unlimited).
+The restaurant Offers Engine's `promo_offers`/`offer_usages` path
+(migration 47) uses the identical lock-recheck-insert shape via the same
+file's `$recordOfferUsage` closure — built with this protection from day
+one rather than retrofitted.
+
+Verified by manual read (2026-08-30 session) — no PHP CLI/live DB in
+this sandbox, so this hasn't been exercised under real concurrent
+requests, but the lock semantics are correct as written.
 
 ### 1.4 🟢 Verified safe — coupon discount capping
 `price_cart()` correctly does `$discount = min($discount, $itemTotal)`
@@ -191,7 +205,7 @@ show the same line two days running defeats the point of having 40-50.
 |---|---|---|---|
 | 1.1 | `discount_percent` no upper clamp → negative price | 🔴 High (money) | Pricing |
 | 1.2 | OTP generated for COD but never shown to customer | 🔴 High (ops) | Delivery OTP |
-| 1.3 | Coupon usage race condition (double redemption) | 🟡 Medium | Pricing |
+| 1.3 | Coupon usage race condition (double redemption) | 🟢 Fixed (2026-08-30) | Pricing |
 | 2.1 | OTP request has no rate limit | 🔴 High (once SMTP live) | Security |
 | 2.2 | `debug_otp` exposed in API response | 🔴 High (pre-launch blocker) | Security |
 | 2.3 | GitHub PAT pasted in chat — confirm revoked | 🟡 Medium | Security |

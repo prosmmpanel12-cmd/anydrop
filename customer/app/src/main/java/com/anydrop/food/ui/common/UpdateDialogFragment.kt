@@ -43,7 +43,19 @@ class UpdateDialogFragment : DialogFragment() {
             if (!url.isNullOrBlank()) {
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
             }
-            if (!forced) dismiss()
+            if (!forced) {
+                // Bug fix (2026-08-30): this used to only dismiss() here,
+                // never invoking onLater — so on an OPTIONAL update, tapping
+                // "Update Now" sent the user to the Play Store/browser but
+                // left SplashActivity's proceed() never called. Returning to
+                // the app (without force-closing it) landed back on a bare
+                // splash with nothing happening, since onDone() only fired
+                // from the "Later" button. A forced update correctly still
+                // skips this — the app must not proceed until the min
+                // version requirement is met, dialog stays up either way.
+                onLater?.invoke()
+                dismiss()
+            }
         }
 
         binding.btnLater.setOnClickListener {

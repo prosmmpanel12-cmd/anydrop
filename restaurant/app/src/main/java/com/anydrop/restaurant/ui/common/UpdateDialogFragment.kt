@@ -44,7 +44,14 @@ class UpdateDialogFragment : DialogFragment() {
             if (!url.isNullOrBlank()) {
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
             }
-            if (!forced) dismiss()
+            if (!forced) {
+                // Bug fix (2026-08-30) — see Customer App's identical fix
+                // for the full rationale: without invoking onLater here,
+                // "Update Now" on an optional update left the app stuck on
+                // splash after returning from the Play Store/browser.
+                onLater?.invoke()
+                dismiss()
+            }
         }
 
         binding.btnLater.setOnClickListener {

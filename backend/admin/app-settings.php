@@ -81,6 +81,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             write_audit_log('admin', $admin['id'], 'app_settings_updated', ['app' => $postedApp]);
             $flash = ucfirst($postedApp) . ' app update settings saved.';
             $app = $postedApp;
+
+            // Soft validation, after save — still saves whatever was
+            // entered (an admin mid-rollout may intentionally pass
+            // through an odd intermediate state), but flags the one
+            // combination that's never correct: min_version above
+            // latest_version would force-update every installed build
+            // to a "latest" that's actually older than the floor being
+            // enforced, which is always a typo, not a real intent.
+            $minAfterSave = (int) get_setting('min_app_version_' . $postedApp, 0);
+            $latestAfterSave = (int) get_setting('latest_app_version_' . $postedApp, 0);
+            if ($minAfterSave > $latestAfterSave) {
+                $flash .= ' Warning: minimum supported version (' . $minAfterSave
+                    . ') is higher than the latest version (' . $latestAfterSave
+                    . ') — every install will be forced to update against a target that\'s behind the floor. Double-check these numbers.';
+                $flashType = 'error';
+            }
         } elseif ($formAction === 'save_maintenance') {
             $enabled = isset($_POST['maintenance_enabled']) ? '1' : '0';
             $message = trim($_POST['maintenance_message'] ?? '');

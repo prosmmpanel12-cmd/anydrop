@@ -41,11 +41,13 @@ respond_ok([
     'update_message' => get_setting("update_message_{$platform}", 'A new version of Anydrop is available.'),
     'update_url' => get_setting("update_url_{$platform}", ''),
     // Set from the admin panel's App Settings screen
-    // (admin/app-settings.php). Added for the client apps to read and
-    // show a maintenance screen — no app currently does this yet, that
-    // Android-side handling is a separate follow-up, but the flag is
-    // live here as soon as an admin flips it, so that follow-up needs
-    // no further backend change.
+    // (admin/app-settings.php). Read by the Customer and Restaurant
+    // apps' UpdateChecker as of the 2026-08-30 session (shows a
+    // non-dismissible MaintenanceDialogFragment at splash, checked
+    // ahead of the version-code branches below). Rider App doesn't
+    // exist yet as a built project, so nothing reads
+    // maintenance_mode_rider client-side yet — the flag is still live
+    // here regardless, ready for whenever that app is built.
     'maintenance_mode' => get_setting("maintenance_mode_{$platform}", '0') === '1',
     'maintenance_message' => get_setting("maintenance_message_{$platform}", ''),
 ]);

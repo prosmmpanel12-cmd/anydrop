@@ -931,21 +931,32 @@ Refund
 **Status:** PENDING / FINAL AUDIT REQUIRED
 
 ### Required
-- [ ] OTP rate limiting
-- [ ] OTP abuse protection
-- [ ] Order idempotency
-- [ ] Coupon race-condition protection
-- [ ] Server-side price validation
-- [ ] Server-side operational-state validation
+- [x] OTP rate limiting — `otp_request_cooldown_seconds` (migration 19) enforced in `customer-request-otp.php`/`restaurant-request-otp.php`
+- [ ] OTP abuse protection (beyond the per-email cooldown — no broader anti-abuse layer yet)
+- [x] Order idempotency — `orders.idempotency_key` (migration 20), enforced in `api/v1/orders/create.php`
+- [x] Coupon race-condition protection — bugs.md #1.3, verified fixed 2026-08-30 (`SELECT ... FOR UPDATE` on the coupon row inside the order transaction; same pattern also covers the Offers Engine)
+- [x] Server-side price validation — `price_cart()` (`lib/orders.php`) prices every line item from `menu_items`/`menu_item_variants`/`menu_item_addons` DB rows; the client only ever sends `menu_item_id`/`quantity`/`variant_id`/`addon_ids`, never a price. Was already fully built, just never checked off.
+- [ ] Server-side operational-state validation — mostly built already: `price_cart()` checks `restaurants.status`, `operational_status`, opening/closing time + working days, and `restaurants.current_due` against `restaurant_due_limit`, all before pricing. Left unchecked because of one known, already-documented gap: a "schedule for later" order's item-availability window is checked against the current time, not the scheduled time (see `docs/68_...md`) — not re-verified as part of this pass, listed here as the one real remaining piece.
 - [ ] Payment authorization
 - [ ] Refund authorization
-- [ ] Admin RBAC audit
+- [x] Admin RBAC audit — migration 29, `admin_require_permission()`/`admin_has_permission()` enforced across all admin pages
 - [ ] Financial-data access control
-- [ ] Audit logging
-- [ ] Production secret management
-- [ ] Error logging
+- [x] Audit logging — `lib/audit.php`'s `write_audit_log()`, called from 23+ admin pages
+- [ ] Production secret management (email OTP's `SecretManager` exists for provider API keys; `APP_SECRET` itself is still a placeholder — see `NEXT_SESSION_PROMPT_email_otp.md`)
+- [x] Error logging — `lib/error_handler.php` (new, 2026-08-30), wired in from `config/config.php` so it installs once per request with no per-file changes. Catches uncaught exceptions, fatals, and warnings/notices; logs to `logs/php-error-YYYY-MM-DD.log` (request body/query string deliberately excluded — may contain OTPs/passwords/tokens); turns `display_errors` off so a crash can no longer leak a raw stack trace into an API JSON response or the admin panel. One known lower-severity gap left alone rather than fixed here: `admin/areas.php`'s merge-failure flash shows a raw `$e->getMessage()` to an already-authenticated admin — out of scope for this pass, flagged for a future cleanup.
 - [ ] Backup policy
 - [ ] Restore testing
+
+**Note (2026-08-30, second pass):** the `[x]` items above were verified
+by reading the actual call sites, not just confirming a
+migration/file exists — they are real, wired-up code. None have been
+exercised against a live DB/concurrent load/real crash in this sandbox
+(no PHP CLI here), so "done" means "correctly built," not
+"load-tested." `error_handler.php` specifically has never actually
+caught a real error yet — its logic was read closely instead (shutdown
+function order, `error_reporting()` mask respect, JSON vs HTML
+response branching), but no PHP CLI means it's untested in the literal
+sense.
 
 ### Main docs
 - `docs/security.md`
