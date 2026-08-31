@@ -7,9 +7,16 @@
      those screens so it has contrast again.
      Changed oval -> rounded rectangle (2026-08-31, follow-up) so the
      backdrop shape matches the logo's own rounded-square artwork instead
-     of showing a mismatched circle behind a square-ish logo. -->
+     of showing a mismatched circle behind a square-ish logo.
+     Changed solid fill -> thin 0.5dp outline only (2026-08-31, follow-up 2)
+     per feedback that the solid white block behind the logo looked too
+     heavy/boxy — a thin stroke now just outlines the badge instead of
+     filling it. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="@color/white" />
+    <solid android:color="@android:color/transparent" />
+    <stroke
+        android:width="0.5dp"
+        android:color="@color/white" />
     <corners android:radius="22dp" />
 </shape>
