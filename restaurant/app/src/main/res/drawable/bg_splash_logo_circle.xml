@@ -3,9 +3,13 @@
      black rounded-square background baked into the image itself. Now
      that the splash screen and login/signup hero headers are also solid
      black (monochrome theme), the logo was rendering almost invisible —
-     black-on-black. This white circle sits behind the logo on those
-     screens so it has contrast again. -->
+     black-on-black. This white rounded-rectangle sits behind the logo on
+     those screens so it has contrast again.
+     Changed oval -> rounded rectangle (2026-08-31, follow-up) so the
+     backdrop shape matches the logo's own rounded-square artwork instead
+     of showing a mismatched circle behind a square-ish logo. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="oval">
+    android:shape="rectangle">
     <solid android:color="@color/white" />
+    <corners android:radius="22dp" />
 </shape>
