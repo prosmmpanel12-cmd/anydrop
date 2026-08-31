@@ -125,27 +125,102 @@ screen's `ImageView` to `@mipmap/ic_launcher_round` (the same true-circle
 asset the login screen already used), which at 96dp sits with a clean
 8dp margin inside the 112dp backdrop.
 
+## ✅ Done this continued pass (round 3, same day)
+
+### 7. Category-icon-picker dialog tabs (your image 2)
+Same underlying bug as the Insights range toggle, in a dialog this
+time: `dialog_category_icon_picker.xml`'s Bundled/Icons/Photos tabs used
+`MaterialButtonToggleGroup` + the `ToggleButton.Pill` style, which only
+ever rendered the *first* tab as a real pill — the other two came out as
+plain bordered rectangles (same corner-radius conflict as before — see
+item 2 in the original list, and the Insights fix's own comment for the
+full explanation). Rebuilt with the exact same purpose-built segmented
+control (`bg_segment_track` + `bg_segment_item`) as Insights. IDs kept
+identical, so `MenuFragment.kt`'s tab-switching logic only needed the
+`addOnButtonCheckedListener` swapped for click listeners + `isSelected` —
+same pattern as `InsightsFragment.kt`.
+
+### 8. Login/splash logo "white ring" looking thin/uneven (your image 1)
+Not a bug exactly — the math was fine (checked in the previous pass) —
+but at 56dp icon / 66dp backdrop (login) and 96dp / 112dp (splash) the
+white ring was only ~5–8dp, which read as thin and inconsistent next to
+the logo artwork. Shrunk the icon relative to its backdrop on both
+screens — 46dp/66dp on login, 80dp/112dp on splash — for a full, even
+~10–16dp ring that reads as a clean badge instead of a sliver.
+
+### 9. App icon rendering as a plain circle (your image 3)
+Real root cause, different from the original "icon rendering round /
+clipped" fix: that pass fixed the *foreground* (transparent PNG, no
+baked-in shape) but left the *background* as a flat `#000000` colour
+filling the entire 108dp adaptive-icon canvas edge-to-edge. A flat
+full-bleed colour has no shape of its own — so on a launcher configured
+for circular icons, the icon has no choice but to become a plain circle,
+losing the rounded-square badge look entirely.
+
+Fixed by replacing the flat-colour background with
+`drawable/ic_launcher_background_shape.xml` — a black rounded square
+inset 32dp on all sides of the 108dp canvas (44dp square, ~62dp corner-
+to-corner diagonal), which keeps it inside Android's ~66dp adaptive-icon
+"safe zone". Content inside that safe zone is guaranteed to survive
+*any* launcher mask (circle, squircle, rounded-square, teardrop)
+un-clipped — so the badge now looks the same rounded-square shape
+everywhere, regardless of the launcher's global icon-shape setting,
+instead of conforming to whatever shape the launcher picks.
+
+Since the badge shrank from full-bleed to a 44dp/108dp inset, the
+foreground glyph (`ic_launcher_foreground.png`) was also rescaled down
+(≈50%) and re-centered so "ANY / Dr🍴p" sits inside the new smaller
+badge with real padding, instead of overflowing outside it. Regenerated
+the legacy fallback `ic_launcher.png` at every density (mdpi→xxxhdpi) to
+match — composited from the same background shape + rescaled glyph, so
+pre-Android-8 devices see the same rounded-square badge.
+`ic_launcher_round.png` (the dedicated circular variant, for launchers
+that explicitly want a full circle) was left as-is — it was already a
+clean true circle and wasn't part of what you flagged.
+
+### 10. Orange PNG/JPG icons → black
+Scanned every raster (`.png`/`.jpg`) icon in the app — 11 total, all in
+`drawable-xxhdpi/` plus the launcher foreground. Only one,
+`illus_add_menu_item.png` (the empty-state cooking-pot illustration),
+was actually using the app's old brand orange as a flat single-tone
+fill; recoloured it to black, alpha channel untouched so the edges/
+anti-aliasing stay exactly as smooth as before.
+
+The other 9 illustrations (`illus_coupon`, `illus_confirm_delete`,
+`illus_logout`, `illus_maintenance`, `illus_success`,
+`illus_update_available`, `illus_upload_banner`, `illus_upload_logo`,
+`illus_item_available`) were **left untouched** — they're multi-colour
+decorative art (food illustrations, a red trash can, a green checkmark,
+etc.), not single-tone brand-orange icons, so "orange → black" doesn't
+apply to them. Flagging this rather than silently deciding — if you
+actually want those recoloured/restyled too, say the word and I'll do a
+specific pass on them.
+
 ---
 
 ## ⏳ Not done yet — pick up next session
 
-1. **Build & device-test everything above.** This pass edited XML only,
-   in a sandbox with no Android SDK/emulator — nothing was compiled or
-   visually confirmed. Please build, install, and eyeball: the switch
-   toggles app-wide, the login hero badge, and the splash badge.
-2. **Splash screen "loading animations" polish** — the badge-overflow
-   *bug* is fixed (see #6 above), but the broader ask — restyling the
-   splash to match one of the loading-animation treatments in your UI
-   kit reference (spin/pulse/wave/bounce/circle-progress/food-loading —
-   panel **60** in `07_ui_kit_reference_part4.png`, not 58) — is a
-   genuine visual redesign, not a bug fix. It also runs into the same
-   theme conflict as item 3 below: the UI kit reference is a dark/black
-   theme, but `activity_splash.xml` still carries an explicit
-   "2026-08-16 revert back to orange+white" comment. Doing the loading-
-   animation polish properly means deciding that theme question first —
-   deferred into item 3 rather than done half-in-one-theme,
-   half-in-the-other.
-3. **Full app re-theme to match your 5 uploaded reference UI kit images**
+1. **Build & device-test everything above.** This pass edited XML,
+   Kotlin, and raster PNGs only, in a sandbox with no Android SDK/
+   emulator — nothing was compiled or visually confirmed. Please build,
+   install, and eyeball: the switch toggles app-wide, the icon-picker
+   dialog's 3 tabs, the login hero badge, the splash badge, and — most
+   important, since it depends on the launcher's own icon-shape setting
+   — the home-screen app icon on your actual device/launcher.
+2. **Coupon active/inactive toggle** — `item_coupon_manage_row.xml`
+   uses the same `MaterialButtonToggleGroup` + `ToggleButton.Pill`
+   combo that was broken on the Insights range toggle and the icon-
+   picker tabs (both now fixed). Same bug, almost certainly, but you
+   didn't flag it this round, so it wasn't touched — say the word if
+   you want the same segmented-control treatment applied there too.
+3. **Splash screen "loading animations" polish** — panel **60** in
+   `07_ui_kit_reference_part4.png` (spin/pulse/wave/bounce/circle-
+   progress/food-loading options), if you still want the splash
+   restyled to one of those treatments. Note `colors.xml` shows the app
+   already moved to the monochrome black/white theme as of today, so
+   the earlier "theme conflict" blocker on this is gone — this is just
+   unstarted, not blocked.
+4. **Full app re-theme to match your 5 uploaded reference UI kit images**
    (`04_ui_kit_reference_part1.png` → `08_ui_kit_reference_part5_final.png`,
    85 reference screens total). This is a large scope — recommend doing it
    screen-by-screen rather than all at once so quality stays controlled.

@@ -636,16 +636,24 @@ class MenuFragment : Fragment() {
             }
         }
 
-        pickerBinding.iconPickerTabGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked) return@addOnButtonCheckedListener
-            selectTab(
-                when (checkedId) {
-                    pickerBinding.tabIcons.id -> IconPickerTab.ICONS
-                    pickerBinding.tabPhotos.id -> IconPickerTab.PHOTOS
-                    else -> IconPickerTab.BUNDLED
-                }
-            )
+        // 2026-08-31 (continued): iconPickerTabGroup's 3 tabs are now
+        // plain TextViews in a segmented-track LinearLayout (see
+        // dialog_category_icon_picker.xml's comment) instead of
+        // MaterialButtonToggleGroup, so selection is wired the same way
+        // InsightsFragment's range toggle does it — a small local list +
+        // click listeners flipping View.isSelected, no addOnButtonCheckedListener.
+        val iconPickerTabs = listOf(
+            pickerBinding.tabBundled to IconPickerTab.BUNDLED,
+            pickerBinding.tabIcons to IconPickerTab.ICONS,
+            pickerBinding.tabPhotos to IconPickerTab.PHOTOS
+        )
+        iconPickerTabs.forEach { (tab, pickerTab) ->
+            tab.setOnClickListener {
+                iconPickerTabs.forEach { (v, t) -> v.isSelected = (t == pickerTab) }
+                selectTab(pickerTab)
+            }
         }
+        iconPickerTabs.forEach { (v, t) -> v.isSelected = (t == IconPickerTab.BUNDLED) }
 
         pickerBinding.iconSearchInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}

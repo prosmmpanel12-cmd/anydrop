@@ -8,15 +8,10 @@
     android:background="@color/anydrop_primary"
     android:gravity="center">
 
-    <!-- 2026-08-31: was @mipmap/ic_launcher (the legacy fallback icon,
-         a near-full-bleed rounded square) rendered at 96dp inside this
-         112dp circle backdrop — that square's ~136dp corner-to-corner
-         diagonal poked outside the 112dp circle. Switched to
-         @mipmap/ic_launcher_round, which (after this session's app-icon
-         fix) is a true circle inscribed in its own canvas, so at 96dp
-         it sits with a clean 8dp margin inside the 112dp backdrop with
-         nothing to poke out. Same fix already in place on the login
-         screen, which already used the round variant. -->
+    <!-- 2026-08-31 (continued): icon shrunk 96dp -> 80dp for the same
+         reason as the login screen's badge — the old 8dp ring read as
+         thin/uneven next to the logo's own artwork. 80dp inside this
+         112dp backdrop gives a full, consistent 16dp ring. -->
     <FrameLayout
         android:layout_width="112dp"
         android:layout_height="112dp"
@@ -24,8 +19,8 @@
 
         <ImageView
             android:id="@+id/splashLogo"
-            android:layout_width="96dp"
-            android:layout_height="96dp"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
             android:layout_gravity="center"
             android:src="@mipmap/ic_launcher_round"
             android:contentDescription="@string/app_name"

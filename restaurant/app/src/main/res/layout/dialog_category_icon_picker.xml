@@ -25,38 +25,75 @@
     android:paddingTop="4dp"
     tools:context="com.anydrop.restaurant.ui.menu.MenuFragment">
 
-    <com.google.android.material.button.MaterialButtonToggleGroup
+    <!-- 2026-08-31 (continued): rebuilt as the same purpose-built
+         segmented control as Insights' range toggle (bg_segment_track +
+         bg_segment_item), instead of MaterialButtonToggleGroup +
+         ToggleButton.Pill. Same underlying problem as that one: the
+         toggle group's automatic corner-squaring on the middle/end
+         buttons fought with the style's own fixed corner radius, so only
+         the first tab ("Bundled") ever rendered as a real pill. IDs kept
+         identical (tabBundled/tabIcons/tabPhotos) so MenuFragment's
+         wiring only needed its click-handling swapped from
+         addOnButtonCheckedListener to plain click listeners + isSelected
+         — see MenuFragment.kt. -->
+    <LinearLayout
         android:id="@+id/iconPickerTabGroup"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_height="40dp"
         android:layout_gravity="center_horizontal"
         android:layout_marginBottom="10dp"
-        app:singleSelection="true"
-        app:selectionRequired="true">
+        android:orientation="horizontal"
+        android:background="@drawable/bg_segment_track"
+        android:padding="3dp">
 
-        <com.google.android.material.button.MaterialButton
+        <TextView
             android:id="@+id/tabBundled"
-            style="@style/ToggleButton.Pill"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@drawable/bg_segment_item"
+            android:paddingHorizontal="16dp"
             android:text="@string/icon_picker_tab_bundled"
-            android:checked="true" />
+            android:textColor="@color/segment_text_color"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textAllCaps="false" />
 
-        <com.google.android.material.button.MaterialButton
+        <TextView
             android:id="@+id/tabIcons"
-            style="@style/ToggleButton.Pill"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/icon_picker_tab_icons" />
+            android:layout_height="match_parent"
+            android:layout_marginStart="4dp"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@drawable/bg_segment_item"
+            android:paddingHorizontal="16dp"
+            android:text="@string/icon_picker_tab_icons"
+            android:textColor="@color/segment_text_color"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textAllCaps="false" />
 
-        <com.google.android.material.button.MaterialButton
+        <TextView
             android:id="@+id/tabPhotos"
-            style="@style/ToggleButton.Pill"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/icon_picker_tab_photos" />
+            android:layout_height="match_parent"
+            android:layout_marginStart="4dp"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@drawable/bg_segment_item"
+            android:paddingHorizontal="16dp"
+            android:text="@string/icon_picker_tab_photos"
+            android:textColor="@color/segment_text_color"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textAllCaps="false" />
 
-    </com.google.android.material.button.MaterialButtonToggleGroup>
+    </LinearLayout>
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/searchInputLayout"
