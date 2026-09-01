@@ -83,8 +83,31 @@ class StaffLoginActivity : AppCompatActivity() {
                     InAppNotifier.show(this@StaffLoginActivity, friendlyError(error), InAppNotifier.Type.ERROR)
                     setLoading(false)
                 }
-            } catch (e: Exception) {
+            } catch (e: java.io.IOException) {
+                // Genuine transport-level failure — no internet, DNS
+                // failure, timeout, connection refused, TLS handshake
+                // failure. This is the only case that should actually
+                // say "check your connection".
                 InAppNotifier.show(this@StaffLoginActivity, "Network error — check your connection", InAppNotifier.Type.ERROR)
+                setLoading(false)
+            } catch (e: Exception) {
+                // Anything else (most commonly Gson's JsonSyntaxException)
+                // means the server WAS reached and DID respond, but with
+                // something the app couldn't parse as the expected JSON —
+                // e.g. a PHP notice/warning printed before the JSON body,
+                // a raw HTML error page from the web server, or a WAF/
+                // hosting-panel interstitial page. That used to get
+                // lumped into the same "check your connection" message,
+                // which sent people looking at their WiFi for a bug that
+                // was actually on the server. Logged so `adb logcat` (or
+                // KS Web's PHP error log for the matching request) shows
+                // the real cause.
+                android.util.Log.e("StaffLogin", "Unexpected response parsing staff login", e)
+                InAppNotifier.show(
+                    this@StaffLoginActivity,
+                    "Server sent an unexpected response — check KS Web's PHP error log, or try again in a moment",
+                    InAppNotifier.Type.ERROR
+                )
                 setLoading(false)
             }
         }

@@ -112,8 +112,16 @@ class LoginActivity : AppCompatActivity() {
                     InAppNotifier.show(this@LoginActivity, friendlyError(error), InAppNotifier.Type.ERROR)
                     setLoading(false)
                 }
-            } catch (e: Exception) {
+            } catch (e: java.io.IOException) {
                 InAppNotifier.show(this@LoginActivity, "Network error — check your connection", InAppNotifier.Type.ERROR)
+                setLoading(false)
+            } catch (e: Exception) {
+                android.util.Log.e("Login", "Unexpected response parsing login", e)
+                InAppNotifier.show(
+                    this@LoginActivity,
+                    "Server sent an unexpected response — check KS Web's PHP error log, or try again in a moment",
+                    InAppNotifier.Type.ERROR
+                )
                 setLoading(false)
             }
         }
