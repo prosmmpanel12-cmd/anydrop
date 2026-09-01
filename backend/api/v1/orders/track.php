@@ -3,7 +3,18 @@
  * GET /api/v1/orders/{id}/track
  * Auth: Customer token (must own the order)
  * Response: { status, rider: { name, mobile, lat, lng } | null, eta_minutes,
- *             otp: "1234" (only if status is rider_assigned/out_for_delivery and payment_method=upi) }
+ *             otp: "1234" (only if status is rider_assigned/out_for_delivery
+ *             AND an OTP was actually generated for this order) }
+ *
+ * bugs.md #1.2 fix — this used to gate the OTP purely on
+ * `payment_method === 'upi'`, independently of `orders/create.php`'s own
+ * generation condition (`payment_method === 'upi' || otp_required_for_cod`).
+ * If an admin ever flips `otp_required_for_cod` on, a COD order would get
+ * a real `delivery_otp` written to the DB that this endpoint would then
+ * never return — the customer could never see a code to hand the rider.
+ * Now checks `delivery_otp !== null` directly (i.e. "was one actually
+ * generated for this order"), which stays correct regardless of which
+ * condition governs generation in the future.
  *
  * Deliberately tiny/fast — meant to be polled every few seconds while an
  * order is active (Phase 4 will add the live map on top of this same call).
@@ -50,7 +61,7 @@ if ($order['rider_id']) {
 }
 
 $otp = null;
-if (in_array($order['status'], ['rider_assigned', 'out_for_delivery'], true) && $order['payment_method'] === 'upi') {
+if (in_array($order['status'], ['rider_assigned', 'out_for_delivery'], true) && $order['delivery_otp'] !== null) {
     $otp = $order['delivery_otp'];
 }
 

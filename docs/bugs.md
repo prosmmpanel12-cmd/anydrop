@@ -14,45 +14,45 @@ that the code allows.
 
 ## 1. Money / pricing bugs
 
-### 1.1 🔴 `discount_percent` has no upper-bound clamp — can produce negative prices
-**Where:** `backend/lib/orders.php`, `price_cart()`:
+### 1.1 🟢 FIXED — `discount_percent` upper-bound clamp
+**Doc-audit correction (2026-08-31 session):** this doc still showed 🔴,
+but `backend/lib/orders.php`'s `price_cart()` already reads:
 ```php
-if ((float) $item['discount_percent'] > 0) {
-    $unitPrice = round($unitPrice * (1 - (float) $item['discount_percent'] / 100), 2);
-}
+$discountPercent = min(100, max(0, (float) $item['discount_percent']));
 ```
-No `min(100, ...)` anywhere — DB column, this function, and the (not yet
-built) restaurant coupon/discount UI all lack a ceiling. A value like
-`discount_percent = 150` (typo, or a restaurant owner trying to "look
-generous") produces a **negative unit price**, which flows straight into
-`item_total`, `discount_amount`, and `grand_total`. Right now this field
-is only set via manual phpMyAdmin `UPDATE`, so the blast radius is small
-— but this becomes a **real money-loss bug the moment a restaurant-side
-"set a discount" UI ships** (which is now in scope, see updated roadmap).
-**Fix needed:** clamp `discount_percent` to 0–100 both at write time
-(API validation, whenever that endpoint is built) and as a defensive
-`min(100, max(0, ...))` at read time in `price_cart()` regardless.
+— confirmed directly in the current source, not re-derived from an older
+handover doc. A negative unit price is no longer reachable through this
+path regardless of what garbage value ends up in the column. No write-time
+clamp exists yet on a restaurant-side discount-setting UI, but none of
+that UI exists yet either (still manual phpMyAdmin `UPDATE` only, see
+`Status.md`'s Known Limitations) — add one alongside whenever that UI is
+actually built.
 
-### 1.2 🔴 Delivery OTP generation and OTP display use different conditions — real orders may get an OTP nobody can see
-**Where:** `orders/create.php` generates the OTP when:
-```php
-$otpRequired = $paymentMethod === 'upi' || (bool) get_setting('otp_required_for_cod', false);
-```
-But `orders/track.php` (the endpoint the Customer App actually polls to
-*show* the OTP) only returns it when:
-```php
-$order['payment_method'] === 'upi'
-```
-If an admin ever flips `otp_required_for_cod` to true (a real
-`app_settings` row that already exists for this purpose), COD orders
-**will have an OTP generated and stored**, but the Customer App will
-never receive it via `track.php` — the customer can't give the rider a
-code they were never shown. Right now this is latent (the setting
-defaults false and UPI isn't wired yet, so no live order has an OTP at
-all today) — but it's a real bug waiting for either switch to flip.
-**Fix needed:** `track.php`'s condition should check `$order['delivery_otp'] !== null`
-(i.e., "was one actually generated for this order"), not re-derive
-`payment_method === 'upi'` independently.
+### 1.2 🟢 FIXED (2026-08-31) — Delivery OTP generation/display condition mismatch
+**Was:** `orders/create.php` generates the OTP when
+`payment_method === 'upi' || otp_required_for_cod`, but `orders/track.php`
+(the endpoint the Customer App polls to *show* the OTP) only returned it
+when `payment_method === 'upi'` — independently re-derived instead of
+checking whether an OTP actually existed. If an admin ever flipped
+`otp_required_for_cod` on, a COD order would get a real `delivery_otp`
+written to the DB that the customer could never see, with no way to give
+the rider a code they were never shown.
+
+**Fix:** `track.php`'s condition now checks `$order['delivery_otp'] !== null`
+directly — "was one actually generated for this order" — instead of
+re-deriving `payment_method === 'upi'`. Stays correct regardless of which
+condition governs generation in `create.php` in the future; no change was
+needed on the generation side, only the display side was out of sync.
+
+Previously deferred to "fix as part of Phase K (Rider App)" on the
+reasoning that it's meaningless to fix in isolation before a rider flow
+exists to use the OTP — but the fix itself is a one-line, self-contained
+condition change with no rider-flow dependency, so it was safe to land
+now rather than wait. Not build/device-verified — no PHP CLI in this
+sandbox, same standing limitation as every prior session; balance-checked
+only. Still needs a live test once a rider flow exists: an order sitting
+at `rider_assigned`/`out_for_delivery` with `otp_required_for_cod` on and
+`payment_method = 'cod'` should now return a real `otp` from `track.php`.
 
 ### 1.3 🟢 FIXED — Coupon usage-limit check race condition (TOCTOU)
 **Was:** `price_cart()` checks `usage_limit_per_user` / `usage_limit_total`
@@ -93,23 +93,27 @@ No fix needed — noted here so it's not re-flagged in a future audit.
 
 ## 2. Security bugs
 
-### 2.1 🔴 OTP request endpoint has no rate limiting
-**Where:** `backend/api/v1/auth/customer-request-otp.php`. Any caller can
-POST an email address repeatedly with no cooldown, no per-IP or
-per-email throttle, no CAPTCHA. Combined with 2.2 below (OTP returned in
-the response body), this isn't currently exploitable for OTP theft, but
-once real SMTP sending replaces `debug_otp`, this becomes an open email-
-bombing vector (attacker spams someone else's email with OTP mails) and,
-separately, cheap DB-row spam (`email_otps` grows unbounded).
-**Fix needed:** simple per-email cooldown (e.g. `WHERE email = :e AND
-created_at > NOW() - INTERVAL 60 SECOND` check before inserting a new
-row), same pattern most OTP systems use.
+### 2.1 🟢 FIXED — OTP request rate limiting
+**Doc-audit correction (2026-08-31 session):** already fixed (Phase J,
+2026-08-14) and confirmed again directly in current source —
+`customer-request-otp.php` now checks a per-email cooldown
+(`app_settings.otp_request_cooldown_seconds`, default 60s) against
+`email_otps`'s most recent row for that address before inserting a new
+one, returning `429 otp_request_cooldown` with `retry_after_seconds`
+when hit. This doc had simply gone stale; no code change needed here.
 
-### 2.2 🔴 `debug_otp` is returned in the live API response
-**Where:** same file — `respond_ok(['message' => 'OTP sent', 'debug_otp' => $otp])`.
-Already flagged in `Status.md`'s Known Limitations as a temporary
-testing aid, repeating it here so it's tracked as a security item, not
-just a "TODO wire up SMTP" item: **this must be removed (or gated behind
+### 2.2 🟢 FIXED — `debug_otp` gated behind a settings flag, real email delivery now wired
+**Doc-audit correction (2026-08-31 session):** confirmed directly in
+current source, not just an older doc's claim. `debug_otp` is now only
+included in the response when `app_settings.debug_otp_enabled === '1'`
+(defaults off). The endpoint also no longer unconditionally claims
+success — it now calls a real `EmailOtpService` (multi-provider
+failover, per `AnyDrop_Email_OTP_MultiProvider_Plan.md`) and returns a
+genuine `503 email_delivery_unavailable` if every provider fails and
+debug mode is off, rather than pretending an OTP was sent. **Action
+still needed, unchanged:** confirm `debug_otp_enabled` is `'0'`/absent
+on whatever DB actually goes to production — this is safe by default but
+worth a manual check before launch, same note as before. item: **this must be removed (or gated behind
 an admin/debug-only flag) before this ever reaches real users**, since
 anyone with the API reachable can log in as any email address with zero
 possession-of-inbox proof today.
@@ -119,15 +123,17 @@ Already flagged in `Status.md` — restating here because it's a real
 credential-leak risk until confirmed revoked. **Action needed:** confirm
 revoked/regenerated at github.com/settings/tokens if not already done.
 
-### 2.4 🔴 No idempotency protection on `POST /orders`
-Double-tapping "Place Order" (slow network, accidental double-tap, retry
-after a timeout that actually succeeded server-side) has no client-side
-button-disable-on-tap confirmed in `CheckoutActivity`, and the backend
-has no idempotency key — two identical orders can be created and charged
-(once real payments are wired). **Fix needed:** disable the place-order
-button immediately on tap (client) **and** an idempotency key
-(client-generated UUID sent with the request, server checks/stores it
-for a short window) so a retried request can't double-create.
+### 2.4 🟢 FIXED — Idempotency protection on `POST /orders`
+**Doc-audit correction (2026-08-31 session):** already fixed (Phase J,
+2026-08-14) and confirmed directly in current source —
+`orders/create.php` accepts an optional `idempotency_key`, looks up an
+existing order by `(customer_id, idempotency_key)` before creating a new
+one, and has a race-safe fallback in its transaction's catch block
+keyed off the `uniq_customer_idempotency_key` constraint (the concurrent
+double-submit case, same shape as bug 1.3's coupon-lock fix). Client
+side, `CheckoutActivity` generates one UUID per place-order attempt,
+keeps it across a network-exception retry, and clears it on a clean
+error response. This doc had simply gone stale; no code change needed.
 
 ---
 
@@ -203,26 +209,38 @@ show the same line two days running defeats the point of having 40-50.
 
 | # | Item | Severity | Category |
 |---|---|---|---|
-| 1.1 | `discount_percent` no upper clamp → negative price | 🔴 High (money) | Pricing |
-| 1.2 | OTP generated for COD but never shown to customer | 🔴 High (ops) | Delivery OTP |
+| 1.1 | `discount_percent` no upper clamp → negative price | 🟢 Fixed (verified 2026-08-31) | Pricing |
+| 1.2 | OTP generated for COD but never shown to customer | 🟢 Fixed (2026-08-31) | Delivery OTP |
 | 1.3 | Coupon usage race condition (double redemption) | 🟢 Fixed (2026-08-30) | Pricing |
-| 2.1 | OTP request has no rate limit | 🔴 High (once SMTP live) | Security |
-| 2.2 | `debug_otp` exposed in API response | 🔴 High (pre-launch blocker) | Security |
+| 2.1 | OTP request has no rate limit | 🟢 Fixed (verified 2026-08-31) | Security |
+| 2.2 | `debug_otp` exposed in API response | 🟢 Fixed (verified 2026-08-31) | Security |
 | 2.3 | GitHub PAT pasted in chat — confirm revoked | 🟡 Medium | Security |
-| 2.4 | No idempotency on order creation (double order) | 🔴 High (once payments live) | Security/Money |
-| 3.1 | No admin panel — due-limit/approval/settings unoperated | 🔴 High (structural) | Admin |
+| 2.4 | No idempotency on order creation (double order) | 🟢 Fixed (verified 2026-08-31) | Security/Money |
+| 3.1 | No admin panel — due-limit/approval/settings unoperated | 🟡 Largely built, see PENDING.md | Admin |
 | 3.2 | No restaurant-side write path for discount/bestseller flags | 🟡 Medium | Restaurant App |
 | 3.3 | Service-area check is city-wide, not radius-precise | 🟢 Low | UX accuracy |
-| 4.1 | Notification system has no template pool / triggers yet | 🔴 (scope gap, not a bug) | Notifications |
+| 4.1 | Notification system has no template pool / triggers yet | 🟢 Fixed (2026-08-14, template pool + rotation shipped) | Notifications |
 | 6.1 | Home GPS-off banner (Zomato-style, dynamic text) — spec only, not built | 🆕 Feature, not yet built | Address/GPS |
-| 6.2 | Address Book "set as default" — no such action exists in code | 🔴 High (missing feature) | Address Book |
-| 6.3 | `orders/create.php` never checks restaurant operational_status | 🔴 High (ops/money) | Restaurant status |
+| 6.2 | Address Book "set as default" — no such action exists in code | 🟢 Fixed (verified 2026-08-31) | Address Book |
+| 6.3 | `orders/create.php` never checks restaurant operational_status | 🟢 Fixed (2026-08-13, verified 2026-08-31) | Restaurant status |
 
-**Priority for fixing, independent of new-feature work:** 1.1 and 2.2 are
-the two that matter most before anything money- or auth-related ships
-further (1.1 before the restaurant discount/coupon UI goes live, 2.2
-before real users ever hit production). 1.2 matters before COD OTP is
-ever turned on. The rest can ride alongside the new roadmap items below.
+**Doc-audit note (2026-08-31 session):** this table had gone significantly
+stale — six items (1.1, 1.2, 2.1, 2.2, 2.4, 4.1) were still marked 🔴 even
+though the underlying code had already been fixed in earlier sessions
+(mostly Phase J, 2026-08-14) or, for 1.2, fixed this session. Each was
+re-verified against actual current source before being marked 🟢 here —
+see each item's own entry above for the exact line(s) checked. **3.1's
+severity was also downgraded** — the Admin Panel now covers order
+control, analytics, restaurant approval, settlements, refunds, and more
+(see `PENDING.md` for the current per-module status); it is no longer
+accurate to say "no admin panel exists."
+
+**Genuinely still open, in priority order:** 2.3 (confirm the GitHub PAT
+is revoked — an action item, not a code fix), 3.2 (no restaurant-side UI
+to set discount/bestseller flags), 6.1 (the GPS-off Home banner is still
+spec-only, not built). 6.2 and 6.3 were also re-checked directly against
+current source this session and are already fixed (see their entries
+above) — this doc had simply never been updated after either landed.
 
 ---
 
@@ -299,7 +317,20 @@ those strings/that state rather than writing new ones.
 entry exists so the spec is captured precisely before the next session
 starts implementing it, rather than starting from the screenshot again.
 
-### 6.2 🔴 Address Book — "set as default" doesn't switch because no
+### 6.2 🟢 RESOLVED (verified 2026-08-31) — "Set as default" action built,
+exactly per this entry's own spec below
+Confirmed directly in current source: `AddressAdapter.kt` now takes an
+`onSetDefault` callback (kept deliberately separate from `onActivate`,
+per the client-confusion note below), `item_address_card.xml` has a
+`btnSetDefaultAddress` row hidden on whichever address is already
+default, and `AddressBookActivity.setDefaultAddress()` sends the full
+existing address payload through `PUT` with `is_default = true` (not a
+bare `{is_default: true}`) — matching this entry's own "one thing to
+watch" warning about `require_fields`. This entry's original write-up is
+kept below for history/context, not because the gap still exists.
+
+### 6.2 (original write-up, kept for history — see ✅ resolution above)
+Address Book — "set as default" doesn't switch because no
 client-side action exists yet (backend already supports it — confirmed)
 Checked `AddressAdapter.kt`, `AddressBookActivity.kt`, and
 `backend/api/v1/customer/addresses.php` directly. The gap is narrower
