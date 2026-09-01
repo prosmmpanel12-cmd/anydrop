@@ -124,18 +124,14 @@
             android:scaleType="centerCrop"
             android:background="@drawable/bg_card_rounded" />
 
-        <!-- Discount badge, top-start corner of the image (restyled
-             2026-09-01 to match item_restaurant.xml's card badge
-             placement — was bottom-end per the original features.md §4
-             convention, moved for consistency with the restaurant-list
-             and restaurant-detail-header badges, which both now use this
-             same corner). Visible only when item.discountPercent > 0,
-             bound in MenuAdapter.ItemVH.bind(). -->
+        <!-- Discount badge, bottom-end corner of the image (features.md §4).
+             Visible only when item.discountPercent > 0, bound in
+             MenuAdapter.ItemVH.bind(). -->
         <TextView
             android:id="@+id/itemDiscountBadge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="top|start"
+            android:layout_gravity="bottom|end"
             android:background="@drawable/bg_discount_badge_corner"
             android:paddingHorizontal="7dp"
             android:paddingVertical="3dp"

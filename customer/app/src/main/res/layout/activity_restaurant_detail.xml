@@ -21,13 +21,6 @@
 
         <!-- Offer badge, e.g. "50% OFF select items" — top-left over the cover image,
              same pattern as item_restaurant.xml. Hidden when offer_badge_text is null. -->
-        <!-- Offer badge, e.g. "50% OFF select items" — top-left over the cover
-             image. Restyled 2026-09-01 to the same orange ribbon
-             (bg_discount_badge_corner) item_restaurant.xml's card badge now
-             uses, replacing the old flat black-translucent (#CC000000) box —
-             keeps the discount-badge visual language consistent everywhere
-             it appears (restaurant list cards, this detail header, menu-item
-             cards). Hidden when offer_badge_text is null. -->
         <TextView
             android:id="@+id/detailOfferBadge"
             android:layout_width="wrap_content"
@@ -35,7 +28,7 @@
             android:layout_gravity="top|start"
             android:layout_marginTop="52dp"
             android:layout_marginStart="12dp"
-            android:background="@drawable/bg_discount_badge_corner"
+            android:background="#CC000000"
             android:paddingHorizontal="10dp"
             android:paddingVertical="5dp"
             android:text="50% OFF select items"
@@ -78,22 +71,16 @@
 
         </LinearLayout>
 
-        <!-- Back button — restyled to match the bookmark/share circular
-             buttons (white circle, dark icon) instead of a solid-orange
-             square, per the 2026-09-01 white+orange UI pass (recall.md).
-             Was @drawable/bg_button_primary (orange fill, white icon,
-             12dp-radius square) — now @drawable/bg_circle_outline, same
-             44dp touch target as its neighbors on this same image. -->
         <ImageView
             android:id="@+id/btnBack"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:layout_gravity="top|start"
-            android:layout_margin="10dp"
-            android:padding="11dp"
+            android:layout_margin="12dp"
+            android:padding="6dp"
             android:src="@drawable/ic_back"
-            app:tint="@color/text_primary"
-            android:background="@drawable/bg_circle_outline" />
+            app:tint="@color/white"
+            android:background="@drawable/bg_button_primary" />
 
     </FrameLayout>
 
