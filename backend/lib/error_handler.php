@@ -76,23 +76,52 @@ if (!defined('ANYDROP_ERROR_HANDLER_INSTALLED')) {
     }
 
     /**
-     * Appends one line to today's log file. Falls back to PHP's own
-     * error_log() (whatever destination php.ini has configured) if the
-     * logs/ directory can't be created or written to — e.g. a
-     * read-only deploy — so an entry is never silently lost.
+     * Appends one line to today's log file, AND always also calls PHP's
+     * own error_log() regardless of whether the custom write succeeded.
+     *
+     * Originally this only fell back to error_log() when the logs/
+     * write failed. On KSWEB (Android) that fallback is the ONLY path
+     * that ever actually fires in practice — Android's scoped storage
+     * commonly blocks a PHP process from creating/writing files outside
+     * locations the app was explicitly granted, so @mkdir()/
+     * @file_put_contents() below silently fail every time without ever
+     * throwing, and every log line was quietly going to error_log()'s
+     * destination instead of backend/logs/ — which is exactly why that
+     * folder stayed empty even while real errors were happening.
+     * Calling error_log() unconditionally (not just as a fallback)
+     * means there's always at least one guaranteed place to look — see
+     * this file's own top for where that KSWEB log actually lives.
      */
     function anydrop_log_line(string $line): void
     {
         $dir = $GLOBALS['__anydrop_log_dir'];
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0775, true);
+        $dirReady = is_dir($dir) || @mkdir($dir, 0775, true);
+        $written = false;
+        if ($dirReady) {
+            $file = $dir . '/php-error-' . date('Y-m-d') . '.log';
+            $entry = '[' . date('c') . '] ' . $line . PHP_EOL;
+            $written = @file_put_contents($file, $entry, FILE_APPEND | LOCK_EX);
         }
-        $file = $dir . '/php-error-' . date('Y-m-d') . '.log';
-        $entry = '[' . date('c') . '] ' . $line . PHP_EOL;
-        $written = @file_put_contents($file, $entry, FILE_APPEND | LOCK_EX);
-        if ($written === false) {
-            error_log('[anydrop] ' . $line);
-        }
+        // Always also goes to PHP's own configured error_log — on KSWEB
+        // this is usually visible from inside the KSWEB app itself
+        // (its own Server/Error Log viewer), independent of whatever
+        // storage permission backend/logs/ does or doesn't have.
+        error_log('[anydrop] ' . $line . ($written === false ? ' (also: could not write to ' . $dir . ' — check KSWEB storage permission)' : ''));
+    }
+
+    // One-time, at-boot diagnostic — not tied to any particular
+    // request's error, just answers "can this process write to
+    // backend/logs/ at all" directly so it doesn't have to be inferred
+    // from silence. Cheap (one is_writable() call) so it's fine to run
+    // on every request; only actually logs when something's wrong.
+    if (!is_dir($GLOBALS['__anydrop_log_dir'])) {
+        @mkdir($GLOBALS['__anydrop_log_dir'], 0775, true);
+    }
+    if (!is_writable($GLOBALS['__anydrop_log_dir'])) {
+        error_log('[anydrop] WARNING: ' . $GLOBALS['__anydrop_log_dir'] . ' is not writable by the PHP process — '
+            . 'on KSWEB (Android) this is almost always a storage-permission issue, not a code bug. '
+            . 'Check: Android Settings > Apps > KSWEB > Permissions > Files/Storage (grant "Allow management of all files" '
+            . 'on Android 11+), and check KSWEB\'s own PHP user/working directory has write access to this path.');
     }
 
     /** Generic 500 body — JSON for API routes, a plain HTML page otherwise. */

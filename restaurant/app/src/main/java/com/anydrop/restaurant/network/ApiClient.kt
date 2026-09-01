@@ -1,7 +1,7 @@
 package com.anydrop.restaurant.network
 
 import android.content.Context
-import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -27,7 +27,10 @@ object ApiClient {
      * so BASE_URL only needs to change in one place. */
     fun baseUrlForStaticFiles(context: Context): String = BASE_URL.removeSuffix("api/v1/")
 
-    private val gson = Gson()
+    private val gson = GsonBuilder()
+        .registerTypeAdapter(Boolean::class.javaObjectType, LenientBooleanTypeAdapter)
+        .registerTypeAdapter(Boolean::class.javaPrimitiveType, LenientBooleanTypeAdapter)
+        .create()
     private val envelopeType = object : TypeToken<Map<String, Any?>>() {}.type
 
     fun create(context: Context): ApiService {
@@ -91,7 +94,7 @@ object ApiClient {
         return Retrofit.Builder()
             .baseUrl(BASE_URL)
             .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
             .create(ApiService::class.java)
     }

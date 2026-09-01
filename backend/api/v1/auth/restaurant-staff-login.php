@@ -109,6 +109,19 @@ write_audit_log('restaurant', (int) $restaurant['id'], 'staff_login_success', [
 
 unset($restaurant['password_hash']);
 unset($staff['password_hash']);
+// Cast explicitly to a real PHP bool before json_encode() — PDO/MySQL
+// otherwise hands back this TINYINT(1) as a bare integer (0/1), which
+// json_encode() then serializes as a JSON *number*, not `true`/`false`.
+// The Android client's Gson-based StaffProfile.isActive: Boolean can
+// only be deserialized from an actual JSON boolean by default, so a
+// bare `1` crashed that parse client-side even though this endpoint's
+// own HTTP response was completely valid — confirmed via a direct
+// curl test returning a normal 200 with is_active:1. (The Android
+// client also now has a lenient Boolean adapter as defense in depth —
+// see network/LenientBooleanTypeAdapter.kt — but fixing the wire
+// format here is the correct root fix so the API contract is
+// unambiguous regardless of client.)
+$staff['is_active'] = (bool) $staff['is_active'];
 
 respond_ok([
     'restaurant' => $restaurant,
