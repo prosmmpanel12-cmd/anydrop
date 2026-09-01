@@ -24,16 +24,15 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent" />
 
-            <!-- Offer badge, e.g. "50% OFF select items" — bottom-end corner
-                 over the cover image (moved here from top-start per user
-                 request, 2026-08-09, to match the same bottom-right corner
-                 convention as the menu-item/popular-dish discount badges
-                 from features.md §4). Hidden when offer_badge_text is null. -->
+            <!-- Offer badge, e.g. "50% OFF select items" — moved back to the
+                 top-start corner over the cover image (2026-09-01 UI refresh,
+                 matches the reference mockup's ribbon-style discount badge on
+                 restaurant cards). Hidden when offer_badge_text is null. -->
             <TextView
                 android:id="@+id/restaurantOfferBadge"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="bottom|end"
+                android:layout_gravity="top|start"
                 android:background="@drawable/bg_discount_badge_corner"
                 android:paddingHorizontal="10dp"
                 android:paddingVertical="5dp"
