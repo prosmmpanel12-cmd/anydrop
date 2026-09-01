@@ -50,7 +50,21 @@ $stmt->execute(['u' => $username]);
 $staff = $stmt->fetch();
 
 if (!$staff || !password_verify($password, $staff['password_hash'])) {
-    write_audit_log('restaurant_staff', $staff['id'] ?? null, 'login_failed', ['username' => $username]);
+    // Bug fix: audit_logs.actor_type is an ENUM('customer','restaurant',
+    // 'rider','admin','system') — 'restaurant_staff' isn't a valid
+    // value. Under MySQL's default strict mode that INSERT throws,
+    // which meant *every* staff login attempt (right password or
+    // wrong) 500'd before a response could ever be sent — this is why
+    // staff login looked completely broken rather than just showing a
+    // wrong-password message. Matches write_staff_audit_log()'s own
+    // already-correct convention (permissions.php): actor_type stays
+    // 'restaurant' with actor_id = the restaurant's id, and who
+    // actually acted (which staff account, if any) goes inside
+    // details_json instead.
+    write_audit_log('restaurant', $staff['restaurant_id'] ?? null, 'staff_login_failed', [
+        'username' => $username,
+        'staff_id' => $staff['id'] ?? null,
+    ]);
     respond_error('invalid_credentials', 401);
 }
 
@@ -85,7 +99,13 @@ if ($restaurant['status'] === 'rejected') {
 }
 
 $token = create_auth_token('restaurant', (int) $restaurant['id'], (int) $staff['id']);
-write_audit_log('restaurant_staff', (int) $staff['id'], 'login_success');
+// Same ENUM bug as the failure branch above — 'restaurant_staff' isn't
+// a valid audit_logs.actor_type, so this would have crashed the
+// request even for a completely correct username/password.
+write_audit_log('restaurant', (int) $restaurant['id'], 'staff_login_success', [
+    'staff_id' => (int) $staff['id'],
+    'role' => $staff['role'],
+]);
 
 unset($restaurant['password_hash']);
 unset($staff['password_hash']);
