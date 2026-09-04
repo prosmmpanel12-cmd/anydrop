@@ -22,9 +22,9 @@ import com.anydrop.rider.network.SignupBody
 import com.anydrop.rider.network.parseApiError
 import com.anydrop.rider.ui.common.InAppNotifier
 import com.anydrop.rider.ui.pending.ApplicationStatusActivity
-import com.google.android.gms.location.CancellationTokenSource
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.launch
 
 /**
