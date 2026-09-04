@@ -24,6 +24,11 @@ import kotlinx.coroutines.launch
  * email). This screen only collects the email and requests an OTP;
  * OtpVerifyActivity decides whether to route to the signup form or
  * straight into an authenticated session based on `account_exists`.
+ *
+ * "Sign up" link reuses the same OTP flow — new email → OtpVerifyActivity
+ * gets account_exists=false → routes to SignupActivity automatically.
+ * We prefill the email field (if already typed) so the rider doesn't
+ * have to retype it.
  */
 class LoginActivity : AppCompatActivity() {
 
@@ -45,9 +50,25 @@ class LoginActivity : AppCompatActivity() {
         playEntranceAnimation()
 
         binding.btnSendOtp.setOnClickListener { attemptSendOtp() }
+
+        // "Sign up" routes through the same OTP flow — OtpVerifyActivity will
+        // detect account_exists=false and forward to SignupActivity with the
+        // verified email. We prefill whatever the rider already typed so they
+        // don't have to enter it again.
         binding.btnGoSignup.setOnClickListener {
-            startActivity(Intent(this, com.anydrop.rider.ui.signup.SignupActivity::class.java))
-            overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+            val typedEmail = binding.inputEmail.text?.toString()?.trim()?.lowercase().orEmpty()
+            if (typedEmail.isNotEmpty() && Patterns.EMAIL_ADDRESS.matcher(typedEmail).matches()) {
+                // Email already filled and valid — send OTP straight away
+                attemptSendOtp()
+            } else {
+                // Email empty or invalid — scroll focus to the field with a hint
+                binding.inputEmail.requestFocus()
+                InAppNotifier.show(
+                    this,
+                    getString(R.string.signup_enter_email_hint),
+                    InAppNotifier.Type.INFO
+                )
+            }
         }
     }
 

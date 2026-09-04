@@ -15,11 +15,11 @@ import com.anydrop.rider.ui.pending.ApplicationStatusActivity
 /**
  * Launcher activity. Plays the brand entrance animation, then routes:
  * - No saved token -> LoginActivity.
- * - Saved token -> ApplicationStatusActivity (rider-verify-otp.php's own
- *   login path already established riders are passwordless and gated by
- *   `status`; Phase 1 has no dashboard yet, so any logged-in rider — even
- *   status='approved' — lands on the status screen until Phase 2 builds
- *   the real delivery-flow home screen).
+ * - Saved token -> ApplicationStatusActivity, which is itself the single
+ *   choke point that redirects an approved rider straight on to
+ *   RiderDashboardActivity (Phase 3, doc 83) — see that screen's kdoc for
+ *   why the branch lives there instead of duplicated at every entry point
+ *   (Splash, post-signup, post-login all funnel through it the same way).
  */
 class SplashActivity : AppCompatActivity() {
 

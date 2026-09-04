@@ -50,14 +50,21 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
-        <!-- Shown right after signup (rider-signup.php issues a token
-             immediately, per its own kdoc) and also whenever a returning
-             rider logs in while still status=pending/rejected/suspended.
-             No dashboard/MainActivity exists yet — Phase 2 (core delivery
-             flow) is what actually needs one, once an admin approves a
-             rider via backend/admin/riders.php. -->
+        <!-- Every entry point (Splash / post-signup / post-login) routes
+             here first. Shown for status=pending/rejected/suspended; an
+             approved rider is redirected on to RiderDashboardActivity from
+             inside this activity (see its kdoc) rather than skipped past it. -->
         <activity
             android:name=".ui.pending.ApplicationStatusActivity"
+            android:exported="false" />
+
+        <!-- Approved rider's real landing screen (Phase 3, doc 83) — reached
+             only via ApplicationStatusActivity's redirect, never launched
+             directly by Splash/Login/Signup themselves. Online/offline
+             toggle + placeholder delivery/earnings cards; the full
+             delivery-assignment flow (R3) is a separate, later build. -->
+        <activity
+            android:name=".ui.dashboard.RiderDashboardActivity"
             android:exported="false" />
 
     </application>

@@ -74,6 +74,46 @@ data class RiderProfile(
     @SerializedName("rejection_reason") val rejectionReason: String? = null
 )
 
+// ---- rider/me (backend/api/v1/rider/me.php) ----
+
+/**
+ * Response from GET /api/v1/rider/me — used by ApplicationStatusActivity's
+ * Refresh button to re-check current status without forcing a full logout
+ * + OTP re-login. Includes the service area name so the status screen
+ * can show it as a confirmation of where the rider signed up.
+ */
+data class RiderMeResult(
+    val rider: RiderMeProfile,
+    val status: String
+)
+
+data class RiderMeProfile(
+    val id: Int,
+    val name: String,
+    val email: String,
+    val mobile: String?,
+    val status: String,
+    @SerializedName("rejection_reason") val rejectionReason: String? = null,
+    @SerializedName("service_area_id") val serviceAreaId: Int? = null,
+    @SerializedName("service_area_name") val serviceAreaName: String? = null,
+    @SerializedName("created_at") val createdAt: String? = null,
+    // Phase 3 (doc 83) additions — additive only, everything above is unchanged.
+    @SerializedName("is_online") val isOnline: Boolean = false,
+    @SerializedName("vehicle_type") val vehicleType: String? = null,
+    @SerializedName("vehicle_number") val vehicleNumber: String? = null
+)
+
+// ---- Phase 3: dashboard online toggle + location ping (doc 83) ----
+
+data class OnlineStatusBody(val online: Boolean)
+
+data class OnlineStatusResult(@SerializedName("is_online") val isOnline: Boolean)
+
+data class LocationBody(val lat: Double, val lng: Double)
+
+/** Generic {"ok": true} shape — used by endpoints with nothing else to return. */
+data class OkResult(val ok: Boolean)
+
 // ---- Service areas (backend/api/v1/system/service-areas.php) ----
 
 data class ServiceArea(
