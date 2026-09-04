@@ -22,7 +22,29 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        debug {
+            // Shared, repo-committed debug keystore (see /keystore at
+            // repo root) so every CI run — and every dev machine — signs
+            // debug builds with the SAME key. Without this, each fresh
+            // GitHub Actions runner auto-generates its own throwaway
+            // ~/.android/debug.keystore, so every CI build has a
+            // different signature and Android refuses to install over
+            // the previous one ("App not installed" / forces an
+            // uninstall first). This is a debug-only key — not sensitive,
+            // fine to commit (same convention as Android's own default
+            // debug keystore password).
+            storeFile rootProject.file('../keystore/anydrop-debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
