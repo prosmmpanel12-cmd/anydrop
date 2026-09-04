@@ -650,11 +650,42 @@ data class TrackRider(
     val lng: Double?
 )
 
+/** Phase 3 R5 follow-up (deep-plan §14-15) — static per order (a
+ * restaurant's own location), included on every track.php poll but
+ * only actually needs reading once by the Android side; see that
+ * endpoint's kdoc. */
+data class TrackRestaurant(
+    val name: String?,
+    val lat: Double?,
+    val lng: Double?
+)
+
+/** The order's saved delivery address pin — also static per order.
+ * Same "only read it once" note as [TrackRestaurant]. */
+data class TrackDelivery(
+    val lat: Double?,
+    val lng: Double?
+)
+
 data class OrderTrackResult(
     val status: String,
     val rider: TrackRider?,
+    val restaurant: TrackRestaurant?,
+    val delivery: TrackDelivery?,
     @SerializedName("eta_minutes") val etaMinutes: Int?,
     val otp: String?
+)
+
+/** GET /orders/{id}/route.php result — see that endpoint's kdoc for
+ * the to_restaurant/to_customer leg logic and why polyline/distanceKm/
+ * durationMinutes are all nullable (no rider yet, no destination
+ * coordinates, or no Directions API key configured are all normal,
+ * non-error states here). */
+data class RouteResult(
+    val polyline: String?,
+    @SerializedName("distance_km") val distanceKm: Double?,
+    @SerializedName("duration_minutes") val durationMinutes: Int?,
+    val leg: String?
 )
 
 // ---- Addresses (§1.8/§2.6 — structured form) ----

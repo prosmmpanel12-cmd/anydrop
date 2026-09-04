@@ -107,6 +107,7 @@
             android:letterSpacing="0.04" />
 
         <LinearLayout
+            android:id="@+id/noActiveDeliveryCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
@@ -130,6 +131,183 @@
                 android:text="@string/dashboard_no_active_delivery"
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp" />
+        </LinearLayout>
+
+        <!-- Incoming offer card (Phase 3 R3, doc 85) — shown instead of the
+             placeholder above when the dispatch engine has an open offer
+             for this rider. -->
+        <LinearLayout
+            android:id="@+id/offerCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card_rounded"
+            android:padding="18dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/dashboard_new_delivery"
+                    android:textColor="@color/anydrop_green"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.03" />
+
+                <TextView
+                    android:id="@+id/offerTimer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/warning_fg"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    tools:text="0:38" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/offerRestaurant"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                tools:text="Spice Villa" />
+
+            <TextView
+                android:id="@+id/offerDetails"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
+                tools:text="2.4 km \u2022 3 items \u2022 COD \u20b9420" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnRejectOffer"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="8dp"
+                    android:backgroundTint="@color/surface_alt"
+                    android:text="@string/btn_reject"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_primary"
+                    app:cornerRadius="12dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAcceptOffer"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:backgroundTint="@color/anydrop_green"
+                    android:text="@string/btn_accept"
+                    android:textAllCaps="false"
+                    android:textColor="@color/black"
+                    app:cornerRadius="12dp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Active delivery card (Phase 3 R3, doc 85; advance-status
+             buttons added this session — pickup/drop-off flow,
+             deep-plan §9-16). orders-current.php reports
+             rider_assigned/picked_up/out_for_delivery; in practice the
+             card only ever shows rider_assigned or out_for_delivery
+             since orders-pickup.php advances straight through
+             picked_up server-side (deep-plan §11 V1 recommendation —
+             see that endpoint's kdoc). -->
+        <LinearLayout
+            android:id="@+id/currentOrderCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card_rounded"
+            android:padding="18dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/currentOrderStatusPill"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_status_pill"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="4dp"
+                android:textColor="@color/status_approved_fg"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                tools:text="RIDER ASSIGNED" />
+
+            <TextView
+                android:id="@+id/currentOrderRestaurant"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                tools:text="Spice Villa" />
+
+            <TextView
+                android:id="@+id/currentOrderAddress"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
+                tools:text="Deliver to: 12 MG Road, Sector 4" />
+
+            <TextView
+                android:id="@+id/currentOrderMeta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                tools:text="Order #AD1029 \u2022 COD \u20b9420" />
+
+            <!-- Only one of these two is ever visible at a time, toggled
+                 in code from the order's status: rider_assigned shows
+                 "Mark Picked Up", out_for_delivery shows "Mark Delivered"
+                 (which opens the OTP dialog when one is required). -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnMarkPickedUp"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="16dp"
+                android:backgroundTint="@color/anydrop_green"
+                android:text="@string/btn_mark_picked_up"
+                android:textAllCaps="false"
+                android:textColor="@color/black"
+                app:cornerRadius="12dp"
+                android:visibility="gone" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnMarkDelivered"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="16dp"
+                android:backgroundTint="@color/anydrop_green"
+                android:text="@string/btn_mark_delivered"
+                android:textAllCaps="false"
+                android:textColor="@color/black"
+                app:cornerRadius="12dp"
+                android:visibility="gone" />
         </LinearLayout>
 
         <!-- Earnings placeholder -->

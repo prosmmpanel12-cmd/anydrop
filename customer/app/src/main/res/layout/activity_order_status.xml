@@ -89,6 +89,26 @@
             android:textColor="@color/text_secondary" />
     </LinearLayout>
 
+    <!-- Phase 3 R5 follow-up (deep-plan §14-15) — live tracking map.
+         Fixed height (not wrap_content — MapView needs an explicit
+         size) and gone by default; shown only while there's an active
+         rider position to plot (see shouldShowMap() in the Activity).
+         This screen has no ScrollView anywhere, same as before this
+         change — on a short screen with riderCard + this map + otpCard
+         + refundCard all visible at once, content could in principle
+         run past the visible area since nothing here scrolls. That
+         was already a latent risk with the pre-existing cards; this
+         map is the largest addition to it and is worth flagging if a
+         real device ever shows the overlap, rather than silently
+         wrapping the whole screen in a ScrollView as an unasked-for
+         side change in this same session. -->
+    <com.google.android.gms.maps.MapView
+        android:id="@+id/trackingMapView"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:layout_marginTop="14dp"
+        android:visibility="gone" />
+
     <LinearLayout
         android:id="@+id/otpCard"
         android:layout_width="match_parent"

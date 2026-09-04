@@ -1,5 +1,6 @@
 package com.anydrop.food.ui.orderstatus
 
+import android.animation.ValueAnimator
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
@@ -14,6 +15,17 @@ import com.anydrop.food.network.RefundInfo
 import com.anydrop.food.ui.common.InAppNotifier
 import com.anydrop.food.ui.home.HomeActivity
 import com.anydrop.food.ui.orders.RateOrderDialog
+import com.anydrop.food.util.PolylineDecoder
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.GoogleMap
+import com.google.android.gms.maps.OnMapReadyCallback
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
+import com.google.android.gms.maps.model.Marker
+import com.google.android.gms.maps.model.MarkerOptions
+import com.google.android.gms.maps.model.Polyline
+import com.google.android.gms.maps.model.PolylineOptions
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -22,8 +34,7 @@ import java.util.Locale
 /**
  * Phase 3 — Order status/tracking. Polls GET /orders/{id}/track every 5s
  * while the order is active (simple polling, per docs/03_Live_Tracking.md —
- * the live map view itself is Phase 4 scope, this screen just shows status +
- * rider contact + delivery OTP once assigned).
+ * this screen shows status + rider contact + delivery OTP once assigned).
  *
  * I2 (docs/features.md Phase I) adds the visual stepper — see
  * [OrderStatusStepperView] for the 9-status-to-5-step mapping and how
@@ -34,20 +45,60 @@ import java.util.Locale
  * as `scheduled_for` above: it never changes on a timescale the 5s poll
  * needs to catch, so it's fetched once alongside scheduledFor in
  * loadOrderDetail() rather than every poll cycle. See renderRefund().
+ *
+ * Phase 3 R5 follow-up (deep-plan §14-15) — live tracking map added this
+ * session. Two independent cadences, matching the deep-plan's split:
+ *   - startPolling()'s existing 5s loop now also drives the rider
+ *     marker, animated (not jumped) from its last position to the new
+ *     one over roughly one poll interval — see animateRiderMarker().
+ *   - a separate, slower startRouteRecalcLoop() re-fetches/redraws the
+ *     route line + refits the camera bounds every
+ *     ROUTE_RECALC_INTERVAL_MS (35s, inside the plan's 30-45s target).
+ *     Kept independent of the 5s loop rather than "every Nth tick of
+ *     the same loop" so the two cadences stay easy to reason about and
+ *     tune separately.
+ * Restaurant/delivery markers are added once, the first time each
+ * becomes available, since both are static per order (see
+ * [com.anydrop.food.network.TrackRestaurant]/[com.anydrop.food.network.TrackDelivery]
+ * kdoc) — no reason to touch them again every poll.
  */
-class OrderStatusActivity : AppCompatActivity() {
+class OrderStatusActivity : AppCompatActivity(), OnMapReadyCallback {
 
     companion object {
         const val EXTRA_ORDER_ID = "extra_order_id"
         private const val POLL_INTERVAL_MS = 5000L
+        private const val ROUTE_RECALC_INTERVAL_MS = 35_000L
         private val TERMINAL_STATUSES = setOf("delivered", "cancelled", "rejected", "refunded", "failed", "expired")
         private val CANCELLABLE_STATUSES = setOf("pending", "accepted")
+
+        // A rider position is only worth plotting/routing while they're
+        // actually mid-delivery — matches rider/location.php's own
+        // active-delivery status set (Phase 3 R4/R5) and route.php's
+        // leg-selection set, so all three stay in sync by construction
+        // rather than by three separately-maintained lists.
+        private val MAP_ACTIVE_STATUSES = setOf("rider_assigned", "picked_up", "out_for_delivery")
     }
 
     private lateinit var binding: ActivityOrderStatusBinding
     private val api by lazy { ApiClient.create(this) }
     private var orderId: Int = 0
     private var polling = true
+
+    private var googleMap: GoogleMap? = null
+    private var mapReady = false
+    private var restaurantMarker: Marker? = null
+    private var deliveryMarker: Marker? = null
+    private var riderMarker: Marker? = null
+    private var riderMarkerAnimator: ValueAnimator? = null
+    private var routePolyline: Polyline? = null
+    private var restaurantLatLng: LatLng? = null
+    private var deliveryLatLng: LatLng? = null
+    private var mapEverShown = false
+    // Last track() response — kept around so onMapReady() (which can
+    // fire after a poll has already landed) can draw the current state
+    // immediately instead of waiting up to POLL_INTERVAL_MS for the
+    // next poll.
+    private var lastTrack: OrderTrackResult? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,6 +114,12 @@ class OrderStatusActivity : AppCompatActivity() {
         binding.btnBackHome.setOnClickListener { goHome() }
         binding.btnCancelOrder.setOnClickListener { cancelOrder() }
 
+        // Google Maps' MapView needs its own lifecycle forwarded from the
+        // Activity's — same requirement MapPinDropActivity's kdoc
+        // documents for its own MapView.
+        binding.trackingMapView.onCreate(savedInstanceState)
+        binding.trackingMapView.getMapAsync(this)
+
         // Covers reopening the app straight into an already-active order
         // (process was killed, or the poller was never started this
         // session) — idempotent/additive, see the service's kdoc.
@@ -70,11 +127,57 @@ class OrderStatusActivity : AppCompatActivity() {
 
         loadOrderDetail()
         startPolling()
+        startRouteRecalcLoop()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        binding.trackingMapView.onResume()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        binding.trackingMapView.onPause()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        binding.trackingMapView.onStart()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        binding.trackingMapView.onStop()
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        binding.trackingMapView.onLowMemory()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        binding.trackingMapView.onSaveInstanceState(outState)
     }
 
     override fun onDestroy() {
         super.onDestroy()
         polling = false
+        riderMarkerAnimator?.cancel()
+        binding.trackingMapView.onDestroy()
+    }
+
+    /** Fired once by the Maps SDK when the underlying GoogleMap is ready.
+     * render()'s own map-update calls all check [mapReady] first, so
+     * whichever of (map ready) / (first track poll landing) happens
+     * second is the one that actually draws the initial state — no
+     * ordering assumption between the two async events. */
+    override fun onMapReady(map: GoogleMap) {
+        googleMap = map
+        mapReady = true
+        map.uiSettings.isZoomControlsEnabled = false
+        map.uiSettings.isMyLocationButtonEnabled = false
+        lastTrack?.let { updateMap(it) }
     }
 
     private fun goHome() {
@@ -241,6 +344,9 @@ class OrderStatusActivity : AppCompatActivity() {
     }
 
     private fun render(track: OrderTrackResult) {
+        lastTrack = track
+        updateMap(track)
+
         binding.orderCodeText.text = getString(R.string.order_placed_title)
         binding.statusText.text = statusLabel(track.status)
 
@@ -285,6 +391,163 @@ class OrderStatusActivity : AppCompatActivity() {
             if (track.status == "delivered") {
                 maybePromptRating(hasRider = track.rider != null)
             }
+        }
+    }
+
+    // ---- Live tracking map (Phase 3 R5 follow-up, deep-plan §14-15) ----
+
+    private fun shouldShowMap(track: OrderTrackResult): Boolean {
+        return track.status in MAP_ACTIVE_STATUSES && track.rider?.lat != null && track.rider.lng != null
+    }
+
+    /** Called from every 5s render() — adds the static restaurant/
+     * delivery markers the first time coordinates for them show up,
+     * and moves the rider marker (animated, never jumped) to its
+     * latest position. Route line + camera refit are NOT done here —
+     * those run on the separate, slower loop started by
+     * startRouteRecalcLoop(), per this class's kdoc. */
+    private fun updateMap(track: OrderTrackResult) {
+        if (!shouldShowMap(track)) {
+            binding.trackingMapView.visibility = View.GONE
+            return
+        }
+        binding.trackingMapView.visibility = View.VISIBLE
+
+        val map = googleMap
+        if (!mapReady || map == null) return // onMapReady's own lastTrack replay will catch up once it fires
+
+        if (restaurantMarker == null && track.restaurant?.lat != null && track.restaurant.lng != null) {
+            val pos = LatLng(track.restaurant.lat, track.restaurant.lng)
+            restaurantLatLng = pos
+            restaurantMarker = map.addMarker(
+                MarkerOptions().position(pos).title(track.restaurant.name ?: "Restaurant")
+                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE))
+            )
+        }
+        if (deliveryMarker == null && track.delivery?.lat != null && track.delivery.lng != null) {
+            val pos = LatLng(track.delivery.lat, track.delivery.lng)
+            deliveryLatLng = pos
+            deliveryMarker = map.addMarker(
+                MarkerOptions().position(pos).title("Delivery address")
+                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE))
+            )
+        }
+
+        // track.rider is non-null with non-null lat/lng — guaranteed by
+        // shouldShowMap()'s check above, which already returned early
+        // otherwise.
+        val newPos = LatLng(track.rider!!.lat!!, track.rider.lng!!)
+        val existing = riderMarker
+        if (existing == null) {
+            riderMarker = map.addMarker(
+                MarkerOptions().position(newPos).title(track.rider.name ?: "Your rider")
+                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN))
+            )
+        } else {
+            animateRiderMarker(existing, existing.position, newPos)
+        }
+
+        if (!mapEverShown) {
+            mapEverShown = true
+            refitCameraBounds()
+        }
+    }
+
+    /** deep-plan §14's "Android interpolates marker between A and B" —
+     * server only writes a new point roughly once per poll, so this
+     * tweens the marker smoothly across the interval instead of
+     * snapping it, without needing any extra location data from the
+     * server. Duration matches POLL_INTERVAL_MS so the marker arrives
+     * at B right around when the next poll (and next A→B animation)
+     * would start. Plain linear lerp on lat/lng — accurate enough over
+     * the short hops one 5s poll interval covers at delivery speeds;
+     * not a great-circle interpolation, which would only matter over
+     * much longer distances than this ever animates. */
+    private fun animateRiderMarker(marker: Marker, from: LatLng, to: LatLng) {
+        riderMarkerAnimator?.cancel()
+        riderMarkerAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = POLL_INTERVAL_MS
+            addUpdateListener { anim ->
+                val t = anim.animatedValue as Float
+                val lat = from.latitude + (to.latitude - from.latitude) * t
+                val lng = from.longitude + (to.longitude - from.longitude) * t
+                marker.position = LatLng(lat, lng)
+            }
+            start()
+        }
+    }
+
+    /** Fits the camera to whichever of restaurant/delivery/rider
+     * markers currently exist. Only called on the map's first
+     * appearance and again from the slower route-recalc loop — NOT on
+     * every 5s rider-position update, since re-fitting bounds every
+     * few seconds would fight the marker animation above and feel
+     * jumpy rather than smooth. Between those refits the rider marker
+     * can drift toward/past the visible edge; a manual "recenter"
+     * button would be the natural fix but is future work, not this
+     * slice. */
+    private fun refitCameraBounds() {
+        val map = googleMap ?: return
+        val points = listOfNotNull(restaurantLatLng, deliveryLatLng, riderMarker?.position)
+        if (points.isEmpty()) return
+        if (points.size == 1) {
+            map.moveCamera(CameraUpdateFactory.newLatLngZoom(points[0], 15f))
+            return
+        }
+        val boundsBuilder = LatLngBounds.Builder()
+        points.forEach { boundsBuilder.include(it) }
+        try {
+            map.moveCamera(CameraUpdateFactory.newLatLngBounds(boundsBuilder.build(), 80))
+        } catch (e: Exception) {
+            // newLatLngBounds can throw if the map hasn't laid out yet
+            // (zero width/height) — harmless to skip this one refit,
+            // the next route-recalc cycle tries again.
+        }
+    }
+
+    /** Separate, slower loop (deep-plan §15: ~30-45s) that re-fetches
+     * the route polyline and redraws it, alongside a camera refit —
+     * kept independent of the 5s rider-position poll in startPolling()
+     * so the two cadences don't have to share one interval. Runs for
+     * the Activity's full lifetime and just no-ops when the map isn't
+     * currently shown (checked via [lastTrack] each cycle) rather than
+     * being started/stopped in step with the map's own visibility —
+     * simpler than plumbing a start/stop signal across two independent
+     * loops for what's already a cheap no-op check. */
+    private fun startRouteRecalcLoop() {
+        lifecycleScope.launch {
+            while (polling) {
+                val track = lastTrack
+                if (track != null && shouldShowMap(track) && mapReady) {
+                    fetchAndDrawRoute()
+                }
+                delay(ROUTE_RECALC_INTERVAL_MS)
+            }
+        }
+    }
+
+    private suspend fun fetchAndDrawRoute() {
+        val map = googleMap ?: return
+        try {
+            val result = api.getOrderRoute(orderId).body()?.data ?: return
+            routePolyline?.remove()
+            routePolyline = null
+            if (!result.polyline.isNullOrBlank()) {
+                val points = PolylineDecoder.decode(result.polyline)
+                if (points.size >= 2) {
+                    routePolyline = map.addPolyline(
+                        PolylineOptions().addAll(points).width(10f).color(getColorCompat(R.color.anydrop_primary))
+                    )
+                }
+            }
+            // Route recalc is also this loop's cue to refit the camera
+            // (see refitCameraBounds() kdoc for why that doesn't happen
+            // on every 5s marker update).
+            refitCameraBounds()
+        } catch (e: Exception) {
+            // Network hiccup — same silent-retry-next-cycle convention
+            // as startPolling()'s own try/catch; the previously-drawn
+            // route (if any) just stays on screen untouched.
         }
     }
 

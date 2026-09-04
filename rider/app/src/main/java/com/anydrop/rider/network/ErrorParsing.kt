@@ -23,7 +23,11 @@ data class ParsedApiError(
     val code: String?,
     val fields: List<String>?,
     val reason: String?,
-    val status: String?
+    val status: String?,
+    // Pickup/drop-off flow (this session) — orders-deliver.php's
+    // invalid_otp error carries this in `data` (see that endpoint's
+    // kdoc). Null for every other error code, which just omit the key.
+    val attemptsRemaining: Int? = null
 )
 
 fun parseApiError(errorBody: ResponseBody?): ParsedApiError {
@@ -37,7 +41,11 @@ fun parseApiError(errorBody: ResponseBody?): ParsedApiError {
         val fields = (data?.get("fields") as? List<*>)?.map { it.toString() }
         val reason = data?.get("reason") as? String
         val status = data?.get("status") as? String
-        ParsedApiError(code, fields, reason, status)
+        // Gson decodes JSON numbers as Double via the raw Map::class.java
+        // path used here (no typed data class) — same reasoning as the
+        // fields/reason/status fields above, just numeric.
+        val attemptsRemaining = (data?.get("attempts_remaining") as? Double)?.toInt()
+        ParsedApiError(code, fields, reason, status, attemptsRemaining)
     } catch (e: Exception) {
         ParsedApiError(null, null, null, null)
     }

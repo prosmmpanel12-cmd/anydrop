@@ -100,6 +100,12 @@ interface ApiService {
     @GET("orders/track.php")
     suspend fun trackOrder(@Query("id") orderId: Int): Response<ApiResponse<OrderTrackResult>>
 
+    /** Phase 3 R5 follow-up (deep-plan §14-15) — route recalculation,
+     * polled far less often than trackOrder() above (~30-45s vs ~5s);
+     * see route.php's kdoc for the leg-selection logic. */
+    @GET("orders/route.php")
+    suspend fun getOrderRoute(@Query("id") orderId: Int): Response<ApiResponse<RouteResult>>
+
     @POST("orders/cancel.php")
     suspend fun cancelOrder(@Query("id") orderId: Int): Response<ApiResponse<OrderDetailResult>>
 

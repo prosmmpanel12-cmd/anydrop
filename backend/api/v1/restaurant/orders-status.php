@@ -4,8 +4,10 @@
  * Auth: Restaurant token (must own the order)
  * Request: { "status": "preparing" | "ready" }
  * Valid transitions: accepted -> preparing -> ready.
- * (ready -> rider_assigned happens via assign-rider, which is Phase 4 scope
- * since it needs a rider to assign; not built yet.)
+ * ('ready' now triggers the Phase 3 R3 assignment engine — see
+ * dispatch_next_candidate() below — which creates the first rider
+ * offer. ready -> rider_assigned happens when a rider accepts that
+ * offer via rider/orders-accept.php, not from this endpoint.)
  */
 
 require_once __DIR__ . '/../../../config/database.php';
@@ -14,6 +16,7 @@ require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/permissions.php';
 require_once __DIR__ . '/../../../lib/orders.php';
 require_once __DIR__ . '/../../../lib/notifications.php';
+require_once __DIR__ . '/../../../lib/dispatch.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -81,6 +84,16 @@ if (isset($statusNotifications[$newStatus])) {
         'order',
         ['order_id' => $orderId, 'screen' => 'order_status']
     );
+}
+
+// Phase 3 R3 (doc 83/85) — 'ready' is the trigger point the assignment
+// engine's own kdoc (dispatch.php) says it plugs into. Fire-and-forget:
+// dispatch_next_candidate() no-ops safely if there are no eligible
+// riders right now (order just stays 'ready', logged for admin
+// attention) — that's not a reason to fail this request, the
+// restaurant's status update itself already succeeded.
+if ($newStatus === 'ready') {
+    dispatch_next_candidate($db, $orderId);
 }
 
 $fetch = $db->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');

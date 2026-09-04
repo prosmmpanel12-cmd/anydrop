@@ -76,6 +76,10 @@
     <string name="dashboard_no_active_delivery">No active delivery right now</string>
     <string name="dashboard_today_heading">TODAY</string>
     <string name="dashboard_placeholder_amount">₹0</string>
+    <!-- Deep-plan §19-20: real today-earnings total once refreshEarnings()
+         lands, replacing dashboard_placeholder_amount above (still used
+         as the initial/pre-load text so the card never renders blank). -->
+    <string name="dashboard_earnings_amount_format">₹%.0f</string>
     <string name="dashboard_placeholder_count">0</string>
     <string name="dashboard_earnings_label">Earnings</string>
     <string name="dashboard_deliveries_label">Deliveries</string>
@@ -83,4 +87,31 @@
     <string name="dashboard_location_permission_denied">Location permission is needed to go online</string>
     <string name="dashboard_went_online">You\'re online ✓</string>
     <string name="dashboard_went_offline">You\'re offline</string>
+
+    <!-- Assignment engine (Phase 3 R3, doc 85) -->
+    <string name="dashboard_new_delivery">NEW DELIVERY</string>
+    <string name="btn_accept">Accept</string>
+    <string name="btn_reject">Reject</string>
+    <string name="dashboard_offer_expired">This delivery was already taken</string>
+    <string name="dashboard_offer_accepted">Order accepted \u2713</string>
+    <string name="status_rider_assigned">RIDER ASSIGNED</string>
+    <string name="status_picked_up">PICKED UP</string>
+    <string name="status_out_for_delivery">OUT FOR DELIVERY</string>
+
+    <!-- Pickup / drop-off flow (this session — deep-plan §9-16) -->
+    <string name="btn_mark_picked_up">Mark Picked Up</string>
+    <string name="btn_mark_delivered">Mark Delivered</string>
+    <string name="pickup_confirmed">Picked up \u2014 on your way \u2713</string>
+    <string name="delivery_otp_dialog_title">Enter delivery code</string>
+    <string name="delivery_otp_dialog_subtitle">Ask the customer for the code and enter it below</string>
+    <string name="hint_delivery_otp">Delivery code</string>
+    <string name="btn_confirm_delivery">Confirm Delivery</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="delivery_confirmed">Order delivered \u2713</string>
+    <string name="error_otp_incomplete_delivery">Enter the delivery code</string>
+    <string name="error_delivery_otp_invalid_format">Incorrect code \u2014 %1$d attempt(s) remaining</string>
+    <string name="error_delivery_otp_invalid">Incorrect code \u2014 please try again</string>
+    <string name="error_delivery_otp_empty">Enter the delivery code</string>
+    <string name="error_delivery_otp_locked">Too many incorrect attempts \u2014 contact support</string>
+    <string name="error_order_state_changed">This order has moved on \u2014 refreshing</string>
 </resources>

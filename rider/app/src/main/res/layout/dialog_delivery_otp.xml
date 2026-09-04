@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pickup/drop-off flow (deep-plan §16) — plain single-field dialog,
+     not the boxed 6-digit grid activity_otp_verify.xml uses. That screen
+     exists for the rider's OWN email OTP with SMS-autofill in mind; this
+     is the rider manually typing a code the customer reads out loud at
+     the door, usually 4 digits (otp_length setting default) — a single
+     TextInputEditText is the right amount of UI for that, not a reused
+     6-box grid sized for a different number of digits. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="24dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/delivery_otp_dialog_subtitle"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        app:boxCornerRadiusTopStart="12dp"
+        app:boxCornerRadiusTopEnd="12dp"
+        app:boxCornerRadiusBottomStart="12dp"
+        app:boxCornerRadiusBottomEnd="12dp"
+        app:boxStrokeColor="@color/anydrop_green"
+        app:hintTextColor="@color/anydrop_green"
+        app:startIconDrawable="@drawable/ic_lock"
+        app:startIconTint="@color/text_secondary">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/inputDeliveryOtp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/hint_delivery_otp"
+            android:textColor="@color/text_primary"
+            android:inputType="number"
+            android:maxLength="6"
+            android:letterSpacing="0.3"
+            android:textSize="18sp" />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <TextView
+        android:id="@+id/deliveryOtpError"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textColor="@color/error_fg"
+        android:textSize="12sp"
+        android:visibility="gone"
+        tools:text="Incorrect code — 2 attempts remaining" />
+
+</LinearLayout>

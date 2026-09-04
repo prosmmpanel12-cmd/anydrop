@@ -109,10 +109,97 @@ data class OnlineStatusBody(val online: Boolean)
 
 data class OnlineStatusResult(@SerializedName("is_online") val isOnline: Boolean)
 
-data class LocationBody(val lat: Double, val lng: Double)
+/** orderId is optional — omit (null) for the plain online-toggle ping.
+ *  Pass it during an active delivery (deep-plan §12-13, Phase 3 R4) so
+ *  the backend also writes a `rider_locations` audit row on top of the
+ *  usual `riders.last_lat/last_lng` cache update; see location.php's
+ *  own kdoc for why a bad/foreign/stale orderId here is always a
+ *  silent no-op server-side, never a client-visible error. */
+data class LocationBody(
+    val lat: Double,
+    val lng: Double,
+    @SerializedName("order_id") val orderId: Int? = null,
+    @SerializedName("speed_kmh") val speedKmh: Double? = null
+)
 
 /** Generic {"ok": true} shape — used by endpoints with nothing else to return. */
 data class OkResult(val ok: Boolean)
+
+// ---- Phase 3 R3: assignment engine (doc 85) ----
+
+data class OfferResult(val offer: Offer?)
+
+data class Offer(
+    @SerializedName("assignment_id") val assignmentId: Int,
+    @SerializedName("order_id") val orderId: Int,
+    @SerializedName("order_code") val orderCode: String,
+    @SerializedName("restaurant_name") val restaurantName: String,
+    @SerializedName("restaurant_address") val restaurantAddress: String?,
+    @SerializedName("distance_km") val distanceKm: Double?,
+    @SerializedName("payment_method") val paymentMethod: String,
+    @SerializedName("grand_total") val grandTotal: Double,
+    @SerializedName("item_count") val itemCount: Int,
+    @SerializedName("expires_at") val expiresAt: String,
+    @SerializedName("expires_in_seconds") val expiresInSeconds: Int
+)
+
+data class CurrentOrderResult(val order: CurrentOrder?)
+
+data class CurrentOrder(
+    val id: Int,
+    @SerializedName("order_code") val orderCode: String,
+    val status: String,
+    @SerializedName("restaurant_name") val restaurantName: String,
+    @SerializedName("restaurant_address") val restaurantAddress: String?,
+    @SerializedName("delivery_address") val deliveryAddress: String?,
+    @SerializedName("delivery_lat") val deliveryLat: Double?,
+    @SerializedName("delivery_lng") val deliveryLng: Double?,
+    @SerializedName("delivery_instructions") val deliveryInstructions: String?,
+    @SerializedName("payment_method") val paymentMethod: String,
+    @SerializedName("grand_total") val grandTotal: Double,
+    @SerializedName("item_count") val itemCount: Int,
+    @SerializedName("delivery_otp_required") val deliveryOtpRequired: Boolean,
+    @SerializedName("accepted_at") val acceptedAt: String?
+)
+
+data class AcceptOrderResult(@SerializedName("order_id") val orderId: Int, val status: String)
+
+data class RejectOrderBody(val reason: String? = null)
+
+// ---- Pickup / drop-off flow (this session — deep-plan §9-16) ----
+
+data class PickupOrderResult(@SerializedName("order_id") val orderId: Int, val status: String)
+
+/** otp is "" when the current order's deliveryOtpRequired is false —
+ *  the backend ignores it entirely in that case (see orders-deliver.php kdoc). */
+data class DeliverOrderBody(val otp: String)
+
+data class DeliverOrderResult(
+    @SerializedName("order_id") val orderId: Int,
+    val status: String,
+    // Nullable/defaulted: older cached responses or a mid-rollout server
+    // without migration 73 applied yet still deserialize fine.
+    @SerializedName("earning_amount") val earningAmount: Double? = null
+)
+
+// ---- Rider earnings (deep-plan §19-20, migration 73) ----
+
+data class EarningsSummaryResult(
+    @SerializedName("today_total") val todayTotal: Double,
+    val balance: Double,
+    @SerializedName("share_percent") val sharePercent: Double,
+    val recent: List<EarningsLedgerEntry>
+)
+
+data class EarningsLedgerEntry(
+    val id: Int,
+    @SerializedName("entry_type") val entryType: String,
+    val amount: Double,
+    @SerializedName("order_id") val orderId: Int?,
+    @SerializedName("order_code") val orderCode: String?,
+    val note: String?,
+    @SerializedName("created_at") val createdAt: String
+)
 
 // ---- Service areas (backend/api/v1/system/service-areas.php) ----
 

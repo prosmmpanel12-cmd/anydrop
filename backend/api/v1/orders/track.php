@@ -2,7 +2,9 @@
 /**
  * GET /api/v1/orders/{id}/track
  * Auth: Customer token (must own the order)
- * Response: { status, rider: { name, mobile, lat, lng } | null, eta_minutes,
+ * Response: { status, rider: { name, mobile, lat, lng } | null,
+ *             restaurant: { name, lat, lng } | null,
+ *             delivery: { lat, lng } | null, eta_minutes,
  *             otp: "1234" (only if status is rider_assigned/out_for_delivery
  *             AND an OTP was actually generated for this order) }
  *
@@ -17,7 +19,16 @@
  * condition governs generation in the future.
  *
  * Deliberately tiny/fast — meant to be polled every few seconds while an
- * order is active (Phase 4 will add the live map on top of this same call).
+ * order is active.
+ *
+ * `restaurant`/`delivery` added this session (deep-plan §14-15, live
+ * tracking map) — both are static per order (a restaurant's location and
+ * a delivery address's pin don't move mid-order), so the Android side
+ * only needs to read them off the *first* successful poll rather than
+ * re-reading every 5s cycle; they're included on every response anyway
+ * since this endpoint has no per-field caching and the extra two rows'
+ * worth of already-joined columns cost nothing meaningful here. `rider`
+ * stays the only field that actually changes poll-to-poll.
  */
 
 require_once __DIR__ . '/../../../config/database.php';
@@ -65,6 +76,41 @@ if (in_array($order['status'], ['rider_assigned', 'out_for_delivery'], true) && 
     $otp = $order['delivery_otp'];
 }
 
+// Restaurant pin — same coordinates the restaurant's own listing/menu
+// pages use (restaurants.latitude/longitude), not something specific to
+// this order. Included for the map's restaurant marker + as a route
+// origin/destination candidate; null lat/lng falls back to name-only
+// display on the Android side rather than a missing marker crashing
+// anything (a restaurant without coordinates set is a pre-existing data
+// gap this endpoint doesn't need to solve).
+$restStmt = $db->prepare('SELECT name, latitude, longitude FROM restaurants WHERE id = :id LIMIT 1');
+$restStmt->execute(['id' => $order['restaurant_id']]);
+$rest = $restStmt->fetch();
+$restaurant = $rest ? [
+    'name' => $rest['name'],
+    'lat' => $rest['latitude'] !== null ? (float) $rest['latitude'] : null,
+    'lng' => $rest['longitude'] !== null ? (float) $rest['longitude'] : null,
+] : null;
+
+// Delivery pin — the saved address this order is actually going to
+// (orders.delivery_address_id), not the customer's current live
+// location (which this endpoint has no way to know and isn't asked
+// for). Null when the order predates delivery_address_id being
+// required, or the address was later deleted — same tolerant-null
+// pattern as $restaurant above.
+$delivery = null;
+if ($order['delivery_address_id']) {
+    $addrStmt = $db->prepare('SELECT latitude, longitude FROM customer_addresses WHERE id = :id LIMIT 1');
+    $addrStmt->execute(['id' => $order['delivery_address_id']]);
+    $addr = $addrStmt->fetch();
+    if ($addr) {
+        $delivery = [
+            'lat' => $addr['latitude'] !== null ? (float) $addr['latitude'] : null,
+            'lng' => $addr['longitude'] !== null ? (float) $addr['longitude'] : null,
+        ];
+    }
+}
+
 // Simple placeholder ETA until Phase 4 wires OSRM route-based ETA.
 $etaMinutes = in_array($order['status'], ['pending', 'accepted', 'preparing'], true)
     ? $order['estimated_prep_minutes']
@@ -73,6 +119,8 @@ $etaMinutes = in_array($order['status'], ['pending', 'accepted', 'preparing'], t
 respond_ok([
     'status' => $order['status'],
     'rider' => $rider,
+    'restaurant' => $restaurant,
+    'delivery' => $delivery,
     'eta_minutes' => $etaMinutes !== null ? (int) $etaMinutes : null,
     'otp' => $otp,
 ]);
