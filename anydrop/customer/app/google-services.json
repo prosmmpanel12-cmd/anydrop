@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "681580896631",
+    "project_id": "anydrop-2d917",
+    "storage_bucket": "anydrop-2d917.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:681580896631:android:6a42a96ef7f9b68fb08172",
+        "android_client_info": {
+          "package_name": "com.anydrop.food"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAh0uki53eFAG84JUwKFi8ZOPcKkwKdAUA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:681580896631:android:27ba2e546464ff54b08172",
+        "android_client_info": {
+          "package_name": "com.anydrop.restaurant"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAh0uki53eFAG84JUwKFi8ZOPcKkwKdAUA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:681580896631:android:ba294d6f74434c50b08172",
+        "android_client_info": {
+          "package_name": "com.anydrop.rider"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAh0uki53eFAG84JUwKFi8ZOPcKkwKdAUA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reverted 2026-08-16 (§8.1.1): btnBack back to floating unstyled on the
+     plain background — undoes the ink-pass header-bar treatment,
+     restoring the pre-ink-pass structure. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="28dp">
+
+    <ImageView
+        android:id="@+id/btnBack"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginBottom="12dp"
+        android:src="@drawable/ic_back"
+        android:contentDescription="@null"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?attr/selectableItemBackgroundBorderless" />
+
+    <TextView
+        android:id="@+id/otpTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/otp_title"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:textColor="@color/text_primary" />
+
+    <TextView
+        android:id="@+id/otpSubtitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="32dp"
+        android:textColor="@color/text_secondary" />
+
+    <LinearLayout
+        android:id="@+id/otpBoxRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center">
+
+        <EditText
+            android:id="@+id/otpDigit1"
+            style="@style/OtpDigitBox" />
+
+        <EditText
+            android:id="@+id/otpDigit2"
+            style="@style/OtpDigitBox" />
+
+        <EditText
+            android:id="@+id/otpDigit3"
+            style="@style/OtpDigitBox" />
+
+        <EditText
+            android:id="@+id/otpDigit4"
+            style="@style/OtpDigitBox" />
+
+        <EditText
+            android:id="@+id/otpDigit5"
+            style="@style/OtpDigitBox" />
+
+        <EditText
+            android:id="@+id/otpDigit6"
+            style="@style/OtpDigitBox" />
+
+    </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnVerify"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginTop="28dp"
+        android:backgroundTint="@color/anydrop_primary"
+        android:text="@string/btn_verify"
+        app:cornerRadius="12dp" />
+
+    <ProgressBar
+        android:id="@+id/otpProgress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:layout_gravity="center_horizontal"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/txtResend"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:layout_gravity="center_horizontal"
+        android:textColor="@color/anydrop_primary"
+        android:textStyle="bold"
+        android:padding="6dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?attr/selectableItemBackground" />
+
+    </LinearLayout>
+</LinearLayout>

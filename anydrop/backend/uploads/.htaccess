@@ -1,0 +1,4 @@
+# User-uploaded files only — never execute scripts from here.
+<FilesMatch "\.(php|php3|php4|php5|phtml)$">
+    Require all denied
+</FilesMatch>

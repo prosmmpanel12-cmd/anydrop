@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Custom SwitchMaterial track (2026-08-19 toggle redesign, resized
+     2026-08-20 per a second app-owner reference — a noticeably more
+     compact pill than the first pass' 52x30dp, still fully-filled and
+     colored orange when ON / light grey when OFF, not the thin Material
+     line-track or the old green/red scheme. Paired with
+     switch_thumb_pill.xml (now a small black circle, was white) via
+     app:track/app:thumb on Widget.AnydropRestaurant.Switch — every
+     SwitchMaterial in the app uses that one style, so this single pair
+     of drawables drives all of them. Fixed intrinsic size (38dp x 20dp)
+     so the pill always renders at the same size regardless of where
+     it's used. -->
+<!-- 2026-08-31 (later same day): app owner felt the 46x26dp version
+     above was too big on real devices, asked to bring it back down a
+     bit. Settled on 40x22dp — smaller than the 46x26dp pass but still
+     noticeably bigger than the original too-thin 38x20dp, keeping the
+     darker #BDBDBD OFF-track contrast fix from that pass. Paired thumb
+     resized to match in switch_thumb_pill.xml. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_checked="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/anydrop_primary" />
+            <corners android:radius="11dp" />
+            <size
+                android:width="40dp"
+                android:height="22dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <stroke android:width="1dp" android:color="@color/outline" />
+            <solid android:color="@color/switch_track_off" />
+            <corners android:radius="11dp" />
+            <size
+                android:width="40dp"
+                android:height="22dp" />
+        </shape>
+    </item>
+</selector>

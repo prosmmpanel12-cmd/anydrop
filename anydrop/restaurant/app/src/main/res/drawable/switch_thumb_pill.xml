@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 2026-08-31 (later same day): switch_track_pill.xml came back down
+     from 46x26dp to 40x22dp, so the thumb is resized to match — 20dp ->
+     18dp — keeping the same ~2dp margin top/bottom inside the track
+     that the original 38x20dp/16dp pairing had, plus the thin outline
+     border from the previous pass so the thumb still reads as a
+     distinct disc against a light background. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@color/switch_thumb_color" />
+    <stroke android:width="0.5dp" android:color="@color/outline" />
+    <size
+        android:width="18dp"
+        android:height="18dp" />
+</shape>

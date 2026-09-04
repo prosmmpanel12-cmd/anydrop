@@ -1,0 +1,521 @@
+<?php
+/**
+ * POST /api/v1/orders
+ * Auth: Customer token
+ * Request:  { "restaurant_id", "items": [...], "delivery_address_id", "payment_method": "upi"|"cod",
+ *             "coupon_code"?, "delivery_instructions"?, "scheduled_for"?, "idempotency_key"? }
+ * Response: { "order": {...}, "order_code": "QRX-..." }
+ *
+ * Re-validates the cart server-side (never trusts client totals), checks the
+ * restaurant is open & under its due limit, checks min order amount, writes
+ * order_items + order_status_history, and (Phase 6) would trigger a push to
+ * the restaurant — for now the restaurant app polls GET /restaurant/orders.
+ *
+ * `idempotency_key` (bugs.md #2.4) — optional client-generated string,
+ * stable across retries of the same place-order attempt. A repeated
+ * request with the same (customer, key) returns the original order
+ * instead of creating a duplicate. Safe to omit (older clients / no key
+ * sent) — falls back to today's un-deduplicated behaviour.
+ */
+
+require_once __DIR__ . '/../../../config/database.php';
+require_once __DIR__ . '/../../../lib/response.php';
+require_once __DIR__ . '/../../../lib/auth.php';
+require_once __DIR__ . '/../../../lib/orders.php';
+require_once __DIR__ . '/../../../lib/notifications.php';
+require_once __DIR__ . '/../../../lib/cod_rules.php';
+require_once __DIR__ . '/../../../lib/payment_restrictions.php';
+require_once __DIR__ . '/../../../lib/wallet.php';
+require_once __DIR__ . '/../../../lib/ledger.php';
+
+header('Access-Control-Allow-Origin: *');
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    respond_error('method_not_allowed', 405);
+}
+
+$owner = require_auth('customer');
+$customerId = $owner['owner_id'];
+
+$body = get_json_body();
+require_fields($body, ['restaurant_id', 'items', 'payment_method']);
+
+$restaurantId = (int) $body['restaurant_id'];
+$items = is_array($body['items']) ? $body['items'] : [];
+$paymentMethod = $body['payment_method'];
+$addressId = isset($body['delivery_address_id']) ? (int) $body['delivery_address_id'] : null;
+$couponCode = $body['coupon_code'] ?? null;
+$instructions = isset($body['delivery_instructions']) ? trim((string) $body['delivery_instructions']) : null;
+// I4 — optional same-day "Schedule for later" slot, "Y-m-d H:i:s" (or any
+// strtotime-parseable string) from the app's slot picker. Validated below
+// against the priced restaurant row, once we have it.
+$scheduledForRaw = $body['scheduled_for'] ?? null;
+// bugs.md #2.4 (server-side half) — client-generated key, stable across
+// retries of the same place-order attempt (timeout-then-retry), fresh for
+// every genuinely new attempt. Optional: null/absent falls back to
+// today's behaviour (no dedup) rather than rejecting the request, since
+// older app builds won't send this yet.
+$idempotencyKey = isset($body['idempotency_key']) ? trim((string) $body['idempotency_key']) : null;
+if ($idempotencyKey === '') {
+    $idempotencyKey = null;
+}
+
+// recall.md item 26 §D — Wallet checkout integration. 'wallet' joins
+// 'upi'/'cod' as a full payment method (orders.payment_method ENUM
+// already widened in migration 43); no split/partial-wallet model,
+// same "whole order or refused" constraint lib/wallet.php's
+// debit_wallet_for_order() already documents.
+if (!in_array($paymentMethod, ['upi', 'cod', 'wallet'], true)) {
+    respond_error('validation_error', 422, ['fields' => ['payment_method']]);
+}
+
+$db = Database::get();
+
+// bugs.md #2.4 — if this exact (customer, key) already created an order,
+// this is a retry (timeout-then-retry, double-submit past the client-side
+// button-disable), not a new order. Return the original instead of
+// re-pricing/re-inserting. Checked before price_cart() runs at all, so a
+// retry doesn't even re-validate the cart/coupon/restaurant-hours.
+if ($idempotencyKey !== null) {
+    $existingStmt = $db->prepare(
+        'SELECT id, order_code FROM orders WHERE customer_id = :cid AND idempotency_key = :key LIMIT 1'
+    );
+    $existingStmt->execute(['cid' => $customerId, 'key' => $idempotencyKey]);
+    $existing = $existingStmt->fetch();
+    if ($existing) {
+        $fetch = $db->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');
+        $fetch->execute(['id' => $existing['id']]);
+        $order = $fetch->fetch();
+        respond_ok([
+            'order' => format_order($db, $order),
+            'order_code' => $existing['order_code'],
+        ], 201);
+    }
+}
+
+// Address must belong to this customer, if provided.
+$addressLat = null;
+$addressLng = null;
+if ($addressId !== null) {
+    $addrStmt = $db->prepare('SELECT id, latitude, longitude FROM customer_addresses WHERE id = :id AND customer_id = :cid LIMIT 1');
+    $addrStmt->execute(['id' => $addressId, 'cid' => $customerId]);
+    $addressRow = $addrStmt->fetch();
+    if (!$addressRow) {
+        respond_error('validation_error', 422, ['fields' => ['delivery_address_id']]);
+    }
+    $addressLat = $addressRow['latitude'] !== null ? (float) $addressRow['latitude'] : null;
+    $addressLng = $addressRow['longitude'] !== null ? (float) $addressRow['longitude'] : null;
+}
+
+// recall.md Phase B item 15 / migration 37 — general area-wide payment
+// method gate, checked BEFORE the COD-specific fine-grained rule below.
+// This is the coarser "is this method allowed in this area at all"
+// check (e.g. a prepaid-only launch area) — a method that fails this
+// never reaches evaluate_cod_eligibility() at all, since there's no
+// point evaluating COD sub-rules for a customer who can't use COD here
+// under any circumstance.
+//
+// 'wallet' is intentionally NOT gated by this area-wide rule —
+// is_payment_method_allowed_in_area() only ever restricts 'upi'/'cod'
+// (migration 37's area_payment_restrictions has no wallet column), so
+// this call returns allowed=true for 'wallet' by default. That's
+// correct, not an oversight: this gate exists to control which
+// payment RAILS a launch area trusts (prepaid-only, no-COD-fraud-risk
+// areas, etc) — a wallet debit is the customer spending their own
+// already-verified balance, not a new rail the area needs to vet.
+$paymentRestriction = get_effective_payment_restrictions($db, $addressLat, $addressLng);
+$methodAllowed = is_payment_method_allowed_in_area($paymentRestriction, $paymentMethod);
+if (!$methodAllowed['allowed']) {
+    respond_error('payment_method_not_allowed', 422, ['reason' => $methodAllowed['reason']]);
+}
+
+// recall.md item 4 / migration 35 — area-wise COD eligibility. Checked
+// before pricing so a rejected COD order fails fast rather than pricing
+// a cart that's about to be rejected anyway. Order-amount cap is
+// checked again after price_cart() below (grand_total isn't known
+// yet at this point) — this first pass only covers the checks that
+// don't need the priced total (enabled/disabled, order-count checks).
+if ($paymentMethod === 'cod') {
+    $codRule = get_effective_cod_rule($db, $addressLat, $addressLng);
+    $codCheck = evaluate_cod_eligibility($db, $codRule, $customerId, null);
+    if (!$codCheck['eligible']) {
+        respond_error('cod_not_eligible', 422, ['reason' => $codCheck['reason']]);
+    }
+}
+
+// scheduledForRaw passed in so price_cart() knows whether to check the
+// restaurant's hours against right-now (a "Deliver Now" order) or skip
+// that check (a scheduled order — validate_scheduled_for() below checks
+// its own target slot against the restaurant's hours instead).
+$priced = price_cart($db, $restaurantId, $items, $couponCode, $customerId, $scheduledForRaw, $addressLat, $addressLng);
+
+if ($priced['error']) {
+    // H4 follow-up (2026-08-10) — attach min_order_amount + item_total
+    // alongside below_min_order_amount so the app can show "Add ₹X more"
+    // instead of a generic failure message. Harmless/no-op for every other
+    // error code, which just gets the plain invalid_items payload as before.
+    $errorData = ['invalid_items' => $priced['invalid_items']];
+    if ($priced['error'] === 'below_min_order_amount') {
+        $errorData['min_order_amount'] = $priced['min_order_amount'];
+        $errorData['item_total'] = $priced['item_total'];
+    }
+    respond_error($priced['error'], 422, $errorData);
+}
+
+// Second COD check — the amount-based cap couldn't be checked before
+// pricing (grand_total wasn't known yet). Enabled/count checks already
+// ran above; re-running evaluate_cod_eligibility() here is cheap (same
+// two count queries) and keeps this a single function to maintain
+// rather than splitting the amount check out into its own inline
+// comparison.
+if ($paymentMethod === 'cod') {
+    $codCheck = evaluate_cod_eligibility($db, $codRule, $customerId, (float) $priced['grand_total']);
+    if (!$codCheck['eligible']) {
+        respond_error('cod_not_eligible', 422, ['reason' => $codCheck['reason']]);
+    }
+}
+
+// recall.md item 26 §D.12 — wallet balance pre-check, same "fail fast
+// before opening the insert transaction" shape as the COD checks
+// above. This is a courtesy check only (fast, no lock held) — the
+// authoritative check is debit_wallet_for_order()'s own row-locked
+// read inside the transaction below, which is what actually prevents
+// two concurrent wallet orders from both passing this cheap check
+// against the same stale balance and then both succeeding. No partial-
+// wallet model (migration 43's header) — a balance that doesn't cover
+// the whole grand_total fails outright rather than falling back to
+// another method silently.
+if ($paymentMethod === 'wallet') {
+    $walletBalance = get_wallet_balance($db, $customerId);
+    if ($walletBalance < (float) $priced['grand_total']) {
+        respond_error('wallet_insufficient_balance', 422, [
+            'wallet_balance' => $walletBalance,
+            'required' => (float) $priced['grand_total'],
+        ]);
+    }
+}
+
+$otpRequired = $paymentMethod === 'upi' || (bool) get_setting('otp_required_for_cod', false);
+$otpLength = (int) get_setting('otp_length', 4);
+
+// I4 — validated after pricing (needs $priced['restaurant']'s open hours),
+// before the insert transaction opens, so a bad slot fails fast with a
+// normal 422 rather than a mid-transaction rollback.
+$scheduleCheck = validate_scheduled_for($priced['restaurant'], $scheduledForRaw);
+if ($scheduleCheck['error'] !== null) {
+    respond_error($scheduleCheck['error'], 422, ['fields' => ['scheduled_for']]);
+}
+$scheduledFor = $scheduleCheck['value'];
+
+try {
+    $db->beginTransaction();
+
+    $orderCode = generate_order_code($db);
+    $deliveryOtp = null;
+    if ($otpRequired) {
+        $deliveryOtp = (string) random_int(
+            (int) str_pad('1', $otpLength, '0'),
+            (int) str_pad('', $otpLength, '9')
+        );
+        $deliveryOtp = str_pad($deliveryOtp, $otpLength, '0', STR_PAD_LEFT);
+    }
+
+    $insertOrder = $db->prepare(
+        'INSERT INTO orders (
+            order_code, customer_id, idempotency_key, restaurant_id, status,
+            item_total, delivery_charge, platform_fee, packing_charge, tax_amount, discount_amount,
+            grand_total, commission_amount, payment_method, payment_status,
+            delivery_address_id, delivery_instructions, scheduled_for, coupon_id, delivery_otp,
+            offer_id, offer_discount_amount, free_delivery_offer_id, free_delivery_discount_amount
+        ) VALUES (
+            :code, :cust, :idem, :rest, \'pending\',
+            :item_total, :delivery_charge, :platform_fee, :packing_charge, :tax_amount, :discount_amount,
+            :grand_total, :commission_amount, :payment_method, :payment_status,
+            :address_id, :instructions, :scheduled_for, :coupon_id, :otp,
+            :offer_id, :offer_discount, :fd_offer_id, :fd_discount
+        )'
+    );
+    $insertOrder->execute([
+        'code' => $orderCode,
+        'cust' => $customerId,
+        'idem' => $idempotencyKey,
+        'rest' => $restaurantId,
+        'item_total' => $priced['item_total'],
+        'delivery_charge' => $priced['delivery_charge'],
+        'platform_fee' => $priced['platform_fee'],
+        'packing_charge' => $priced['packing_charge'],
+        'tax_amount' => $priced['tax_amount'],
+        'discount_amount' => $priced['discount_amount'],
+        'grand_total' => $priced['grand_total'],
+        'commission_amount' => $priced['commission_amount'],
+        'payment_method' => $paymentMethod,
+        'payment_status' => $paymentMethod === 'cod' ? 'pending' : 'pending',
+        'address_id' => $addressId,
+        'instructions' => $instructions,
+        'scheduled_for' => $scheduledFor,
+        'coupon_id' => $priced['coupon_id'],
+        'otp' => $deliveryOtp,
+        // recall.md Phase D item 28 / migration 47 — Offers Engine.
+        'offer_id' => $priced['offer_id'],
+        'offer_discount' => $priced['offer_discount_amount'],
+        'fd_offer_id' => $priced['free_delivery_offer_id'],
+        'fd_discount' => $priced['free_delivery_discount_amount'],
+    ]);
+    $orderId = (int) $db->lastInsertId();
+
+    $insertItem = $db->prepare(
+        'INSERT INTO order_items (order_id, menu_item_id, item_name_snapshot, variant_name, quantity, unit_price, addons_json, special_instructions, subtotal, commission_percent, commission_amount)
+         VALUES (:oid, :mid, :name, :variant, :qty, :price, :addons, :instructions, :subtotal, :commission_percent, :commission_amount)'
+    );
+    foreach ($priced['line_items'] as $line) {
+        $insertItem->execute([
+            'oid' => $orderId,
+            'mid' => $line['menu_item_id'],
+            'name' => $line['item_name_snapshot'],
+            'variant' => $line['variant_name'],
+            'qty' => $line['quantity'],
+            'price' => $line['unit_price'],
+            'addons' => $line['addons_json'],
+            'instructions' => $line['special_instructions'] ?? null,
+            'subtotal' => $line['subtotal'],
+            // recall.md Phase C items 20-23 / migration 38 — per-line
+            // snapshot from price_cart(), see lib/commission.php.
+            'commission_percent' => $line['commission_percent'] ?? null,
+            'commission_amount' => $line['commission_amount'] ?? null,
+        ]);
+    }
+
+    insert_status_history($db, $orderId, 'pending', 'customer', $customerId, 'Order placed');
+
+    // recall.md item 26 §D.12 — wallet debit happens INSIDE this same
+    // transaction as the order insert (per the follow-up prompt's own
+    // framing): a debit can never succeed against an order that then
+    // fails to insert (it wouldn't — we're already past the insert by
+    // here), or vice versa (a debit failure below throws, which rolls
+    // back the order insert too, same as any other failure in this
+    // transaction). The pre-check above already covers the common
+    // case; this is the authoritative, row-locked check
+    // (debit_wallet_for_order() -> debit_wallet()'s SELECT ... FOR
+    // UPDATE) that actually prevents a race between two concurrent
+    // wallet orders both passing the cheap pre-check against the same
+    // stale balance.
+    if ($paymentMethod === 'wallet') {
+        $debitResult = debit_wallet_for_order($db, $customerId, $orderId, (float) $priced['grand_total']);
+        if (!$debitResult['ok']) {
+            // Insufficient balance surfaced only now (race lost against
+            // another concurrent order/debit since the pre-check above) —
+            // throw to trigger this transaction's own rollback, then
+            // hand back the same error shape the pre-check uses so the
+            // app doesn't need a second error code to handle.
+            throw new RuntimeException('wallet_insufficient_balance_race');
+        }
+
+        // A wallet order is paid the instant the debit succeeds — there's
+        // no separate confirmation step the way UPI needs an admin to
+        // verify a UTR (PaymentService::promoteOrderIfNeeded() is that
+        // flow's equivalent of this same "flip to paid + ledger + notify"
+        // moment). COD stays 'pending' until cash is actually collected
+        // (no 'delivered' transition exists yet — recall.md's own
+        // "NOT WIRED" note), which doesn't apply here since the money
+        // already left the wallet balance for real, synchronously.
+        $db->prepare("UPDATE orders SET payment_status = 'paid' WHERE id = :id")
+            ->execute(['id' => $orderId]);
+        insert_status_history($db, $orderId, 'pending', 'system', null, 'Paid via Anydrop Wallet');
+        record_paid_order_ledger_entries($db, [
+            'id' => $orderId,
+            'order_code' => $orderCode,
+            'restaurant_id' => $restaurantId,
+            'grand_total' => $priced['grand_total'],
+            'commission_amount' => $priced['commission_amount'],
+            'platform_fee' => $priced['platform_fee'],
+        ]);
+    }
+
+    if ($priced['coupon_id'] !== null) {
+        // bugs.md #1.3 fix — price_cart()'s usage_limit_per_user /
+        // usage_limit_total check runs before this transaction opens, so
+        // two near-simultaneous requests (double-tap "Place Order", same
+        // user on two devices) could both pass that check before either
+        // insert below landed, both succeed, and a usage_limit_per_user=1
+        // coupon gets used twice. A blanket UNIQUE KEY on
+        // (coupon_id, customer_id) isn't safe here since usage_limit_per_user
+        // can legitimately be >1 or NULL (unlimited) — so instead, re-check
+        // the same limits here, inside the transaction, with a locking read
+        // (SELECT ... FOR UPDATE) immediately before the insert. Two
+        // concurrent transactions now serialize on this lock: the second
+        // one to reach it sees the first one's already-committed-or-pending
+        // usage row and fails cleanly instead of both slipping through.
+        $couponLockStmt = $db->prepare(
+            'SELECT usage_limit_per_user, usage_limit_total FROM coupons WHERE id = :cid LIMIT 1 FOR UPDATE'
+        );
+        $couponLockStmt->execute(['cid' => $priced['coupon_id']]);
+        $couponRow = $couponLockStmt->fetch();
+
+        if ($couponRow) {
+            if ($couponRow['usage_limit_per_user'] !== null) {
+                $recheckUser = $db->prepare(
+                    'SELECT COUNT(*) AS c FROM coupon_usages WHERE coupon_id = :cid AND customer_id = :uid'
+                );
+                $recheckUser->execute(['cid' => $priced['coupon_id'], 'uid' => $customerId]);
+                if ((int) $recheckUser->fetch()['c'] >= (int) $couponRow['usage_limit_per_user']) {
+                    throw new RuntimeException('coupon_usage_limit_reached');
+                }
+            }
+            if ($couponRow['usage_limit_total'] !== null) {
+                $recheckTotal = $db->prepare('SELECT COUNT(*) AS c FROM coupon_usages WHERE coupon_id = :cid');
+                $recheckTotal->execute(['cid' => $priced['coupon_id']]);
+                if ((int) $recheckTotal->fetch()['c'] >= (int) $couponRow['usage_limit_total']) {
+                    throw new RuntimeException('coupon_usage_limit_reached');
+                }
+            }
+        }
+
+        $couponUse = $db->prepare(
+            'INSERT INTO coupon_usages (coupon_id, customer_id, order_id) VALUES (:cid, :uid, :oid)'
+        );
+        $couponUse->execute(['cid' => $priced['coupon_id'], 'uid' => $customerId, 'oid' => $orderId]);
+    }
+
+    // recall.md Phase D item 28 / migration 47 — restaurant Offers
+    // Engine. Same race-protection shape as the coupon block just
+    // above (bugs.md #1.3's fix, applied here from day one instead of
+    // retrofitted later): price_cart()'s own usage-limit check ran
+    // before this transaction opened, so a locking re-check right
+    // before the insert is what actually serializes two near-
+    // simultaneous orders both trying to claim the last slot of a
+    // limited offer. Both the auto-applied item/restaurant offer and
+    // the free-delivery offer go through the same helper — they're
+    // independent stacking slots (doc 20 §13) but share identical
+    // limit-checking logic, so one function handles both rather than
+    // duplicating the lock/recheck/insert dance twice.
+    $recordOfferUsage = function (int $offerId, float $discountAmount) use ($db, $customerId, $orderId): void {
+        $lockStmt = $db->prepare(
+            'SELECT daily_limit, total_limit, per_customer_limit FROM promo_offers WHERE id = :oid LIMIT 1 FOR UPDATE'
+        );
+        $lockStmt->execute(['oid' => $offerId]);
+        $offerRow = $lockStmt->fetch();
+
+        if ($offerRow) {
+            if ($offerRow['per_customer_limit'] !== null) {
+                $recheck = $db->prepare('SELECT COUNT(*) AS c FROM offer_usages WHERE offer_id = :oid AND customer_id = :uid');
+                $recheck->execute(['oid' => $offerId, 'uid' => $customerId]);
+                if ((int) $recheck->fetch()['c'] >= (int) $offerRow['per_customer_limit']) {
+                    throw new RuntimeException('offer_usage_limit_reached');
+                }
+            }
+            if ($offerRow['daily_limit'] !== null) {
+                $recheck = $db->prepare('SELECT COUNT(*) AS c FROM offer_usages WHERE offer_id = :oid AND DATE(created_at) = CURDATE()');
+                $recheck->execute(['oid' => $offerId]);
+                if ((int) $recheck->fetch()['c'] >= (int) $offerRow['daily_limit']) {
+                    throw new RuntimeException('offer_usage_limit_reached');
+                }
+            }
+            if ($offerRow['total_limit'] !== null) {
+                $recheck = $db->prepare('SELECT COUNT(*) AS c FROM offer_usages WHERE offer_id = :oid');
+                $recheck->execute(['oid' => $offerId]);
+                if ((int) $recheck->fetch()['c'] >= (int) $offerRow['total_limit']) {
+                    throw new RuntimeException('offer_usage_limit_reached');
+                }
+            }
+        }
+
+        $insertUsage = $db->prepare(
+            'INSERT INTO offer_usages (offer_id, order_id, customer_id, discount_amount) VALUES (:oid, :ordid, :uid, :amt)'
+        );
+        $insertUsage->execute(['oid' => $offerId, 'ordid' => $orderId, 'uid' => $customerId, 'amt' => $discountAmount]);
+    };
+
+    if ($priced['offer_id'] !== null) {
+        $recordOfferUsage((int) $priced['offer_id'], (float) $priced['offer_discount_amount']);
+    }
+    if ($priced['free_delivery_offer_id'] !== null) {
+        $recordOfferUsage((int) $priced['free_delivery_offer_id'], (float) $priced['free_delivery_discount_amount']);
+    }
+
+    $db->commit();
+} catch (Throwable $e) {
+    $db->rollBack();
+    if ($e->getMessage() === 'coupon_usage_limit_reached') {
+        respond_error('coupon_usage_limit_reached', 422);
+    }
+    // recall.md Phase D item 28 — the rare race the pre-check inside
+    // price_cart() can't catch (same TOCTOU shape as the coupon
+    // limit above — two near-simultaneous orders both passing the
+    // cheap check before either's locked recheck+insert lands). No
+    // amount/limit payload needed here — the app's cart just needs to
+    // know to re-fetch pricing and try again; the offer that raced
+    // away will simply no longer be selected as "best" on retry.
+    if ($e->getMessage() === 'offer_usage_limit_reached') {
+        respond_error('offer_usage_limit_reached', 422);
+    }
+    // recall.md item 26 §D.12 — the rare race the pre-check above can't
+    // catch (balance drained by another concurrent order between the
+    // pre-check and this transaction's own locked debit). No
+    // wallet_balance/required payload here the way the pre-check's
+    // 422 has one — the balance has moved since the client last saw
+    // it, so re-fetching would just be another round-trip; the app's
+    // existing generic "insufficient balance" handling (same string as
+    // the pre-check's error code) covers both call sites identically.
+    if ($e->getMessage() === 'wallet_insufficient_balance_race') {
+        respond_error('wallet_insufficient_balance', 422);
+    }
+    // bugs.md #2.4 — the early idempotency-key lookup above has its own
+    // race: two near-simultaneous requests with the same key can both
+    // pass that SELECT before either INSERT lands (same TOCTOU shape as
+    // bug #1.3). The uniq_customer_idempotency_key constraint added in
+    // migration 20 makes the loser's INSERT fail here instead of silently
+    // creating a duplicate order — recognize that specific failure and
+    // hand back the winner's order rather than a generic 500.
+    if ($idempotencyKey !== null && str_contains($e->getMessage(), 'uniq_customer_idempotency_key')) {
+        $raceStmt = $db->prepare(
+            'SELECT id, order_code FROM orders WHERE customer_id = :cid AND idempotency_key = :key LIMIT 1'
+        );
+        $raceStmt->execute(['cid' => $customerId, 'key' => $idempotencyKey]);
+        $winner = $raceStmt->fetch();
+        if ($winner) {
+            $fetch = $db->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');
+            $fetch->execute(['id' => $winner['id']]);
+            $order = $fetch->fetch();
+            respond_ok([
+                'order' => format_order($db, $order),
+                'order_code' => $winner['order_code'],
+            ], 201);
+        }
+    }
+    respond_error('server_error', 500);
+}
+
+$fetch = $db->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');
+$fetch->execute(['id' => $orderId]);
+$order = $fetch->fetch();
+
+// Notify the restaurant of the new order — after commit, never inside it,
+// so a notification-write failure can never roll back a real order (see
+// lib/notifications.php's kdoc). OrderPollingService already covers the
+// urgent sound/alarm path on the restaurant app; this is the persistent
+// "you can look back at this later" record the bell list is for.
+//
+// UPI FIX (2026-08-23): only fire this immediately for payment methods
+// that are already resolved at this point — 'cod' (pays on delivery,
+// nothing to wait for) and 'wallet' (already flipped to payment_status
+// = 'paid' above, synchronously, before we got here). A 'upi' order is
+// still payment_status = 'pending' right now — the restaurant must NOT
+// be alerted or shown as "New order received" until the payment
+// actually clears. That notification is sent instead from
+// PaymentService::promoteOrderIfNeeded(), the same moment payment_status
+// flips to 'paid' (via customer poll or admin UTR approval) — see there.
+if ($paymentMethod !== 'upi' || $order['payment_status'] === 'paid') {
+    create_notification(
+        'restaurant',
+        $restaurantId,
+        'New order received',
+        "Order $orderCode — ₹" . number_format((float) $order['grand_total'], 0),
+        'order',
+        ['order_id' => $orderId, 'screen' => 'order_detail']
+    );
+}
+
+respond_ok([
+    'order' => format_order($db, $order),
+    'order_code' => $orderCode,
+], 201);

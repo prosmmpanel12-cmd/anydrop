@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- features.md §6 — one row inside fragment_restaurant_offers.xml's
+     offersList. Plain title-bold/description-grey pair, no icon/action —
+     this sheet is a viewer only. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingVertical="10dp">
+
+    <!-- Row separator — thin top border, same convention as
+         detailOffersDivider on the header itself. Only visible for rows
+         after the first (the first row already sits right under the sheet
+         title, no border needed there). -->
+    <View
+        android:id="@+id/offerRowDivider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginBottom="10dp"
+        android:background="@color/outline" />
+
+    <TextView
+        android:id="@+id/offerTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:textColor="@color/text_primary"
+        tools:text="50% OFF up to ₹100" />
+
+    <TextView
+        android:id="@+id/offerDescription"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:textSize="12sp"
+        android:textColor="@color/text_secondary"
+        tools:text="Use code WELCOME50 on orders above ₹199" />
+
+</LinearLayout>

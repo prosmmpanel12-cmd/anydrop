@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingVertical="12dp"
+        android:gravity="center_vertical">
+
+    <!-- App owner ask (2026-08-25): show the item's dish photo in the
+         cart list, not just the veg/non-veg dot — reuses the exact same
+         rounded-corner treatment item_menu_item.xml's itemImage already
+         uses (bg_card_rounded), just shrunk to fit this denser row.
+         Falls back to ic_restaurant via Coil's placeholder/error, same
+         convention as MenuAdapter/FoodCategoryAdapter's own image loads. -->
+    <ImageView
+        android:id="@+id/cartLineImage"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginEnd="10dp"
+        android:scaleType="centerCrop"
+        android:background="@drawable/bg_card_rounded" />
+
+    <View
+        android:id="@+id/cartLineVegBadge"
+        android:layout_width="14dp"
+        android:layout_height="14dp"
+        android:layout_marginEnd="10dp"
+        android:background="@drawable/bg_badge_veg" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingEnd="10dp">
+
+        <TextView
+            android:id="@+id/cartLineName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:textColor="@color/text_primary" />
+
+        <TextView
+            android:id="@+id/cartLinePrice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textSize="13sp"
+            android:textColor="@color/text_secondary" />
+
+        <!-- §2.6 — addon summary ("Extra Cheese, Extra Sauce") and/or the
+             cooking-request note, shown only when the line actually has one;
+             GONE by default so plain (non-customized) lines look unchanged. -->
+        <TextView
+            android:id="@+id/cartLineCustomization"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textSize="12sp"
+            android:textStyle="italic"
+            android:visibility="gone"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:textColor="@color/text_secondary" />
+
+        <!-- App owner ask (2026-08-25) — offer badge (e.g. "Buy 1 Get 1
+             Free", "20% OFF") when this line's menu item carries an
+             offer_tag (already loaded onto every MenuItem/CartLine —
+             see MenuItem.offerTag's own kdoc — no extra network call).
+             Same rounded offer-tinted pill treatment item_menu_item.xml's
+             own offer badge already uses elsewhere in the app, shrunk to
+             fit this denser row. GONE by default so a plain line looks
+             unchanged. -->
+        <TextView
+            android:id="@+id/cartLineOfferTag"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="1dp"
+            android:background="@drawable/bg_card_rounded"
+            android:backgroundTint="@color/offer_bg"
+            android:textColor="@color/offer_fg"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            tools:text="Buy 1 Get 1 Free"
+            tools:visibility="visible" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/cartLineStepperGroup"
+        android:layout_width="wrap_content"
+        android:layout_height="32dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_qty_stepper"
+        android:paddingHorizontal="4dp">
+
+        <ImageView
+            android:id="@+id/btnLineDecrease"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:padding="6dp"
+            android:src="@drawable/ic_remove"
+            app:tint="@color/white" />
+
+        <TextView
+            android:id="@+id/cartLineQty"
+            android:layout_width="22dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="@color/white"
+            android:textStyle="bold"
+            android:textSize="13sp" />
+
+        <ImageView
+            android:id="@+id/btnLineIncrease"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:padding="6dp"
+            android:src="@drawable/ic_add"
+            app:tint="@color/white" />
+
+    </LinearLayout>
+
+    <!-- Checkout read-only mode (CheckoutItemAdapter) — plain "× qty"
+         label shown instead of cartLineStepperGroup above (GONE in that
+         mode). Checkout is a review screen, not where quantities get
+         edited (that's the cart sheet's job) — see CheckoutItemAdapter's
+         own kdoc. -->
+    <TextView
+        android:id="@+id/cartLineQtyReadonly"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:textColor="@color/text_secondary"
+        android:visibility="gone"
+        tools:text="× 2" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/outline" />
+
+</LinearLayout>

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background"
+    android:gravity="center"
+    android:padding="32dp">
+
+    <!-- Reverted 2026-08-16 (§8.1.1): removed the ink circle backdrop added
+         by the pre-login ink pass — back to the plain icon with no
+         background, its pre-ink-pass state. -->
+    <ImageView
+        android:id="@+id/successIcon"
+        android:layout_width="88dp"
+        android:layout_height="88dp"
+        android:src="@drawable/ic_check_circle"
+        android:contentDescription="@null"
+        app:tint="@color/success_fg" />
+
+    <TextView
+        android:id="@+id/successTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="@string/signup_success_title"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:textColor="@color/text_primary"
+        android:gravity="center" />
+
+    <TextView
+        android:id="@+id/successBody"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="@string/signup_success_body"
+        android:textColor="@color/text_secondary"
+        android:gravity="center" />
+
+    <!-- Service-area notice (§0, 2026-08-28) — shown only when the owner
+         picked a location on signup but it didn't resolve to any known
+         service area (area_resolved: false). Informational only, never
+         blocks signup — the row above already confirms submission. -->
+    <TextView
+        android:id="@+id/areaNoticeText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bg_input_outline"
+        android:padding="14dp"
+        android:text="@string/signup_area_not_covered"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp"
+        android:gravity="center"
+        android:visibility="gone" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnBackToLogin"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginTop="32dp"
+        android:backgroundTint="@color/anydrop_primary"
+        android:text="@string/btn_back_to_login"
+        app:cornerRadius="12dp" />
+
+</LinearLayout>

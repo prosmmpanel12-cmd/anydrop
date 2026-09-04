@@ -1,0 +1,350 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Converted to a BottomSheetDialog (doc 22 item 2 follow-up: app-owner-
+     confirmed split puts add-coupon + add-menu-item in the "complex,
+     bottom sheet" bucket, everything else stays a centered
+     MaterialAlertDialogBuilder). Root LinearLayout now carries the
+     rounded-top sheet background directly (same bg_dialog_rounded_top.xml
+     token the customer app's bottom sheets already use) and a title +
+     Save/Cancel button row replace what setPositiveButton/setNegativeButton
+     used to render, since a plain BottomSheetDialog has no built-in
+     action-button chrome the way AlertDialog does. See
+     MenuFragment.showItemDialog() for the click wiring. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_dialog_rounded_top">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <View
+            android:layout_width="36dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/bg_sheet_handle" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:id="@+id/itemDialogTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                tools:text="Add Menu Item" />
+
+            <ImageView
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/illus_add_menu_item"
+                android:contentDescription="@null" />
+
+        </LinearLayout>
+
+        <!-- Photo picker (NEXT_SESSION_PROMPT.md item 4) — same staged-
+             upload pattern as EditProfileActivity's logoPickerRow: upload
+             only fires on dialog Save, never on pick, so cancelling the
+             dialog never orphans a DB write. Rounded-square (not circular)
+             since this is a dish photo, not a logo. -->
+        <LinearLayout
+            android:id="@+id/itemPhotoPickerRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingBottom="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/stat_chip_bg"
+                app:strokeColor="@color/outline"
+                app:strokeWidth="1dp">
+
+                <ImageView
+                    android:id="@+id/itemPhotoPreview"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_food_placeholder"
+                    android:padding="20dp"
+                    app:tint="@color/text_secondary"
+                    android:contentDescription="@null" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <TextView
+                android:id="@+id/itemPhotoLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/btn_add_photo"
+                android:textColor="@color/anydrop_primary"
+                android:textStyle="bold"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <!-- doc 22 item 6 — leading icons on fields, using the generic
+             bundled set (no sourcing debate for these, per that item). -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:startIconDrawable="@drawable/ic_tag">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/inputItemName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/hint_item_name"
+                android:inputType="textCapSentences"
+                android:maxLength="150" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            app:startIconDrawable="@drawable/ic_rupee">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/inputItemPrice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/hint_item_price"
+                android:inputType="numberDecimal" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/inputItemDescription"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/hint_item_description"
+                android:inputType="textCapSentences|textMultiLine"
+                android:minLines="2" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="12dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/label_veg"
+                android:textColor="@color/text_primary" />
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchIsVeg"
+                style="@style/Widget.AnydropRestaurant.Switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true" />
+        </LinearLayout>
+
+        <!-- Item availability timing (today.md §1, migration 62) — optional
+             daily recurring window, e.g. a breakfast item only orderable
+             7:00-11:00. Both fields optional/independent; leaving both
+             blank (the default for every existing item) means no
+             restriction, same as before this existed. Same start/end
+             TIME-picker field pair OfferManagerActivity's happy-hour
+             fields already use (dialog_add_offer.xml's startTimeLayout/
+             endTimeLayout) — copied rather than re-invented. -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/label_item_availability_timing"
+            android:textColor="@color/text_primary"
+            android:textStyle="bold"
+            android:textSize="13sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/label_item_availability_timing_hint"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/itemAvailableFromLayout"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                app:startIconDrawable="@drawable/ic_clock"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_close">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputItemAvailableFrom"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/hint_item_available_from"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:cursorVisible="false" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/itemAvailableUntilLayout"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                app:startIconDrawable="@drawable/ic_clock"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_close">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputItemAvailableUntil"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/hint_item_available_until"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:cursorVisible="false" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+        </LinearLayout>
+
+        <!-- Item tags (Pizza / Onion / Capsicum / ...) — 2026-08-20 ask.
+             Chips populated at runtime from food-tags-list.php (see
+             MenuFragment.loadFoodTagsIfNeeded()); multi-select, no
+             singleSelection, so a dish can carry more than one tag (e.g.
+             a Pizza that's also tagged Onion + Capsicum). Selected tags
+             are what let this item show up when a customer taps a Home
+             category chip (Customer app, home/category-items.php) — same
+             food_categories/menu_item_categories mechanism, just wired
+             from the restaurant side for the first time. -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/label_item_tags"
+            android:textColor="@color/text_primary"
+            android:textStyle="bold"
+            android:textSize="13sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/label_item_tags_hint"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/itemTagsGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:singleSelection="false" />
+
+        <TextView
+            android:id="@+id/itemTagsEmptyLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/label_item_tags_loading"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
+        <!-- Manage Add-ons entry point (§1, today.md 2026-08-28; doc 58).
+             Visible only when existingItem != null — MenuFragment.
+             showItemDialog() sets this GONE for a brand-new item, which
+             has no id yet to attach addon groups to. Same click-row
+             shape as activity_signup.xml's rowSetLocation. -->
+        <LinearLayout
+            android:id="@+id/rowManageAddons"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_input_outline"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="14dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:src="@drawable/ic_tag"
+                app:tint="@color/text_secondary"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="10dp"
+                android:text="@string/btn_manage_addons"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="24dp"
+            android:gravity="end">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnItemDialogCancel"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_cancel" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnItemDialogSave"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:backgroundTint="@color/anydrop_primary"
+                android:text="@string/btn_save" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

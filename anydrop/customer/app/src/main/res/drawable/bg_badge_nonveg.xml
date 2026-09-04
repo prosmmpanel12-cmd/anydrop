@@ -1,0 +1,17 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Outer square outline (unchanged from before) -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFF" />
+            <corners android:radius="2dp" />
+            <stroke android:width="1.2dp" android:color="@color/nonveg_red" />
+        </shape>
+    </item>
+    <!-- Inner filled dot — the piece bug 1.4 was missing, matches the
+         standard Zomato/Swiggy non-veg symbol (red/maroon square + dot) -->
+    <item android:gravity="center" android:width="6dp" android:height="6dp">
+        <shape android:shape="oval">
+            <solid android:color="@color/nonveg_red" />
+        </shape>
+    </item>
+</layer-list>

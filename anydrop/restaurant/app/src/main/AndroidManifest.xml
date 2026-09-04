@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Location Picker (Edit Profile), 2026-08-16 — same permissions as
+         the Customer app's H6 pin-drop screen. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Order Management small addition, "loud sound on new order"
+         (docs/18, docs/restorent/00_Status.md backlog item 2). Superseded
+         2026-08-18 by OrderPollingService + OrderNotificationHelper (real
+         alert-even-when-closed fix — see that class's kdoc) but VIBRATE
+         is still needed, both by the notification channel's own
+         vibration pattern and NotificationCompat.Builder.setVibrate(). -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- OrderPollingService (2026-08-18) — foreground service so order
+         polling survives the app being closed, per its own kdoc. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Runtime-requested on API 33+ (MainActivity.startOrderPollingService)
+         — without this, OrderNotificationHelper's alert notification
+         silently never shows, no error anywhere. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- "Ring until acted on" alarm screen (2026-08-18, NewOrderAlarmActivity)
+         — required to show that screen via a full-screen intent, including
+         over the lock screen, same mechanism incoming-call apps use.
+         Auto-granted for apps targeting API 33 and below; on API 34+ it's
+         granted by default too but the OS may revoke it for apps it
+         doesn't consider trustworthy for full-screen alerts — see
+         NotificationManager.canUseFullScreenIntent() if that ever needs
+         checking/re-requesting at runtime. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.AnydropRestaurant"
+        android:usesCleartextTraffic="true"
+        android:supportsRtl="true">
+
+        <!-- usesCleartextTraffic: needed for local KS Web HTTP backend during
+             development, same as the customer app (see network/ApiClient.kt). -->
+
+        <!-- Google Maps SDK key — same key/setup pattern as the Customer
+             app's manifest (see that file's kdoc for the full "why" —
+             Android-restricted, resolves via
+             restaurant/app/src/debug|release/res/values/google_maps_api.xml,
+             gitignored, not yet added). Placeholder until a real restricted
+             key exists — map area shows grey/blank until then, same as the
+             Customer app. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="@string/google_maps_key" />
+
+        <!-- FileProvider — first use in this app (Insights CSV export,
+             PENDING.md's "Export PDF/Excel" item). Needed to hand a
+             cache-dir file to another app (WhatsApp/Gmail/Drive/etc)
+             via the Android share-sheet without exposing a raw file://
+             Uri, which FLAG_GRANT_READ_URI_PERMISSION + newer Android
+             versions both reject. authority follows the standard
+             "${applicationId}.fileprovider" convention so it can never
+             collide with another installed app's provider. Paths
+             defined in res/xml/file_paths.xml. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- Launcher moved here from LoginActivity this session — plays the
+             brand entrance animation, then routes to Dashboard or Login. -->
+        <activity
+            android:name=".ui.splash.SplashActivity"
+            android:exported="true"
+            android:theme="@style/Theme.AnydropRestaurant">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ui.login.LoginActivity"
+            android:exported="false" />
+
+        <!-- Migration 63 (Restaurant Staff/RBAC, PENDING.md item 3). -->
+        <activity
+            android:name=".ui.staff.StaffLoginActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.staff.StaffManagementActivity"
+            android:exported="false" />
+
+        <!-- Migration 64 (Staff Audit Trail, PENDING.md §7's last checkbox). -->
+        <activity
+            android:name=".ui.staff.StaffAuditLogActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.signup.SignupActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.signup.OtpVerifyActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.signup.SignupSuccessActivity"
+            android:exported="false" />
+
+        <!-- Bottom-nav shell (docs/restorent/19 §3/§10 item 2) — replaces
+             DashboardActivity and MenuManagementActivity as the post-login
+             entry point; both are now fragments (Orders/Menu tabs) hosted
+             here alongside the new Insights/Account tabs. -->
+        <activity
+            android:name=".ui.main.MainActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.orderdetail.OrderDetailActivity"
+            android:exported="false" />
+
+        <!-- Notification bell (Type 1, docs/Status.md 2026-08-20). -->
+        <activity
+            android:name=".ui.notifications.NotificationListActivity"
+            android:exported="false" />
+
+        <!-- Reviews reply (docs/restorent/00_Status.md, this session). -->
+        <activity
+            android:name=".ui.reviews.ReviewListActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Add-on Group management (§1, today.md 2026-08-28; doc 58). -->
+        <activity
+            android:name=".ui.menu.AddonGroupsActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Closure Schedule (§3, today.md 2026-08-28; doc 60/61). -->
+        <activity
+            android:name=".ui.account.ClosureScheduleActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Restaurant Bank Details (PENDING.md §15, migration 59, doc 63). -->
+        <activity
+            android:name=".ui.account.BankDetailsActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Account tab / Edit Profile (docs/restorent/19 §7, §10 item 5,
+             NEXT_SESSION_PROMPT.md item 1). -->
+        <activity
+            android:name=".ui.account.EditProfileActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Location Picker for Edit Profile (app-owner real-device
+             feedback, 2026-08-16, docs/restorent/00_Status.md item 3). -->
+        <activity
+            android:name=".ui.account.LocationPickerActivity"
+            android:exported="false" />
+
+        <!-- Crop screen (app-owner feedback item #2, 2026-08-17) — shared
+             by the logo, dish-photo, category-photo, and banner pickers. -->
+        <activity
+            android:name=".ui.common.CropActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AnydropRestaurant" />
+
+        <!-- Restaurant Banners manager (app-owner feedback item #3,
+             2026-08-17), launched from AccountFragment's new row. -->
+        <activity
+            android:name=".ui.account.BannerManagerActivity"
+            android:exported="false" />
+
+        <!-- My Coupons manager (doc 07 §2.1, this session), launched from
+             AccountFragment's new row. -->
+        <activity
+            android:name=".ui.account.CouponManagerActivity"
+            android:exported="false" />
+
+        <!-- "Offers" screen (doc 20 §14; docs/29 "Not built" item 1,
+             session 7). Launched from AccountFragment's new row, same
+             exported="false" as every other internal-only screen here. -->
+        <activity
+            android:name=".ui.account.OfferManagerActivity"
+            android:exported="false" />
+
+        <!-- "Ring until acted on" alarm screen (2026-08-18) — launched via
+             OrderNotificationHelper's full-screen intent. singleTask +
+             excludeFromRecents so a burst of orders can't stack multiple
+             copies of this screen or leave a stray entry in Recents after
+             it's dismissed; taskAffinity left default (main task) so
+             "View order" -> OrderDetailActivity feels like normal in-app
+             navigation rather than a separate task. -->
+        <activity
+            android:name=".ui.orders.NewOrderAlarmActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.AnydropRestaurant" />
+
+        <!-- Real "alert even when app is closed" fix (2026-08-18) — see
+             OrderPollingService's kdoc. foregroundServiceType="dataSync"
+             matches its actual behavior (periodically syncing/polling
+             order data from the backend) — required on API 34+, every
+             foreground service must declare one. -->
+        <service
+            android:name=".service.OrderPollingService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- "Dismiss" action on the new-order notification (2026-08-18) —
+             silences OrderNotificationHelper's central ringing loop
+             straight from the notification shade / lock screen. -->
+        <receiver
+            android:name=".service.DismissOrderAlertReceiver"
+            android:exported="false" />
+
+        <!-- FCM (this session) — see RestaurantFirebaseMessagingService's
+             kdoc for how a push routes into the existing
+             OrderNotificationHelper. Not exported: only the OS's own FCM
+             plumbing is meant to bind to this. -->
+        <service
+            android:name=".service.RestaurantFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Default small icon + notification color for a push that
+             arrives while the app is fully killed (no code running to
+             build a NotificationCompat.Builder at all) — FCM's own
+             system tray auto-display uses these meta-data values in
+             that case. Reuses the same ic_notification drawable
+             OrderNotificationHelper already builds every other
+             notification with, so a cold-start push looks identical to
+             every other notification this app posts. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+
+    </application>
+
+</manifest>

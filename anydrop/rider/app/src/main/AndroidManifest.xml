@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Service-area GPS auto-detect on the signup form (doc 79 —
+         "live location fetch AND dropdown, both, dropdown wins if both
+         given"). Same permission pair the restaurant/customer apps use
+         for their own location pickers. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.AnydropRider"
+        android:usesCleartextTraffic="true"
+        android:supportsRtl="true">
+
+        <!-- usesCleartextTraffic: needed for a local dev HTTP backend during
+             development, same as the customer/restaurant apps (see
+             network/ApiClient.kt). -->
+
+        <activity
+            android:name=".ui.splash.SplashActivity"
+            android:exported="true"
+            android:theme="@style/Theme.AnydropRider">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Rider auth is email-OTP-only (passwordless) — this screen
+             collects just the email and requests an OTP; OtpVerifyActivity
+             does double duty as login (existing rider) and step 2 of
+             signup (new email), per rider-verify-otp.php's own contract. -->
+        <activity
+            android:name=".ui.login.LoginActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.login.OtpVerifyActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.signup.SignupActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Every entry point (Splash / post-signup / post-login) routes
+             here first. Shown for status=pending/rejected/suspended; an
+             approved rider is redirected on to RiderDashboardActivity from
+             inside this activity (see its kdoc) rather than skipped past it. -->
+        <activity
+            android:name=".ui.pending.ApplicationStatusActivity"
+            android:exported="false" />
+
+        <!-- Approved rider's real landing screen (Phase 3, doc 83) — reached
+             only via ApplicationStatusActivity's redirect, never launched
+             directly by Splash/Login/Signup themselves. Online/offline
+             toggle + placeholder delivery/earnings cards; the full
+             delivery-assignment flow (R3) is a separate, later build. -->
+        <activity
+            android:name=".ui.dashboard.RiderDashboardActivity"
+            android:exported="false" />
+
+    </application>
+
+</manifest>

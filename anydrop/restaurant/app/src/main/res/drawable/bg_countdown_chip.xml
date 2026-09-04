@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Orders tab redesign (docs/restorent/19, §4/§8) — "Accept within
+     1:45" countdown chip on New-section cards. Client-side visual cue
+     only, see docs/restorent/00_Status.md 2026-08-15 entry: the backend
+     has no accept-deadline concept, so this never turns into an
+     auto-reject, only a color cue for staff. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/warning_amber_bg" />
+    <corners android:radius="20dp" />
+</shape>

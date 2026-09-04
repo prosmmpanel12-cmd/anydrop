@@ -1,0 +1,22 @@
+<!-- Phase 2 (UI/UX overhaul, 2026-08-19) — replaces the "🗑️" emoji glyph
+     used as row-action button text in item_menu_category.xml and
+     item_menu_food.xml. Standard trash-can delete icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?attr/colorControlNormal">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M9.5,2.5 L14.5,2.5 C14.91,2.5 15.25,2.84 15.25,3.25 L15.25,4.5 L19.5,4.5 C19.91,4.5 20.25,4.84 20.25,5.25 C20.25,5.66 19.91,6 19.5,6 L4.5,6 C4.09,6 3.75,5.66 3.75,5.25 C3.75,4.84 4.09,4.5 4.5,4.5 L8.75,4.5 L8.75,3.25 C8.75,2.84 9.09,2.5 9.5,2.5 Z M10.25,4 L13.75,4 L13.75,4 L10.25,4 Z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M5.5,7.5 L18.5,7.5 L17.79,20.09 C17.72,21.19 16.81,22 15.7,22 L8.3,22 C7.19,22 6.28,21.19 6.21,20.09 L5.5,7.5 Z M7.09,9 L7.7,20 C7.72,20.29 7.96,20.5 8.25,20.5 L15.75,20.5 C16.04,20.5 16.28,20.29 16.3,20 L16.91,9 L7.09,9 Z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M10,10.75 C10.41,10.75 10.75,11.09 10.75,11.5 L10.75,17.5 C10.75,17.91 10.41,18.25 10,18.25 C9.59,18.25 9.25,17.91 9.25,17.5 L9.25,11.5 C9.25,11.09 9.59,10.75 10,10.75 Z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M14,10.75 C14.41,10.75 14.75,11.09 14.75,11.5 L14.75,17.5 C14.75,17.91 14.41,18.25 14,18.25 C13.59,18.25 13.25,17.91 13.25,17.5 L13.25,11.5 C13.25,11.09 13.59,10.75 14,10.75 Z" />
+</vector>

@@ -1,0 +1,670 @@
+<resources>
+    <string name="app_name">Anydrop Restaurant</string>
+
+    <!-- Google Maps SDK key placeholder — same as Customer app's strings.xml
+         entry, see AndroidManifest.xml's kdoc on the meta-data tag using it. -->
+    <string name="google_maps_key" translatable="false">YOUR_ANDROID_RESTRICTED_MAPS_KEY_HERE</string>
+
+    <!-- Login -->
+    <string name="login_title">Restaurant Login</string>
+    <string name="login_subtitle">Sign in with your registered email</string>
+    <string name="hint_email">Email address</string>
+    <string name="hint_password">Password</string>
+    <string name="btn_login">Log In</string>
+    <string name="login_no_account">New restaurant partner?</string>
+    <string name="login_go_signup">Sign up</string>
+    <string name="login_staff_instead">Login as staff member instead</string>
+    <string name="staff_login_title">Staff Login</string>
+    <string name="staff_login_subtitle">Sign in with the username your restaurant gave you</string>
+    <string name="hint_username">Username</string>
+    <string name="staff_login_back_to_owner">Restaurant owner? Log in here</string>
+
+    <!-- Staff Management screen (doc 71, migration 63, PENDING.md item 3) -->
+    <string name="account_row_staff_management">Staff Management</string>
+    <string name="staff_management_title">Staff Management</string>
+    <string name="empty_staff">No staff accounts yet. Tap + Add Staff to give someone their own login.</string>
+    <string name="staff_load_failed">Couldn\'t load staff</string>
+    <string name="staff_save_failed">Couldn\'t save staff details</string>
+    <string name="staff_username_taken">That username is already taken — usernames must be unique across all restaurants. Try another.</string>
+    <string name="staff_error_name_required">Enter a name</string>
+    <string name="staff_error_username_short">Username must be at least 3 characters</string>
+    <string name="staff_error_password_required">Enter a password</string>
+    <string name="staff_error_password_short">Password must be at least 6 characters</string>
+    <string name="staff_error_username_password_same">Username and password can\'t be the same — pick a different password</string>
+    <string name="staff_error_invalid_role">Select a valid role</string>
+    <string name="staff_error_forbidden">Only the restaurant owner can manage staff</string>
+    <string name="staff_saved">Staff saved</string>
+    <string name="staff_deleted">Staff removed</string>
+    <string name="staff_delete_confirm_title">Remove this staff member?</string>
+    <string name="staff_delete_confirm_message">They\'ll no longer be able to log in. This can\'t be undone from the app.</string>
+    <string name="dialog_add_staff_title">Add staff</string>
+    <string name="dialog_edit_staff_title">Edit staff</string>
+    <string name="hint_staff_name">Full name</string>
+    <string name="hint_staff_password">Password</string>
+    <string name="hint_staff_password_optional">New password (leave blank to keep current)</string>
+    <string name="label_staff_role">Role</string>
+    <string name="staff_role_manager">Manager</string>
+    <string name="staff_role_kitchen">Kitchen</string>
+    <string name="staff_role_cashier">Cashier</string>
+    <string name="staff_username_role_format">%1$s · %2$s</string>
+
+    <!-- Staff Audit Trail (migration 64, PENDING.md §7's last checkbox) -->
+    <string name="account_row_staff_audit_log">Staff Activity Log</string>
+    <string name="staff_audit_log_title">Staff Activity Log</string>
+    <string name="empty_staff_audit_log">No staff activity yet</string>
+    <string name="staff_audit_log_load_failed">Couldn\'t load staff activity</string>
+    <string name="audit_by_owner">By you (Owner)</string>
+    <string name="audit_by_staff">By staff (%1$s)</string>
+    <string name="audit_staff_created">%1$s added as %2$s</string>
+    <string name="audit_staff_role_changed">%1$s\'s role changed from %2$s to %3$s</string>
+    <string name="audit_staff_activated">%1$s re-enabled</string>
+    <string name="audit_staff_deactivated">%1$s disabled</string>
+    <string name="audit_staff_deleted">%1$s removed</string>
+    <string name="audit_staff_updated">%1$s\'s details updated</string>
+
+    <!-- App update (§9, 2026-08-28) -->
+    <string name="update_title">Update Available</string>
+    <string name="btn_update_later">Later</string>
+    <string name="btn_update_now">Update Now</string>
+    <string name="maintenance_title">Down for maintenance</string>
+    <string name="maintenance_message_default">We\'re currently doing scheduled maintenance. Please check back shortly.</string>
+    <string name="btn_maintenance_retry">Retry</string>
+
+    <!-- Splash -->
+    <string name="splash_tagline">Partner Dashboard</string>
+
+    <!-- Signup -->
+    <string name="signup_title">Partner With Anydrop</string>
+    <string name="signup_subtitle">Grow your restaurant with us</string>
+    <string name="hint_restaurant_name">Restaurant name</string>
+    <string name="hint_owner_name">Owner name</string>
+    <string name="hint_owner_mobile">Mobile number</string>
+    <string name="hint_confirm_password">Confirm password</string>
+    <string name="hint_address">Restaurant address (optional)</string>
+    <string name="btn_continue">Continue</string>
+    <string name="signup_have_account">Already a partner?</string>
+    <string name="signup_go_login">Log in</string>
+    <string name="error_fill_all_fields">Please fill all required fields</string>
+    <string name="error_passwords_dont_match">Passwords don\'t match</string>
+    <string name="error_invalid_mobile">Enter a valid 10-digit mobile number</string>
+    <string name="error_invalid_email">Enter a valid email address</string>
+    <string name="error_password_short">Password must be at least 6 characters</string>
+    <string name="error_email_registered">This email is already registered — try logging in</string>
+    <string name="row_set_service_area_location">Set restaurant location (optional)</string>
+    <string name="row_service_area_location_set">Location set — %1$s</string>
+    <string name="signup_area_not_covered">We don\'t serve your area yet — we\'ll reach out once we do. You can still continue and finish signing up.</string>
+
+    <!-- OTP verify -->
+    <string name="otp_title">Verify your email</string>
+    <string name="otp_subtitle_format">We\'ve sent a 6-digit code to %1$s</string>
+    <string name="btn_verify">Verify &amp; Continue</string>
+    <string name="otp_resend_in_format">Resend code in %1$ds</string>
+    <string name="otp_resend_now">Resend code</string>
+    <string name="otp_resent">OTP resent</string>
+    <string name="error_otp_incomplete">Enter the full 6-digit code</string>
+    <string name="error_otp_invalid">Incorrect code — try again</string>
+    <string name="error_otp_expired">Code expired — request a new one</string>
+
+    <!-- Signup success -->
+    <string name="signup_success_title">Application Submitted!</string>
+    <string name="signup_success_body">Our team will review your details and approve your restaurant within 24\u201348 hours. You\'ll be able to log in once approved.</string>
+    <string name="btn_back_to_login">Back to Login</string>
+
+    <!-- Bottom nav shell (docs/restorent/19 §3) -->
+    <string name="nav_orders">Orders</string>
+    <string name="nav_menu">Menu</string>
+    <string name="nav_insights">Insights</string>
+    <string name="nav_account">Account</string>
+
+    <!-- Orders tab (formerly "Dashboard") -->
+    <string name="dashboard_title">Orders</string>
+    <string name="tab_new">New</string>
+    <string name="tab_active">Active</string>
+    <string name="tab_history">History</string>
+    <string name="empty_orders">No orders here right now</string>
+    <string name="today_summary">Today: %1$d orders · ₹%2$s earned</string>
+    <string name="btn_logout">Log out</string>
+    <string name="accepting_orders_label">Accepting orders</string>
+    <string name="status_update_failed">Couldn\'t update — try again</string>
+
+    <!-- Orders tab redesign (docs/restorent/19 §4, §10 item 3) -->
+    <string name="section_new_orders">New</string>
+    <string name="section_in_progress">In progress</string>
+    <string name="section_completed_today">Completed today</string>
+    <string name="stat_orders_label">Orders</string>
+    <string name="stat_earnings_label">Earnings</string>
+    <string name="stat_avg_prep_label">Avg prep</string>
+    <string name="stat_placeholder">—</string>
+    <string name="stat_avg_prep_format">%1$d min</string>
+    <string name="countdown_format">%1$d:%2$02d</string>
+    <string name="countdown_expired">Accept now</string>
+    <string name="step_preparing">Preparing</string>
+    <string name="step_ready">Ready</string>
+    <string name="step_handed_to_rider">Handed to rider</string>
+    <string name="btn_mark_next_step">Mark next step</string>
+    <string name="empty_new_orders">No new orders right now</string>
+    <string name="empty_in_progress_orders">Nothing in progress</string>
+    <string name="empty_completed_orders">Nothing completed yet today</string>
+    <string name="restaurant_open_label">Open</string>
+    <string name="restaurant_closed_label">Closed</string>
+    <string name="dialog_close_restaurant_title">Stop accepting orders?</string>
+    <string name="dialog_close_restaurant_message">New orders won\'t be able to reach you until you switch back to Open.</string>
+    <string name="btn_confirm_close">Yes, close</string>
+
+    <!-- Illustrated logout-confirmation dialog (2026-08-19 illustration
+         retrofit) — see dialog_logout_confirm.xml's header comment for
+         why this is new functionality, not just new copy. -->
+    <string name="dialog_logout_title">Logout?</string>
+    <string name="dialog_logout_message">Are you sure you want to logout from your account?</string>
+    <string name="dialog_logout_confirm_action">Logout</string>
+
+    <!-- Illustrated delete-confirmation dialog (2026-08-19 illustration
+         retrofit) — dialog_confirm_delete.xml is shared by both item and
+         category deletes; title differs per call site, message reuses
+         the existing confirm_delete_item/confirm_delete_category
+         strings from before this retrofit. -->
+    <string name="dialog_delete_item_title">Delete this item?</string>
+    <string name="dialog_delete_category_title">Delete this category?</string>
+
+    <!-- Insights tab (§10 item 6 — backend: insights.php) -->
+    <string name="insights_coming_soon_title">Insights are coming soon</string>
+    <string name="insights_coming_soon_body">Today/week/month stats, earnings, and your best-selling items will show up here.</string>
+    <string name="insights_range_today">Today</string>
+    <string name="insights_range_week">This week</string>
+    <string name="insights_range_month">This month</string>
+    <string name="insights_stat_orders_label">Total orders</string>
+    <string name="insights_stat_earnings_label">Total earnings</string>
+    <string name="insights_stat_aov_label">Avg. order value</string>
+    <string name="insights_stat_cancellation_label">Cancellation rate</string>
+    <string name="insights_chart_title">Orders per day (last 7 days)</string>
+    <string name="insights_top_items_title">Top 5 best-selling items</string>
+    <string name="insights_top_items_empty">No delivered orders in this range yet.</string>
+    <string name="insights_repeat_customers_title">Repeat customers</string>
+    <string name="insights_repeat_customers_body">%1$d of %2$d customers this range have ordered from you before</string>
+    <string name="insights_load_error">Couldn\'t load insights</string>
+    <string name="insights_export_button">Export insights as CSV</string>
+    <string name="insights_export_choice_title">Export insights</string>
+    <string name="insights_export_choice_current_range">Current range (%1$s)</string>
+    <string name="insights_export_choice_custom_range">Choose a custom date range</string>
+    <string name="insights_export_range_picker_title">Select export range</string>
+    <string name="insights_export_preparing">Preparing export…</string>
+    <string name="insights_export_failed">Couldn\'t export insights</string>
+    <string name="insights_export_share_title">Share insights export</string>
+    <string name="insights_peak_hours_title">Peak hours (last 30 days)</string>
+    <string name="insights_peak_hours_caption">Busiest: %1$s %2$s — %3$d orders</string>
+    <string name="insights_peak_hours_empty">Not enough orders yet to show a pattern.</string>
+
+    <!-- Account tab (docs/restorent/19 §7, §10 item 5) -->
+    <string name="account_edit_profile_row">Edit profile</string>
+    <string name="account_temp_closed_label">Temporarily closed</string>
+    <string name="account_temp_closed_hint">Pause new orders without logging out</string>
+    <string name="account_payout_title">Payout details</string>
+    <string name="account_upi_label">UPI ID</string>
+    <string name="account_due_label">Outstanding balance</string>
+    <string name="account_not_set">Not set</string>
+    <string name="account_profile_load_failed">Couldn\'t load profile — pull down to try again</string>
+    <string name="account_hours_format">%1$s – %2$s</string>
+    <string name="account_working_days_summary_format">%1$d days/week</string>
+
+    <!-- Edit Profile screen -->
+    <string name="edit_profile_title">Edit Profile</string>
+
+    <!-- Crop screen (app-owner feedback item #2, 2026-08-17). -->
+    <string name="crop_title">Crop photo</string>
+    <string name="crop_cancel">Cancel</string>
+    <string name="crop_done">Done</string>
+    <string name="crop_hint">Drag to reposition · Pinch to zoom</string>
+    <string name="crop_ratio_square">Square 1:1</string>
+    <string name="crop_ratio_landscape">Wide 16:9</string>
+    <string name="crop_ratio_standard">Standard 4:3</string>
+    <string name="crop_ratio_portrait">Tall 4:5</string>
+    <string name="crop_processing_error">Couldn\'t process that photo, please try another</string>
+
+    <!-- Restaurant Banners manager (app-owner feedback item #3, 2026-08-17). -->
+    <string name="banner_manager_title">Restaurant Banners</string>
+    <string name="banner_manager_subtitle">Add photos to show as a rotating banner on your restaurant\'s page. Add just one to keep it fixed, or a few for an auto-rotating carousel.</string>
+    <string name="banner_manager_add">+ Add Banner</string>
+    <string name="banner_upload_failed">Couldn\'t upload banner, please try again</string>
+    <string name="banner_delete_failed">Couldn\'t remove banner, please try again</string>
+    <string name="banner_limit_reached">You\'ve reached the maximum of 10 banners</string>
+    <string name="banner_load_failed">Couldn\'t load your banners</string>
+    <string name="banner_confirm_delete">Remove this banner?</string>
+    <string name="account_row_banners">Restaurant Banners</string>
+    <string name="account_row_coupons">My Coupons</string>
+
+    <!-- Coupon Manager screen (doc 07 §2.1, this session) -->
+    <string name="coupon_manager_title">My Coupons</string>
+    <string name="coupon_add_title">New Coupon</string>
+    <string name="coupon_hint_code">Coupon code (e.g. SAVE50)</string>
+    <string name="coupon_hint_discount_type">Discount type: flat or percent</string>
+    <string name="coupon_hint_discount_value">Discount value</string>
+    <string name="coupon_hint_min_order">Min order amount (optional)</string>
+    <string name="coupon_hint_max_discount">Max discount cap (optional, percent only)</string>
+    <string name="coupon_hint_valid_until">Valid until (optional) — tap to pick date &amp; time</string>
+    <string name="coupon_valid_until_not_set">No expiry set</string>
+    <string name="coupon_hint_usage_limit_total">Total uses allowed, all customers (optional)</string>
+    <string name="coupon_hint_usage_limit_per_user">Uses allowed per customer (optional)</string>
+    <string name="coupon_empty_state">No coupons yet — tap + to create one.</string>
+    <string name="coupon_created">Coupon created</string>
+    <string name="coupon_create_failed">Couldn\'t create coupon</string>
+    <string name="coupon_code_taken">That code is already in use — try another</string>
+    <string name="coupon_updated">Coupon updated</string>
+    <string name="coupon_update_failed">Couldn\'t update coupon</string>
+    <string name="coupon_edit_title">Edit Coupon</string>
+    <string name="coupon_edit_type_locked_fmt">Discount type: %1$s (can\'t be changed after creation)</string>
+    <string name="coupon_type_percent">Percent</string>
+    <string name="coupon_type_flat">Flat</string>
+    <string name="coupon_flat_off_fmt">Flat ₹%1$s off</string>
+    <string name="coupon_percent_off_fmt">%1$s%% off</string>
+    <string name="coupon_min_order_fmt">Min order ₹%1$s</string>
+    <string name="coupon_times_used_fmt">Used %1$d times</string>
+    <string name="coupon_visible_label">Visible to customers</string>
+    <string name="coupon_toggle_on">ON</string>
+    <string name="coupon_toggle_off">OFF</string>
+    <string name="coupon_archive_action">Archive coupon</string>
+    <string name="coupon_archived_label">Archived</string>
+    <string name="coupon_restore_action">Restore</string>
+    <string name="coupon_archive_confirm_title">Archive this coupon?</string>
+    <string name="coupon_archive_confirm_message">Archived coupons are removed from your active list and can\'t be applied at checkout anymore. Past usage history is kept, and you can restore it anytime.</string>
+    <string name="coupon_archive_confirm_positive">Archive</string>
+    <string name="coupon_archived_success">Coupon archived</string>
+    <string name="coupon_archive_failed">Couldn\'t archive coupon</string>
+    <string name="coupon_unarchived_success">Coupon restored</string>
+    <string name="coupon_unarchive_failed">Couldn\'t restore coupon</string>
+    <string name="coupon_public_toggle_label">Show on coupon screen</string>
+    <string name="coupon_public_toggle_hint">Public coupons are auto-suggested to customers on the offers screen. Private ones only work if the customer types the exact code.</string>
+
+    <!-- Restaurant Offers screen (doc 20 §1/§12/§14; docs/29 "Not built"
+         item 1, this session). See OfferManagerActivity/OfferAdapter/
+         dialog_add_offer.xml — screen itself not yet wired up
+         (AccountFragment row + manifest + Activity/Adapter Kotlin still
+         pending as of this string batch), added here so the layouts
+         that already reference these keys don't fail to compile. -->
+    <string name="account_row_offers">Offers</string>
+    <string name="offer_manager_title">Offers</string>
+    <string name="offer_add_title">New Offer</string>
+    <string name="offer_edit_title">Edit Offer</string>
+    <string name="offer_empty_state">No offers yet — tap + to create one.</string>
+    <string name="offer_tab_active">Active</string>
+    <string name="offer_tab_scheduled">Scheduled</string>
+    <string name="offer_tab_expired">Expired</string>
+    <string name="offer_tab_paused">Paused</string>
+
+    <string name="offer_hint_title">Offer title (e.g. 3 Samosa @ ₹50)</string>
+    <string name="offer_hint_offer_type">Offer type</string>
+    <string name="offer_type_quantity_deal">Quantity deal</string>
+    <string name="offer_type_buy_x_for_y">Buy X for ₹Y</string>
+    <string name="offer_type_buy_x_get_y">Buy X get Y</string>
+    <string name="offer_type_percent_discount">% discount</string>
+    <string name="offer_type_flat_discount">₹ flat discount</string>
+    <string name="offer_type_free_delivery">Free delivery</string>
+    <string name="offer_type_combo">Combo / bundle</string>
+    <string name="offer_edit_type_locked_fmt">Type: %1$s (can\'t be changed after creation)</string>
+
+    <!-- Migration 49 — apply_mode (Default vs Coupon Based). -->
+    <string name="offer_hint_apply_mode">How should this offer apply?</string>
+    <string name="offer_apply_mode_default_label">Default</string>
+    <string name="offer_apply_mode_coupon_based_label">Coupon Based</string>
+    <string name="offer_hint_code">Coupon code (e.g. SAVE20)</string>
+    <string name="offer_apply_mode_locked_default_fmt">Apply mode: Default — applies automatically, no code (can\'t be changed after creation)</string>
+    <string name="offer_apply_mode_locked_coupon_based_fmt">Apply mode: Coupon Based — code %1$s (can\'t be changed after creation)</string>
+    <string name="offer_public_toggle_label">Show on offers screen</string>
+    <string name="offer_public_toggle_hint">Public coupon-based offers are auto-suggested to customers on the offers screen. Private ones only apply if the customer types the exact code.</string>
+    <string name="offer_code_required_error">Enter a coupon code for a Coupon Based offer</string>
+
+    <string name="offer_hint_required_qty">Required quantity</string>
+    <string name="offer_hint_offer_price">Offer price (₹)</string>
+    <string name="offer_hint_get_qty">Free quantity</string>
+    <string name="offer_hint_discount_percent">Discount percent</string>
+    <string name="offer_hint_discount_flat">Flat discount (₹)</string>
+
+    <!-- Migration 50 / docs/40 — combo/bundle. offer_price is a
+         distinct field (inputComboPrice) from inputOfferPrice above
+         since a View can't live in two mutually-exclusive mechanic
+         groups at once; both wire to the same OfferCreateBody.offerPrice
+         field server-side. -->
+    <string name="offer_hint_combo_items">Combo items (add 2 or more)</string>
+    <string name="offer_hint_combo_price">Bundle price (₹)</string>
+    <string name="offer_hint_combo_item_picker">Menu item</string>
+    <string name="offer_hint_combo_item_qty">Qty</string>
+    <string name="btn_add_combo_item">+ Add item</string>
+    <string name="offer_combo_min_items_error">Add at least 2 different menu items to the combo</string>
+    <string name="offer_combo_items_locked_fmt">Combo items (can\'t be changed after creation): %1$s</string>
+    <string name="offer_combo_item_line_fmt">%1$d× %2$s</string>
+
+    <string name="offer_free_delivery_notice">Free Delivery offer: the customer won\'t be charged a delivery fee — the delivery fee will be deducted from your (restaurant\'s) settlement instead.\nनिःशुल्क डिलीवरी ऑफर: ग्राहक से डिलीवरी शुल्क नहीं लिया जाएगा — यह शुल्क आपके (रेस्टोरेंट के) सेटलमेंट में से काटा जाएगा।</string>
+    <string name="offer_hint_scope">Applies to</string>
+    <string name="offer_scope_item">Item</string>
+    <string name="offer_scope_category">Category</string>
+    <string name="offer_scope_restaurant">Whole restaurant</string>
+    <string name="offer_hint_menu_item">Select menu item</string>
+    <string name="offer_hint_food_category">Select category</string>
+
+    <string name="offer_hint_min_order">Min order amount (optional)</string>
+
+    <!-- migration 48 — allow_coupon_stacking. Backend already treats a
+         missing/omitted value as true (see offers-create.php), so the
+         switch defaults to checked in the add dialog to match. -->
+    <string name="offer_stacking_toggle_label">Allow coupon stacking</string>
+    <string name="offer_stacking_toggle_hint">When on, a customer can combine this offer with a coupon code at checkout. When off, this offer\'s own discount always wins and any coupon they entered is dropped for this order.</string>
+
+    <string name="offer_hint_eligibility">Customer eligibility</string>
+    <string name="offer_eligibility_all">All customers</string>
+    <string name="offer_eligibility_new">New customers only</string>
+    <string name="offer_eligibility_existing">Existing customers only</string>
+
+    <string name="offer_hint_start_date">Start date (optional)</string>
+    <string name="offer_hint_end_date">End date (optional)</string>
+    <string name="offer_hint_start_time">Start time (optional)</string>
+    <string name="offer_hint_end_time">End time (optional)</string>
+    <string name="offer_hint_weekdays">Repeat on (leave blank for every day)</string>
+
+    <string name="offer_hint_daily_limit">Daily usage limit (optional)</string>
+    <string name="offer_hint_total_limit">Total usage limit (optional)</string>
+    <string name="offer_hint_per_customer_limit">Per-customer limit (optional)</string>
+
+    <string name="offer_action_edit">Edit</string>
+    <string name="offer_action_pause">Pause</string>
+    <string name="offer_action_resume">Resume</string>
+    <string name="offer_action_view">View</string>
+
+    <string name="offer_status_active">ACTIVE</string>
+    <string name="offer_status_paused">PAUSED</string>
+    <string name="offer_status_disabled">DISABLED BY ADMIN</string>
+
+    <string name="offer_used_of_fmt">Used: %1$d / %2$d</string>
+    <string name="offer_used_unlimited_fmt">Used: %1$d</string>
+    <string name="offer_valid_range_fmt">Valid: %1$s – %2$s</string>
+    <string name="offer_valid_from_fmt">Valid from %1$s</string>
+    <string name="offer_valid_until_fmt">Valid until %1$s</string>
+
+    <string name="offer_created">Offer created</string>
+    <string name="offer_create_failed">Couldn\'t create offer</string>
+    <string name="offer_create_failed_detail">Couldn\'t create offer (%1$s)</string>
+    <string name="offer_updated">Offer updated</string>
+    <string name="offer_update_failed">Couldn\'t update offer</string>
+    <string name="offer_update_failed_detail">Couldn\'t update offer (%1$s)</string>
+    <string name="offer_paused_success">Offer paused</string>
+    <string name="offer_resumed_success">Offer resumed</string>
+    <string name="offer_pause_resume_failed">Couldn\'t update offer status</string>
+    <string name="offer_disabled_by_admin_message">This offer was disabled by the AnyDrop team and can\'t be resumed from here.</string>
+
+    <string name="btn_change_logo">Change logo</string>
+    <string name="hint_cuisine_tags">Cuisine tags (comma separated)</string>
+    <string name="label_business_details">Business Details</string>
+    <string name="hint_gst_number">GST number (optional)</string>
+    <string name="hint_fssai_number">FSSAI license number (optional)</string>
+    <string name="error_invalid_gst_number">Enter a valid 15-character GST number</string>
+    <string name="error_invalid_fssai_number">Enter a valid 14-digit FSSAI number</string>
+
+    <!-- Item Customization / Add-on Groups (§1, today.md 2026-08-28) -->
+    <string name="addon_groups_title">Manage Add-ons</string>
+    <string name="btn_manage_addons">Manage Add-ons</string>
+    <string name="btn_add_addon_group">+ Add Group</string>
+    <string name="btn_add_addon">+ Add add-on</string>
+    <string name="hint_addon_group_name">Group name (e.g. Choose Size)</string>
+    <string name="label_addon_group_required">Required</string>
+    <string name="label_addon_group_max_select">Maximum selections allowed</string>
+    <string name="hint_addon_group_max_select">Max select (e.g. 1)</string>
+    <string name="hint_addon_name">Add-on name (e.g. Large)</string>
+    <string name="hint_addon_price">Extra price (₹, optional)</string>
+    <string name="addon_price_prefix">+ ₹%1$s</string>
+    <string name="label_addon_group_required_badge">Required</string>
+    <string name="label_addon_group_optional_badge">Optional</string>
+    <string name="label_addon_group_pick_one">Pick 1</string>
+    <string name="label_addon_group_pick_up_to">Pick up to %1$d</string>
+    <string name="other_addons_section_title">Other add-ons</string>
+    <string name="dialog_add_addon_group_title">Add group</string>
+    <string name="dialog_edit_addon_group_title">Edit group</string>
+    <string name="dialog_add_addon_title">Add add-on</string>
+    <string name="dialog_edit_addon_title">Edit add-on</string>
+    <string name="addon_group_save_failed">Couldn\'t save the group</string>
+    <string name="addon_save_failed">Couldn\'t save the add-on</string>
+    <string name="addon_group_delete_confirm_title">Delete this group?</string>
+    <string name="addon_group_delete_confirm_message">Its add-ons will be removed too. This can\'t be undone from the app.</string>
+    <string name="addon_remove_confirm_title">Remove this add-on?</string>
+    <string name="addon_remove_confirm_message">This add-on will no longer show for customers. This can\'t be undone from the app.</string>
+    <string name="empty_addon_groups">No add-on groups yet. Tap + Add Group to create one (e.g. \"Choose Size\").</string>
+    <string name="addon_group_saved">Group saved</string>
+    <string name="addon_group_deleted">Group deleted</string>
+    <string name="addon_saved">Add-on saved</string>
+    <string name="addon_removed">Add-on removed</string>
+    <string name="addon_groups_load_failed">Couldn\'t load add-ons</string>
+
+    <!-- Temp Closure/Holiday Scheduling (§3, today.md 2026-08-28, doc
+         60/61) — ClosureScheduleActivity + its list row/dialog, plus
+         the resume-time prompt on AccountFragment's existing
+         switchTempClosed. Naming follows the addon_group_* pattern
+         above. -->
+    <string name="closure_schedule_title">Closure Schedule</string>
+    <string name="btn_add_closure">+ Add Closure</string>
+    <string name="closure_type_date_range">Date range</string>
+    <string name="closure_type_weekly_recurring">Weekly</string>
+    <string name="hint_closure_start_date">Start date</string>
+    <string name="hint_closure_end_date">End date</string>
+    <string name="label_closure_day_of_week">Day of week</string>
+    <string name="hint_closure_reason">Reason (optional)</string>
+    <string name="closure_summary_weekly">Every %1$s</string>
+    <string name="closure_summary_date_range">%1$s \u2013 %2$s</string>
+    <string name="dialog_add_closure_title">Add closure</string>
+    <string name="dialog_edit_closure_title">Edit closure</string>
+    <string name="closure_save_failed">Couldn\'t save the closure</string>
+    <string name="closure_saved">Closure saved</string>
+    <string name="closure_deleted">Closure deleted</string>
+    <string name="closures_load_failed">Couldn\'t load closures</string>
+    <string name="closure_delete_confirm_title">Delete this closure?</string>
+    <string name="closure_delete_confirm_message">This can\'t be undone from the app.</string>
+    <string name="empty_closures">No scheduled closures yet. Tap + Add Closure to plan a holiday or weekly off day.</string>
+    <string name="account_row_closures">Closure Schedule</string>
+    <string name="closure_resume_time_title">When will you reopen?</string>
+    <string name="btn_skip">Skip</string>
+
+    <!-- 0=Monday..6=Sunday, matching dialog_add_closure.xml's
+         spinnerDayOfWeek index convention (see ClosureAdapter.kt /
+         ClosureScheduleActivity.kt for the -1/+1 conversion against
+         the day_of_week 1=Mon..7=Sun column convention). -->
+    <string-array name="day_names_full">
+        <item>Monday</item>
+        <item>Tuesday</item>
+        <item>Wednesday</item>
+        <item>Thursday</item>
+        <item>Friday</item>
+        <item>Saturday</item>
+        <item>Sunday</item>
+    </string-array>
+
+    <!-- Restaurant Bank Details (PENDING.md §15, migration 59) -->
+    <string name="account_row_bank_details">Bank Details</string>
+    <string name="bank_details_title">Bank Details</string>
+    <string name="label_account_holder_name">Account Holder Name</string>
+    <string name="hint_account_holder_name">As per bank records</string>
+    <string name="label_bank_name">Bank Name</string>
+    <string name="hint_bank_name">e.g. State Bank of India</string>
+    <string name="label_account_number">Account Number</string>
+    <string name="hint_account_number">Enter your account number</string>
+    <string name="label_ifsc_code">IFSC Code</string>
+    <string name="hint_ifsc_code">e.g. SBIN0001234</string>
+    <string name="label_upi_id_optional">UPI ID (optional)</string>
+    <string name="hint_upi_id">e.g. name@bank</string>
+    <string name="btn_save_bank_details">Save Bank Details</string>
+    <string name="error_invalid_account_number">Enter a valid account number (9\u201318 digits)</string>
+    <string name="error_invalid_ifsc_code">Enter a valid IFSC code, e.g. SBIN0001234</string>
+    <string name="error_invalid_upi_id">Enter a valid UPI ID, e.g. name@bank</string>
+    <string name="bank_details_saved">Bank details submitted for verification</string>
+    <string name="bank_details_save_failed">Couldn\'t save bank details</string>
+    <string name="bank_details_load_failed">Couldn\'t load bank details</string>
+    <string name="bank_status_pending">Pending Review</string>
+    <string name="bank_status_verified">Verified</string>
+    <string name="bank_status_rejected">Rejected</string>
+    <string name="bank_details_empty_state">No bank details on file yet. Add your account details so we can pay you out.</string>
+    <string name="bank_account_number_masked_label">Current account on file</string>
+    <string name="hint_min_order_amount">Minimum order amount (₹)</string>
+    <string name="hint_profile_description">Description (optional)</string>
+    <string name="label_hours">Hours</string>
+    <string name="label_opening_time">Opening time</string>
+    <string name="label_closing_time">Closing time</string>
+    <string name="label_working_days">Working days</string>
+    <string name="day_short_mon">Mon</string>
+    <string name="day_short_tue">Tue</string>
+    <string name="day_short_wed">Wed</string>
+    <string name="day_short_thu">Thu</string>
+    <string name="day_short_fri">Fri</string>
+    <string name="day_short_sat">Sat</string>
+    <string name="day_short_sun">Sun</string>
+    <string name="error_working_days_required">Select at least one working day</string>
+    <string name="profile_save_failed">Couldn\'t save — check the details and try again</string>
+    <string name="profile_saved">Profile updated</string>
+    <string name="min_order_below_area_floor">Minimum order can\'t be below ₹%1$s for your area</string>
+    <string name="logo_upload_failed">Couldn\'t upload the logo — try again</string>
+    <string name="btn_add_photo">Add photo</string>
+    <string name="btn_change_photo">Change photo</string>
+    <string name="photo_upload_failed">Couldn\'t upload the photo — try again</string>
+    <string name="row_set_location">Set restaurant location on map</string>
+    <string name="row_location_set">Location set (tap to change)</string>
+
+    <!-- Location split into 2 parts (app-owner ask, 2026-08-17). -->
+    <string name="row_use_current_location">Use current location (GPS)</string>
+    <string name="row_choose_on_map">Choose on map</string>
+    <string name="row_current_location_set">Current location used (tap to refresh)</string>
+    <string name="row_map_location_set">Location set on map (tap to change)</string>
+    <string name="location_fetching">Fetching your location…</string>
+    <string name="location_gps_off">Turn on device location (GPS) and try again</string>
+    <string name="location_permission_denied">Location permission denied</string>
+    <string name="location_fetch_failed">Couldn\'t get your location, try \"Choose on map\" instead</string>
+
+    <!-- Location Picker (Edit Profile), 2026-08-16 — reuses Customer app's
+         H6 MapPinDropActivity copy/strings pattern, trimmed for a single
+         restaurant-address use case (no photo, no saved-addresses list). -->
+    <string name="location_picker_title">Restaurant Location</string>
+    <string name="location_picker_use_current_location">Use current location</string>
+    <string name="location_picker_resolving_address">Locating…</string>
+    <string name="location_picker_geocode_failed">Couldn\'t resolve an address for this point</string>
+    <string name="btn_confirm_location">Confirm location</string>
+
+    <!-- Order detail -->
+    <string name="order_detail_title">Order Detail</string>
+    <string name="order_scheduled_for_format">Scheduled for %1$s</string>
+    <string name="btn_accept">Accept</string>
+    <string name="btn_reject">Reject</string>
+    <string name="btn_mark_preparing">Mark Preparing</string>
+    <string name="btn_mark_ready">Mark Ready</string>
+    <string name="hint_reject_reason">Reason for rejecting</string>
+    <string name="btn_confirm_reject">Confirm Reject</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="items_label">Items</string>
+    <string name="customer_note_label">Delivery instructions</string>
+    <string name="bill_total_label">Item total</string>
+
+    <!-- Order Management small addition — prep-time select on Accept
+         (docs/18_Restaurant_App_Full_Scope_And_Rating_System.md, Order
+         Management section). -->
+    <string name="prep_time_dialog_title">How long to prepare this order?</string>
+    <string name="prep_time_option_format">%1$d minutes</string>
+
+    <!-- Menu Management -->
+    <string name="menu_management_title">Menu Management</string>
+    <string name="btn_add_category">+ Category</string>
+    <string name="btn_add_item">+ Item</string>
+    <string name="hint_category_name">Category name (e.g. Starters)</string>
+    <string name="hint_item_name">Item name</string>
+    <string name="hint_item_price">Price (₹)</string>
+    <string name="hint_item_description">Description (optional)</string>
+    <string name="label_veg">Veg</string>
+    <string name="label_item_availability_timing">Availability timing (optional)</string>
+    <string name="label_item_availability_timing_hint">Leave blank for always-available. Set both to limit ordering to a daily window (e.g. a breakfast item, 7:00-11:00).</string>
+    <string name="hint_item_available_from">Available from</string>
+    <string name="hint_item_available_until">Available until</string>
+    <string name="label_item_tags">Tags</string>
+    <string name="label_item_tags_hint">Pick tags so this dish shows up under matching Home categories (Pizza, Onion, Capsicum…)</string>
+    <string name="label_item_tags_loading">Loading tags…</string>
+    <string name="label_item_tags_unavailable">Couldn\'t load tags — item will save without them</string>
+    <string name="label_available">Available</string>
+    <string name="empty_categories">No categories yet — add one to start building your menu</string>
+    <string name="empty_items_in_category">No items in this category yet</string>
+    <string name="dialog_add_category_title">Add Category</string>
+    <string name="dialog_edit_category_title">Edit Category</string>
+    <string name="dialog_add_item_title">Add Menu Item</string>
+    <string name="dialog_edit_item_title">Edit Menu Item</string>
+    <string name="btn_save">Save</string>
+    <string name="btn_delete">Delete</string>
+    <string name="confirm_delete_category">Delete this category? Items inside it will stay but the category will be hidden.</string>
+    <string name="confirm_delete_item">Delete this item? This can\'t be undone.</string>
+
+    <!-- Bundled category icon picker (doc 22 item 1) -->
+    <string name="btn_choose_icon">Choose icon</string>
+    <string name="category_icon_picker_title">Choose a category icon</string>
+    <string name="category_icon_biryani">Biryani</string>
+    <string name="category_icon_north_indian">North Indian</string>
+    <string name="category_icon_south_indian">South Indian</string>
+    <string name="category_icon_chinese">Chinese</string>
+    <string name="category_icon_pizza">Pizza</string>
+    <string name="category_icon_burger">Burger</string>
+    <string name="category_icon_tandoori">Tandoori</string>
+    <string name="category_icon_momos">Momos</string>
+    <string name="category_icon_breakfast">Breakfast</string>
+    <string name="category_icon_bakery">Bakery</string>
+    <string name="category_icon_desserts">Desserts</string>
+    <string name="category_icon_ice_cream">Ice Cream</string>
+    <string name="category_icon_beverages">Beverages</string>
+    <string name="category_icon_salads">Salads</string>
+
+    <!-- Live icon/photo search tabs (Phase 1, 2026-08-19 UI/UX overhaul —
+         the "search more" option 2 doc 22 item 1 deferred at the time) -->
+    <string name="icon_picker_tab_bundled">Bundled</string>
+    <string name="icon_picker_tab_icons">Icons</string>
+    <string name="icon_picker_tab_photos">Photos</string>
+    <string name="icon_picker_search_hint">Search e.g. pizza, biryani, coffee</string>
+    <string name="icon_picker_search_prompt">Type to search online</string>
+    <string name="icon_picker_search_no_results">No results — try another word</string>
+    <string name="icon_picker_search_failed">Search failed — check your connection and try again</string>
+    <string name="icon_picker_applying_result">Adding your pick…</string>
+    <string name="menu_save_failed">Couldn\'t save — check the details and try again</string>
+    <string name="menu_load_failed">Couldn\'t load menu — pull to refresh</string>
+    <string name="menu_item_saved">Item saved</string>
+    <string name="menu_category_saved">Category saved</string>
+    <string name="menu_item_deleted">Item deleted</string>
+    <string name="menu_category_deleted">Category deleted</string>
+    <string name="menu_search_hint">Search menu</string>
+    <string name="menu_search_no_results">No items match \"%1$s\"</string>
+
+    <!-- §10 item 4 follow-up — category tabs strip + drag-to-reorder -->
+    <string name="menu_tab_all">All</string>
+    <string name="btn_reorder_categories">Reorder</string>
+    <string name="btn_reorder_done">Done</string>
+    <string name="menu_reorder_hint">Drag to reorder categories</string>
+    <!-- Phase 2 (UI/UX overhaul, 2026-08-19) — contentDescription strings
+         for the new icon-based row-action buttons (replacing emoji-text
+         buttons in item_menu_category.xml / item_menu_food.xml). -->
+    <string name="btn_edit_category">Edit category</string>
+    <string name="btn_delete_category">Delete category</string>
+    <string name="btn_edit_item_desc">Edit item</string>
+    <string name="btn_delete_item_desc">Delete item</string>
+    <string name="menu_reorder_saved">Category order saved</string>
+    <string name="menu_reorder_failed">Couldn\'t save the new order — pull to refresh and try again</string>
+
+    <!-- Notification bell (Type 1, docs/Status.md 2026-08-20) -->
+    <string name="notifications_title">Notifications</string>
+    <string name="mark_all_read">Mark all as read</string>
+    <string name="empty_notifications">No notifications yet</string>
+
+    <!-- Reviews reply (docs/restorent/00_Status.md, this session) -->
+    <string name="reviews_title">Reviews</string>
+    <string name="empty_reviews">No reviews yet</string>
+    <string name="review_your_reply_label">Your reply</string>
+    <string name="review_edit_reply">Edit reply</string>
+    <string name="review_reply_hint">Write a reply…</string>
+    <string name="review_reply_sent">Reply sent</string>
+    <string name="review_reply_failed">Couldn\'t send reply</string>
+    <string name="review_reply_empty">Write something before sending</string>
+
+    <!-- Restaurant-side "Report review" (§7, today.md 2026-08-28) -->
+    <string name="review_report">Report</string>
+    <string name="review_reported">Reported</string>
+    <string name="review_report_title">Report this review</string>
+    <string name="review_report_hint">Why are you reporting this review?</string>
+    <string name="review_report_confirm">Submit report</string>
+    <string name="review_report_sent">Review reported — our team will take a look</string>
+    <string name="review_report_failed">Couldn\'t submit report</string>
+    <string name="review_report_reason_required">Add a reason before submitting</string>
+    <string name="account_row_reviews">Reviews</string>
+</resources>

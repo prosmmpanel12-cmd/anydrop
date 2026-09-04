@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- features.md §6 — restaurant detail header's rating pill ("★ 4.3"),
+     solid brand-green so it reads as a badge, not a chip. Reuses
+     anydrop_secondary rather than introducing a new color. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/anydrop_secondary" />
+    <corners android:radius="20dp" />
+</shape>

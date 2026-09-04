@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Loading-state building block (docs/restorent/19, §9.4).
+     Pill-radius version of the skeleton bar, used for the status
+     chip / stepper placeholder on the order-card skeleton. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/skeleton_base" />
+    <corners android:radius="20dp" />
+</shape>

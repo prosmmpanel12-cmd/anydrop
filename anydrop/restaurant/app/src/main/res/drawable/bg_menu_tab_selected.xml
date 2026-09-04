@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- §5 category tabs strip — selected state. Uses anydrop_primary directly
+     rather than reusing bg_chip_selected.xml (that one is a plain-shape
+     template the Orders tab re-tints per status color at runtime — its
+     default fill, anydrop_primary_container, is too light for white text).
+     §8's color token table lists Primary explicitly for "active tab", so
+     this is that token applied directly. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/anydrop_primary" />
+    <corners android:radius="20dp" />
+</shape>

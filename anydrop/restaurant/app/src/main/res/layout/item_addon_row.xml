@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Single add-on row (§1, today.md 2026-08-28) — inflated dynamically
+    into item_addon_group.xml's addonsContainer, and also reused as-is
+    for the "Other add-ons" (ungrouped) section in activity_addon_groups.xml
+    (see AddonGroupsActivity.renderUngroupedSection()).
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingVertical="6dp">
+
+    <TextView
+        android:id="@+id/addonName"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textSize="13.5sp"
+        android:textColor="@color/text_primary"
+        tools:text="Large" />
+
+    <TextView
+        android:id="@+id/addonPrice"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="10dp"
+        android:textSize="13sp"
+        android:textColor="@color/text_secondary"
+        tools:text="+ ₹80" />
+
+    <ImageView
+        android:id="@+id/btnEditAddon"
+        android:layout_width="18dp"
+        android:layout_height="18dp"
+        android:src="@drawable/ic_edit"
+        app:tint="@color/text_secondary"
+        android:padding="1dp"
+        android:contentDescription="@null"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?attr/selectableItemBackgroundBorderless" />
+
+    <ImageView
+        android:id="@+id/btnRemoveAddon"
+        android:layout_width="18dp"
+        android:layout_height="18dp"
+        android:layout_marginStart="6dp"
+        android:src="@drawable/ic_delete"
+        app:tint="@color/text_secondary"
+        android:padding="1dp"
+        android:contentDescription="@null"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?attr/selectableItemBackgroundBorderless" />
+
+</LinearLayout>

@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/surface"
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginTop="12dp"
+    android:padding="12dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <!-- §5 "Drag-handle icon on category rows for reordering" — only
+             visible while MenuFragment's reorder mode is active; long-press
+             not needed, ACTION_DOWN on this handle starts the drag directly
+             (ItemTouchHelper.startDrag), same as most reorder-list UIs.
+             Phase 2 (UI/UX overhaul, 2026-08-19): swapped the "☰" text
+             glyph for a real ic_drag_handle ImageView — same 18dp visual
+             weight, same touch target, ItemTouchHelper still starts the
+             drag on this view's ACTION_DOWN (MenuFragment untouched). -->
+        <ImageView
+            android:id="@+id/dragHandle"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:padding="3dp"
+            android:src="@drawable/ic_drag_handle"
+            app:tint="@color/text_secondary"
+            android:contentDescription="@string/menu_reorder_hint"
+            android:visibility="gone" />
+
+        <!-- Category thumbnail (NEXT_SESSION_PROMPT.md item 6) — same
+             44dp bg_skeleton_thumb pattern as item_menu_food.xml's
+             itemThumb. No distinct category placeholder icon exists yet,
+             so ic_food_placeholder is reused here too (tinted fallback,
+             same as MenuItemAdapter's no-photo state). Hidden in reorder
+             mode along with the other row controls. -->
+        <ImageView
+            android:id="@+id/categoryThumb"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginEnd="10dp"
+            android:scaleType="centerCrop"
+            android:background="@drawable/bg_skeleton_thumb"
+            android:contentDescription="@null" />
+
+        <TextView
+            android:id="@+id/categoryNameText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary" />
+
+        <TextView
+            android:id="@+id/categoryItemCountText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary"
+            android:paddingEnd="10dp" />
+
+        <!-- Phase 2 (UI/UX overhaul, 2026-08-19): "✏️"/"🗑️" emoji-text
+             buttons replaced with real ic_edit/ic_delete ImageViews.
+             CategoryAdapter.kt only sets .visibility and
+             .setOnClickListener on these two IDs (no .text usage
+             anywhere) — confirmed before converting, so the
+             TextView→ImageView swap needed no Kotlin changes. -->
+        <ImageView
+            android:id="@+id/btnEditCategory"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:padding="6dp"
+            android:src="@drawable/ic_edit"
+            app:tint="@color/text_secondary"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/btn_edit_category" />
+
+        <ImageView
+            android:id="@+id/btnDeleteCategory"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:padding="6dp"
+            android:src="@drawable/ic_delete"
+            app:tint="@color/nonveg_red"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/btn_delete_category" />
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/itemsRecycler"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:nestedScrollingEnabled="false" />
+
+    <TextView
+        android:id="@+id/emptyItemsText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/empty_items_in_category"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp"
+        android:paddingVertical="8dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/btnAddItem"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/btn_add_item"
+        android:textColor="@color/anydrop_primary"
+        android:textStyle="bold"
+        android:paddingTop="8dp" />
+
+</LinearLayout>

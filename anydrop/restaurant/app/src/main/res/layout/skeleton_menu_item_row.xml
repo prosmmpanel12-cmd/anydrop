@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mirrors item_menu_food.xml's proportions, plus the 60x60 photo
+     thumbnail slot planned in §5 (docs/restorent/19, §9.2): a small
+     square for the future thumbnail, two stacked bars for name/price.
+     Meant to be repeated inside a category card, inside a ShimmerFrameLayout. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingVertical="8dp">
+
+    <View
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_marginEnd="10dp"
+        android:background="@drawable/bg_skeleton_thumb" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <!-- item name -->
+        <View
+            android:layout_width="140dp"
+            android:layout_height="14dp"
+            android:background="@drawable/bg_skeleton_bar" />
+
+        <!-- item price -->
+        <View
+            android:layout_width="70dp"
+            android:layout_height="12dp"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_skeleton_bar" />
+    </LinearLayout>
+
+    <!-- switch/edit/delete affordance area -->
+    <View
+        android:layout_width="36dp"
+        android:layout_height="20dp"
+        android:background="@drawable/bg_skeleton_blob" />
+
+</LinearLayout>

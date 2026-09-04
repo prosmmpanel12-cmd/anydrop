@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 2026-08-31 (continued): was a flat @color/ic_launcher_background
+     (#000000) filling the entire 108dp adaptive-icon canvas edge to
+     edge. A flat full-bleed fill has no shape of its own, so whatever
+     mask the launcher applies (circle/squircle/rounded-square/teardrop)
+     becomes the icon's entire visible silhouette — which is why the app
+     icon was rendering as a plain black circle on a launcher configured
+     for circular icons, even though the intended badge shape is a
+     rounded square. This inset shape keeps the black badge inside
+     Android's ~66dp "safe zone" circle (44dp square, 32dp inset on all
+     sides of the 108dp canvas — 44*sqrt(2)≈62dp diagonal, comfortably
+     under the 66dp safe-zone diameter), so the rounded-square shape
+     itself survives untouched under any launcher mask instead of being
+     redrawn as that mask's shape. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:insetLeft="32dp"
+    android:insetTop="32dp"
+    android:insetRight="32dp"
+    android:insetBottom="32dp">
+    <shape android:shape="rectangle">
+        <solid android:color="#000000" />
+        <corners android:radius="10dp" />
+    </shape>
+</inset>

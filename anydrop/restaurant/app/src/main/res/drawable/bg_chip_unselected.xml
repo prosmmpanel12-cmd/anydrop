@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- §5 category tabs strip — unselected pill state. Same corner radius as
+     the existing bg_chip_selected.xml (kept in sync intentionally) so a
+     tab's shape doesn't change size when selection toggles, only color. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/stat_chip_bg" />
+    <corners android:radius="20dp" />
+</shape>

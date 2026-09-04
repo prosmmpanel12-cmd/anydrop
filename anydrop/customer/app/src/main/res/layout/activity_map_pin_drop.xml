@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="16dp"
+        android:background="@color/surface">
+
+        <ImageView
+            android:id="@+id/btnBack"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_back"
+            app:tint="@color/text_primary"
+            tools:ignore="ContentDescription" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:text="@string/map_pin_drop_title" />
+
+    </LinearLayout>
+
+    <!-- Search bar removed (2026-08-12 revision) — no search UI in this
+         update, current-location + pin-drop only. See
+         docs/12_Handover_H6_Map_PinDrop_Photo.md, "Search bar: fully
+         removed for this update." The inputMapSearch EditText that used to
+         be here is gone along with it; don't reference it from
+         MapPinDropActivity.kt. -->
+
+    <!-- Map area: MapView + fixed center pin overlay + floating "use
+         current location" pill. weight=1 so the bottom form panel below
+         gets whatever wrap_content space it needs first. -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <!-- Google Maps SDK (migrated from osmdroid — see
+             docs/12_Handover_H6_Map_PinDrop_Photo.md, "Google Maps SDK
+             migration plan"). Requires the com.google.android.geo.API_KEY
+             meta-data tag in AndroidManifest.xml to actually render tiles;
+             will show a grey/blank area at runtime until a real
+             Android-restricted key replaces the placeholder in
+             strings.xml's google_maps_key. -->
+        <com.google.android.gms.maps.MapView
+            android:id="@+id/mapView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- Fixed center pin — map pans underneath it, pin never moves.
+             Anchored so the pin's bottom tip (not its visual center) sits
+             on the true map-center pixel; see MapPinDropActivity's
+             centerPin layout logic for the vertical offset. -->
+        <ImageView
+            android:id="@+id/centerPin"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_map_center_pin"
+            tools:ignore="ContentDescription" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnUseCurrentLocationMap"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="16dp"
+            android:backgroundTint="@color/surface"
+            android:text="@string/map_pin_drop_use_current_location"
+            android:textAllCaps="false"
+            android:textColor="@color/anydrop_secondary"
+            app:cornerRadius="24dp"
+            app:icon="@drawable/ic_target"
+            app:iconGravity="textStart"
+            app:iconTint="@color/anydrop_secondary" />
+
+    </FrameLayout>
+
+    <!-- Bottom form panel -->
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxHeight="420dp"
+        android:background="@drawable/bg_dialog_rounded_top"
+        android:elevation="8dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/map_pin_drop_delivery_details"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+
+            <!-- Reverse-geocoded address row (updates as the pin/map moves) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_card_rounded"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="12dp">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_location"
+                    app:tint="@color/anydrop_secondary"
+                    tools:ignore="ContentDescription" />
+
+                <TextView
+                    android:id="@+id/textResolvedAddress"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    tools:text="Kamla Nehru Nagar, Jodhpur, Rajasthan, India" />
+
+            </LinearLayout>
+
+            <!-- "X km away from current location" warning banner -->
+            <TextView
+                android:id="@+id/textDistanceWarning"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_banner_info"
+                android:padding="10dp"
+                android:textColor="@color/info_fg"
+                android:textSize="13sp"
+                android:visibility="gone"
+                tools:text="This address is 61 km away from your current location"
+                tools:visibility="visible" />
+
+            <EditText
+                android:id="@+id/inputAddressDetails"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/bg_card_rounded"
+                android:hint="@string/hint_address_details"
+                android:inputType="textCapSentences"
+                android:padding="12dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/hint_address_details_example"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="16dp"
+                android:background="@color/outline" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/map_pin_drop_receiver_details"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+
+            <EditText
+                android:id="@+id/inputReceiverNameMap"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_card_rounded"
+                android:hint="@string/hint_receiver_name"
+                android:inputType="textCapWords"
+                android:padding="12dp" />
+
+            <EditText
+                android:id="@+id/inputReceiverPhoneMap"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_card_rounded"
+                android:hint="@string/hint_receiver_phone"
+                android:inputType="phone"
+                android:padding="12dp" />
+
+            <!-- Door / building photo (H6 part 2 — new, not in original §7 spec) -->
+            <LinearLayout
+                android:id="@+id/rowAddPhoto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/bg_card_rounded"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="12dp">
+
+                <ImageView
+                    android:id="@+id/imgAddressPhotoThumb"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="@drawable/bg_circle_outline"
+                    android:padding="7dp"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_camera"
+                    app:tint="@color/anydrop_secondary"
+                    tools:ignore="ContentDescription" />
+
+                <TextView
+                    android:id="@+id/textAddPhotoLabel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:text="@string/map_pin_drop_add_photo"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp" />
+
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSaveAddressMap"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:layout_marginTop="20dp"
+                android:backgroundTint="@color/anydrop_secondary"
+                android:text="@string/btn_save_address_map"
+                app:cornerRadius="12dp" />
+
+        </LinearLayout>
+
+    </androidx.core.widget.NestedScrollView>
+
+</LinearLayout>

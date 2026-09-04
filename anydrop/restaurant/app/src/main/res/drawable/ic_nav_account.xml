@@ -1,0 +1,19 @@
+<!-- Phase 2 (UI/UX overhaul, 2026-08-19) — new dedicated nav-account icon
+     (bottom_nav_menu.xml previously reused the generic ic_person for this
+     slot; kept ic_person.xml itself untouched since it's still used
+     elsewhere, e.g. edit-profile screens). Smoother/more rounded person
+     glyph than ic_person's sharper original, matching the rest of this
+     phase's icon set. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?attr/colorControlNormal">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M12,2.5 C14.9,2.5 17.25,4.85 17.25,7.75 C17.25,10.65 14.9,13 12,13 C9.1,13 6.75,10.65 6.75,7.75 C6.75,4.85 9.1,2.5 12,2.5 Z M12,4 C9.93,4 8.25,5.68 8.25,7.75 C8.25,9.82 9.93,11.5 12,11.5 C14.07,11.5 15.75,9.82 15.75,7.75 C15.75,5.68 14.07,4 12,4 Z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M12,14.25 C16.28,14.25 20.75,16.36 20.75,20 L20.75,20.75 C20.75,21.16 20.41,21.5 20,21.5 C19.59,21.5 19.25,21.16 19.25,20.75 L19.25,20 C19.25,17.61 15.94,15.75 12,15.75 C8.06,15.75 4.75,17.61 4.75,20 L4.75,20.75 C4.75,21.16 4.41,21.5 4,21.5 C3.59,21.5 3.25,21.16 3.25,20.75 L3.25,20 C3.25,16.36 7.72,14.25 12,14.25 Z" />
+</vector>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- I2 — Order status stepper (docs/features.md Phase I). Outlined circle,
+     tinted-fill, for the step currently in progress. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@color/anydrop_primary_container" />
+    <stroke
+        android:width="2dp"
+        android:color="@color/anydrop_primary" />
+</shape>

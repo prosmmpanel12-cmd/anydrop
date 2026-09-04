@@ -1,0 +1,86 @@
+<resources>
+    <string name="app_name">AnyDrop Rider</string>
+
+    <!-- Login -->
+    <string name="login_title">Welcome, Rider</string>
+    <string name="login_subtitle">Enter your email to get started</string>
+    <string name="hint_email">Email address</string>
+    <string name="btn_send_otp">Send OTP</string>
+    <string name="login_no_account">New rider?</string>
+    <string name="login_go_signup">Sign up</string>
+
+    <!-- OTP -->
+    <string name="otp_title">Verify your email</string>
+    <string name="otp_subtitle_format">We sent a 6-digit code to %1$s</string>
+    <string name="btn_verify">Verify</string>
+    <string name="otp_resend_in_format">Resend in %1$ds</string>
+    <string name="otp_resend_now">Resend code</string>
+    <string name="otp_resent">OTP resent</string>
+    <string name="error_otp_incomplete">Enter all 6 digits</string>
+    <string name="error_otp_invalid">Incorrect code — try again</string>
+    <string name="error_otp_expired">Code expired — request a new one</string>
+
+    <!-- Signup -->
+    <string name="signup_title">Become a Rider</string>
+    <string name="signup_subtitle">Deliver with AnyDrop and earn on your own time</string>
+    <string name="hint_name">Full name</string>
+    <string name="hint_mobile">Mobile number</string>
+    <string name="label_service_area">Service area</string>
+    <string name="btn_use_current_location">Use current location</string>
+    <string name="hint_service_area_dropdown">Select your area</string>
+    <string name="btn_continue">Continue</string>
+    <string name="signup_area_hint">We\'ll find your area automatically, or you can pick one below</string>
+    <string name="area_detected_format">Detected: %1$s</string>
+    <string name="area_not_detected">Couldn\'t detect your area — please select one below</string>
+    <string name="detecting_location">Detecting your location…</string>
+    <string name="location_captured">Location captured ✓</string>
+    <string name="location_unavailable">Couldn\'t get your location — select your area manually</string>
+    <string name="location_permission_denied">Location permission denied — select your area manually</string>
+
+    <!-- Signup via login screen -->
+    <string name="signup_enter_email_hint">Enter your email above to sign up</string>
+
+    <!-- Errors -->
+    <string name="error_fill_all_fields">Please fill in all fields</string>
+    <string name="error_invalid_email">Enter a valid email address</string>
+    <string name="error_invalid_mobile">Enter a valid 10-digit mobile number</string>
+    <string name="error_email_registered">This email is already registered</string>
+    <string name="error_network">Network error — check your connection</string>
+
+    <!-- Application status -->
+    <string name="status_title">Application Status</string>
+    <string name="status_pending_title">Application Under Review</string>
+    <string name="status_pending_body">Thanks for signing up! Our team is reviewing your application. We\'ll notify you once it\'s approved.</string>
+    <string name="status_approved_title">You\'re Approved!</string>
+    <string name="status_approved_body">Your rider account is active.</string>
+    <!-- Note: an approved rider is redirected to RiderDashboardActivity before
+         this body ever renders (see ApplicationStatusActivity, Phase 3 doc 83) —
+         kept only as a harmless fallback string, not shown in normal flow. -->
+    <string name="status_rejected_title">Application Not Approved</string>
+    <string name="status_rejected_body">Unfortunately your application wasn\'t approved this time.</string>
+    <string name="status_suspended_title">Account Suspended</string>
+    <string name="status_suspended_body">Your rider account has been suspended. Contact support for details.</string>
+    <string name="btn_refresh_status">Refresh Status</string>
+    <string name="status_refreshed">Status updated ✓</string>
+    <string name="btn_logout">Log out</string>
+    <string name="status_reason_format">Reason: %1$s</string>
+    <string name="status_refresh_hint">Please verify your email again to refresh your status</string>
+
+    <!-- Dashboard (Phase 3, doc 83) -->
+    <string name="dashboard_greeting_format">Hi, %1$s</string>
+    <string name="dashboard_online_title">You\'re online</string>
+    <string name="dashboard_online_subtitle">Looking for deliveries near you</string>
+    <string name="dashboard_offline_title">You\'re offline</string>
+    <string name="dashboard_offline_subtitle">Go online to start receiving deliveries</string>
+    <string name="dashboard_current_delivery_heading">CURRENT DELIVERY</string>
+    <string name="dashboard_no_active_delivery">No active delivery right now</string>
+    <string name="dashboard_today_heading">TODAY</string>
+    <string name="dashboard_placeholder_amount">₹0</string>
+    <string name="dashboard_placeholder_count">0</string>
+    <string name="dashboard_earnings_label">Earnings</string>
+    <string name="dashboard_deliveries_label">Deliveries</string>
+    <string name="dashboard_location_required">Turn on location to go online</string>
+    <string name="dashboard_location_permission_denied">Location permission is needed to go online</string>
+    <string name="dashboard_went_online">You\'re online ✓</string>
+    <string name="dashboard_went_offline">You\'re offline</string>
+</resources>

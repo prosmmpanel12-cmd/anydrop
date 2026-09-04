@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/surface">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:id="@+id/editorTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            tools:text="Add new address" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnUseCurrentLocation"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/btn_use_current_location"
+            android:textAllCaps="false"
+            app:icon="@drawable/ic_location"
+            app:iconTint="@color/anydrop_primary"
+            app:iconGravity="textStart"
+            android:textColor="@color/anydrop_primary" />
+
+        <!-- Address type: Home / Work / Other -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/typeHome"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="18dp"
+                android:paddingVertical="8dp"
+                android:text="@string/address_type_home"
+                android:textSize="13sp"
+                android:background="@drawable/bg_chip_selected" />
+
+            <TextView
+                android:id="@+id/typeWork"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:paddingHorizontal="18dp"
+                android:paddingVertical="8dp"
+                android:text="@string/address_type_work"
+                android:textSize="13sp"
+                android:background="@drawable/bg_chip_unselected" />
+
+            <TextView
+                android:id="@+id/typeOther"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:paddingHorizontal="18dp"
+                android:paddingVertical="8dp"
+                android:text="@string/address_type_other"
+                android:textSize="13sp"
+                android:background="@drawable/bg_chip_unselected" />
+
+        </LinearLayout>
+
+        <EditText
+            android:id="@+id/inputHouseFlatNo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:hint="@string/hint_house_flat_no"
+            android:background="@drawable/bg_card_rounded"
+            android:padding="12dp"
+            android:inputType="textCapSentences" />
+
+        <EditText
+            android:id="@+id/inputFloor"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:hint="@string/hint_floor"
+            android:background="@drawable/bg_card_rounded"
+            android:padding="12dp"
+            android:inputType="textCapSentences" />
+
+        <EditText
+            android:id="@+id/inputArea"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:hint="@string/hint_area_address"
+            android:background="@drawable/bg_card_rounded"
+            android:padding="12dp"
+            android:minLines="2"
+            android:inputType="textMultiLine|textCapSentences" />
+
+        <EditText
+            android:id="@+id/inputLandmark"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:hint="@string/hint_landmark"
+            android:background="@drawable/bg_card_rounded"
+            android:padding="12dp"
+            android:inputType="textCapSentences" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginVertical="16dp"
+            android:background="@color/outline" />
+
+        <EditText
+            android:id="@+id/inputReceiverName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/hint_receiver_name"
+            android:background="@drawable/bg_card_rounded"
+            android:padding="12dp"
+            android:inputType="textCapWords" />
+
+        <EditText
+            android:id="@+id/inputReceiverPhone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:hint="@string/hint_receiver_phone"
+            android:background="@drawable/bg_card_rounded"
+            android:padding="12dp"
+            android:inputType="phone" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSaveAddress"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginTop="20dp"
+            android:backgroundTint="@color/anydrop_primary"
+            android:text="@string/btn_save_address"
+            app:cornerRadius="12dp" />
+
+    </LinearLayout>
+
+</androidx.core.widget.NestedScrollView>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One cell in CategoryPhotoSearchAdapter's grid (part of
+     dialog_category_icon_picker.xml's "Search photos" tab). Click target
+     is the root FrameLayout, not the inner card, so the ripple + the
+     adapter's onClickListener share one consuming view — same pattern
+     item_category_icon_search_option.xml uses, see that file's comment
+     for why the click listener can't live on a separately-clickable
+     child. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="6dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground">
+
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        app:cardCornerRadius="14dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="@color/stat_chip_bg"
+        app:strokeColor="@color/outline"
+        app:strokeWidth="1dp">
+
+        <ImageView
+            android:id="@+id/photoSearchImage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:contentDescription="@null" />
+
+    </com.google.android.material.card.MaterialCardView>
+
+</FrameLayout>

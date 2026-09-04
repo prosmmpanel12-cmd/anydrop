@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="10dp"
+    app:cardCornerRadius="14dp"
+    app:cardElevation="0dp"
+    app:strokeColor="@color/outline"
+    app:strokeWidth="1dp"
+    app:cardBackgroundColor="@color/surface">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="14dp">
+
+        <!-- Tappable to edit (edit-dialog work, coupon-system follow-up
+             session) — the switch stays a separate, non-nested tap target
+             for the visibility toggle, so tapping to edit vs. tapping to
+             toggle are two clearly distinct gestures. Same
+             ?attr/selectableItemBackground pattern fragment_account.xml's
+             row items already use. -->
+        <LinearLayout
+            android:id="@+id/couponInfoColumn"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground"
+            android:paddingVertical="2dp">
+
+            <TextView
+                android:id="@+id/couponCodeText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/anydrop_primary"
+                android:letterSpacing="0.03" />
+
+            <TextView
+                android:id="@+id/couponDiscountText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textSize="13sp"
+                android:textColor="@color/text_primary" />
+
+            <TextView
+                android:id="@+id/couponMetaText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary" />
+
+        </LinearLayout>
+
+        <!-- Toggle-standardization pass (2026-08-19, supersedes doc 22
+             item 4's pill toggle): plain SwitchMaterial now, same
+             switch_track_color.xml green/red style as every other on/off
+             switch in the app (statusSwitch, switchAvailable, etc.)
+             instead of a bespoke MaterialButtonToggleGroup just for this
+             row. Archive icon button unchanged. -->
+        <LinearLayout
+            android:id="@+id/activeControlsGroup"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchActive"
+                style="@style/Widget.AnydropRestaurant.Switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/coupon_visible_label"
+                android:textSize="9sp"
+                android:textColor="@color/text_secondary"
+                android:gravity="center" />
+
+            <ImageButton
+                android:id="@+id/btnArchive"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginTop="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/coupon_archive_action"
+                android:src="@drawable/ic_archive"
+                app:tint="@color/text_secondary" />
+
+        </LinearLayout>
+
+        <!-- Archived state: the toggle/archive column above is hidden and
+             this simple "Archived · Restore" column shown instead — an
+             archived coupon has no is_active/is_public state left to
+             flip from this row, only "bring it back". -->
+        <LinearLayout
+            android:id="@+id/archivedGroup"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/coupon_archived_label"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_secondary" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnUnarchive"
+                style="@style/ToggleButton.Pill"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/coupon_restore_action"
+                app:icon="@drawable/ic_unarchive" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>

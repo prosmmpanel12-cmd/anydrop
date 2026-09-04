@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Account tab / Edit Profile (docs/restorent/19 §7, §10 item 5) — the
+     opening/closing time rows are tappable (open a TimePickerDialog)
+     rather than typed EditTexts, so they can't use a real
+     TextInputLayout box. Same 12dp corner radius as the
+     Widget.Material3.TextInputLayout.OutlinedBox fields elsewhere on
+     this screen, so the two field styles sit together without looking
+     mismatched. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/surface" />
+    <corners android:radius="12dp" />
+    <stroke android:width="1dp" android:color="@color/outline" />
+</shape>

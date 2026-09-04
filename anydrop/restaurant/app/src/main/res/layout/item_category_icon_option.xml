@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One cell in CategoryIconPickerAdapter's grid (dialog_category_icon_
+     picker.xml). Selected state is toggled by CategoryIconPickerAdapter
+     directly (swap card stroke/fill + icon tint) rather than a
+     StateListDrawable, since selection here is single-select across the
+     whole adapter (not a per-view pressed/checked android state) — same
+     "adapter decides, view just renders" split as CategoryAdapter's own
+     reorder-mode visibility toggling. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:paddingVertical="8dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:background="?attr/selectableItemBackground">
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/iconOptionCard"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="@color/stat_chip_bg"
+        app:strokeColor="@android:color/transparent"
+        app:strokeWidth="2dp">
+
+        <ImageView
+            android:id="@+id/iconOptionImage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="14dp"
+            app:tint="@color/text_secondary"
+            android:contentDescription="@null" />
+
+    </com.google.android.material.card.MaterialCardView>
+
+    <TextView
+        android:id="@+id/iconOptionLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textSize="11sp"
+        android:textColor="@color/text_secondary"
+        tools:ignore="MissingPrefix"
+        tools:text="Biryani" />
+
+</LinearLayout>

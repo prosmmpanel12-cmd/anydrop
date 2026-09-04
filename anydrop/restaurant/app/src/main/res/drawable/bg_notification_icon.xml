@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Circular tinted icon background for each notification row
+    (item_notification.xml), Restaurant App mirror of the Customer App's
+    drawable of the same name.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@color/anydrop_primary_container" />
+</shape>

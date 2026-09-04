@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Reviews reply screen row (docs/restorent/00_Status.md, this session).
+    Same CardView shell as item_notification.xml for visual consistency
+    with the rest of this app's list screens. Star row uses 5 fixed
+    ImageViews (ivStar1..5) tinted filled/outline in code rather than a
+    custom rating-bar view, cheaper than pulling in a library for
+    something this app only needs read-only (restaurant never rates
+    anything itself). replyGroup vs. repliedGroup are mutually exclusive —
+    exactly one visible per row depending on whether restaurant_reply is
+    null, bound in ReviewAdapter.kt.
+-->
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginTop="10dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="1dp"
+    app:cardBackgroundColor="@color/surface">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/reviewCustomerName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                tools:text="Ananya Sharma" />
+
+            <TextView
+                android:id="@+id/reviewTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="11sp"
+                android:textColor="@color/text_secondary"
+                tools:text="18 Aug, 7:40 pm" />
+
+            <!-- §7, today.md 2026-08-28: report a suspected fake review.
+                 Plain clickable TextView, same styling as btnEditReply
+                 below — no new drawable needed. Text/enabled state flips
+                 to "Reported" after a successful call (ReviewAdapter). -->
+            <TextView
+                android:id="@+id/btnReportReview"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:text="@string/review_report"
+                android:textSize="11sp"
+                android:textColor="@color/text_secondary"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
+                android:padding="4dp" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/starRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <ImageView android:id="@+id/ivStar1" android:layout_width="16dp" android:layout_height="16dp" android:src="@drawable/ic_star" />
+            <ImageView android:id="@+id/ivStar2" android:layout_width="16dp" android:layout_height="16dp" android:layout_marginStart="2dp" android:src="@drawable/ic_star" />
+            <ImageView android:id="@+id/ivStar3" android:layout_width="16dp" android:layout_height="16dp" android:layout_marginStart="2dp" android:src="@drawable/ic_star" />
+            <ImageView android:id="@+id/ivStar4" android:layout_width="16dp" android:layout_height="16dp" android:layout_marginStart="2dp" android:src="@drawable/ic_star" />
+            <ImageView android:id="@+id/ivStar5" android:layout_width="16dp" android:layout_height="16dp" android:layout_marginStart="2dp" android:src="@drawable/ic_star" />
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/reviewComment"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textSize="13.5sp"
+            android:textColor="@color/text_primary"
+            android:visibility="gone"
+            tools:visibility="visible"
+            tools:text="Food was great but delivery took a while." />
+
+        <!-- Already replied — read-only display. -->
+        <LinearLayout
+            android:id="@+id/repliedGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card_rounded"
+            android:padding="10dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/review_your_reply_label"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textColor="@color/anydrop_primary" />
+
+            <TextView
+                android:id="@+id/repliedText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:textSize="13sp"
+                android:textColor="@color/text_primary"
+                tools:text="Thanks for the feedback! We're working on faster delivery times." />
+
+            <TextView
+                android:id="@+id/btnEditReply"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/review_edit_reply"
+                android:textSize="12sp"
+                android:textColor="@color/anydrop_primary"
+                android:textStyle="bold"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
+                android:padding="4dp" />
+
+        </LinearLayout>
+
+        <!-- Not replied yet (or editing) — input row. -->
+        <LinearLayout
+            android:id="@+id/replyGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            tools:visibility="visible">
+
+            <EditText
+                android:id="@+id/replyInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/bg_card_rounded"
+                android:padding="10dp"
+                android:textSize="13sp"
+                android:textColor="@color/text_primary"
+                android:hint="@string/review_reply_hint"
+                android:maxLines="4"
+                android:inputType="textMultiLine|textCapSentences" />
+
+            <ImageView
+                android:id="@+id/btnSendReply"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="8dp"
+                android:padding="6dp"
+                android:src="@drawable/ic_send"
+                app:tint="@color/anydrop_primary"
+                android:background="@drawable/bg_notification_icon"
+                android:clickable="true"
+                android:focusable="true" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>

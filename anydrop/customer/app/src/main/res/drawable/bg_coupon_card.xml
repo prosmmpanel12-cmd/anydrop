@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- H5 — coupon row background: dashed border, common "voucher" visual
+     language (vs. bg_card_rounded's plain solid card used elsewhere). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/surface" />
+    <corners android:radius="12dp" />
+    <stroke
+        android:width="1.5dp"
+        android:color="@color/anydrop_primary_container"
+        android:dashWidth="6dp"
+        android:dashGap="4dp" />
+</shape>

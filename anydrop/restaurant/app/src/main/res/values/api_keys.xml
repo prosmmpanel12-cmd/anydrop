@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 2026-08-20 — optional free-tier photo/icon-search API keys (Pixabay,
+     Pexels, Unsplash, Flaticon — see ExternalApiClient.kt / ExternalModels.kt's
+     header comments for the full multi-source fallback picture). All
+     four are FREE to sign up for but do each require their own
+     personal key, unlike every other provider in this project's search
+     chains (Iconify, Openverse, Openclipart, Wikimedia Commons, Google's
+     Material Icons metadata endpoint, and the DuckDuckGo scrape fallback
+     all work with none of these four filled in).
+
+     Left empty here on purpose — no placeholder/demo key is embedded in
+     this project. ExternalApiClient.searchPhotos{Pixabay,Pexels,Unsplash}()
+     and searchIconsFlaticon() each check their own key string first and
+     skip the network call entirely (return an empty list, no request
+     made) when it's blank, so leaving these empty is completely safe; it
+     just means those chains rely on their key-less providers instead.
+
+     To turn one on: sign up for a free key at the provider's own site,
+     paste it in below, rebuild. Do NOT commit a real key to a public
+     repo without checking that provider's terms on key exposure in a
+     distributed app first.
+       - Pixabay:  https://pixabay.com/api/docs/  (instant, no approval wait)
+       - Pexels:   https://www.pexels.com/api/    (instant, no approval wait)
+       - Unsplash: https://unsplash.com/developers (Demo tier, 50 req/hour)
+       - Flaticon:  https://developer.flaticon.com/landing (instant free key) -->
+<resources>
+    <string name="pixabay_api_key" translatable="false"></string>
+    <string name="pexels_api_key" translatable="false"></string>
+    <string name="unsplash_access_key" translatable="false"></string>
+    <string name="flaticon_api_key" translatable="false"></string>
+</resources>

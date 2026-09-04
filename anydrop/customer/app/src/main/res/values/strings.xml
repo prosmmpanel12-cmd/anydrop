@@ -1,0 +1,490 @@
+<resources>
+    <string name="app_name">Anydrop</string>
+    <string name="tagline">Food, delivered fast.</string>
+
+    <!-- PLACEHOLDER — not a real key. Maps SDK init will fail/show a grey
+         tile area at runtime until this is replaced with a real
+         Android-restricted key (package name + SHA-1, see
+         docs/12_Handover_H6_Map_PinDrop_Photo.md "API key security").
+         Kept here inline (not gitignored) only because it's a placeholder
+         with no real value — once a real key exists, move it out of this
+         committed file into a gitignored local.properties-backed resource
+         instead, per that doc's guidance, so it never lands in version
+         control for real. -->
+    <string name="google_maps_key" translatable="false">YOUR_ANDROID_RESTRICTED_MAPS_KEY_HERE</string>
+
+    <!-- Login -->
+    <string name="login_title">Welcome to Anydrop</string>
+    <string name="login_subtitle">Enter your email to get a login code</string>
+    <string name="hint_email">Email address</string>
+    <string name="btn_send_otp">Send OTP</string>
+    <string name="btn_continue_google">Continue with Google</string>
+    <string name="google_coming_soon">Google Sign-In is coming soon — please use Email OTP for now</string>
+    <string name="otp_title">Enter the code</string>
+    <string name="otp_subtitle">We sent a 6-digit code to %1$s</string>
+    <string name="btn_verify_otp">Verify &amp; Continue</string>
+    <string name="btn_resend_otp">Resend code</string>
+
+    <!-- Complete Profile — shown once after OTP verify if name/mobile
+         are still null on the customer row (first-time signup only). -->
+    <string name="complete_profile_title">Tell us about you</string>
+    <string name="complete_profile_subtitle">Just your name and number, so restaurants and your rider can reach you</string>
+    <string name="hint_full_name">Full name</string>
+    <string name="hint_mobile_number">Mobile number</string>
+    <string name="btn_save_continue">Save &amp; Continue</string>
+
+    <!-- Home -->
+    <string name="hint_search">Search for restaurant, cuisine or a dish</string>
+    <string name="voice_search">Voice search</string>
+    <string name="clear_category_filter">Clear category filter</string>
+    <string name="voice_search_prompt">Search for restaurant, cuisine or a dish</string>
+    <string name="voice_search_unavailable">Voice search isn\'t available on this device</string>
+    <string name="restaurants_near_you">Restaurants near you</string>
+    <string name="search_results_for">Results for \"%1$s\"</string>
+    <string name="filter_all">All</string>
+    <string name="filter_veg">Veg</string>
+    <string name="filter_open_now">Open now</string>
+    <string name="filter_rating">Rating 4.0+</string>
+    <string name="filter_near_fast">Near &amp; Fast</string>
+    <string name="filter_under_200">Under ₹200</string>
+    <string name="filter_pure_veg">Pure Veg</string>
+    <string name="veg_only">Veg</string>
+    <string name="empty_restaurants">No restaurants found nearby yet</string>
+    <string name="empty_search_results">No matches. Try a different dish or restaurant name.</string>
+    <string name="also_available_at">Also available at</string>
+    <string name="from_restaurant">from %1$s</string>
+    <!-- features.md §5 — rotating meta-line's highlighted second state,
+         shown alongside the lightning icon when a restaurant qualifies as
+         fast (RotatingEtaView.NEAR_FAST_ETA_THRESHOLD_MIN). -->
+    <string name="near_and_fast">Near &amp; Fast</string>
+    <string name="popular_dishes_near_you">Popular dishes near you</string>
+    <string name="explore_more">Explore More</string>
+    <string name="explore_offers">Offers</string>
+    <string name="explore_offers_subtitle">Deals near you</string>
+    <string name="explore_top10">Top 10</string>
+    <string name="explore_top10_subtitle">Highest rated</string>
+    <string name="explore_train">Food on train</string>
+    <string name="explore_collections">Collections</string>
+    <string name="coming_soon">Coming soon</string>
+    <string name="notif_permission_title">Want to stay updated about offers, order status and more?</string>
+    <string name="notif_permission_positive">Yes, enable notifications</string>
+    <string name="notif_permission_negative">Not now</string>
+
+    <!-- docs/33/34/35 — "Offers" category chip destination screen -->
+    <string name="offers_screen_title">Offers</string>
+    <string name="offers_screen_empty">No offers running right now — check back soon</string>
+
+    <!-- Restaurant detail -->
+    <string name="btn_add_to_cart">Add</string>
+    <string name="highly_reordered">Highly reordered</string>
+    <!-- bugs.md §6.3 follow-up -->
+    <string name="out_of_stock">Out of stock</string>
+    <string name="percent_off">%1$d%% OFF</string>
+    <string name="menu_empty">Menu isn\'t available yet</string>
+
+    <!-- Cart — multi-restaurant, Zomato/Swiggy-style (one independent cart
+         per restaurant; see CartManager.kt kdoc). -->
+    <string name="your_cart">Your Cart</string>
+    <string name="empty_cart">Your cart is empty</string>
+    <string name="item_total">Item total</string>
+    <string name="btn_checkout">Checkout</string>
+    <string name="clear_cart">Clear cart</string>
+    <string name="cd_menu_jump">Jump to menu category</string>
+    <string name="cd_back_to_top">Back to top</string>
+    <string name="back_to_top">Back to top</string>
+    <string name="cart_multiple_restaurants_hint">You have items from %1$d restaurants — checkout each separately</string>
+    <string name="cart_other_restaurant_fallback_generic">Restaurant</string>
+    <plurals name="cart_items_count">
+        <item quantity="one">%d item</item>
+        <item quantity="other">%d items</item>
+    </plurals>
+    <string name="hint_coupon_code">Have a coupon code?</string>
+    <string name="btn_apply_coupon">Apply</string>
+    <string name="coupon_applied">Coupon applied — you saved ₹%1$s</string>
+    <string name="coupon_invalid">Invalid or expired coupon code</string>
+    <string name="coupon_min_order_not_met">Add a bit more to your order to use this coupon</string>
+    <string name="coupon_usage_limit_reached">You\'ve already used this coupon the maximum number of times</string>
+    <string name="below_min_order_amount">Add a few more items to meet this restaurant\'s minimum order amount</string>
+    <string name="below_min_order_amount_with_amount">Add ₹%1$.0f more to your cart to order</string>
+    <string name="could_not_place_order">Couldn\'t place order</string>
+    <string name="restaurant_closed_error">This restaurant is closed right now. Try again during its open hours.</string>
+    <string name="restaurant_paused_error">This restaurant isn\'t accepting orders right now. Please try again shortly.</string>
+    <string name="remove_coupon">Remove</string>
+    <string name="lbl_coupon">Coupon</string>
+    <string name="view_all_offers">View all offers &amp; coupons</string>
+    <string name="coupons_sheet_title">Offers &amp; Coupons</string>
+    <string name="coupons_empty_state">No coupons available for this order right now</string>
+    <string name="coupon_tap_to_apply">Tap to apply</string>
+    <string name="coupon_applied_label">Applied</string>
+    <string name="coupon_flat_off">₹%1$s OFF</string>
+    <string name="coupon_percent_off">%1$s%% OFF</string>
+    <string name="coupon_percent_off_capped">%1$s%% OFF up to ₹%2$s</string>
+    <string name="coupon_min_order_line">Min order ₹%1$s</string>
+
+    <!-- docs/33 — Checkout offer strip + B1G1 free-item row + coupon-
+         disabled-by-offer note. offer_applied_amount mirrors
+         coupon_applied's own "you saved ₹%1$s" phrasing so the two rows
+         read consistently when both happen to be visible at once (e.g.
+         an offer with allow_coupon_stacking = 1 alongside a coupon). -->
+    <string name="offer_applied_amount">%1$s — you saved ₹%2$s</string>
+    <string name="offer_free_item_label">%1$s × %2$d — FREE</string>
+    <string name="coupon_disabled_by_offer_note">Coupon not applied — combines only with select offers</string>
+    <string name="coupon_add_more_to_unlock">Add ₹%1$s more to unlock</string>
+    <string name="coupon_used_up">Already used the maximum times</string>
+
+    <!-- Update popup -->
+    <string name="update_title">Update available</string>
+    <string name="btn_update_now">Update Now</string>
+    <string name="btn_update_later">Later</string>
+    <string name="maintenance_title">Down for maintenance</string>
+    <string name="maintenance_message_default">We\'re currently doing scheduled maintenance. Please check back shortly.</string>
+    <string name="btn_maintenance_retry">Retry</string>
+
+    <!-- Checkout (Phase 3) -->
+    <string name="checkout_title">Checkout</string>
+    <string name="checkout_your_items">Your Items</string>
+    <string name="delivery_address">Delivery address</string>
+    <string name="hint_full_address">House / flat, street, area, city</string>
+    <string name="btn_save_address">Save address</string>
+    <string name="btn_use_current_location">Use current location</string>
+    <string name="delivery_location_placeholder">Delivering to your location</string>
+    <string name="btn_add_address">Add new address</string>
+    <string name="address_type_home">Home</string>
+    <string name="address_type_work">Work</string>
+    <string name="address_type_other">Other</string>
+    <string name="hint_house_flat_no">House / Flat no.</string>
+    <string name="hint_floor">Floor (optional)</string>
+    <string name="hint_landmark">Landmark (optional)</string>
+    <string name="hint_area_address">Area / street / city</string>
+    <string name="hint_receiver_name">Receiver\'s name</string>
+    <string name="hint_receiver_phone">Receiver\'s phone number</string>
+    <string name="edit_address_title">Edit address</string>
+    <string name="add_address_title">Add new address</string>
+    <string name="btn_update_address">Update address</string>
+    <string name="error_house_flat_required">Please enter house/flat number</string>
+    <string name="error_area_required">Please enter area / street / city</string>
+    <string name="error_receiver_name_required">Please enter receiver\'s name</string>
+    <string name="error_receiver_phone_required">Please enter a valid phone number</string>
+
+    <!-- Profile (§2.7) -->
+    <string name="profile_title">Profile</string>
+    <string name="menu_address_book">Address Book</string>
+    <string name="menu_order_history">Order History</string>
+    <string name="menu_saved">Saved</string>
+    <string name="menu_wallet">Wallet</string>
+    <string name="menu_faqs">FAQs</string>
+    <string name="menu_rate_us">Rate Us</string>
+    <string name="menu_feedback">Feedback</string>
+    <string name="menu_logout">Logout</string>
+    <string name="address_book_title">Address Book</string>
+    <string name="order_history_title">Order History</string>
+    <string name="saved_title">Saved</string>
+    <string name="faqs_title">FAQs</string>
+    <string name="feedback_title">Feedback</string>
+    <string name="rate_us_title">Rate Anydrop</string>
+    <string name="rate_us_prompt">How was your experience?</string>
+    <string name="btn_submit">Submit</string>
+    <string name="btn_submit_feedback">Submit feedback</string>
+    <string name="hint_feedback_message">Tell us what\'s on your mind</string>
+    <string name="empty_addresses">No saved addresses yet</string>
+    <string name="empty_orders">No orders yet</string>
+
+    <!-- Notification bell (Type 1, docs/Status.md 2026-08-20) -->
+    <string name="notifications_title">Notifications</string>
+    <string name="empty_notifications">No notifications yet</string>
+    <string name="mark_all_read">Mark all read</string>
+    <string name="empty_saved_restaurants">No saved restaurants yet</string>
+    <string name="empty_saved_dishes">No saved dishes yet</string>
+    <string name="empty_faqs">No FAQs available right now</string>
+    <string name="saved_restaurants_tab">Restaurants</string>
+    <string name="saved_dishes_tab">Dishes</string>
+    <string name="logout_confirm_title">Log out?</string>
+    <string name="logout_confirm_message">You\'ll need to log in again to place orders.</string>
+    <string name="btn_edit">Edit</string>
+    <string name="btn_delete">Delete</string>
+    <!-- Bug 6.2 — Address Book "Set as default" tap target -->
+    <string name="btn_set_default">Set as default</string>
+    <string name="delete_address_confirm">Delete this address?</string>
+    <string name="label_default">DEFAULT</string>
+
+    <!-- H6 — Location Picker (screenshot 12) -->
+    <string name="location_picker_search_hint">Search for area, street name…</string>
+    <string name="location_picker_use_current_location">Use current location</string>
+    <string name="location_picker_add_address">Add Address</string>
+    <string name="location_picker_saved_addresses">SAVED ADDRESSES</string>
+    <string name="location_picker_nearby_locations">NEARBY LOCATIONS</string>
+    <string name="location_picker_resolving">Fetching your location…</string>
+    <string name="location_picker_empty_saved">No saved addresses yet — add one to get started</string>
+    <string name="location_picker_address_activated">Delivering to this address now</string>
+    <string name="location_picker_nearby_coming_soon">Nearby suggestions coming soon</string>
+    <string name="location_services_off_title">Location is turned off</string>
+    <string name="location_services_off_message_with_saved">Turn on location to use your current position, or choose one of your saved addresses below.</string>
+    <string name="location_services_off_message_no_saved">Turn on location to use your current position, or add an address to deliver to instead.</string>
+    <string name="location_services_off_turn_on">Turn on location</string>
+    <string name="location_services_off_choose_saved">Choose saved address</string>
+
+    <!-- H6 part 2 — Map pin-drop screen (screenshot 13) -->
+    <string name="map_pin_drop_title">Select delivery location</string>
+    <string name="map_pin_drop_search_hint">Search for area, street name…</string>
+    <string name="map_pin_drop_use_current_location">Use current location</string>
+    <string name="map_pin_drop_resolving_address">Locating…</string>
+    <string name="map_pin_drop_delivery_details">Delivery details</string>
+    <string name="map_pin_drop_distance_warning">This address is %1$s away from your current location</string>
+    <string name="map_pin_drop_use_current_location_link">Use current location</string>
+    <string name="hint_address_details">Address details*</string>
+    <string name="hint_address_details_example">E.g. Floor, House no.</string>
+    <string name="map_pin_drop_receiver_details">Receiver details for this address</string>
+    <string name="map_pin_drop_add_photo">Add door / building photo (optional)</string>
+    <string name="map_pin_drop_photo_added">Photo added</string>
+    <string name="map_pin_drop_change_photo">Change photo</string>
+    <string name="btn_save_address_map">Save address</string>
+    <string name="error_address_details_required">Please add address details (floor, house no.)</string>
+    <string name="map_pin_drop_uploading_photo">Uploading photo…</string>
+    <string name="map_pin_drop_photo_upload_failed">Couldn\'t upload photo — address will be saved without it</string>
+    <string name="map_pin_drop_geocode_failed">Couldn\'t resolve this location — try moving the map again</string>
+
+    <string name="error_feedback_message_required">Please tell us what\'s on your mind</string>
+    <string name="feedback_submitted">Thanks for your feedback!</string>
+    <string name="rate_us_prompt_stars">Tap a star to rate us</string>
+    <string name="error_select_rating">Please select a rating</string>
+    <string name="rate_us_submitted">Thanks for rating us!</string>
+    <string name="rate_us_default_message">Rated via Rate Us</string>
+    <string name="rate_us_maybe_later">Maybe later</string>
+
+    <!-- Part 13 — Order rating -->
+    <string name="rate_order_title">Rate your order</string>
+    <string name="rate_order_restaurant_label">Food from %1$s</string>
+    <string name="rate_order_restaurant_stars">Restaurant</string>
+    <string name="rate_order_food_stars">Food quality</string>
+    <string name="rate_order_delivery_stars">Delivery</string>
+    <string name="rate_order_comment_hint">Add a comment (optional)</string>
+    <string name="rate_order_submitted">Thanks for rating your order!</string>
+    <string name="rate_order_already_rated">You already rated this order</string>
+    <string name="btn_rate_order">Rate Order</string>
+    <string name="label_rated">Rated</string>
+    <string name="btn_reorder">Reorder</string>
+    <string name="reorder_added_to_cart">Added to cart</string>
+    <string name="reorder_some_items_unavailable">%1$d item(s) no longer available, rest added to cart</string>
+    <string name="reorder_none_available">None of these items are available anymore</string>
+    <string name="reorder_failed">Couldn\'t reorder — try again</string>
+    <string name="account_basics_title">Account</string>
+    <string name="logout_confirm_positive">Log out</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="error_generic">Something went wrong. Please try again.</string>
+    <string name="receiver_line_format">Receiver: %1$s, %2$s</string>
+    <string name="order_meta_format">%1$d items · ₹%2$d · %3$s</string>
+    <string name="dish_price_and_restaurant_format">₹%1$d · from %2$s</string>
+    <string name="delivery_note_label">Delivery note</string>
+    <string name="payment_method">Payment method</string>
+    <string name="pay_cod">Cash on Delivery</string>
+    <string name="pay_upi">UPI</string>
+    <string name="pay_wallet">Anydrop Wallet</string>
+    <string name="pay_wallet_with_balance_format">Anydrop Wallet — ₹%1$s available</string>
+    <string name="payment_method_unavailable_here">Not available for this address</string>
+    <string name="wallet_insufficient_balance_error">Not enough wallet balance for this order</string>
+    <string name="wallet_title">Anydrop Wallet</string>
+    <string name="wallet_balance_label">Available balance</string>
+    <string name="wallet_history_label">Transaction history</string>
+    <string name="wallet_empty_history">No wallet transactions yet</string>
+    <string name="wallet_load_failed">Couldn\'t load your wallet</string>
+    <string name="wallet_reason_refund">Refund</string>
+    <string name="wallet_reason_admin_adjustment">Adjustment</string>
+    <string name="wallet_reason_cashback">Cashback</string>
+    <string name="wallet_reason_order_payment">Order payment</string>
+
+    <!-- PENDING.md §37 — Wallet Withdrawal (migration 65, 2026-08-30) -->
+    <string name="wallet_withdraw_button">Withdraw</string>
+    <string name="withdraw_title">Withdraw to Bank/UPI</string>
+    <string name="withdraw_available_balance_format">Available: ₹%1$s</string>
+    <string name="withdraw_amount_hint">Amount to withdraw</string>
+    <string name="withdraw_method_bank">Bank Transfer</string>
+    <string name="withdraw_method_upi">UPI</string>
+    <string name="withdraw_holder_name_hint">Account holder name</string>
+    <string name="withdraw_bank_name_hint">Bank name</string>
+    <string name="withdraw_account_number_hint">Account number</string>
+    <string name="withdraw_ifsc_hint">IFSC code</string>
+    <string name="withdraw_upi_id_hint">UPI ID</string>
+    <string name="withdraw_submit_button">Request Withdrawal</string>
+    <string name="withdraw_success_message">Withdrawal request submitted</string>
+    <string name="withdraw_failed_generic">Couldn\'t submit withdrawal request</string>
+    <string name="withdraw_insufficient_balance">Not enough wallet balance</string>
+    <string name="withdraw_below_minimum_format">Minimum withdrawal amount is ₹%1$s</string>
+    <string name="withdraw_history_title">Withdrawal History</string>
+    <string name="withdraw_empty_history">No withdrawal requests yet</string>
+    <string name="withdraw_status_requested">Requested</string>
+    <string name="withdraw_status_approved">Approved</string>
+    <string name="withdraw_status_processing">Processing</string>
+    <string name="withdraw_status_completed">Completed</string>
+    <string name="withdraw_status_rejected">Rejected</string>
+    <string name="withdraw_load_failed">Couldn\'t load withdrawal history</string>
+    <string name="hint_delivery_instructions">Delivery instructions (optional)</string>
+    <string name="bill_details">Bill details</string>
+    <string name="lbl_item_total">Item total</string>
+    <string name="lbl_delivery_charge">Delivery charge</string>
+    <string name="lbl_platform_fee">Platform fee</string>
+    <string name="lbl_tax">Taxes</string>
+    <string name="lbl_discount">Discount</string>
+    <string name="lbl_grand_total">To Pay</string>
+    <string name="btn_place_order">Place Order</string>
+
+    <!-- Order status (Phase 3) -->
+    <string name="order_placed_title">Order placed!</string>
+    <string name="order_status_pending">Waiting for restaurant to accept</string>
+    <string name="order_status_accepted">Restaurant accepted your order</string>
+    <string name="order_status_preparing">Your food is being prepared</string>
+    <string name="order_status_ready">Ready — waiting for a rider</string>
+    <string name="order_status_rider_assigned">Rider assigned</string>
+    <string name="order_status_picked_up">Rider picked up your order</string>
+    <string name="order_status_out_for_delivery">Out for delivery</string>
+    <string name="order_status_delivered">Delivered — enjoy your meal!</string>
+    <string name="order_status_cancelled">Order cancelled</string>
+    <string name="order_status_rejected">Restaurant rejected this order</string>
+    <string name="order_scheduled_for_format">Scheduled for %1$s</string>
+    <string name="restaurant_temporarily_unavailable">Temporarily unavailable</string>
+    <string name="btn_cancel_order">Cancel Order</string>
+    <string name="btn_back_to_home">Back to Home</string>
+
+    <!-- Item 25 — Refund System card (recall.md section 19: Amount, Reason,
+         Method, Expected date, Reference, Timeline). refund_status_* mirror
+         refunds.status ENUM (migration 42) exactly. -->
+    <string name="refund_card_title">Refund</string>
+    <string name="refund_status_requested">Refund requested</string>
+    <string name="refund_status_under_review">Under review</string>
+    <string name="refund_status_approved">Refund approved</string>
+    <string name="refund_status_processing">Refund processing</string>
+    <string name="refund_status_refunded">Refund completed</string>
+    <string name="refund_status_rejected">Refund rejected</string>
+    <string name="refund_amount_format">Amount: ₹%1$s</string>
+    <string name="refund_reason_format">Reason: %1$s</string>
+    <string name="refund_method_manual_upi_bank_transfer">Bank/UPI transfer</string>
+    <string name="refund_method_wallet">Anydrop Wallet</string>
+    <string name="refund_expected_by_format">Expected by %1$s</string>
+    <string name="refund_reference_format">Reference: %1$s</string>
+    <string name="refund_reject_reason_format">Reason: %1$s</string>
+
+    <!-- I2 — Order tracking status timeline (visual stepper), docs/features.md
+         Phase I. 5 stepper labels the 9 backend statuses collapse into. -->
+    <string name="step_placed">Placed</string>
+    <string name="step_accepted">Accepted</string>
+    <string name="step_preparing">Preparing</string>
+    <string name="step_out_for_delivery">Out for delivery</string>
+    <string name="step_delivered">Delivered</string>
+
+    <!-- §2.3 — service-area "not available yet" state -->
+    <string name="service_area_unavailable_title">We\'re not available in your area yet</string>
+    <string name="service_area_unavailable_message">No restaurants deliver here right now — we\'re working on it. Coming soon!</string>
+    <string name="service_area_retry">Try again</string>
+    <string name="service_area_change_location">Change Location</string>
+    <!-- Bug 6.1 — Home GPS-off banner. Soft-nudge variant only: the
+         "unavailable" variant intentionally reuses
+         service_area_unavailable_title instead of a new string here, per
+         the bug spec's "don't invent a second, slightly-different message"
+         requirement. -->
+    <string name="gps_off_banner_soft">Turn on location for a better experience</string>
+    <string name="change_address">Change address</string>
+
+    <!-- §2.6/1.9 — dish customization / item detail sheet -->
+    <string name="item_detail_title">Item details</string>
+    <string name="item_addons_heading">Customise your order</string>
+    <string name="item_cooking_request_hint">Add a cooking request (optional)</string>
+    <string name="item_cooking_request_counter_format">%1$d/%2$d</string>
+    <string name="item_view_full_menu_format">View full menu — %1$s</string>
+    <string name="item_add_button_format">Add item · ₹%1$d</string>
+    <string name="item_remove_button">Remove item</string>
+
+    <!-- features.md §2 — item detail sheet bookmark/share buttons -->
+    <string name="cd_save_item">Save item</string>
+    <string name="cd_share_item">Share item</string>
+    <string name="item_share_text_format">Check out %1$s from %2$s on Anydrop! %3$s</string>
+    <string name="item_share_chooser_title">Share dish</string>
+    <string name="restaurant_share_text_format">Check out %1$s on Anydrop!</string>
+    <string name="restaurant_share_chooser_title">Share restaurant</string>
+    <string name="item_no_addons_note">No customisation available for this item — just pick a quantity.</string>
+
+    <!-- features.md §1 — Menu "Filters and Sorting" bottom sheet -->
+    <string name="filters_pill_label">Filters</string>
+    <string name="filters_sheet_title">Filters and Sorting</string>
+    <string name="filters_sort_by_heading">Sort by</string>
+    <string name="filters_sort_price_low_high">Price - low to high</string>
+    <string name="filters_sort_price_high_low">Price - high to low</string>
+    <string name="filters_pure_veg_note">This restaurant serves Pure Veg only</string>
+    <string name="filters_top_picks_heading">Top picks</string>
+    <string name="filters_chip_highly_reordered">Highly reordered</string>
+    <string name="filters_dietary_heading">Dietary preference</string>
+    <string name="filters_chip_spicy">Spicy</string>
+    <string name="filters_chip_kids_choice">Kid\'s choice</string>
+    <string name="filters_clear_all">Clear All</string>
+    <string name="filters_apply_format">Apply (%1$d)</string>
+
+    <!-- I3 — Search filters (docs/features.md Phase I): cuisine, price,
+         rating, nearby. Reuses filters_clear_all / filters_apply_format
+         above for the sticky footer. -->
+    <string name="search_filters_pill_label">Filters</string>
+    <string name="search_filters_sheet_title">Filter Results</string>
+    <string name="search_filters_cuisine_heading">Cuisine</string>
+    <string name="search_filters_price_heading">Price</string>
+    <string name="search_filters_rating_heading">Rating</string>
+    <string name="search_filters_nearby_heading">Distance</string>
+    <string name="search_filters_price_under_200">Under ₹200</string>
+    <string name="search_filters_price_200_400">₹200 – ₹400</string>
+    <string name="search_filters_price_400_600">₹400 – ₹600</string>
+    <string name="search_filters_price_above_600">Above ₹600</string>
+    <string name="search_filters_rating_4_0">4.0+</string>
+    <string name="search_filters_rating_4_3">4.3+</string>
+    <string name="search_filters_rating_4_5">4.5+</string>
+    <string name="search_filters_nearby_2km">Within 2 km</string>
+    <string name="search_filters_nearby_5km">Within 5 km</string>
+    <string name="search_filters_nearby_10km">Within 10 km</string>
+    <string name="search_filters_nearby_unavailable">Turn on location to filter by distance</string>
+
+    <!-- features.md §6 — Restaurant detail header parity pass -->
+    <string name="detail_pure_veg_badge">Pure Veg</string>
+    <string name="detail_distance_format">%1$s km · %2$s</string>
+    <string name="detail_eta_format">%1$d mins · Schedule for later</string>
+    <string name="detail_offers_count_format">%1$d offer%2$s</string>
+    <string name="offers_sheet_title">Offers for you</string>
+
+    <!-- I4 — "Schedule for later" slot picker sheet, same-day only. -->
+    <string name="schedule_sheet_title">Schedule for later</string>
+    <string name="schedule_sheet_subtitle">Today, pick a time you\'d like this delivered by</string>
+    <string name="schedule_deliver_now">Deliver Now</string>
+    <string name="schedule_no_slots_today">This restaurant has no more delivery slots open for today</string>
+    <string name="detail_eta_scheduled_format">Today, %1$s</string>
+    <!-- I4 — one generic message covering all four scheduled_time_* 422
+         codes from orders/create.php (not_today / too_soon /
+         outside_open_hours / invalid), same call CheckoutActivity already
+         makes for other Place Order failures rather than a message per code. -->
+    <string name="schedule_time_unavailable">That delivery time isn\'t available anymore. Pick another.</string>
+
+    <!-- Native UPI Payment Gateway (doc 23, 2026-08-23) -->
+    <string name="upi_payment_title">Scan &amp; pay to confirm your order</string>
+    <string name="upi_test_mode_banner">TEST MODE — this is not a real payment</string>
+    <string name="upi_qr_content_description">UPI payment QR code</string>
+    <string name="upi_instructions_title">How to pay</string>
+    <string name="upi_status_checking">Checking payment status…</string>
+    <string name="upi_status_utr_pending_window">You can also enter your UTR in %1$d sec if this doesn\'t confirm automatically</string>
+    <string name="upi_status_utr_available">Already paid but not confirmed yet? Enter your UTR below.</string>
+    <string name="upi_status_utr_submitted">Thanks — your payment is being verified. This can take a little while.</string>
+    <string name="upi_status_success">Payment confirmed!</string>
+    <string name="upi_status_failed">This payment couldn\'t be confirmed.</string>
+    <string name="upi_status_failed_with_reason">This payment couldn\'t be confirmed: %1$s</string>
+    <string name="upi_status_expired">This QR has expired.</string>
+    <string name="upi_status_too_many_attempts">Too many UTR attempts on this order. Please contact support.</string>
+    <string name="upi_utr_hint">Already paid? Enter the 12-digit UTR / UPI reference number from your payment app so we can verify it manually.</string>
+    <string name="upi_utr_input_hint">12-digit UTR</string>
+    <string name="upi_submit_utr">Submit UTR</string>
+    <string name="upi_switch_to_cod">Cancel and pay by Cash on Delivery instead</string>
+    <string name="upi_expiry_format">QR expires in %1$s</string>
+    <string name="upi_qr_generation_failed">Couldn\'t generate the payment QR. Please try again.</string>
+    <string name="upi_utr_invalid">Enter a valid 12-digit UTR</string>
+    <string name="upi_unavailable">Online payment isn\'t available right now — please choose Cash on Delivery.</string>
+    <!-- Real switch-to-COD flow (payment-switch-cod.php) -->
+    <string name="upi_switch_to_cod_confirm_title">Switch to Cash on Delivery?</string>
+    <string name="upi_switch_to_cod_confirm_message">You\'ll pay the delivery rider in cash instead of by UPI. This can\'t be undone from here.</string>
+    <string name="upi_switch_to_cod_confirm_yes">Switch to COD</string>
+    <string name="upi_switch_to_cod_confirm_no">Keep UPI</string>
+    <string name="upi_switch_to_cod_success">Switched to Cash on Delivery.</string>
+    <string name="upi_switch_to_cod_not_eligible">Cash on Delivery isn\'t available for this order: %1$s</string>
+    <string name="upi_switch_to_cod_failed">Couldn\'t switch to Cash on Delivery. Please try again.</string>
+
+</resources>

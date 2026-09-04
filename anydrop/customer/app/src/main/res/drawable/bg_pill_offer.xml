@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Offer-tag pill background, menu item cards (app owner feedback,
+     2026-08-24). Same shape/radius as bg_pill_highly_reordered, paired
+     with offer_bg/offer_fg instead of success_bg/success_fg. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/offer_bg" />
+    <corners android:radius="20dp" />
+</shape>

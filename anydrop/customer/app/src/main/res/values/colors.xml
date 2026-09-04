@@ -1,0 +1,53 @@
+<resources>
+    <!-- Brand -->
+    <color name="anydrop_primary">#E64A19</color>
+    <color name="anydrop_primary_dark">#B23C14</color>
+    <color name="anydrop_primary_container">#FFE0D3</color>
+    <color name="anydrop_secondary">#2E7D32</color>
+
+    <!-- Surfaces -->
+    <color name="background">#FAFAFA</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="outline">#E0E0E0</color>
+
+    <!-- Filter chip borders (Home) — every chip gets a visible 1dp border,
+         selected and unselected alike, instead of only unselected chips
+         having one. Darker than @color/outline so it reads clearly on the
+         white chip surface; the selected variant matches the brand color
+         so the active chip still stands out without losing its border. -->
+    <color name="chip_border_unselected">#D6D6D6</color>
+    <color name="chip_border_selected">#E64A19</color>
+
+    <!-- Text -->
+    <color name="text_primary">#1A1A1A</color>
+    <color name="text_secondary">#6E6E6E</color>
+    <color name="white">#FFFFFF</color>
+
+    <!-- Semantic -->
+    <color name="veg_green">#2E7D32</color>
+    <color name="nonveg_red">#C62828</color>
+    <color name="rating_gold">#F5A623</color>
+
+    <color name="success_bg">#E7F6E9</color>
+    <color name="success_fg">#1E7B34</color>
+    <color name="error_bg">#FDE9E7</color>
+    <color name="error_fg">#C62828</color>
+    <color name="info_bg">#E8EEFB</color>
+    <color name="info_fg">#2955A8</color>
+    <color name="offer_fg">#B23C14</color>
+    <!-- Pairs with offer_fg above for the new item-card offer-tag pill
+         (app owner feedback, 2026-08-24) — same light-tint-of-the-fg
+         pattern success_bg/error_bg already establish. -->
+    <color name="offer_bg">#FBE7E0</color>
+    <!-- Part B follow-up — "Temporarily unavailable" restaurant-card status,
+         same amber semantic as the Restaurant App's own pending/paused
+         chips: distinct from error_fg's "Closed" red since a paused
+         restaurant could resume any minute. -->
+    <color name="paused_fg">#E65100</color>
+
+    <!-- Soft tinted fill for the login/OTP input boxes -->
+    <color name="anydrop_input_fill">#FBF1EC</color>
+    <!-- Stroke/hint color for the login/OTP input boxes -->
+    <color name="anydrop_input_stroke">#D9A78C</color>
+    <color name="anydrop_launcher_bg">#00000000</color>
+</resources>

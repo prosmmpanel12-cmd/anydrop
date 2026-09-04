@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Inverted variant of switch_track_color.xml — for the one switch in
+     this app where checked=true means a "negative" state, not a
+     positive one: AccountFragment's switchTempClosed (checked = "yes,
+     temporarily closed", per AccountFragment.kt's
+     `profile.operationalStatus == "temp_closed"` check). Checked=red,
+     unchecked=green — same two tokens, direction reversed so the color
+     still means the same real-world thing (red = not accepting orders)
+     regardless of which state the switch's boolean happens to be. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/nonveg_red" android:state_checked="true" />
+    <item android:color="@color/veg_green" />
+</selector>

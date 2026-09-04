@@ -1,0 +1,62 @@
+<resources>
+    <!-- Brand — switched 2026-08-31 to a monochrome black &amp; white
+         theme, matching the app owner's new UI kit reference (black
+         primary, white/light-grey surfaces, black text). Replaces the
+         orange+white brand restored on 2026-08-16 — this is a deliberate
+         follow-up change per the app owner's explicit new instruction, not
+         a reversion of that earlier call. -->
+    <color name="anydrop_primary">#000000</color>
+    <color name="anydrop_primary_dark">#000000</color>
+    <color name="anydrop_primary_container">#EAEAEA</color>
+    <color name="anydrop_secondary">#000000</color>
+
+    <!-- Surfaces -->
+    <color name="background">#F5F5F5</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="outline">#EAEAEA</color>
+
+    <!-- Text -->
+    <color name="text_primary">#000000</color>
+    <color name="text_secondary">#6E6E6E</color>
+    <color name="white">#FFFFFF</color>
+
+    <!-- Semantic -->
+    <color name="veg_green">#2E7D32</color>
+    <color name="nonveg_red">#C62828</color>
+    <color name="rating_gold">#F5A623</color>
+
+    <color name="success_bg">#E7F6E9</color>
+    <color name="success_fg">#1E7B34</color>
+    <color name="error_bg">#FDE9E7</color>
+    <color name="error_fg">#C62828</color>
+    <color name="info_bg">#E8EEFB</color>
+    <color name="info_fg">#2955A8</color>
+
+    <!-- Order status chips -->
+    <color name="status_pending_bg">#FFF3E0</color>
+    <color name="status_pending_fg">#E65100</color>
+    <color name="status_active_bg">#E8EEFB</color>
+    <color name="status_active_fg">#2955A8</color>
+    <color name="status_done_bg">#E7F6E9</color>
+    <color name="status_done_fg">#1E7B34</color>
+    <color name="anydrop_launcher_bg">#0B0B0B</color>
+
+    <!-- Loading states (docs/restorent/19, §9.4) -->
+    <color name="skeleton_base">#E8E8E8</color>
+    <color name="skeleton_shimmer_highlight">#F5F5F5</color>
+
+    <!-- Orders tab redesign (docs/restorent/19, §8) -->
+    <color name="warning_amber">#F9A825</color>
+    <color name="warning_amber_bg">#FFF3D6</color>
+    <color name="stat_chip_bg">#F2F2F2</color>
+
+    <!-- Toggle redesign (2026-08-19, app-owner reference image) — neutral
+         "off" pill color for switch_track_pill.xml. Replaces the old
+         green/red on/off scheme; every switch in the app is now orange
+         (ON) / this grey (OFF) instead. -->
+    <color name="switch_track_off">#BDBDBD</color>
+    <!-- Thumb stays white now that the ON track itself is solid black
+         (2026-08-31 monochrome change) — a black knob on a black track
+         would be invisible. -->
+    <color name="switch_thumb_color">#FFFFFF</color>
+</resources>

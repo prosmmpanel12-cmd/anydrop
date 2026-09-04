@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "Jump to category" list icon for the Restaurant Detail floating Menu
+     button (Phase E, §2.5) — a bulleted-list glyph, distinct from the
+     hamburger-drawer icon so it doesn't imply a nav drawer. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M4,6.75c-0.69,0 -1.25,0.56 -1.25,1.25s0.56,1.25 1.25,1.25 1.25,-0.56 1.25,-1.25S4.69,6.75 4,6.75zM4,11.75c-0.69,0 -1.25,0.56 -1.25,1.25s0.56,1.25 1.25,1.25 1.25,-0.56 1.25,-1.25S4.69,11.75 4,11.75zM4,16.75c-0.69,0 -1.25,0.56 -1.25,1.25s0.56,1.25 1.25,1.25 1.25,-0.56 1.25,-1.25S4.69,16.75 4,16.75zM7.5,7h13v1.5h-13V7zM7.5,12h13v1.5h-13V12zM7.5,17h13v1.5h-13V17z" />
+</vector>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Fix for the "Apply button text not visible" bug reported 2026-08-09:
+  MaterialButton's default disabled-state background was resolving to
+  something close to the text color, making "Apply (0)" unreadable when
+  isEnabled=false. This state list makes disabled explicitly grey (clearly
+  "can't tap this") while android:textColor="@color/white" (set on the
+  button in fragment_menu_filters.xml) stays constant across both states.
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_enabled="false" android:color="@color/text_secondary" />
+    <item android:color="@color/anydrop_primary" />
+</selector>

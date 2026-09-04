@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background">
+
+    <!-- Shared top bar (docs/restorent/19 §3): restaurant name + big
+         OPEN/CLOSED pill, pinned above the bottom nav on every tab.
+         Moved here from OrdersFragment as part of the Orders tab
+         redesign (§10 item 3) — was a small SwitchMaterial inside
+         OrdersFragment's own top section before this.
+
+         Reverted 2026-08-16 (§8.1.1) back to plain white (@color/surface)
+         with @color/text_primary text — app owner preferred the original
+         orange+white look to the ink-chrome refresh after real-device
+         testing. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/surface"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="14dp"
+        android:elevation="2dp">
+
+        <TextView
+            android:id="@+id/restaurantNameText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <!-- Notification bell (Type 1, docs/Status.md 2026-08-20) — Customer
+             App's Home top bar has the equivalent bell+badge FrameLayout;
+             mirrored here between the restaurant name and the OPEN/CLOSED
+             switch, the only shared top bar this app has across all four
+             tabs (see class kdoc above re: why the switch also lives here). -->
+        <FrameLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="10dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:padding="6dp">
+
+            <ImageView
+                android:id="@+id/btnNotifications"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:padding="2dp"
+                android:src="@drawable/ic_notification"
+                app:tint="@color/text_primary" />
+
+            <TextView
+                android:id="@+id/notificationBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|end"
+                android:minWidth="17dp"
+                android:minHeight="17dp"
+                android:gravity="center"
+                android:paddingHorizontal="3dp"
+                android:background="@drawable/bg_notification_badge"
+                android:text="0"
+                android:textColor="@color/surface"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                tools:visibility="visible" />
+
+        </FrameLayout>
+
+        <!-- Toggle-standardization pass (2026-08-19, supersedes Phase 4's
+             MaterialButtonToggleGroup version): app owner asked for one
+             consistent classic slide-switch style everywhere, matching a
+             green-ON/red-OFF reference image, instead of mixing this
+             segmented pill toggle with the several plain SwitchMaterials
+             already elsewhere in the app. Label text carries the
+             OPEN/CLOSED wording (a bare switch has no text of its own);
+             switch_track_color.xml drives the green/red per checked
+             state, shared with every other on/off switch in the app now. -->
+        <TextView
+            android:id="@+id/statusLabelText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:textStyle="bold"
+            android:textSize="13sp" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/statusSwitch"
+            style="@style/Widget.AnydropRestaurant.Switch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/navHostContainer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- Reverted 2026-08-16 (§8.1.1) back to plain white (@color/surface)
+         background, matching the top bar's revert above. -->
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/surface"
+        app:itemIconTint="@color/bottom_nav_item_color"
+        app:itemTextColor="@color/bottom_nav_item_color"
+        app:menu="@menu/bottom_nav_menu" />
+
+</LinearLayout>

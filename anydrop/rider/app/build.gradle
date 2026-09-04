@@ -1,0 +1,88 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'kotlin-parcelize'
+}
+
+android {
+    namespace 'com.anydrop.rider'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.anydrop.rider"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "0.1-phase1"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        debug {
+            // Shared, repo-committed debug keystore (see /keystore at
+            // repo root) so every CI run — and every dev machine — signs
+            // debug builds with the SAME key. Without this, each fresh
+            // GitHub Actions runner auto-generates its own throwaway
+            // ~/.android/debug.keystore, so every CI build has a
+            // different signature and Android refuses to install over
+            // the previous one ("App not installed" / forces an
+            // uninstall first). This is a debug-only key — not sensitive,
+            // fine to commit (same convention as Android's own default
+            // debug keystore password).
+            storeFile rootProject.file('../keystore/anydrop-debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    buildFeatures {
+        viewBinding true
+        buildConfig true
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0'
+    implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.7.0'
+
+    // Networking — same Phase 1 PHP/MySQL backend the customer/restaurant apps use
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+
+    // GPS auto-detect for the service-area picker on signup (Phase 1 scope,
+    // doc 79 — "live location fetch AND dropdown, both")
+    implementation 'com.google.android.gms:play-services-location:21.2.0'
+
+    // Document upload (vehicle doc / ID doc) and Google Maps SDK for live
+    // tracking are intentionally NOT added yet — those belong to the
+    // post-approval "Complete Profile" step and Phase 2's delivery flow
+    // respectively, neither of which is in scope for this signup/login pass.
+}

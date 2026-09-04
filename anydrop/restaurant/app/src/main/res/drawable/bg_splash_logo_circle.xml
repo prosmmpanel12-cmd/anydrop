@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 2026-08-31: the new ANYDROP logo PNG (mipmap/ic_launcher*) has a
+     black rounded-square background baked into the image itself. Now
+     that the splash screen and login/signup hero headers are also solid
+     black (monochrome theme), the logo was rendering almost invisible —
+     black-on-black. This white rounded-rectangle sits behind the logo on
+     those screens so it has contrast again.
+     Changed oval -> rounded rectangle (2026-08-31, follow-up) so the
+     backdrop shape matches the logo's own rounded-square artwork instead
+     of showing a mismatched circle behind a square-ish logo.
+     Changed solid fill -> thin 0.5dp outline only (2026-08-31, follow-up 2)
+     per feedback that the solid white block behind the logo looked too
+     heavy/boxy — a thin stroke now just outlines the badge instead of
+     filling it. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
+    <stroke
+        android:width="0.5dp"
+        android:color="@color/white" />
+    <corners android:radius="22dp" />
+</shape>

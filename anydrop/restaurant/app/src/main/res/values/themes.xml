@@ -1,0 +1,286 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Parent switched from Theme.Material3.DayNight.NoActionBar to the
+         plain (non-DayNight) Light variant — 2026-08-19 dialog-fix pass.
+         Root cause of the "dialogs look broken/invisible" reports (doc 22
+         item 2 fallout, but worse than just "dated styling"): this theme
+         only ever defined LIGHT colors in colors.xml (no values-night/
+         colors.xml exists), but left colorSurface, colorSurfaceVariant,
+         colorOnPrimary-ish container colors, etc. unset — so those fell
+         back to Material3's *built-in* day/night defaults, which DO
+         switch with the system setting. On a phone with system dark mode
+         on, that produced a dark colorSurface (used by every
+         MaterialAlertDialogBuilder dialog, MaterialDatePicker, bottom
+         sheet, etc.) combined with colorOnSurface hardcoded to
+         @color/text_primary (near-black) — dark text on a dark surface,
+         i.e. exactly the "title text I can't read" / "whole dialog looks
+         wrong" screenshots. The rest of the app didn't show this because
+         android:windowBackground is set explicitly to a light color that
+         doesn't have a night-mode counterpart, so activities stayed
+         light; only theme-default-driven surfaces (dialogs, date/time
+         pickers, bottom sheets) flipped dark. Forcing the non-DayNight
+         Light parent (plus colorSurface/colorSurfaceVariant explicitly
+         set below and forceDarkAllowed=false) makes every Material
+         component resolve the same light colors this app actually
+         designs for, regardless of the device's system dark-mode
+         setting, instead of silently diverging. -->
+    <style name="Theme.AnydropRestaurant" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/anydrop_primary</item>
+        <item name="colorPrimaryVariant">@color/anydrop_primary_dark</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorPrimaryContainer">@color/anydrop_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/anydrop_primary_dark</item>
+        <item name="colorSecondary">@color/anydrop_secondary</item>
+        <!-- 2026-08-31: BottomNavigationView's selected-item pill indicator
+             (Material3's itemActiveIndicatorStyle) draws in
+             colorSecondaryContainer by default. Left unset, that resolved
+             to Material3's own default — a light purple/lavender — which
+             clashed badly with the monochrome black/white kit (visible
+             behind the Insights tab icon). Pinning it to a neutral light
+             grey keeps the pill but makes it match the rest of the app. -->
+        <item name="colorSecondaryContainer">@color/anydrop_primary_container</item>
+        <item name="colorOnSecondaryContainer">@color/text_primary</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorSurfaceVariant">@color/background</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+        <item name="colorOutline">@color/outline</item>
+        <!-- 2026-08-31 monochrome pass: most ic_*.xml vectors tint
+             themselves via android:tint="?attr/colorControlNormal" rather
+             than a fixed fillColor. Left unset, Material3 resolves that to
+             its own default (a mid-grey), which reads muddy against the
+             new pure black/white kit. Pinning it to text_primary makes
+             every one of those icons solid black, matching the kit's
+             icon set without touching 100+ individual vector files. -->
+        <item name="colorControlNormal">@color/text_primary</item>
+        <item name="android:windowBackground">@color/background</item>
+        <!-- 2026-08-31 monochrome change: the top bar itself is
+             @color/surface (white), not colorPrimary — a solid black
+             status bar would clash with it, so this now matches the
+             surface color with dark (light-status-bar) icons instead. -->
+        <item name="android:statusBarColor">@color/surface</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <!-- Stops Android 10+'s OS-level "force dark" auto-inversion from
+             re-darkening any view this theme didn't already handle —
+             belt-and-suspenders alongside the Light (non-DayNight) parent
+             above, since forceDark works off heuristics per-view and can
+             still kick in on OEM skins that default it on. -->
+        <item name="android:forceDarkAllowed" tools:targetApi="29">false</item>
+        <!-- Every MaterialAlertDialogBuilder / AlertDialog.Builder dialog
+             in the app now resolves through this themed, rounded-card
+             style instead of the plain system dialog chrome (doc 22 item
+             2's ask) — see ThemeOverlay.AnydropRestaurant.AlertDialog
+             below. -->
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.AnydropRestaurant.AlertDialog</item>
+        <item name="alertDialogTheme">@style/ThemeOverlay.AnydropRestaurant.AlertDialog</item>
+        <!-- Brand-colored MaterialDatePicker (CouponManagerActivity's
+             valid_until picker, doc 22 item 5) instead of Material's
+             default blue/dynamic-color calendar. -->
+        <item name="materialCalendarTheme">@style/ThemeOverlay.AnydropRestaurant.DatePicker</item>
+        <item name="materialCalendarStyle">@style/Widget.AnydropRestaurant.CalendarStyle</item>
+        <!-- MaterialTimePicker chains right after the date picker in
+             CouponManagerActivity.setUpValidUntilPicker() — same
+             dark-surface bug would otherwise hit it too. NOTE: this must
+             be its own overlay (parented off Material3.MaterialTimePicker),
+             not a reuse of ThemeOverlay.AnydropRestaurant.DatePicker —
+             that one is parented off Material3.MaterialCalendar, which
+             doesn't define the theme attrs TimePickerView's own layout
+             needs, and crashes on inflate ("must supply a layout_height
+             attribute") when reused here. -->
+        <item name="materialTimePickerTheme">@style/ThemeOverlay.AnydropRestaurant.TimePicker</item>
+        <!-- Default style for every plain SwitchCompat/SwitchMaterial in
+             the app (belt-and-suspenders alongside the explicit
+             style="@style/Widget.AnydropRestaurant.Switch" on each
+             layout usage below) — see that style's own comment. -->
+        <item name="switchStyle">@style/Widget.AnydropRestaurant.Switch</item>
+        <!-- 2026-08-31 monochrome pass: every plain MaterialButton in the
+             app (dialog_confirm_delete, dialog_logout_confirm, etc. — the
+             ones that don't already use @drawable/bg_button_primary's own
+             12dp radius) previously fell back to Material3's default
+             near-pill corner radius, which reads rounder than the kit's
+             buttons. This pins the same 12dp radius app-wide via the
+             shape system instead of touching every dialog layout. -->
+        <item name="shapeAppearanceCornerExtraSmall">@style/ShapeAppearance.AnydropRestaurant.Button</item>
+        <item name="materialButtonStyle">@style/Widget.AnydropRestaurant.Button</item>
+        <!-- 2026-08-31 cards/chips/badges polish pass: several cards in
+             the app (item_order_card, item_review, item_staff, etc.)
+             already used their own mix of elevation/stroke values (1dp,
+             2dp, 6dp shadow, or 0dp+outline). The kit's cards read flat —
+             a thin light-grey border, no drop shadow. Rather than hand-
+             edit every layout, this sets that as the *default* style for
+             any MaterialCardView that doesn't already declare its own
+             cardElevation/strokeColor — those keep their explicit values
+             unchanged (XML attrs win over a style default), this only
+             fills in the ones that were relying on Material3's own
+             default (a visible drop shadow that doesn't match the kit). -->
+        <item name="materialCardViewStyle">@style/Widget.AnydropRestaurant.Card</item>
+    </style>
+
+    <style name="Widget.AnydropRestaurant.Card" parent="Widget.Material3.CardView.Filled">
+        <item name="cardElevation">0dp</item>
+        <item name="cardCornerRadius">14dp</item>
+        <item name="strokeColor">@color/outline</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="cardBackgroundColor">@color/surface</item>
+    </style>
+
+    <style name="ShapeAppearance.AnydropRestaurant.Button" parent="ShapeAppearance.Material3.Corner.Full">
+        <item name="cornerSize">12dp</item>
+    </style>
+
+    <style name="Widget.AnydropRestaurant.Button" parent="Widget.Material3.Button">
+        <item name="shapeAppearance">@style/ShapeAppearance.AnydropRestaurant.Button</item>
+    </style>
+
+    <!-- Shared rounded-card look for every AlertDialog/MaterialAlertDialog
+         in the app (dialog_add_category, category icon picker,
+         dialog_add_coupon, the "Stop accepting orders?" confirm, etc.) —
+         fixes both the "looks like a plain 2012 system dialog" feedback
+         (doc 22 item 2) and the dark-surface/dark-text contrast bug this
+         theme change resolves above. Explicitly pins colorSurface/
+         colorOnSurface/colorPrimary rather than relying on inheritance,
+         so this dialog theme is correct even if it's ever launched from a
+         context whose own theme resolution differs. -->
+    <style name="ThemeOverlay.AnydropRestaurant.AlertDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+        <item name="colorPrimary">@color/anydrop_primary</item>
+        <item name="colorOutline">@color/outline</item>
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearance.AnydropRestaurant.Dialog</item>
+        <item name="materialAlertDialogTitleTextStyle">@style/TextAppearance.AnydropRestaurant.DialogTitle</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.AnydropRestaurant.Dialog.Button</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Widget.AnydropRestaurant.Dialog.Button</item>
+        <item name="buttonBarNeutralButtonStyle">@style/Widget.AnydropRestaurant.Dialog.Button</item>
+    </style>
+
+    <style name="ShapeAppearance.AnydropRestaurant.Dialog" parent="ShapeAppearance.Material3.MediumComponent">
+        <item name="cornerSize">16dp</item>
+    </style>
+
+    <style name="TextAppearance.AnydropRestaurant.DialogTitle" parent="MaterialAlertDialog.Material3.Title.Text">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="Widget.AnydropRestaurant.Dialog.Button" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/anydrop_primary</item>
+    </style>
+
+    <!-- App-wide switch style (2026-08-19 toggle redesign, app-owner
+         reference image — a fully-filled rounded pill with a big white
+         knob, orange when ON / grey when OFF, replacing both the old
+         thin-line Material switch and the earlier green/red color
+         scheme). Custom track+thumb drawables carry the actual look
+         (see switch_track_pill.xml / switch_thumb_pill.xml); trackTint/
+         thumbTint are explicitly cleared here since a tint on top of an
+         already fully-colored custom drawable would just wash it out.
+         Applied via style="@style/Widget.AnydropRestaurant.Switch" on
+         every SwitchMaterial in the app (statusSwitch, switchActive,
+         switchAvailable, switchIsVeg, switchPublic, switchTempClosed) —
+         one shared style so all of them move together if this look ever
+         changes again, instead of six separate copy-pasted attribute
+         sets.
+
+         `android:thumb` — SwitchCompat/SwitchMaterial reuses the
+         *framework* `android:thumb` attribute directly rather than
+         declaring a library attr of its own (that's exactly why the
+         unprefixed `thumb` item name failed to resolve at all: there IS
+         no androidx/material `attr/thumb`, only the framework one). Its
+         *track*, on the other hand, genuinely is the library's own
+         custom attr — `track` (no `android:` prefix) is correct there,
+         unlike thumb. Mixing this up (or prefixing both, or neither) is
+         exactly what broke the real Gradle build the first time this
+         was compiled (`aapt2` error, values.xml:7486 — "style attribute
+         'attr/thumb' not found"), caught from the build log rather than
+         by hand-inspection like everything else in this session. -->
+    <style name="Widget.AnydropRestaurant.Switch" parent="Widget.MaterialComponents.CompoundButton.Switch">
+        <item name="track">@drawable/switch_track_pill</item>
+        <item name="android:thumb">@drawable/switch_thumb_pill</item>
+        <item name="trackTint">@null</item>
+        <item name="thumbTint">@null</item>
+        <item name="showText">false</item>
+    </style>
+
+    <!-- MaterialDatePicker theming (doc 22 item 5) — brand orange header/
+         selected-day instead of the Material default, and forces the
+         same light colorSurface as the rest of the app so the calendar
+         doesn't go dark-on-dark like the plain AlertDialogs did. -->
+    <style name="ThemeOverlay.AnydropRestaurant.DatePicker" parent="ThemeOverlay.Material3.MaterialCalendar">
+        <item name="colorPrimary">@color/anydrop_primary</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+    </style>
+
+    <!-- Same brand colors as ThemeOverlay.AnydropRestaurant.DatePicker
+         above, but parented off the MaterialTimePicker theme chain
+         instead of MaterialCalendar's — MaterialTimePicker's own
+         TimePickerView layout needs attrs that only this parent defines;
+         see materialTimePickerTheme's comment in this file's root theme. -->
+    <style name="ThemeOverlay.AnydropRestaurant.TimePicker" parent="ThemeOverlay.Material3.MaterialTimePicker">
+        <item name="colorPrimary">@color/anydrop_primary</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+    </style>
+
+    <style name="Widget.AnydropRestaurant.CalendarStyle" parent="Widget.Material3.MaterialCalendar">
+        <item name="android:windowFullscreen">false</item>
+    </style>
+
+    <!-- Pill-shaped ON/OFF toggle (doc 22 item 4, app-owner ask
+         2026-08-18: "make the toggle attractive, your call on style").
+         Used as the two children of a MaterialButtonToggleGroup (single
+         selection) — item_coupon_manage_row.xml's is_active toggle and
+         dialog_add_coupon.xml's is_public toggle both reuse this same
+         style so the whole coupon screen has one consistent toggle
+         language rather than a different control per flag. Selected/
+         unselected coloring comes from MaterialButtonToggleGroup's own
+         checked-state handling against colorPrimary — no manual
+         state-list drawable needed. -->
+    <style name="ToggleButton.Pill" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="cornerRadius">20dp</item>
+        <item name="strokeColor">@color/anydrop_primary</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">36dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="iconPadding">4dp</item>
+        <item name="iconSize">16dp</item>
+    </style>
+
+    <!-- ToggleButton.Pill.StatusOpen/StatusClosed (Phase 4, top-bar
+         segmented toggle) removed 2026-08-19: superseded by the
+         toggle-standardization pass — the top-bar status control is a
+         plain SwitchMaterial now (activity_main.xml's statusSwitch),
+         styled via switch_track_color.xml like every other on/off switch
+         in the app, not a bespoke segmented-button style. -->
+
+    <!-- Single-digit OTP input box (ui/signup/OtpVerifyActivity) — six of these
+         in a row, auto-advancing on input, same visual language as
+         bg_card_rounded used everywhere else in this app for input fields. -->
+    <style name="OtpDigitBox">
+        <item name="android:layout_width">44dp</item>
+        <item name="android:layout_height">52dp</item>
+        <item name="android:layout_marginStart">4dp</item>
+        <item name="android:layout_marginEnd">4dp</item>
+        <item name="android:background">@drawable/bg_card_rounded</item>
+        <item name="android:gravity">center</item>
+        <item name="android:inputType">number</item>
+        <item name="android:maxLength">1</item>
+        <item name="android:textSize">22sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:cursorVisible">true</item>
+        <item name="android:imeOptions">actionNext</item>
+    </style>
+</resources>

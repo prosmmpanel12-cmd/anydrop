@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OTP-box wrong-code feedback — small horizontal shake, cheaper and
+     less intrusive than a dialog for a "try again" moment. -->
+<translate xmlns:android="http://schemas.android.com/anim/res/android"
+    android:fromXDelta="-8dp"
+    android:toXDelta="8dp"
+    android:duration="60"
+    android:repeatCount="4"
+    android:repeatMode="reverse"
+    android:interpolator="@android:anim/linear_interpolator" />

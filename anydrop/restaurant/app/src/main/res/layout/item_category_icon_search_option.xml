@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One cell in CategoryIconSearchAdapter's grid (part of
+     dialog_category_icon_picker.xml's "Search icons" tab). No label
+     (unlike item_category_icon_option.xml's bundled-set cells) — Iconify
+     result ids like "mdi:pizza-slice-outline" aren't reliably nice
+     display text, so this tab leans on the visual alone plus the search
+     query the restaurant just typed. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="6dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground">
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/iconSearchCard"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        app:cardCornerRadius="14dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="@color/stat_chip_bg"
+        app:strokeColor="@color/outline"
+        app:strokeWidth="1dp">
+
+        <ImageView
+            android:id="@+id/iconSearchImage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="14dp"
+            android:contentDescription="@null" />
+
+    </com.google.android.material.card.MaterialCardView>
+
+</FrameLayout>

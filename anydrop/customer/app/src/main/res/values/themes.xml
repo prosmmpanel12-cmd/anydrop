@@ -1,0 +1,40 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Parent is forced to Light (not DayNight). We only ship light colors
+         (colors.xml has no values-night variants), but DayNight was letting
+         Material3 components (like TextInputEditText) pick up automatic
+         *dark-mode* text/surface colors on a phone with system dark mode on
+         — e.g. near-white input text — while our backgrounds stayed light,
+         making typed text invisible. Locking to Light fixes that everywhere. -->
+    <style name="Theme.AnydropCustomer" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/anydrop_primary</item>
+        <item name="colorPrimaryVariant">@color/anydrop_primary_dark</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/anydrop_secondary</item>
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:statusBarColor">@color/anydrop_primary</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+    </style>
+
+    <style name="Theme.AnydropCustomer.Splash" parent="Theme.AnydropCustomer">
+        <item name="android:windowBackground">#0B0B0B</item>
+        <item name="android:statusBarColor">#0B0B0B</item>
+    </style>
+
+    <!-- Attractive, rounded input fields with clearly visible dark text,
+         a soft tinted fill, and a brand-colored border that lights up
+         while focused. -->
+    <style name="Widget.Anydrop.TextInputLayout" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxCornerRadiusTopStart">16dp</item>
+        <item name="boxCornerRadiusTopEnd">16dp</item>
+        <item name="boxCornerRadiusBottomStart">16dp</item>
+        <item name="boxCornerRadiusBottomEnd">16dp</item>
+        <item name="boxStrokeWidth">1.5dp</item>
+        <item name="boxStrokeWidthFocused">2.5dp</item>
+        <item name="boxBackgroundColor">@color/anydrop_input_fill</item>
+        <item name="boxStrokeColor">@color/anydrop_input_stroke</item>
+        <item name="hintTextColor">@color/anydrop_input_stroke</item>
+        <item name="android:textColorHint">@color/text_secondary</item>
+        <item name="cursorColor">@color/anydrop_primary</item>
+    </style>
+</resources>

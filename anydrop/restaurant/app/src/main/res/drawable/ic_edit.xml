@@ -1,0 +1,16 @@
+<!-- Phase 2 (UI/UX overhaul, 2026-08-19) — replaces the "✏️" emoji glyph
+     used as row-action button text in item_menu_category.xml and
+     item_menu_food.xml. Standard pencil-in-square edit icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?attr/colorControlNormal">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M17.66,3.34 C18.05,2.95 18.68,2.95 19.07,3.34 L20.66,4.93 C21.05,5.32 21.05,5.95 20.66,6.34 L11.5,15.5 L7.5,16.5 L8.5,12.5 L17.66,3.34 Z M16.96,5.46 L9.68,12.74 L9.24,14.5 L11,14.06 L18.28,6.78 L16.96,5.46 Z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M4.5,6 C4.22,6 4,6.22 4,6.5 L4,19.5 C4,19.78 4.22,20 4.5,20 L17.5,20 C17.78,20 18,19.78 18,19.5 L18,12.6 C18,12.19 18.34,11.85 18.75,11.85 C19.16,11.85 19.5,12.19 19.5,12.6 L19.5,19.5 C19.5,20.6 18.6,21.5 17.5,21.5 L4.5,21.5 C3.4,21.5 2.5,20.6 2.5,19.5 L2.5,6.5 C2.5,5.4 3.4,4.5 4.5,4.5 L11.4,4.5 C11.81,4.5 12.15,4.84 12.15,5.25 C12.15,5.66 11.81,6 11.4,6 L4.5,6 Z" />
+</vector>

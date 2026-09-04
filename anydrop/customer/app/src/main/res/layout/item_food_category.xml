@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="72dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:paddingHorizontal="6dp"
+    android:background="?attr/selectableItemBackgroundBorderless">
+
+    <FrameLayout
+        android:layout_width="56dp"
+        android:layout_height="56dp">
+
+        <!-- MaterialCardView (not the plain CardView this used to be) so a
+             colored stroke can ring the icon when its category is selected —
+             the "achha sa chooser" ask: selection is now shown as a highlighted
+             border + tinted background, not just the label's text color. -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/categoryCard"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            app:cardCornerRadius="28dp"
+            app:cardElevation="1dp"
+            app:cardBackgroundColor="@color/surface"
+            app:strokeWidth="0dp"
+            app:strokeColor="@color/anydrop_primary">
+
+            <ImageView
+                android:id="@+id/categoryIcon"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="10dp"
+                android:scaleType="centerInside"
+                tools:src="@drawable/ic_restaurant" />
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Remove/undo badge — only visible on the currently-selected
+             category, tapping it clears the category filter back to "All". -->
+        <ImageView
+            android:id="@+id/categoryRemoveBadge"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_gravity="top|end"
+            android:background="@drawable/bg_bookmark_circle"
+            android:padding="4dp"
+            android:src="@drawable/ic_close"
+            android:contentDescription="@string/clear_category_filter"
+            app:tint="@color/anydrop_primary"
+            android:visibility="gone" />
+
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/categoryName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textSize="12sp"
+        android:textColor="@color/text_primary"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:gravity="center"
+        tools:text="Pizza" />
+
+</LinearLayout>

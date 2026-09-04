@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reverted 2026-08-16 (§8.1.1) back to flat @color/anydrop_primary
+     (orange) background, matching the app-wide orange+white revert. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/anydrop_primary"
+    android:gravity="center">
+
+    <!-- 2026-08-31 (continued 3): logo grown to fill the backdrop almost
+         edge-to-edge (108dp inside 112dp — just enough margin for the
+         2dp stroke), matching a normal app-icon look (like Amazon's)
+         instead of a small icon floating in a mostly-empty box. -->
+    <FrameLayout
+        android:layout_width="112dp"
+        android:layout_height="112dp"
+        android:background="@drawable/bg_splash_logo_circle">
+
+        <ImageView
+            android:id="@+id/splashLogo"
+            android:layout_width="108dp"
+            android:layout_height="108dp"
+            android:layout_gravity="center"
+            android:src="@mipmap/ic_launcher"
+            android:contentDescription="@string/app_name"
+            android:visibility="invisible" />
+
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/splashTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="18dp"
+        android:text="@string/app_name"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="@color/white"
+        android:visibility="invisible" />
+
+    <TextView
+        android:id="@+id/splashTagline"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/splash_tagline"
+        android:textSize="14sp"
+        android:textColor="@color/anydrop_primary_container"
+        android:visibility="invisible" />
+
+</LinearLayout>

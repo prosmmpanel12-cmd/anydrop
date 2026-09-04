@@ -1,0 +1,529 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="16dp"
+        android:background="@color/surface">
+
+        <ImageView
+            android:id="@+id/btnBack"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_back"
+            app:tint="@color/text_primary" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:text="@string/checkout_title"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- Delivery address -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/delivery_address"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <LinearLayout
+                android:id="@+id/addressGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card_rounded"
+                android:padding="12dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAddAddress"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/btn_add_address"
+                app:icon="@drawable/ic_add"
+                app:iconTint="@color/anydrop_primary"
+                android:textColor="@color/anydrop_primary"
+                app:cornerRadius="10dp" />
+
+            <!-- I4 — "Schedule for later", same-day only. Tapping opens
+                 ScheduleTimeSlotBottomSheet (same sheet the restaurant-detail
+                 ETA row uses); this row lets the customer change or clear
+                 the pick they made there, without going back. -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/schedule_sheet_title"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <LinearLayout
+                android:id="@+id/rowDeliveryTime"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_card_rounded"
+                android:padding="12dp"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_bolt"
+                    app:tint="@color/veg_green" />
+
+                <TextView
+                    android:id="@+id/deliveryTimeText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:textSize="14sp"
+                    android:textColor="@color/text_primary"
+                    tools:text="Deliver Now" />
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_chevron_down"
+                    app:tint="@color/text_secondary" />
+
+            </LinearLayout>
+
+            <!-- Payment method -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/payment_method"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <RadioGroup
+                android:id="@+id/paymentGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="vertical">
+
+                <RadioButton
+                    android:id="@+id/radioCod"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/pay_cod"
+                    android:checked="true"
+                    android:textColor="@color/text_primary" />
+
+                <RadioButton
+                    android:id="@+id/radioUpi"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/pay_upi"
+                    android:textColor="@color/text_primary" />
+
+                <!-- item 26 §D.14 — wallet is hide-when-unavailable, not
+                     disable-with-reason like Cod/Upi above (see §D.13's
+                     payment-methods.php comment: wallet_allowed means "has
+                     a positive balance", not "rail enabled here" — showing
+                     a permanently-disabled "Wallet — no balance" row isn't
+                     useful the way a temporary area restriction is). Starts
+                     gone; CheckoutActivity's applyPaymentMethodRestrictions()
+                     unhides it only when paymentMethods.walletAllowed. -->
+                <RadioButton
+                    android:id="@+id/radioWallet"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/pay_wallet"
+                    android:textColor="@color/text_primary"
+                    android:visibility="gone" />
+            </RadioGroup>
+
+            <!-- Delivery instructions -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/delivery_note_label"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <EditText
+                android:id="@+id/inputInstructions"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:hint="@string/hint_delivery_instructions"
+                android:background="@drawable/bg_card_rounded"
+                android:padding="12dp"
+                android:inputType="textCapSentences" />
+
+            <!-- H5 — "View all offers & coupons" browse entry point, opens
+                 CouponsListBottomSheetFragment. Sits above the coupon code
+                 box since browsing is the more common path than typing a
+                 known code from memory. -->
+            <LinearLayout
+                android:id="@+id/rowViewAllOffers"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_card_rounded"
+                android:padding="12dp"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_offer_tag"
+                    app:tint="@color/offer_fg" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="10dp"
+                    android:text="@string/view_all_offers"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
+                    android:textColor="@color/text_primary" />
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_chevron_down"
+                    android:rotation="-90"
+                    app:tint="@color/text_secondary" />
+
+            </LinearLayout>
+
+            <!-- Coupon (Phase 3.7 gap fix — was on the old single-cart sheet,
+                 moved here since a coupon now applies to one restaurant's
+                 order, not the whole multi-restaurant cart; see
+                 CartManager.kt / docs/Status.md.) -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/lbl_coupon"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <LinearLayout
+                android:id="@+id/couponEntryRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <EditText
+                    android:id="@+id/inputCouponCode"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="@string/hint_coupon_code"
+                    android:background="@drawable/bg_card_rounded"
+                    android:padding="12dp"
+                    android:inputType="textCapCharacters"
+                    android:maxLines="1"
+                    android:imeOptions="actionDone" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnApplyCoupon"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="@string/btn_apply_coupon"
+                    android:textColor="@color/anydrop_primary"
+                    app:cornerRadius="10dp" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/couponAppliedRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_card_rounded"
+                android:backgroundTint="@color/success_bg"
+                android:padding="12dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/couponAppliedText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="13sp"
+                    android:textColor="@color/success_fg"
+                    tools:text="SAVE50 applied — you saved ₹50" />
+
+                <TextView
+                    android:id="@+id/btnRemoveCoupon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="@string/remove_coupon"
+                    android:textColor="@color/anydrop_primary"
+                    android:textStyle="bold"
+                    android:textSize="13sp"
+                    android:padding="4dp" />
+
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/couponErrorText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textSize="12sp"
+                android:textColor="@color/error_fg"
+                android:visibility="gone"
+                tools:text="Invalid or expired coupon code" />
+
+            <!-- docs/33 — coupon-disabled-by-offer note. Small inline text
+                 near the coupon UI above (not a full row like couponErrorText,
+                 since this isn't an error the customer needs to fix — the
+                 code they typed was fine, it just doesn't combine with the
+                 offer that's already winning). Visible only when
+                 totals.couponDisabledByOffer == true, set in renderBill(). -->
+            <TextView
+                android:id="@+id/couponDisabledByOfferText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:visibility="gone"
+                android:text="@string/coupon_disabled_by_offer_note" />
+
+            <!-- docs/33 — offer strip. Shown only when totals.offerId != null
+                 (an auto-applied Offers Engine offer won the cart), set in
+                 renderBill(). Same rounded/tinted-card treatment as
+                 couponAppliedRow above, offer-colored instead of
+                 success-colored, and no remove action since auto offers
+                 aren't something the customer typed in — they can't detach
+                 it the way they can a coupon code. -->
+            <LinearLayout
+                android:id="@+id/offerAppliedRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_card_rounded"
+                android:backgroundTint="@color/offer_bg"
+                android:padding="12dp"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_offer_tag"
+                    app:tint="@color/offer_fg" />
+
+                <TextView
+                    android:id="@+id/offerAppliedText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:textSize="13sp"
+                    android:textColor="@color/offer_fg"
+                    tools:text="Buy 1 Get 1 — you saved ₹149" />
+
+            </LinearLayout>
+
+            <!-- docs/33 — B1G1 synthetic free-item row. Styled like a cart
+                 line (name/qty + price column) rather than a discount line,
+                 per the app owner's own framing ("ek extra item with 0₹").
+                 Display-only — no CartLine is added anywhere; the order's
+                 real pricing already accounts for this via
+                 offer_discount_amount, this row only explains the total.
+                 Visible only when totals.offerFreeUnits > 0. -->
+            <LinearLayout
+                android:id="@+id/offerFreeItemRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_card_rounded"
+                android:padding="12dp"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <View
+                    android:layout_width="9dp"
+                    android:layout_height="9dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/dot_veg_fill" />
+
+                <TextView
+                    android:id="@+id/offerFreeItemText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_primary"
+                    tools:text="Choco Lava Cake × 1 — FREE" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="₹0"
+                    android:textStyle="bold"
+                    android:textColor="@color/success_fg"
+                    android:textSize="13sp" />
+
+            </LinearLayout>
+
+            <!-- App owner ask (2026-08-25) — actual cart item list on
+                 the Checkout screen itself (image + name + qty + price),
+                 not just the aggregate bill-total rows below. Reuses
+                 CartItemAdapter/item_cart_line.xml verbatim — same
+                 image/price/offer-tag treatment the cart sheet already
+                 has, so a customer doesn't see two different-looking
+                 item rows between the cart sheet and checkout. Read-
+                 only here (no qty +/- stepper interaction — see
+                 CheckoutItemAdapter's own kdoc for why the stepper
+                 controls are hidden rather than reusing CartItemAdapter
+                 directly), nested inside this screen's own ScrollView
+                 (nestedScrollingEnabled=false so the RecyclerView
+                 doesn't fight the parent ScrollView for the scroll
+                 gesture) rather than its own scrollable list. -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/checkout_your_items"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/checkoutItemList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card_rounded"
+                android:paddingHorizontal="12dp"
+                android:nestedScrollingEnabled="false"
+                tools:listitem="@layout/item_cart_line" />
+
+            <!-- Bill details -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/bill_details"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card_rounded"
+                android:padding="14dp">
+
+                <include layout="@layout/row_bill_line" android:id="@+id/rowItemTotal" />
+                <include layout="@layout/row_bill_line" android:id="@+id/rowDiscount" />
+                <include layout="@layout/row_bill_line" android:id="@+id/rowDelivery" />
+                <include layout="@layout/row_bill_line" android:id="@+id/rowPlatformFee" />
+                <include layout="@layout/row_bill_line" android:id="@+id/rowTax" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginVertical="8dp"
+                    android:background="@color/outline" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/lbl_grand_total"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_primary" />
+
+                    <TextView
+                        android:id="@+id/grandTotalText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textStyle="bold"
+                        android:textColor="@color/anydrop_primary" />
+                </LinearLayout>
+
+                <!-- H4 fix (2026-08-10) — shown when price_cart()'s `warning` is
+                     `below_min_order_amount`; bill above is now real numbers
+                     (not ₹0), this just tells the user why Place Order is
+                     disabled instead of leaving them guessing. -->
+                <TextView
+                    android:id="@+id/belowMinOrderText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/error_fg"
+                    android:textSize="13sp"
+                    android:visibility="gone"
+                    tools:text="@string/below_min_order_amount" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </ScrollView>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnPlaceOrder"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_margin="16dp"
+        android:backgroundTint="@color/anydrop_primary"
+        android:textColor="@color/white"
+        android:textAllCaps="false"
+        android:textStyle="bold"
+        android:text="@string/btn_place_order"
+        app:cornerRadius="12dp" />
+
+</LinearLayout>

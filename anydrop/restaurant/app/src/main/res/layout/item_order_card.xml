@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Orders tab redesign (docs/restorent/19, §4). One shared layout for
+     all three sections (New / In-progress / Completed today), driven by
+     OrderAdapter.CardMode rather than three separate item layouts —
+     see docs/restorent/NEXT_SESSION_PROMPT.md's suggested approach.
+     countdownChip / stepperRow / actionRow are shown/hidden per mode in
+     OrderAdapter; all three default to gone so a plain view of this XML
+     still looks like a normal (Completed-mode) card. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bg_card_rounded"
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginTop="10dp"
+    android:padding="14dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/orderCodeText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:textColor="@color/text_primary" />
+
+        <!-- New-section only: "Accept within 1:45" countdown chip.
+             Client-side visual cue, not a real deadline — see
+             docs/restorent/00_Status.md 2026-08-15 entry. -->
+        <TextView
+            android:id="@+id/countdownChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/bg_countdown_chip"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="@color/warning_amber"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/statusChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_chip_selected"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/itemsSummaryText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textColor="@color/text_secondary"
+        android:maxLines="2"
+        android:ellipsize="end" />
+
+    <!-- I4 follow-up (docs/16 Part A2) — badge so a scheduled order
+         doesn't look identical to an ASAP one sitting in the queue.
+         Hidden entirely for normal orders. -->
+    <TextView
+        android:id="@+id/scheduledBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_badge_scheduled"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="3dp"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:textColor="@color/info_fg"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/grandTotalText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textStyle="bold"
+            android:textColor="@color/anydrop_primary" />
+
+        <TextView
+            android:id="@+id/paymentMethodText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary" />
+    </LinearLayout>
+
+    <!-- In-progress only: horizontal status stepper (Preparing -> Ready
+         -> Handed to rider). "Handed to rider" is shown for context but
+         is never reachable by a Mark-next-step tap from this app — rider
+         assignment is Phase 4 (not built); see
+         backend/api/v1/restaurant/orders-status.php's allowed
+         transitions (accepted->preparing->ready only). -->
+    <LinearLayout
+        android:id="@+id/stepperRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="12dp"
+        android:visibility="gone">
+
+        <View
+            android:id="@+id/stepDot1"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:background="@drawable/bg_stepper_dot_filled" />
+
+        <TextView
+            android:id="@+id/stepLabel1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:text="@string/step_preparing"
+            android:textSize="11sp"
+            android:textColor="@color/text_secondary" />
+
+        <View
+            android:layout_width="16dp"
+            android:layout_height="1dp"
+            android:background="@color/outline" />
+
+        <View
+            android:id="@+id/stepDot2"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:layout_marginStart="4dp"
+            android:background="@drawable/bg_stepper_dot_empty" />
+
+        <TextView
+            android:id="@+id/stepLabel2"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:text="@string/step_ready"
+            android:textSize="11sp"
+            android:textColor="@color/text_secondary" />
+
+        <View
+            android:layout_width="16dp"
+            android:layout_height="1dp"
+            android:background="@color/outline" />
+
+        <View
+            android:id="@+id/stepDot3"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:layout_marginStart="4dp"
+            android:background="@drawable/bg_stepper_dot_empty" />
+
+        <TextView
+            android:id="@+id/stepLabel3"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:text="@string/step_handed_to_rider"
+            android:textSize="11sp"
+            android:textColor="@color/text_secondary" />
+    </LinearLayout>
+
+    <!-- New-section: Accept / Reject buttons. In-progress: single "Mark
+         next step" button (reuses btnAccept as the primary slot, hides
+         btnReject) so only one button row is needed for both modes. -->
+    <LinearLayout
+        android:id="@+id/actionRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="12dp"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/btnReject"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="8dp"
+            android:text="@string/btn_reject"
+            android:textColor="@color/nonveg_red"
+            app:strokeColor="@color/nonveg_red" />
+
+        <Button
+            android:id="@+id/btnAccept"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:backgroundTint="@color/anydrop_primary"
+            android:text="@string/btn_accept"
+            android:textColor="@color/white" />
+    </LinearLayout>
+
+</LinearLayout>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generic circular icon backdrop for illustrated dialogs (2026-08-19
+     illustration retrofit). Solid white by default — set
+     android:backgroundTint per usage (e.g. error_bg for the delete
+     dialog's pink circle, matching the app owner's reference mockup). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@android:color/white" />
+</shape>

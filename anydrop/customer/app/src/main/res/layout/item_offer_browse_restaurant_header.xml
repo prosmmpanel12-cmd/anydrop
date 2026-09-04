@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- docs/33/34 — Offers screen, one row per restaurant that currently has
+     a browsable offer (see OfferBrowseAdapter.RestaurantHeaderVH). Tapping
+     the row opens RestaurantDetailActivity, same as every other
+     restaurant-card entry point in the app. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingHorizontal="16dp"
+    android:paddingTop="20dp"
+    android:paddingBottom="10dp"
+    android:background="@color/background"
+    android:clickable="true"
+    android:focusable="true">
+
+    <ImageView
+        android:id="@+id/headerLogo"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:scaleType="centerCrop"
+        android:background="@drawable/bg_card_rounded" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="12dp"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/headerRestaurantName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:maxLines="1"
+                android:ellipsize="end"
+                tools:text="Spice Garden" />
+
+            <ImageView
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:src="@drawable/ic_star"
+                app:tint="@color/rating_gold" />
+
+            <TextView
+                android:id="@+id/headerRating"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                tools:text="4.3" />
+
+            <TextView
+                android:id="@+id/headerDistance"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:visibility="gone"
+                tools:text="2.1 km"
+                tools:visibility="visible" />
+
+        </LinearLayout>
+
+        <!-- Every browsable offer title this restaurant currently has live,
+             bullet-joined — same "titles, not full offer objects" scope
+             this screen uses elsewhere (see offers-browse.php's own kdoc). -->
+        <TextView
+            android:id="@+id/headerOfferTitles"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textSize="12sp"
+            android:textColor="@color/offer_fg"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="Buy 1 Get 1 • 20% OFF" />
+
+    </LinearLayout>
+
+</LinearLayout>

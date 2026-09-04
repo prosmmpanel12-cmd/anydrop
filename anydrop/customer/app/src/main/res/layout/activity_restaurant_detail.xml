@@ -1,0 +1,515 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background">
+
+    <FrameLayout
+        android:id="@+id/coverFrame"
+        android:layout_width="0dp"
+        android:layout_height="180dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <com.anydrop.food.ui.common.RestaurantBannerCarouselView
+            android:id="@+id/bannerCarousel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- Offer badge, e.g. "50% OFF select items" — top-left over the cover image,
+             same pattern as item_restaurant.xml. Hidden when offer_badge_text is null. -->
+        <TextView
+            android:id="@+id/detailOfferBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|start"
+            android:layout_marginTop="52dp"
+            android:layout_marginStart="12dp"
+            android:background="#CC000000"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="5dp"
+            android:text="50% OFF select items"
+            android:textColor="@color/white"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            tools:visibility="visible"
+            tools:ignore="HardcodedText" />
+
+        <!-- features.md §2 — bumped to the same 44dp circular-outlined style
+             as the item detail sheet's bookmark/share buttons. -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:layout_margin="10dp"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/detailBookmark"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:padding="11dp"
+                android:background="@drawable/bg_circle_outline"
+                android:src="@drawable/ic_bookmark_outline"
+                app:tint="@color/text_primary"
+                android:contentDescription="@string/cd_save_item" />
+
+            <ImageView
+                android:id="@+id/detailShare"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginStart="10dp"
+                android:padding="11dp"
+                android:background="@drawable/bg_circle_outline"
+                android:src="@drawable/ic_share"
+                app:tint="@color/text_primary"
+                android:contentDescription="@string/cd_share_item" />
+
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/btnBack"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_gravity="top|start"
+            android:layout_margin="12dp"
+            android:padding="6dp"
+            android:src="@drawable/ic_back"
+            app:tint="@color/white"
+            android:background="@drawable/bg_button_primary" />
+
+    </FrameLayout>
+
+    <!-- Info card overlaps the bottom edge of the cover image intentionally, anchored to it -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/scrollContainer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:clipToPadding="false"
+        app:layout_constraintTop_toBottomOf="@id/coverFrame"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_card_rounded"
+                android:padding="16dp"
+                android:layout_margin="12dp"
+                android:layout_marginTop="-28dp"
+                android:elevation="4dp">
+
+                <!-- features.md §6 — Pure Veg badge, reuses the app's existing
+                     veg square-and-dot visual language (bg_badge_veg, same
+                     icon used per-item elsewhere) instead of inventing a leaf
+                     icon — driven directly by restaurant.isVegOnly, not the
+                     generic tags list (avoids double-showing if a "pure_veg"
+                     tag is also mapped). -->
+                <LinearLayout
+                    android:id="@+id/detailPureVegRow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="4dp"
+                    android:visibility="gone"
+                    tools:visibility="visible">
+
+                    <View
+                        android:layout_width="12dp"
+                        android:layout_height="12dp"
+                        android:background="@drawable/bg_badge_veg" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="@string/detail_pure_veg_badge"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/veg_green" />
+
+                </LinearLayout>
+
+                <!-- Name (start) + rating pill (top-end) side by side, per
+                     the reference screenshot — name wraps up to two lines
+                     without pushing under the pill. -->
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <!-- Restaurant logo (Restaurant app's Account tab
+                         logo-upload.php) — small circular avatar next to
+                         the name, same rounded-card + tinted-icon-fallback
+                         pattern used for dish/category photos elsewhere in
+                         this app. Hidden entirely when logo_url is unset
+                         (most test restaurants) rather than showing a
+                         placeholder here, since ic_restaurant's the cover
+                         image's own placeholder right above it already
+                         covers that visual gap. -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/detailLogoCard"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        app:cardCornerRadius="20dp"
+                        app:cardElevation="0dp"
+                        app:strokeColor="@color/outline"
+                        app:strokeWidth="1dp"
+                        android:visibility="gone"
+                        tools:visibility="visible"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintBottom_toBottomOf="@id/detailRestaurantName">
+
+                        <ImageView
+                            android:id="@+id/detailLogoImage"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop"
+                            android:contentDescription="@null" />
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <TextView
+                        android:id="@+id/detailRestaurantName"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_primary"
+                        app:layout_constraintStart_toEndOf="@id/detailLogoCard"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintEnd_toStartOf="@id/detailRatingPillGroup"
+                        app:layout_constraintHorizontal_bias="0"
+                        app:layout_goneMarginStart="0dp" />
+
+                    <!-- Rating pill (★ 4.3) + "By 9.5K+" underneath, stacked -->
+                    <LinearLayout
+                        android:id="@+id/detailRatingPillGroup"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center_horizontal"
+                        android:layout_marginStart="8dp"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent">
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:background="@drawable/bg_rating_pill"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="4dp">
+
+                            <ImageView
+                                android:layout_width="12dp"
+                                android:layout_height="12dp"
+                                android:src="@drawable/ic_star"
+                                app:tint="@color/white" />
+
+                            <TextView
+                                android:id="@+id/detailRating"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="3dp"
+                                android:textSize="13sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/white" />
+
+                        </LinearLayout>
+
+                        <!-- "By 1.5K+" ratings-count label, derived from restaurant.ratingCount (bug 1.1) -->
+                        <TextView
+                            android:id="@+id/detailRatingCount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:textSize="11sp"
+                            android:textColor="@color/text_secondary" />
+
+                    </LinearLayout>
+
+                </androidx.constraintlayout.widget.ConstraintLayout>
+
+                <TextView
+                    android:id="@+id/detailCuisines"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_secondary" />
+
+                <!-- bugs.md §6.3 follow-up — detail page previously showed
+                     no open/paused/closed status at all, unlike the Home
+                     card and search result for the same restaurant. Same
+                     three-state text + color as RestaurantAdapter's
+                     restaurantStatus (Open/Temporarily unavailable/Closed),
+                     bound the same way in bindRestaurantDetail(). -->
+                <TextView
+                    android:id="@+id/detailStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <!-- features.md §6 — address + distance row, e.g. "2.7 km ·
+                     Sardarpura". Distance only shows once a GPS fix resolves
+                     (distance_km null until then) — see
+                     RestaurantDetailActivity's resolveLocationThenLoad(). -->
+                <LinearLayout
+                    android:id="@+id/detailLocationRow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="8dp"
+                    android:visibility="gone"
+                    tools:visibility="visible">
+
+                    <ImageView
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:src="@drawable/ic_location"
+                        app:tint="@color/text_secondary" />
+
+                    <TextView
+                        android:id="@+id/detailLocationText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:textSize="12sp"
+                        android:textColor="@color/text_secondary" />
+
+                </LinearLayout>
+
+                <!-- features.md §6 — ETA row with lightning icon + "Schedule
+                     for later" (not a real feature yet — tapping shows the
+                     app's standard "Coming soon" toast, same as the Google
+                     Sign-In button). -->
+                <LinearLayout
+                    android:id="@+id/detailEtaRow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="6dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:visibility="gone"
+                    tools:visibility="visible">
+
+                    <ImageView
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:src="@drawable/ic_bolt"
+                        app:tint="@color/veg_green" />
+
+                    <TextView
+                        android:id="@+id/detailEta"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/veg_green" />
+
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_marginStart="2dp"
+                        android:src="@drawable/ic_chevron_down"
+                        app:tint="@color/text_secondary" />
+
+                </LinearLayout>
+
+                <!-- Tag chips row — "Near & Fast", "Frequently reordered", "No
+                     packaging charges" etc, same data/pattern as
+                     item_restaurant.xml's restaurantTagsGroup. "pure_veg" is
+                     filtered out in code — already shown by the dedicated
+                     badge above. -->
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/detailTagsGroup"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    app:chipSpacingHorizontal="6dp"
+                    app:singleLine="false" />
+
+                <!-- features.md §6 — offer strip, e.g. "3 offers ⌄". Only
+                     shown when restaurant.offers is non-empty; tapping opens
+                     OffersBottomSheetFragment. -->
+                <View
+                    android:id="@+id/detailOffersDivider"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@color/outline"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
+
+                <LinearLayout
+                    android:id="@+id/detailOffersStrip"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="10dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:visibility="gone"
+                    tools:visibility="visible">
+
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_offer_tag"
+                        app:tint="@color/offer_fg" />
+
+                    <TextView
+                        android:id="@+id/detailOffersCount"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="6dp"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/offer_fg" />
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:src="@drawable/ic_chevron_down"
+                        app:tint="@color/offer_fg" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- features.md §1 — "Filters" pill, opens the Filters and Sorting bottom sheet.
+                 Sits right above the category tab bar (own row, since this app's chip row
+                 doesn't otherwise carry standalone Highly-reordered/Spicy chips outside the
+                 sheet — those live as toggles inside MenuFiltersBottomSheet itself). Always
+                 visible, independent of whether the category tab bar below it is shown. -->
+            <TextView
+                android:id="@+id/btnOpenFilters"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_marginTop="10dp"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="8dp"
+                android:text="@string/filters_pill_label"
+                android:textSize="13sp"
+                android:textColor="@color/text_primary"
+                android:background="@drawable/bg_chip_unselected"
+                android:drawableStart="@drawable/ic_filter"
+                android:drawablePadding="6dp"
+                app:drawableTint="@color/text_secondary"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <!-- In-menu category tab bar (§2.1) — built from the categories already present in
+                 the menu response (restaurant-owner-defined, sort_order-driven); tapping a chip
+                 jumps the scroll position to that category's header. Hidden when there's only
+                 one category (nothing to jump between). -->
+            <HorizontalScrollView
+                android:id="@+id/categoryTabsScroll"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:scrollbars="none"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/categoryTabsGroup"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_marginTop="6dp"
+                    app:chipSpacingHorizontal="8dp"
+                    app:singleLine="true" />
+
+            </HorizontalScrollView>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/menuList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="100dp"
+                android:clipToPadding="false"
+                android:nestedScrollingEnabled="false" />
+
+            <LinearLayout
+                android:id="@+id/menuEmptyState"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:padding="40dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:src="@drawable/ic_restaurant"
+                    app:tint="@color/text_secondary" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/menu_empty"
+                    android:textColor="@color/text_secondary" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/btnMenuJump"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="12dp"
+        android:src="@drawable/ic_menu_list"
+        android:contentDescription="@string/cd_menu_jump"
+        android:visibility="gone"
+        app:tint="@color/white"
+        app:backgroundTint="@color/anydrop_primary"
+        app:fabSize="mini"
+        app:elevation="6dp"
+        tools:visibility="visible"
+        app:layout_constraintBottom_toTopOf="@id/btnViewCart"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_goneMarginBottom="16dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnViewCart"
+        android:layout_width="0dp"
+        android:layout_height="52dp"
+        android:layout_margin="14dp"
+        android:backgroundTint="@color/anydrop_primary"
+        android:text="View Cart"
+        android:elevation="6dp"
+        android:visibility="gone"
+        app:cornerRadius="12dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

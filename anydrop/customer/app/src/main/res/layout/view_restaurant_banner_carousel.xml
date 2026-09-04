@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Merged into RestaurantBannerCarouselView (a FrameLayout). Deliberately
+     simpler than view_dish_photo_carousel.xml: plain dot indicators
+     (dot_carousel_selected/unselected — same drawables the promo-banner
+     carousel elsewhere in this app already uses) instead of Stories-style
+     progress segments, and no dish-name/price overlay text — a
+     restaurant's own promotional banner doesn't have a "dish" to caption. -->
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <ImageView
+        android:id="@+id/bannerCarouselImage"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:background="@color/anydrop_primary_container"
+        tools:src="@drawable/ic_restaurant" />
+
+    <LinearLayout
+        android:id="@+id/bannerCarouselDots"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="10dp"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:visibility="gone"
+        tools:visibility="visible" />
+
+</merge>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bundled category icon (doc 22 item 1) — see ic_cat_biryani.xml header
+     for the v1-placeholder-art caveat. Bowl with two crossed chopsticks. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M4,14 L20,14 L17.5,21 A2,2 0 0,1 15.5,22.5 L8.5,22.5 A2,2 0 0,1 6.5,21 Z
+                           M14.4,2 L15.4,2 L11.3,16 L10.3,16 Z
+                           M17.7,3 L18.7,3 L14.3,17 L13.3,17 Z" />
+</vector>

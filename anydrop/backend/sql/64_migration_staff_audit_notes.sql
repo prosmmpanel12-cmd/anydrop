@@ -1,0 +1,33 @@
+-- Migration 64 — Restaurant Staff Audit Trail (PENDING.md item 7's
+-- one remaining checkbox, doc 71/72's "genuinely still open" list).
+--
+-- No new table. `audit_logs` (01_schema.sql) already exists and is
+-- the exact right shape for this: actor_type/actor_id/action/
+-- details_json/ip_address/created_at. This migration is a no-op on
+-- schema — it exists only as a numbered marker/doc for when staff
+-- audit logging was wired up, same convention 59_migration_restaurant
+-- _bank_verification.sql followed when it also reused audit_logs
+-- without a schema change.
+--
+-- Design: audit_logs.actor_type stays 'restaurant' for every staff
+-- action (there is no 'staff' enum value and adding one is unnecessary
+-- churn) with actor_id = the restaurant's own id — same "owner_id
+-- always means the restaurant" convention auth_tokens.owner_id
+-- already follows for staff sessions (see auth.php). WHO actually
+-- performed the action (owner vs a named staff member) is recorded
+-- inside details_json as staff_id/staff_name/role, not in actor_id.
+-- This keeps audit_logs' existing actor_type enum untouched and keeps
+-- every other actor_type='restaurant' row (signup, login, bank
+-- details save, etc.) in the same bucket a restaurant owner would
+-- expect "my restaurant's activity log" to mean.
+--
+-- Actions logged (see backend/lib/permissions.php's
+-- write_staff_audit_log() helper, added this migration's session):
+--   staff_created, staff_updated, staff_role_changed,
+--   staff_activated, staff_deactivated, staff_deleted
+--
+-- Endpoint: backend/api/v1/restaurant/staff-audit-list.php (owner
+-- only, manage_staff permission — same gate as the staff CRUD
+-- endpoints themselves, since seeing who changed staff accounts is
+-- exactly as sensitive as changing them).
+SELECT 1;

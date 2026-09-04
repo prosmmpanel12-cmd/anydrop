@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Orders tab redesign (docs/restorent/19, §4/§8) — "Today" snapshot
+     strip chips (Orders count / Earnings / Avg prep time), gray-100
+     so they sit apart from the white order cards. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/stat_chip_bg" />
+    <corners android:radius="10dp" />
+</shape>

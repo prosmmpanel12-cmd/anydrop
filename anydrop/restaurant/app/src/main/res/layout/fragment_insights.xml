@@ -1,0 +1,376 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Insights tab (docs/restorent/19 §6, §10 item 6). Backend:
+     restaurant/insights.php. Range toggle reuses the existing
+     MaterialButtonToggleGroup + ToggleButton.Pill style (same one
+     dialog_category_icon_picker.xml uses for its 3 tabs) rather than
+     inventing a new segmented-control pattern. Skeleton state mirrors
+     §9.2's spec: 4 stat chips + a chart-shaped gray rectangle,
+     wrapped in the existing ShimmerFrameLayout. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="16dp"
+        android:background="@color/surface">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/nav_insights"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary" />
+
+        <!-- CSV export (PENDING.md "Export PDF/Excel" item) — exports
+             the currently-selected range by default; long-press isn't
+             used for the custom-range option since that's not a
+             discoverable gesture on this screen elsewhere, so a plain
+             second click target is used instead (see btnExportCustomRange). -->
+        <ImageButton
+            android:id="@+id/btnExportInsights"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/insights_export_button"
+            android:src="@drawable/ic_download"
+            android:padding="8dp" />
+    </LinearLayout>
+
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipeRefresh"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingBottom="24dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingTop="12dp">
+
+                <!-- Range toggle: Today / This week / This month.
+                     Rebuilt as a single rounded track (bg_segment_track)
+                     with three equal-weight segments (bg_segment_item
+                     selector) instead of MaterialButtonToggleGroup, which
+                     rendered "Today" as a full pill but "This week" /
+                     "This month" as plain bordered rectangles — see the
+                     drawable's own comment for why. Selection is handled
+                     manually in InsightsFragment via View.isSelected. -->
+                <LinearLayout
+                    android:id="@+id/rangeToggleGroup"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginBottom="16dp"
+                    android:orientation="horizontal"
+                    android:background="@drawable/bg_segment_track"
+                    android:padding="4dp">
+
+                    <TextView
+                        android:id="@+id/rangeToday"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="@drawable/bg_segment_item"
+                        android:text="@string/insights_range_today"
+                        android:textColor="@color/segment_text_color"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:textAllCaps="false" />
+
+                    <TextView
+                        android:id="@+id/rangeWeek"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:gravity="center"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="@drawable/bg_segment_item"
+                        android:text="@string/insights_range_week"
+                        android:textColor="@color/segment_text_color"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:textAllCaps="false" />
+
+                    <TextView
+                        android:id="@+id/rangeMonth"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:gravity="center"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="@drawable/bg_segment_item"
+                        android:text="@string/insights_range_month"
+                        android:textColor="@color/segment_text_color"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:textAllCaps="false" />
+
+                </LinearLayout>
+
+                <!-- Skeleton loading state -->
+                <com.anydrop.restaurant.ui.common.ShimmerFrameLayout
+                    android:id="@+id/insightsSkeleton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:visibility="visible">
+
+                    <include layout="@layout/skeleton_insights" />
+
+                </com.anydrop.restaurant.ui.common.ShimmerFrameLayout>
+
+                <!-- Real content, hidden until first successful load -->
+                <LinearLayout
+                    android:id="@+id/insightsContent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <!-- Stat cards: 2x2 grid -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingBottom="8dp">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="8dp"
+                            android:orientation="vertical"
+                            android:gravity="center"
+                            android:background="@drawable/bg_stat_chip"
+                            android:paddingVertical="12dp">
+
+                            <TextView
+                                android:id="@+id/statOrdersValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textStyle="bold"
+                                android:textSize="18sp"
+                                android:textColor="@color/text_primary" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/insights_stat_orders_label"
+                                android:textSize="11sp"
+                                android:textColor="@color/text_secondary" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:gravity="center"
+                            android:background="@drawable/bg_stat_chip"
+                            android:paddingVertical="12dp">
+
+                            <TextView
+                                android:id="@+id/statEarningsValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textStyle="bold"
+                                android:textSize="18sp"
+                                android:textColor="@color/text_primary" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/insights_stat_earnings_label"
+                                android:textSize="11sp"
+                                android:textColor="@color/text_secondary" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingBottom="16dp">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="8dp"
+                            android:orientation="vertical"
+                            android:gravity="center"
+                            android:background="@drawable/bg_stat_chip"
+                            android:paddingVertical="12dp">
+
+                            <TextView
+                                android:id="@+id/statAovValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textStyle="bold"
+                                android:textSize="18sp"
+                                android:textColor="@color/text_primary" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/insights_stat_aov_label"
+                                android:textSize="11sp"
+                                android:textColor="@color/text_secondary" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:gravity="center"
+                            android:background="@drawable/bg_stat_chip"
+                            android:paddingVertical="12dp">
+
+                            <TextView
+                                android:id="@+id/statCancellationValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textStyle="bold"
+                                android:textSize="18sp"
+                                android:textColor="@color/text_primary" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/insights_stat_cancellation_label"
+                                android:textSize="11sp"
+                                android:textColor="@color/text_secondary" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- 7-day bar chart -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/insights_chart_title"
+                        android:textStyle="bold"
+                        android:textSize="14sp"
+                        android:textColor="@color/text_primary"
+                        android:paddingBottom="8dp" />
+
+                    <com.anydrop.restaurant.ui.insights.OrdersBarChartView
+                        android:id="@+id/ordersBarChart"
+                        android:layout_width="match_parent"
+                        android:layout_height="140dp"
+                        android:layout_marginBottom="20dp" />
+
+                    <!-- Top 5 best-selling items -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/insights_top_items_title"
+                        android:textStyle="bold"
+                        android:textSize="14sp"
+                        android:textColor="@color/text_primary"
+                        android:paddingBottom="4dp" />
+
+                    <LinearLayout
+                        android:id="@+id/topItemsList"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:divider="@drawable/divider_line"
+                        android:showDividers="middle" />
+
+                    <TextView
+                        android:id="@+id/topItemsEmptyText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/insights_top_items_empty"
+                        android:textSize="13sp"
+                        android:textColor="@color/text_secondary"
+                        android:paddingVertical="12dp"
+                        android:visibility="gone" />
+
+                    <!-- Repeat customers -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:background="@drawable/bg_stat_chip"
+                        android:padding="14dp"
+                        android:layout_marginTop="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/insights_repeat_customers_title"
+                            android:textStyle="bold"
+                            android:textSize="14sp"
+                            android:textColor="@color/text_primary" />
+
+                        <TextView
+                            android:id="@+id/repeatCustomersText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:textSize="13sp"
+                            android:textColor="@color/text_secondary" />
+
+                    </LinearLayout>
+
+                    <!-- Peak hours heatmap (PENDING.md item 3's own "Peak
+                         hours" line — design decision resolved: full
+                         heatmap over a single busiest-hour stat). Always
+                         the last 30 days, independent of the range toggle
+                         above — see insights.php's header for why. -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/insights_peak_hours_title"
+                        android:textStyle="bold"
+                        android:textSize="14sp"
+                        android:textColor="@color/text_primary"
+                        android:paddingTop="16dp"
+                        android:paddingBottom="8dp" />
+
+                    <com.anydrop.restaurant.ui.insights.PeakHoursHeatmapView
+                        android:id="@+id/peakHoursHeatmap"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
+                    <TextView
+                        android:id="@+id/peakHoursCaption"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textSize="13sp"
+                        android:textColor="@color/text_secondary" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </ScrollView>
+
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+</LinearLayout>

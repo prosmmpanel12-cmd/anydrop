@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reverted 2026-08-16 (§8.1.1) back to @color/text_secondary for the
+     unselected state, matching the white bottom nav background restored
+     in activity_main.xml. Checked state unchanged (brand orange). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/anydrop_primary" android:state_checked="true" />
+    <item android:color="@color/text_secondary" />
+</selector>

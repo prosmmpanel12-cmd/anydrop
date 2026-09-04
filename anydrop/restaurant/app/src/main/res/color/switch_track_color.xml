@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Standard on/off SwitchMaterial track color, app-wide (2026-08-19
+     toggle-standardization ask: match the reference green=ON/red=OFF
+     slide-switch, one style everywhere instead of mixing the pill-button
+     toggle and several different purple-tinted switches). Checked=on=
+     veg_green, unchecked=off=nonveg_red — reuses the same two tokens the
+     rest of this app already uses for veg/non-veg dots and open/closed
+     pills, so this doesn't introduce new brand colors.
+
+     Use this for any switch where checked/ON is the "positive" state:
+     restaurant open, coupon active, coupon public, item available, veg.
+     For a switch where checked means a "negative" state instead (e.g.
+     "temporarily closed"), use switch_track_color_inverted.xml. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/veg_green" android:state_checked="true" />
+    <item android:color="@color/nonveg_red" />
+</selector>
