@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Deep green radial glow over black, curved bottom edge via the layered
+     shape below — echoes the app icon's glassy green card on black. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="380dp"
+                android:centerX="0.5"
+                android:centerY="0.2"
+                android:startColor="@color/anydrop_green_deep"
+                android:endColor="@color/background" />
+        </shape>
+    </item>
+</layer-list>

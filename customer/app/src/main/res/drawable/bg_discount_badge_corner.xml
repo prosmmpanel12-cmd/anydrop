@@ -7,6 +7,6 @@
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
     <solid android:color="@color/anydrop_primary_dark" />
     <corners
-        android:topLeftRadius="10dp"
-        android:bottomRightRadius="12dp" />
+        android:topLeftRadius="12dp"
+        android:bottomRightRadius="10dp" />
 </shape>

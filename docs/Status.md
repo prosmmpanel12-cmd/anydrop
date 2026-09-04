@@ -4508,3 +4508,49 @@ null — is NOT started. Full step-by-step for next session is in doc
 52 and `PENDING.md` item 11b.
 
 Not build/device-verified — same standing sandbox limitation.
+
+
+## Admin Service Area map picker: bonik.in address preview + Customer App Home UI refresh, first pass (2026-09-01, session 20)
+
+Two small owner-requested changes, unrelated to the Wallet-Withdrawal
+(§37) / Rider App queue recall.md's last few sessions were working
+through — owner explicitly picked these instead this session.
+
+**1. `backend/admin/areas.php`** — the existing "Choose on map"
+Leaflet dialog now shows a live reverse-geocoded address preview
+under the coordinates line on every map click/drag, via a client-side
+call to `https://bonik.in/api/google/address?lat=..&lng=..` (owner-
+supplied API, confirmed better address quality for this region than
+the OSM Nominatim lookups this same page already uses elsewhere).
+Request-token guard prevents a stale response from a fast
+click-then-drag sequence overwriting a newer one. JS-only change
+inside the dialog's existing `<script>` block — no PHP, no migration,
+no change to how `centerLatInput`/`editCenterLatInput` get filled.
+Not browser-tested this session (no outbound network in this
+sandbox) — needs one live click-through on the Add and Edit area
+forms.
+
+**2. Customer App Home screen** — first pass of a white+orange UI
+refresh toward reference mockups the owner supplied (screenshots, not
+a written spec). Owner chose Home & Discovery as the flow to start
+with; Restaurant & Menu / Cart & Checkout / Orders & Tracking were
+NOT touched this session. Changed: `activity_home.xml`'s `topBar` —
+white background instead of the old solid-orange gradient, dark
+icons/text instead of white-on-orange, orange location-pin icon kept
+as the one accent color in the bar; `bg_cart_badge.xml` simplified to
+a flat solid-orange badge (was a two-tone gold+orange-stroke combo);
+`item_restaurant.xml`'s discount ribbon badge moved from the
+bottom-end corner back to the top-start corner
+(`bg_discount_badge_corner.xml`'s corners mirrored to match), to
+match the mockup's top-left ribbon style. Promo banner section
+deliberately left untouched (renders real backend images with a dark
+scrim, not a flat color card — flagged rather than silently
+restructured). Every change is a `background`/`tint`/`textColor`
+attribute value only — no view IDs added/removed/renamed, so
+`HomeActivity.kt`'s bindings are unaffected. See recall.md's matching
+2026-09-01 entry for the full file-by-file list.
+
+Not build/device-verified — same standing sandbox limitation (no
+Android SDK here). Next session, if continuing: Restaurant & Menu is
+the owner's stated next flow, once this Home pass is confirmed to
+look right on a real device/build.

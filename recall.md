@@ -3111,3 +3111,79 @@ environment is available, there is no more Claude-actionable code
 work left in §37; move to Rider App (item 18, largest remaining
 phase) or another item from the standing priority list instead. See
 `NEXT_SESSION_PROMPT.md`.
+
+**2026-09-01 (session 20) — two small owner-requested UI/UX asks,
+unrelated to §37/Rider App queue above (owner explicitly picked these
+over continuing that queue this session).**
+
+1. **Admin Service Area map picker — bonik.in reverse-geocode
+   preview added.** `backend/admin/areas.php`'s existing "Choose on
+   map" Leaflet dialog (`mapPickerDialog`, service_areas Add/Edit
+   forms) now shows a live address preview under the coordinates line
+   on every click/drag — calls `https://bonik.in/api/google/address?
+   lat=..&lng=..` client-side (no new backend endpoint, no proxy — the
+   owner supplied this exact API and confirmed it gives better
+   addresses for this region than OSM's Nominatim, which this same
+   dialog already falls back to for the actual geocode-by-name buttons
+   elsewhere on this page). Guarded with a request-token counter so a
+   fast click-then-drag sequence never lets a stale response overwrite
+   a newer one, and resets on every dialog re-open. Purely additive —
+   the existing lat/lng flow into `centerLatInput`/`editCenterLatInput`
+   is completely unchanged, this only adds a read-only address label
+   next to it. No PHP touched, no migration, JS-only change inside the
+   existing `<script>` block. Not device/browser-tested this session
+   (no outbound network in this sandbox, same standing limitation) —
+   needs one real click-through: open "Choose on map" on either the
+   Add or Edit area form, click a point, confirm the address renders
+   under the coordinates line and updates on drag.
+
+2. **Customer App Home screen — first pass of a UI refresh toward a
+   white+orange reference style the owner supplied (mockup
+   screenshots, not a spec doc).** Owner confirmed Home & Discovery as
+   the flow to start with; other flows (Restaurant & Menu, Cart &
+   Checkout, Orders & Tracking) intentionally NOT touched this
+   session — pick up from there next time if the owner wants more
+   screens redone. Changed, all in `customer/app/src/main/res/`:
+   - `layout/activity_home.xml` — `topBar` background swapped from
+     the solid `bg_topbar_gradient` drawable to plain `@color/surface`
+     (white), location-pin icon tint changed to `@color/anydrop_primary`
+     (was white-on-orange), location text/cart/bell/profile icons
+     switched from white to `@color/text_primary` (dark-on-white now
+     instead of white-on-orange). `bg_topbar_gradient.xml` itself was
+     left in place, just no longer referenced by this screen — did not
+     delete it in case another screen picks it up later.
+   - `drawable/bg_cart_badge.xml` — simplified from a gold-fill +
+     orange-stroke combo to a plain solid `@color/anydrop_primary`
+     circle with a white stroke, matching the flat orange badge in the
+     reference mockup instead of the old two-tone one.
+   - `layout/item_restaurant.xml` + `drawable/bg_discount_badge_corner.xml`
+     — the restaurant-card discount ribbon (`restaurantOfferBadge`,
+     e.g. "50% OFF") moved from the bottom-end corner (2026-08-09's
+     placement) back to the top-start corner, mirroring the drawable's
+     rounded corners to match (`topLeftRadius`/`bottomRightRadius`
+     swapped) — matches the reference mockup's top-left ribbon-style
+     restaurant card badge. Deliberately did NOT touch the promo
+     banner (`promoBannerContainer`/`promoCarousel`/`item_promo_banner.xml`)
+     since those render real backend-supplied images with a dark
+     scrim, not a flat color card like the mockup's promo banner — re-
+     designing that would mean either losing the real-image rendering
+     or a larger restructure than this session's scope, flagged here
+     rather than silently changed.
+   No view IDs were added, removed, or renamed on this screen — every
+   change is a `background`/`android:tint`/`android:textColor`
+   attribute value, so `HomeActivity.kt`'s existing view-binding
+   references are untouched. **Not build/device-verified** — same
+   standing sandbox limitation (no Android SDK here); needs a real
+   build + a look at the actual rendered Home screen next to the
+   reference mockups to confirm it reads as intended before deciding
+   whether to carry the same white+orange treatment into the other
+   three flows.
+
+**NEXT SESSION (if continuing the UI refresh):** Restaurant & Menu is
+the next flow in the owner's stated priority order (see this
+session's UI note above) — apply the same white-top-bar /
+flat-orange-badge treatment pattern to `activity_restaurant_detail.xml`
+and its menu-item cards, after first getting the owner's confirmation
+that this session's Home changes actually read correctly on-device.
+Otherwise, standing priority list unchanged from session 19's note
+above (§37 live testing, then Rider App).

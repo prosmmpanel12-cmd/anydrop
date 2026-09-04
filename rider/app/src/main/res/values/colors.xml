@@ -1,0 +1,43 @@
+<resources>
+    <!-- Brand — matches the AnyDrop rider app icon: deep green glass card
+         on a black backdrop, glowing neon-green edge, white text/glyphs.
+         Deliberately NOT the black/white monochrome theme the Restaurant
+         app uses — the rider app owner asked for this screen's look to
+         follow the icon itself. -->
+    <color name="anydrop_green">#2ECC71</color>
+    <color name="anydrop_green_dark">#1B8A4A</color>
+    <color name="anydrop_green_deep">#0E3B22</color>
+    <color name="anydrop_green_glow">#4DFFB25E</color>
+
+    <!-- Surfaces — dark theme throughout -->
+    <color name="background">#0A0F0C</color>
+    <color name="surface">#121912</color>
+    <color name="surface_alt">#1A231B</color>
+    <color name="outline">#26332A</color>
+
+    <!-- Text -->
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#9FB3A6</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+
+    <!-- Semantic -->
+    <color name="success_bg">#14331F</color>
+    <color name="success_fg">#4ADE80</color>
+    <color name="error_bg">#3A1414</color>
+    <color name="error_fg">#F87171</color>
+    <color name="info_bg">#132A20</color>
+    <color name="info_fg">#5EEAD4</color>
+    <color name="warning_bg">#332B10</color>
+    <color name="warning_fg">#FBBF24</color>
+
+    <!-- Status chips (application status screen) -->
+    <color name="status_pending_bg">#332B10</color>
+    <color name="status_pending_fg">#FBBF24</color>
+    <color name="status_approved_bg">#14331F</color>
+    <color name="status_approved_fg">#4ADE80</color>
+    <color name="status_rejected_bg">#3A1414</color>
+    <color name="status_rejected_fg">#F87171</color>
+    <color name="status_suspended_bg">#26332A</color>
+    <color name="status_suspended_fg">#9FB3A6</color>
+</resources>

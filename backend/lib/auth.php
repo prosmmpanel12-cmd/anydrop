@@ -161,6 +161,27 @@ function require_auth(string $expectedOwnerType): array
         if (!$row || !$row['is_active']) {
             respond_error('account_suspended', 403, ['reason' => $row['suspension_reason'] ?? null]);
         }
+    } elseif ($expectedOwnerType === 'rider') {
+        // Migration 69 (rider self-signup) — same re-check-on-every-request
+        // principle as restaurant/customer above, extended to riders.
+        // `pending`/`rejected` are deliberately NOT blocked here, unlike
+        // restaurant's equivalent: a pending rider still needs to reach
+        // authenticated "application submitted" / profile screens after
+        // rider-signup.php's immediate token issue (see that file's own
+        // header for why). Endpoints that actually require full approval
+        // (going online, accepting orders, earnings) check
+        // `$owner['status'] === 'approved'` themselves — this function
+        // only blocks the account-is-gone/suspended case every owner type
+        // shares.
+        $stmt = $db->prepare(
+            'SELECT status, rejection_reason, is_active FROM riders WHERE id = :id AND deleted_at IS NULL LIMIT 1'
+        );
+        $stmt->execute(['id' => $owner['owner_id']]);
+        $row = $stmt->fetch();
+        if (!$row || $row['status'] === 'suspended' || !$row['is_active']) {
+            respond_error('account_suspended', 403, ['reason' => $row['rejection_reason'] ?? null]);
+        }
+        $owner['status'] = $row['status'];
     }
 
     return $owner;

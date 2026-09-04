@@ -790,6 +790,7 @@ require __DIR__ . '/_layout_head.php';
             <p class="modal-text">Pan/zoom to this area, then click (or tap) its center point. Drag the pin afterwards to fine-tune.</p>
             <div id="mapPickerCanvas" style="height:360px; border-radius:8px; overflow:hidden;"></div>
             <p class="muted" id="mapPickerCoords" style="margin:10px 0 0; font-size:13px;">No point selected yet.</p>
+            <div id="mapPickerAddress" class="muted" style="margin:6px 0 0; font-size:13px; line-height:1.5; display:none;"></div>
             <div class="modal-actions">
                 <button type="button" class="btn btn-outline" id="mapPickerCancel">Cancel</button>
                 <button type="button" class="btn btn-primary" id="mapPickerUse" disabled>Use this point</button>
@@ -812,7 +813,36 @@ require __DIR__ . '/_layout_head.php';
         var activeLatInput = null;
         var activeLngInput = null;
         var coordsText = document.getElementById('mapPickerCoords');
+        var addressBox = document.getElementById('mapPickerAddress');
         var useBtn = document.getElementById('mapPickerUse');
+
+        // Reverse-geocodes the picked point via bonik.in and shows the
+        // formatted address under the coords line — gives a better/more
+        // readable address than what OSM's Nominatim returns for this
+        // region. Best-effort only: the picked point/marker is already
+        // usable via coordinates regardless of whether this succeeds.
+        var addressFetchToken = 0;
+        function fetchBonikAddress(lat, lng) {
+            var token = ++addressFetchToken;
+            addressBox.style.display = 'block';
+            addressBox.textContent = 'Loading address…';
+
+            fetch('https://bonik.in/api/google/address?lat=' + lat + '&lng=' + lng)
+                .then(function (res) { return res.json(); })
+                .then(function (data) {
+                    if (token !== addressFetchToken) return; // stale response
+                    var line1 = data.formatted_address || data.address1 || '';
+                    var line2 = [data.address2, data.city, data.state].filter(Boolean).join(', ');
+                    var line3 = [data.country, data.pincode].filter(Boolean).join(' - ');
+                    addressBox.innerHTML = '<strong>' + (line1 ? line1.replace(/</g, '&lt;') : 'Address unavailable') + '</strong>'
+                        + (line2 ? '<br>' + line2.replace(/</g, '&lt;') : '')
+                        + (line3 ? '<br>' + line3.replace(/</g, '&lt;') : '');
+                })
+                .catch(function (err) {
+                    if (token !== addressFetchToken) return;
+                    addressBox.textContent = 'Address lookup failed: ' + err.message;
+                });
+        }
 
         function ensureMap() {
             if (map) return map;
@@ -851,6 +881,7 @@ require __DIR__ . '/_layout_head.php';
             useBtn.disabled = false;
             useBtn.dataset.lat = latRounded;
             useBtn.dataset.lng = lngRounded;
+            fetchBonikAddress(latRounded, lngRounded);
         }
 
         document.addEventListener('click', function (e) {
@@ -862,6 +893,9 @@ require __DIR__ . '/_layout_head.php';
 
             useBtn.disabled = true;
             coordsText.textContent = 'No point selected yet.';
+            addressBox.style.display = 'none';
+            addressBox.textContent = '';
+            addressFetchToken++; // invalidate any in-flight lookup from a previous open
             if (marker) { marker.remove(); marker = null; }
 
             dlg.showModal();
