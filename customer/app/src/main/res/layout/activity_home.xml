@@ -51,7 +51,7 @@
                 android:layout_height="24dp"
                 android:padding="2dp"
                 android:src="@drawable/ic_cart"
-                app:tint="@color/text_primary" />
+                app:tint="@color/anydrop_primary" />
 
             <TextView
                 android:id="@+id/cartBadge"
@@ -89,7 +89,7 @@
                 android:layout_height="24dp"
                 android:padding="2dp"
                 android:src="@drawable/ic_notification"
-                app:tint="@color/text_primary" />
+                app:tint="@color/anydrop_primary" />
 
             <TextView
                 android:id="@+id/notificationBadge"
@@ -115,7 +115,7 @@
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:src="@drawable/ic_person"
-            app:tint="@color/text_primary" />
+            app:tint="@color/anydrop_primary" />
 
     </LinearLayout>
 
