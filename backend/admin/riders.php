@@ -46,6 +46,16 @@
  * delete concept, same as how a restaurant is suspended rather than
  * deleted.
  *
+ * Migration 75 (deep-plan §22, Rider Documents) added a separate
+ * Documents column/review block, gated by its own
+ * `rider_documents_view`/`rider_documents_manage` pair rather than
+ * riders_view/riders_approve — see that migration's own header for why
+ * viewing a government ID photo is kept as a distinct permission from
+ * the base account-lifecycle ones above. "View ID Doc"/"View Vehicle
+ * Doc" link to documents-view.php (api/v1/rider/), which accepts this
+ * page's own PHP session in addition to a rider Bearer token — see
+ * that endpoint's kdoc for the two-path auth check.
+ *
  * NOT tested end-to-end (no PHP/MySQL/network in the sandbox this was
  * written in) — per done.md, this is 🟡 IMPLEMENTED — TEST PENDING
  * until migration 69 has actually been run against a live DB with at
@@ -54,11 +64,38 @@
 
 require_once __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../lib/audit.php';
+// Deep-plan §23 (Account category: Approved/Rejected/Suspended; also
+// covers the document-verify/reject pair below, which the plan groups
+// under Account rather than a separate category) — this file had zero
+// create_notification() calls before this session despite being the
+// only place any of these four transitions happen. Mirrors the
+// "write the DB change, THEN notify, never inside the same try/catch
+// as the real write" ordering every other call site in this codebase
+// already follows (see lib/notifications.php's own header) — each
+// call below sits right after its own write_audit_log() line, once
+// the transition is already committed.
+require_once __DIR__ . '/../lib/notifications.php';
+// Deep-plan §25 (Admin Rider Command Center, "Rider list" columns:
+// COD cash held, Earnings) — same rider_cod_settlement_limit() helper
+// rider-settlements.php already uses, reused here rather than
+// re-reading the app_settings row a second way.
+require_once __DIR__ . '/../lib/rider_ledger.php';
 
 $admin = admin_require_login();
 admin_require_permission($admin, 'riders_view');
 $canEdit = admin_has_permission($admin['id'], 'riders_edit');
 $canApprove = admin_has_permission($admin['id'], 'riders_approve');
+// Same permission key rider-settlements.php/rider-earnings.php already
+// gate on — this list only *links* to those two existing screens per
+// rider rather than duplicating their detail views, so it reuses their
+// gate rather than introducing a third permission key for the same
+// data.
+$canViewPayouts = admin_has_permission($admin['id'], 'payouts_view');
+// Migration 75 (deep-plan §22) — deliberately separate permission from
+// the three above, same "viewing/actioning a government ID photo is
+// its own blast radius" reasoning that migration's own header gives.
+$canViewDocuments = admin_has_permission($admin['id'], 'rider_documents_view');
+$canManageDocuments = admin_has_permission($admin['id'], 'rider_documents_manage');
 $db = Database::get();
 
 $flash = null;
@@ -74,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $riderId = (int) ($_POST['rider_id'] ?? 0);
 
         $stmt = $db->prepare(
-            "SELECT id, name, status FROM riders
+            "SELECT id, name, status, documents_status FROM riders
              WHERE id = :id AND deleted_at IS NULL AND restaurant_id IS NULL LIMIT 1"
         );
         $stmt->execute(['id' => $riderId]);
@@ -93,9 +130,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if ($action === 'approve') {
                     // Covers pending->approved AND reactivating a rejected/suspended rider.
+                    $fromStatus = $rider['status'];
                     $upd = $db->prepare("UPDATE riders SET status = 'approved', rejection_reason = NULL WHERE id = :id");
                     $upd->execute(['id' => $riderId]);
-                    write_audit_log('admin', $admin['id'], 'rider_approved', ['rider_id' => $riderId, 'from_status' => $rider['status']]);
+                    write_audit_log('admin', $admin['id'], 'rider_approved', ['rider_id' => $riderId, 'from_status' => $fromStatus]);
+                    // "Approved" and "Reactivated" are the same DB
+                    // transition (approve, from any prior status) but
+                    // deep-plan §23 lists them as two distinct events —
+                    // the wording only differs so a rider who was never
+                    // rejected/suspended doesn't get a confusing
+                    // "reactivated" message on their very first approval.
+                    create_notification(
+                        'rider', $riderId,
+                        $fromStatus === 'pending' ? 'Account approved' : 'Account reactivated',
+                        $fromStatus === 'pending'
+                            ? 'Your rider account has been approved. You can now go online and start accepting deliveries.'
+                            : 'Your rider account has been reactivated. You can now go online and start accepting deliveries.',
+                        'account', ['screen' => 'dashboard']
+                    );
                     $flash = admin_escape($rider['name']) . ' is now approved.';
                 } elseif ($action === 'reject') {
                     if ($rider['status'] !== 'pending') {
@@ -108,6 +160,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $upd = $db->prepare("UPDATE riders SET status = 'rejected', rejection_reason = :r WHERE id = :id");
                         $upd->execute(['r' => $reason, 'id' => $riderId]);
                         write_audit_log('admin', $admin['id'], 'rider_rejected', ['rider_id' => $riderId, 'reason' => $reason]);
+                        create_notification(
+                            'rider', $riderId, 'Account rejected',
+                            'Your rider application was rejected: ' . $reason,
+                            'account', ['screen' => 'application_status']
+                        );
                         $flash = admin_escape($rider['name']) . ' rejected.';
                     }
                 } elseif ($action === 'suspend') {
@@ -121,8 +178,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $upd = $db->prepare("UPDATE riders SET status = 'suspended', rejection_reason = :r WHERE id = :id");
                         $upd->execute(['r' => $reason, 'id' => $riderId]);
                         write_audit_log('admin', $admin['id'], 'rider_suspended', ['rider_id' => $riderId, 'reason' => $reason]);
+                        create_notification(
+                            'rider', $riderId, 'Account suspended',
+                            'Your rider account has been suspended: ' . $reason,
+                            'account', ['screen' => 'application_status']
+                        );
                         $flash = admin_escape($rider['name']) . ' suspended.';
                     }
+                }
+            }
+        } elseif ($formAction === 'verify_documents' || $formAction === 'reject_documents') {
+            // Migration 75 — mirrors settlements.php's
+            // verify_bank_details/reject_bank_details action pair
+            // exactly (same form_action-value-picks-the-status trick,
+            // same "remark/reason required only to reject" rule).
+            if (!$canManageDocuments) {
+                $flash = 'Your role doesn\'t have the rider_documents_manage permission.';
+                $flashType = 'error';
+            } elseif ($rider['documents_status'] !== 'pending') {
+                $flash = 'Only documents currently under review (pending) can be verified or rejected — this rider\'s documents are ' . $rider['documents_status'] . '.';
+                $flashType = 'error';
+            } else {
+                $newDocStatus = $formAction === 'verify_documents' ? 'verified' : 'rejected';
+                $reason = trim($_POST['reason'] ?? '');
+
+                if ($newDocStatus === 'rejected' && $reason === '') {
+                    $flash = 'A reason is required when rejecting documents, so the rider knows what to fix.';
+                    $flashType = 'error';
+                } else {
+                    $upd = $db->prepare(
+                        'UPDATE riders
+                         SET documents_status = :status, documents_reject_reason = :reason,
+                             documents_verified_by_admin_id = :admin_id, documents_verified_at = NOW()
+                         WHERE id = :id'
+                    );
+                    $upd->execute([
+                        'status' => $newDocStatus,
+                        'reason' => $newDocStatus === 'rejected' ? $reason : null,
+                        'admin_id' => $admin['id'],
+                        'id' => $riderId,
+                    ]);
+                    write_audit_log('admin', $admin['id'], 'rider_documents_' . $newDocStatus, ['rider_id' => $riderId, 'reason' => $reason ?: null]);
+                    // Not in deep-plan §23's own Account list verbatim
+                    // (that list predates migration 75), but it's the
+                    // same "tell the rider their submission was
+                    // actioned" need as Approved/Rejected/Suspended
+                    // above, so it gets the same 'account' notification
+                    // type rather than inventing a fifth one.
+                    create_notification(
+                        'rider', $riderId,
+                        $newDocStatus === 'verified' ? 'Documents verified' : 'Documents rejected',
+                        $newDocStatus === 'verified'
+                            ? 'Your submitted documents have been verified.'
+                            : 'Your documents were rejected: ' . $reason . '. Please re-submit.',
+                        'account', ['screen' => 'submit_documents']
+                    );
+                    $flash = $newDocStatus === 'verified' ? 'Documents verified.' : 'Documents rejected.';
                 }
             }
         } elseif ($formAction === 'assign_area') {
@@ -164,39 +275,78 @@ $page = max(1, (int) ($_GET['page'] ?? 1));
 $perPage = 20;
 $offset = ($page - 1) * $perPage;
 
-$where = ['deleted_at IS NULL', 'restaurant_id IS NULL'];
+$where = ['r.deleted_at IS NULL', 'r.restaurant_id IS NULL'];
 $params = [];
 if ($q !== '') {
-    $where[] = '(name LIKE :q OR email LIKE :q OR mobile LIKE :q)';
+    $where[] = '(r.name LIKE :q OR r.email LIKE :q OR r.mobile LIKE :q)';
     $params['q'] = '%' . $q . '%';
 }
 if ($statusFilter !== '') {
-    $where[] = 'status = :status';
+    $where[] = 'r.status = :status';
     $params['status'] = $statusFilter;
 }
 if ($areaFilter !== null) {
-    $where[] = 'service_area_id = :area_id';
+    $where[] = 'r.service_area_id = :area_id';
     $params['area_id'] = $areaFilter;
 }
 $whereSql = implode(' AND ', $where);
 
-$countStmt = $db->prepare("SELECT COUNT(*) AS c FROM riders WHERE {$whereSql}");
+// Aliased "r" (rather than the unprefixed style every other WHERE
+// clause in this file otherwise uses) only because of the new
+// current-order LEFT JOIN below — orders has its own restaurant_id/
+// status columns, so an unqualified WHERE would be ambiguous the
+// moment that join is present. Applied to the count query too even
+// though it has no join, just so $whereSql stays one shared string
+// for both rather than two near-identical copies.
+$countStmt = $db->prepare("SELECT COUNT(*) AS c FROM riders r WHERE {$whereSql}");
 $countStmt->execute($params);
 $totalCount = (int) $countStmt->fetch()['c'];
 $totalPages = max(1, (int) ceil($totalCount / $perPage));
 $page = min($page, $totalPages);
 $offset = ($page - 1) * $perPage;
 
+// Deep-plan §25 (Admin Rider Command Center, "Rider list"): current
+// order via a correlated subquery picking the single highest-id
+// active order per rider (mirrors orders-current.php's own "ORDER BY
+// o.id DESC LIMIT 1" convention for "the current one"), then LEFT
+// JOIN orders on that specific id — deliberately not a plain
+// `LEFT JOIN orders ON orders.rider_id = r.id AND status IN (...)`,
+// which would silently duplicate a rider's row if the "no conflicting
+// active order" assignment rule (deep-plan §4.1) is ever violated or
+// relaxed for batching later. is_online/last_location_at/
+// cod_cash_held/earnings_balance are the same columns location.php,
+// rider_ledger.php and earnings-summary.php already read/write —
+// nothing new is added to the riders table this session, only
+// surfaced here.
 $listStmt = $db->prepare(
-    "SELECT id, name, email, mobile, status, service_area_id, vehicle_type,
-            vehicle_number, rejection_reason, created_at
-     FROM riders
+    "SELECT r.id, r.name, r.email, r.mobile, r.status, r.service_area_id, r.vehicle_type,
+            r.vehicle_number, r.rejection_reason, r.created_at,
+            r.documents_status, r.documents_reject_reason, r.id_doc_url, r.vehicle_doc_url,
+            r.profile_photo_url,
+            r.is_online, r.last_location_at, r.cod_cash_held, r.earnings_balance,
+            co.order_code AS current_order_code, co.status AS current_order_status
+     FROM riders r
+     LEFT JOIN orders co ON co.id = (
+         SELECT o.id FROM orders o
+         WHERE o.rider_id = r.id AND o.status IN ('rider_assigned', 'picked_up', 'out_for_delivery')
+         ORDER BY o.id DESC LIMIT 1
+     )
      WHERE {$whereSql}
-     ORDER BY created_at ASC
+     ORDER BY r.created_at ASC
      LIMIT {$perPage} OFFSET {$offset}"
 );
 $listStmt->execute($params);
 $riders = $listStmt->fetchAll();
+
+// Same setting/default dispatch.php enforces COD-assignment blocking
+// against and rider-settlements.php already displays — reused here so
+// this list's "at/over limit" flag can never disagree with either.
+$settlementLimit = rider_cod_settlement_limit();
+$currentOrderStatusLabels = [
+    'rider_assigned' => 'Rider Assigned',
+    'picked_up' => 'Picked Up',
+    'out_for_delivery' => 'Out for Delivery',
+];
 
 // Area dropdown — every active node, since a rider (unlike a
 // restaurant) is reasonably assigned at any level their signup
@@ -270,8 +420,12 @@ require __DIR__ . '/_layout_head.php';
                     <th>Rider</th>
                     <th>Contact</th>
                     <th>Status</th>
+                    <?php if ($canViewDocuments): ?><th>Documents</th><?php endif; ?>
                     <th>Area</th>
                     <th>Vehicle</th>
+                    <th>Online</th>
+                    <th>Current order</th>
+                    <?php if ($canViewPayouts): ?><th>COD held</th><th>Earnings</th><?php endif; ?>
                     <th>Applied</th>
                     <th></th>
                 </tr>
@@ -279,15 +433,52 @@ require __DIR__ . '/_layout_head.php';
             <tbody>
                 <?php foreach ($riders as $r): ?>
                     <tr>
-                        <td><strong><?= admin_escape($r['name']) ?></strong></td>
+                        <td><strong><a href="rider-detail.php?rider_id=<?= (int) $r['id'] ?>"><?= admin_escape($r['name']) ?></a></strong></td>
                         <td class="muted"><?= admin_escape($r['mobile'] ?: '—') ?><br><?= admin_escape($r['email'] ?: '—') ?></td>
                         <td>
                             <span class="badge <?= $r['status'] === 'approved' ? 'active' : ($r['status'] === 'pending' ? 'system' : 'inactive') ?>">
                                 <?= ucfirst($r['status']) ?>
                             </span>
                         </td>
+                        <?php if ($canViewDocuments): ?>
+                        <td>
+                            <span class="badge <?= $r['documents_status'] === 'verified' ? 'active' : ($r['documents_status'] === 'pending' ? 'system' : 'inactive') ?>">
+                                <?= ucfirst(str_replace('_', ' ', $r['documents_status'])) ?>
+                            </span>
+                        </td>
+                        <?php endif; ?>
                         <td><?= $r['service_area_id'] && isset($areaNodeById[(int) $r['service_area_id']]) ? admin_escape(admin_area_breadcrumb_compact($areaNodeById[(int) $r['service_area_id']], $areaNodeById)) : '<span class="muted">Unassigned</span>' ?></td>
                         <td class="muted"><?= admin_escape($r['vehicle_type'] ?: '—') ?><?= $r['vehicle_number'] ? ' · ' . admin_escape($r['vehicle_number']) : '' ?></td>
+                        <td>
+                            <span class="badge <?= ((int) $r['is_online']) === 1 ? 'active' : 'inactive' ?>"><?= ((int) $r['is_online']) === 1 ? 'Online' : 'Offline' ?></span>
+                            <br><span class="muted" style="font-size:11px;">Seen <?= admin_escape(admin_time_ago($r['last_location_at'])) ?></span>
+                        </td>
+                        <td>
+                            <?php if ($r['current_order_code']): ?>
+                                <span class="badge system"><?= admin_escape($currentOrderStatusLabels[$r['current_order_status']] ?? $r['current_order_status']) ?></span>
+                                <br><span class="muted" style="font-size:11px;">#<?= admin_escape($r['current_order_code']) ?></span>
+                            <?php else: ?>
+                                <span class="muted">—</span>
+                            <?php endif; ?>
+                        </td>
+                        <?php if ($canViewPayouts): ?>
+                        <td>
+                            <?php $codHeld = (float) $r['cod_cash_held']; ?>
+                            <?php if ($codHeld >= $settlementLimit && $codHeld > 0): ?>
+                                <span class="badge inactive">⚠ ₹<?= admin_escape(number_format($codHeld, 2)) ?></span>
+                            <?php else: ?>
+                                ₹<?= admin_escape(number_format($codHeld, 2)) ?>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php $owed = (float) $r['earnings_balance']; ?>
+                            <?php if ($owed > 0): ?>
+                                <span class="badge system">₹<?= admin_escape(number_format($owed, 2)) ?></span>
+                            <?php else: ?>
+                                <span class="muted">₹0.00</span>
+                            <?php endif; ?>
+                        </td>
+                        <?php endif; ?>
                         <td class="muted"><?= admin_escape(substr($r['created_at'], 0, 10)) ?></td>
                         <td>
                             <button type="button" class="btn btn-outline" data-open-dialog="manage-<?= (int) $r['id'] ?>">Manage</button>
@@ -315,6 +506,10 @@ require __DIR__ . '/_layout_head.php';
                     Status: <strong><?= ucfirst($r['status']) ?></strong>
                     <?php if ($r['rejection_reason']): ?><br>Last reason: <?= admin_escape($r['rejection_reason']) ?><?php endif; ?>
                 </p>
+
+                <div class="row-actions" style="margin-bottom:10px;">
+                    <a class="btn btn-outline" href="rider-detail.php?rider_id=<?= (int) $r['id'] ?>">View full detail (orders, location, audit trail)</a>
+                </div>
 
                 <?php if ($canApprove): ?>
                     <?php if ($r['status'] === 'pending'): ?>
@@ -355,6 +550,44 @@ require __DIR__ . '/_layout_head.php';
                     <?php endif; ?>
                 <?php endif; ?>
 
+                <?php if ($canViewDocuments): ?>
+                    <hr style="margin:14px 0; border:none; border-top:1px solid var(--border);">
+                    <p class="modal-text">
+                        Documents: <strong><?= ucfirst(str_replace('_', ' ', $r['documents_status'])) ?></strong>
+                        <?php if ($r['documents_reject_reason']): ?><br>Last reason: <?= admin_escape($r['documents_reject_reason']) ?><?php endif; ?>
+                    </p>
+                    <div class="row-actions" style="margin-bottom:10px;">
+                        <?php if ($r['id_doc_url']): ?>
+                            <a class="btn btn-outline" target="_blank" rel="noopener"
+                               href="/api/v1/rider/documents-view.php?rider_id=<?= (int) $r['id'] ?>&doc=id">View ID Doc</a>
+                        <?php else: ?>
+                            <span class="muted">No ID doc submitted</span>
+                        <?php endif; ?>
+                        <?php if ($r['vehicle_doc_url']): ?>
+                            <a class="btn btn-outline" target="_blank" rel="noopener"
+                               href="/api/v1/rider/documents-view.php?rider_id=<?= (int) $r['id'] ?>&doc=vehicle">View Vehicle Doc</a>
+                        <?php else: ?>
+                            <span class="muted">No vehicle doc submitted</span>
+                        <?php endif; ?>
+                    </div>
+                    <?php if ($canManageDocuments && $r['documents_status'] === 'pending'): ?>
+                        <form method="post" style="margin-bottom:10px;">
+                            <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
+                            <input type="hidden" name="rider_id" value="<?= (int) $r['id'] ?>">
+                            <input type="hidden" name="form_action" value="verify_documents">
+                            <button type="submit" class="btn btn-approve" style="width:100%;">Verify Documents</button>
+                        </form>
+                        <form method="post">
+                            <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
+                            <input type="hidden" name="rider_id" value="<?= (int) $r['id'] ?>">
+                            <input type="hidden" name="form_action" value="reject_documents">
+                            <label class="field-label">Rejection reason</label>
+                            <textarea name="reason" style="width:100%; min-height:60px;" required></textarea>
+                            <button type="submit" class="btn btn-outline danger" style="width:100%; margin-top:8px;">Reject Documents</button>
+                        </form>
+                    <?php endif; ?>
+                <?php endif; ?>
+
                 <?php if ($canEdit): ?>
                     <hr style="margin:14px 0; border:none; border-top:1px solid var(--border);">
                     <form method="post" class="form-grid">
@@ -372,6 +605,14 @@ require __DIR__ . '/_layout_head.php';
                         </div>
                         <button type="submit" class="btn btn-outline">Save area</button>
                     </form>
+                <?php endif; ?>
+
+                <?php if ($canViewPayouts): ?>
+                    <hr style="margin:14px 0; border:none; border-top:1px solid var(--border);">
+                    <div class="row-actions" style="margin-bottom:4px;">
+                        <a class="btn btn-outline" href="rider-settlements.php?rider_id=<?= (int) $r['id'] ?>">COD Settlement</a>
+                        <a class="btn btn-outline" href="rider-earnings.php?rider_id=<?= (int) $r['id'] ?>">Earnings Ledger</a>
+                    </div>
                 <?php endif; ?>
 
                 <div class="modal-actions" style="margin-top:14px;">

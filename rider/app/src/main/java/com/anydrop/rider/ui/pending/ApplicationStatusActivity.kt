@@ -13,6 +13,7 @@ import com.anydrop.rider.network.ApiClient
 import com.anydrop.rider.network.parseApiError
 import com.anydrop.rider.ui.common.InAppNotifier
 import com.anydrop.rider.ui.dashboard.RiderDashboardActivity
+import com.anydrop.rider.ui.documents.SubmitDocumentsActivity
 import com.anydrop.rider.ui.login.LoginActivity
 import kotlinx.coroutines.launch
 
@@ -62,9 +63,44 @@ class ApplicationStatusActivity : AppCompatActivity() {
         }
 
         renderStatus(tokenManager.getStatus(), tokenManager.getRejectionReason())
+        renderDocumentsButton()
 
         binding.btnRefreshStatus.setOnClickListener { onRefreshClicked() }
+        binding.btnManageDocuments.setOnClickListener {
+            startActivity(Intent(this, SubmitDocumentsActivity::class.java))
+        }
         binding.btnLogout.setOnClickListener { onLogoutClicked() }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Re-render off the cached value only — SubmitDocumentsActivity
+        // already updates TokenManager's cached documents_status itself
+        // (on load and on a successful submit), so coming back from that
+        // screen just needs this label refreshed, not a new network call.
+        renderDocumentsButton()
+    }
+
+    /** Deep-plan §22 — branches on the cached documents_status the same
+     *  way renderStatus() above branches on the account-level status.
+     *  Hidden entirely once verified (nothing left for the rider to do
+     *  here); shown with a status-appropriate label otherwise. */
+    private fun renderDocumentsButton() {
+        when (tokenManager.getDocumentsStatus()) {
+            "verified" -> binding.btnManageDocuments.visibility = View.GONE
+            "pending" -> {
+                binding.btnManageDocuments.visibility = View.VISIBLE
+                binding.btnManageDocuments.text = getString(R.string.documents_button_pending)
+            }
+            "rejected" -> {
+                binding.btnManageDocuments.visibility = View.VISIBLE
+                binding.btnManageDocuments.text = getString(R.string.documents_button_rejected)
+            }
+            else -> {
+                binding.btnManageDocuments.visibility = View.VISIBLE
+                binding.btnManageDocuments.text = getString(R.string.documents_button_not_submitted)
+            }
+        }
     }
 
     private fun renderStatus(status: String?, rejectionReason: String?) {
@@ -122,6 +158,7 @@ class ApplicationStatusActivity : AppCompatActivity() {
                     // next cold start also gets the fresh values.
                     tokenManager.updateStatus(result.status, result.rider.rejectionReason)
                     tokenManager.setIsOnline(result.rider.isOnline)
+                    tokenManager.updateDocumentsStatus(result.rider.documentsStatus)
                     setRefreshLoading(false)
                     if (result.status == "approved") {
                         InAppNotifier.show(this@ApplicationStatusActivity, getString(R.string.status_refreshed), InAppNotifier.Type.SUCCESS)
@@ -129,6 +166,7 @@ class ApplicationStatusActivity : AppCompatActivity() {
                         return@launch
                     }
                     renderStatus(result.status, result.rider.rejectionReason)
+                    renderDocumentsButton()
                     InAppNotifier.show(this@ApplicationStatusActivity, getString(R.string.status_refreshed), InAppNotifier.Type.SUCCESS)
                 } else {
                     val parsed = parseApiError(response.errorBody())

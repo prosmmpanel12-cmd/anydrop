@@ -175,12 +175,20 @@ function dispatch_next_candidate(PDO $db, int $orderId): bool
  * a cron/worker process. Cheap: the idx_assignment_expiry index makes
  * the SELECT a single index range scan, and this only does real work
  * when something has actually expired.
+ *
+ * Also fires the "Assignment expired" notification (Rider_Deep_Plan.md
+ * §23, Assignment category) to the rider whose offer just timed out —
+ * this is opportunistic too (fires whenever the next dispatch-adjacent
+ * endpoint call happens to sweep it, same as the expiry itself), not a
+ * real-time push the instant the timer hits zero.
  */
 function expire_stale_offers(PDO $db): void
 {
     $stmt = $db->query(
-        "SELECT id, order_id FROM rider_order_assignments
-         WHERE status = 'offered' AND expires_at < NOW()"
+        "SELECT a.id, a.order_id, a.rider_id, o.order_code
+         FROM rider_order_assignments a
+         JOIN orders o ON o.id = a.order_id
+         WHERE a.status = 'offered' AND a.expires_at < NOW()"
     );
     $expired = $stmt->fetchAll();
     if (empty($expired)) {
@@ -190,6 +198,14 @@ function expire_stale_offers(PDO $db): void
     $upd = $db->prepare("UPDATE rider_order_assignments SET status = 'expired', responded_at = NOW() WHERE id = :id");
     foreach ($expired as $row) {
         $upd->execute(['id' => $row['id']]);
+        create_notification(
+            'rider',
+            (int) $row['rider_id'],
+            'Delivery offer expired',
+            "The offer for order {$row['order_code']} timed out and went to another rider.",
+            'order',
+            ['order_id' => (int) $row['order_id'], 'screen' => 'order_offer']
+        );
         dispatch_next_candidate($db, (int) $row['order_id']);
     }
 }

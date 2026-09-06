@@ -4,7 +4,9 @@
  * Headers: Authorization: Bearer <token>
  * Response: { "rider": { id, name, email, mobile, status, rejection_reason,
  *                         service_area_id, service_area_name, created_at,
- *                         is_online, vehicle_type, vehicle_number },
+ *                         is_online, vehicle_type, vehicle_number,
+ *                         documents_status, documents_reject_reason,
+ *                         profile_photo_url },
  *             "status": "pending"|"approved"|"rejected"|"suspended" }
  *
  * Phase 3 (docs/rider/83_Plan_Phase3...) added is_online/vehicle_type/
@@ -12,6 +14,15 @@
  * and behavior below are unchanged. These back RiderDashboardActivity's
  * bootstrap (online switch initial state + vehicle display) so it
  * doesn't need a second round trip after login/refresh.
+ *
+ * Migration 75 (deep-plan §22, Rider Documents) added documents_status/
+ * documents_reject_reason/profile_photo_url — also purely additive.
+ * ApplicationStatusActivity uses documents_status to decide whether to
+ * show a "Complete Profile" prompt (not_submitted/rejected) or a
+ * "Documents under review" note (pending) while the account itself is
+ * still pending; RiderDashboardActivity uses the same field to decide
+ * whether its own document-re-submission entry point should show a
+ * "rejected — action needed" badge.
  *
  * Lightweight "who am I + what's my current status" endpoint for the
  * Rider app's ApplicationStatusActivity "Refresh Status" button.
@@ -56,7 +67,8 @@ $db = Database::get();
 $stmt = $db->prepare(
     'SELECT r.id, r.name, r.email, r.mobile, r.status, r.rejection_reason,
             r.service_area_id, sa.name AS service_area_name, r.created_at,
-            r.is_online, r.vehicle_type, r.vehicle_number
+            r.is_online, r.vehicle_type, r.vehicle_number,
+            r.documents_status, r.documents_reject_reason, r.profile_photo_url
      FROM riders r
      LEFT JOIN service_areas sa ON sa.id = r.service_area_id
      WHERE r.id = :id AND r.deleted_at IS NULL
@@ -85,6 +97,9 @@ respond_ok([
         'is_online'           => (bool) $rider['is_online'],
         'vehicle_type'        => $rider['vehicle_type'],
         'vehicle_number'      => $rider['vehicle_number'],
+        'documents_status'    => $rider['documents_status'],
+        'documents_reject_reason' => $rider['documents_reject_reason'],
+        'profile_photo_url'   => $rider['profile_photo_url'],
     ],
     'status' => $rider['status'],
 ]);

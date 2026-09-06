@@ -36,6 +36,7 @@ require_once __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../lib/audit.php';
 require_once __DIR__ . '/../lib/orders.php';
 require_once __DIR__ . '/../lib/refunds.php';
+require_once __DIR__ . '/../lib/notifications.php';
 
 $admin = admin_require_login();
 admin_require_permission($admin, 'orders_view');
@@ -88,6 +89,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             )->execute(['r' => $reason, 'id' => $orderId]);
             insert_status_history($db, $orderId, 'cancelled', 'admin', (int) $admin['id'], $reason);
 
+            // Rider_Deep_Plan.md §23, Order category ("Admin
+            // cancellation") / Assignment category ("Assignment
+            // cancelled") — a force-cancel can land on an order in any
+            // non-terminal state, which includes both "a rider is
+            // already assigned and working it" and "a rider has an
+            // open, unresponded offer out for it" (dispatch only starts
+            // once the order hits 'ready', so these are the only two
+            // rider-facing possibilities; 'pending'/'accepted'/
+            // 'preparing' have no rider involved yet). Exactly one of
+            // these two branches can apply, never both — an order only
+            // ever has either an assigned rider_id or a live 'offered'
+            // row, not both at once (see orders-accept.php's own
+            // transaction for why).
+            //
+            // Notification is deferred until after $db->commit() below
+            // (doc 106 fix) rather than fired here: create_notification()
+            // sends a live outbound FCM push as a side effect, and
+            // Database::get() is a per-request PDO singleton, so a push
+            // fired here would go out to the rider's phone even if a
+            // later statement in this same transaction (the refund
+            // insert) throws and everything up to here rolls back —
+            // "order cancelled" would reach the rider for an order that,
+            // in the DB, was never actually cancelled. $notifyRiderId/
+            // $notifyPayload capture what to send without sending it yet.
+            $notifyRiderId = null;
+            $notifyTitle = null;
+            $notifyBody = null;
+            $notifyPayload = null;
+            if ($order['rider_id'] !== null) {
+                $notifyRiderId = (int) $order['rider_id'];
+                $notifyTitle = 'Order cancelled';
+                $notifyBody = "Order {$order['order_code']} was cancelled by Anydrop support. No further action is needed.";
+                $notifyPayload = ['order_id' => $orderId, 'screen' => 'order_status'];
+            } else {
+                $openOffer = $db->prepare(
+                    "SELECT rider_id FROM rider_order_assignments WHERE order_id = :id AND status = 'offered' LIMIT 1"
+                );
+                $openOffer->execute(['id' => $orderId]);
+                if ($offerRider = $openOffer->fetch()) {
+                    $db->prepare(
+                        "UPDATE rider_order_assignments SET status = 'cancelled', responded_at = NOW() WHERE order_id = :id AND status = 'offered'"
+                    )->execute(['id' => $orderId]);
+                    $notifyRiderId = (int) $offerRider['rider_id'];
+                    $notifyTitle = 'Delivery offer cancelled';
+                    $notifyBody = "Order {$order['order_code']} is no longer available — it was cancelled before pickup.";
+                    $notifyPayload = ['order_id' => $orderId, 'screen' => 'order_offer'];
+                }
+            }
+
             // Same "don't leave paid money unresolved" rule cancel.php/
             // orders-reject.php already enforce — see those files' own
             // kdoc. get_refund_for_order() guard avoids a duplicate-row
@@ -96,6 +146,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 create_refund_request($db, $order, 'Force-cancelled by admin: ' . $reason, 'admin');
             }
             $db->commit();
+
+            // Fired only after a successful commit — see comment above.
+            if ($notifyRiderId !== null) {
+                create_notification('rider', $notifyRiderId, $notifyTitle, $notifyBody, 'order', $notifyPayload);
+            }
 
             write_audit_log('admin', $admin['id'], 'order_force_cancelled', [
                 'order_id' => $orderId,

@@ -40,4 +40,21 @@
     <color name="status_rejected_fg">#F87171</color>
     <color name="status_suspended_bg">#26332A</color>
     <color name="status_suspended_fg">#9FB3A6</color>
+
+    <!-- Documents status chips (deep-plan §22, migration 75) — a
+         separate 4-state enum from riders.status above (see migration
+         75's own header for why), so it gets its own color aliases
+         rather than reusing status_pending_*/status_approved_* by
+         coincidence. Values intentionally match those existing pairs
+         1:1 today (pending=pending, verified=approved) since the same
+         yellow/green/red/grey semantics apply, but this keeps the two
+         concepts independently themeable if they ever diverge. -->
+    <color name="doc_not_submitted_bg">#26332A</color>
+    <color name="doc_not_submitted_fg">#9FB3A6</color>
+    <color name="doc_pending_bg">#332B10</color>
+    <color name="doc_pending_fg">#FBBF24</color>
+    <color name="doc_verified_bg">#14331F</color>
+    <color name="doc_verified_fg">#4ADE80</color>
+    <color name="doc_rejected_bg">#3A1414</color>
+    <color name="doc_rejected_fg">#F87171</color>
 </resources>

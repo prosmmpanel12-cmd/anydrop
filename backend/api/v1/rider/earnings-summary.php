@@ -3,7 +3,8 @@
  * GET /api/v1/rider/earnings-summary.php
  * Auth: Rider token
  * Response: { "today_total": <float>, "balance": <float>,
- *             "share_percent": <float>, "recent": [
+ *             "share_percent": <float>, "cod_cash_held": <float>,
+ *             "cod_settlement_limit": <float>, "recent": [
  *               { id, entry_type, amount, order_id, order_code, note, created_at }, ...
  *             ] }
  *
@@ -25,12 +26,26 @@
  * date-boundary calculation in this codebase — no per-rider timezone
  * concept exists anywhere, e.g. app-version.php's maintenance windows,
  * insights CSV export's date ranges).
+ *
+ * cod_cash_held/cod_settlement_limit (added deep-plan §17-18) — §17's
+ * explicit instruction is "the rider app should display the running
+ * cash-held amount separately from earnings", so these ride alongside
+ * the earnings figures on the same screen/endpoint rather than mixing
+ * into `balance` (COD cash held is money the rider is physically
+ * carrying and owes the platform — the opposite direction of
+ * `balance`, which is money the platform owes the rider). `cod_limit`
+ * mirrors `dispatch.php`'s own `get_setting('rider_cod_settlement_limit', 2000)`
+ * call exactly (same key, same default) so the Android side's "at
+ * limit" warning always agrees with the server-side assignment block
+ * it's describing, rather than a second hardcoded number drifting out
+ * of sync with the real enforcement point.
  */
 
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/rider_earnings.php';
+require_once __DIR__ . '/../../../lib/settings.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -43,10 +58,14 @@ $riderId = (int) $owner['owner_id'];
 
 $db = Database::get();
 
-$riderStmt = $db->prepare('SELECT earnings_balance FROM riders WHERE id = :id LIMIT 1');
+$riderStmt = $db->prepare('SELECT earnings_balance, cod_cash_held FROM riders WHERE id = :id LIMIT 1');
 $riderStmt->execute(['id' => $riderId]);
 $rider = $riderStmt->fetch();
 $balance = $rider ? (float) $rider['earnings_balance'] : 0.0;
+$codCashHeld = $rider ? (float) $rider['cod_cash_held'] : 0.0;
+// Same key/default dispatch.php's own COD-assignment block uses — see
+// this file's kdoc for why these two must never drift apart.
+$codSettlementLimit = (float) get_setting('rider_cod_settlement_limit', 2000);
 
 $todayStmt = $db->prepare(
     "SELECT COALESCE(SUM(amount), 0) AS total
@@ -85,5 +104,7 @@ respond_ok([
     'today_total' => round($todayTotal, 2),
     'balance' => round($balance, 2),
     'share_percent' => rider_earning_share_percent(),
+    'cod_cash_held' => round($codCashHeld, 2),
+    'cod_settlement_limit' => round($codSettlementLimit, 2),
     'recent' => $recent,
 ]);

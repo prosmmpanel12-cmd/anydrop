@@ -117,3 +117,44 @@ function admin_area_breadcrumb_compact(array $area, array $areaById): string
     }
     return implode(', ', $parts);
 }
+
+/**
+ * Deep-plan §25 (Admin Rider Command Center, "Rider list" — last seen).
+ * First caller is riders.php's `is_online`/`last_location_at` column;
+ * kept here rather than local to that file since "how old is this
+ * timestamp, in words" is a generic admin-list need with no existing
+ * helper anywhere in this codebase (grepped for one before adding this)
+ * and the next screen that wants a relative-time cell (e.g. a future
+ * live rider map's "stale location" flag, deep-plan §25's own "Live
+ * map" sub-section) shouldn't have to re-invent it.
+ *
+ * Deliberately coarse (minute/hour/day buckets only, no i18n plural
+ * rules) — an admin ops screen, not customer-facing copy.
+ */
+function admin_time_ago(?string $timestamp): string
+{
+    if ($timestamp === null || $timestamp === '') {
+        return 'Never';
+    }
+    $then = strtotime($timestamp);
+    if ($then === false) {
+        return 'Never';
+    }
+    $diff = time() - $then;
+    if ($diff < 0) {
+        $diff = 0;
+    }
+    if ($diff < 60) {
+        return 'Just now';
+    }
+    if ($diff < 3600) {
+        $m = (int) floor($diff / 60);
+        return $m . ' min ago';
+    }
+    if ($diff < 86400) {
+        $h = (int) floor($diff / 3600);
+        return $h . ' hr' . ($h === 1 ? '' : 's') . ' ago';
+    }
+    $d = (int) floor($diff / 86400);
+    return $d . ' day' . ($d === 1 ? '' : 's') . ' ago';
+}

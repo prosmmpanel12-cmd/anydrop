@@ -49,6 +49,19 @@ class TokenManager(context: Context) {
         prefs.edit().putBoolean(KEY_IS_ONLINE, online).apply()
     }
 
+    /** Deep-plan §22, migration 75 — cached purely so ApplicationStatusActivity
+     *  can label its "Manage Documents" button on cold start without an
+     *  extra network round trip, same "cached, not source of truth" stance
+     *  getIsOnline()/setIsOnline() already take above. Refreshed whenever
+     *  getMe() or getRiderDocuments() succeeds (see those call sites).
+     *  Defaults to "not_submitted" — matches migration 75's own column
+     *  default for a rider who has never fetched this yet. */
+    fun getDocumentsStatus(): String = prefs.getString(KEY_DOCUMENTS_STATUS, null) ?: "not_submitted"
+
+    fun updateDocumentsStatus(status: String) {
+        prefs.edit().putString(KEY_DOCUMENTS_STATUS, status).apply()
+    }
+
     fun isLoggedIn(): Boolean = !getToken().isNullOrEmpty()
 
     fun clear() {
@@ -62,5 +75,6 @@ class TokenManager(context: Context) {
         private const val KEY_STATUS = "status"
         private const val KEY_REJECTION_REASON = "rejection_reason"
         private const val KEY_IS_ONLINE = "is_online"
+        private const val KEY_DOCUMENTS_STATUS = "documents_status"
     }
 }

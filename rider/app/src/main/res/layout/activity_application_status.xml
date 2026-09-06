@@ -80,6 +80,19 @@
             xmlns:tools="http://schemas.android.com/tools" />
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnManageDocuments"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="20dp"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:text="@string/documents_button_not_submitted"
+            android:textAllCaps="false"
+            android:textSize="15sp"
+            app:cornerRadius="14dp"
+            tools:text="Complete Profile"
+            xmlns:tools="http://schemas.android.com/tools" />
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnRefreshStatus"
             android:layout_width="match_parent"
             android:layout_height="54dp"

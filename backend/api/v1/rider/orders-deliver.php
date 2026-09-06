@@ -157,6 +157,22 @@ create_notification(
     ['order_id' => $orderId, 'screen' => 'order_status']
 );
 
+// Deep-plan §23, Finance category "Earning posted" — the one Finance
+// event that wasn't already covered (Payout initiated/completed/
+// rejected all fire from lib/rider_earnings.php's payout functions
+// already). Fires here rather than inside record_rider_delivery_earning()
+// itself, same "the ledger-writing function stays notification-free,
+// the call site decides whether/how to tell the rider" split payout
+// approval/completion/rejection already establish in rider_earnings.php.
+create_notification(
+    'rider',
+    $riderId,
+    'Earning posted',
+    'You earned ₹' . number_format((float) $earningResult['amount'], 2) . " for order {$order['order_code']}.",
+    'payout',
+    ['order_id' => $orderId, 'screen' => 'earnings']
+);
+
 respond_ok([
     'order_id' => $orderId,
     'status' => 'delivered',

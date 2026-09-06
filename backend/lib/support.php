@@ -129,6 +129,29 @@ if (!function_exists('create_ticket')) {
             'ticket_id' => $ticketId, 'ticket_code' => $ticketCode, 'category' => $category,
         ]);
 
+        // Rider_Deep_Plan.md §23, Order category ("Delivery issue") —
+        // create_ticket() is already raiser-type-generic (see this
+        // file's header), so this fires regardless of who raised the
+        // ticket (today, admin only — PENDING.md #9). Only fires when
+        // the ticket is both category=delivery_issue AND the linked
+        // order actually has a rider assigned; an order-linked issue
+        // logged before a rider ever picked it up has no one to notify.
+        if ($category === 'delivery_issue' && $orderId !== null) {
+            $orderStmt = $db->prepare('SELECT rider_id, order_code FROM orders WHERE id = :id LIMIT 1');
+            $orderStmt->execute(['id' => $orderId]);
+            $linkedOrder = $orderStmt->fetch();
+            if ($linkedOrder && $linkedOrder['rider_id'] !== null) {
+                create_notification(
+                    'rider',
+                    (int) $linkedOrder['rider_id'],
+                    'Delivery issue reported',
+                    "A delivery issue was reported for order {$linkedOrder['order_code']} (ticket {$ticketCode}).",
+                    'order',
+                    ['order_id' => $orderId, 'ticket_id' => $ticketId, 'screen' => 'order_status']
+                );
+            }
+        }
+
         return ['ok' => true, 'ticket_id' => $ticketId, 'ticket_code' => $ticketCode];
     }
 }

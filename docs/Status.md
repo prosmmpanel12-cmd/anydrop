@@ -4554,3 +4554,211 @@ Not build/device-verified — same standing sandbox limitation (no
 Android SDK here). Next session, if continuing: Restaurant & Menu is
 the owner's stated next flow, once this Home pass is confirmed to
 look right on a real device/build.
+
+
+## Route-Line Progress Trim + Deviation Recalc built, then its Admin Settings page (2026-09-04/05, sessions 21-22)
+
+Full detail: `docs/92_Handover_2026-09-05_RouteLine_ProgressTrim_DeviationRecalc_Built.md`
+and `docs/93_Handover_2026-09-05_RouteRecalc_AdminSettings_Built.md`.
+
+Doc 91's plan built in full: server-side `with_route_config()` in
+`api/v1/orders/route.php` now returns three tunable numbers
+(deviation threshold/sustain/max-recalc-interval) on every response;
+Android's `OrderStatusActivity` does smooth per-frame polyline
+trimming as the rider marker animates, plus deviation-triggered route
+recalculation with a fallback ceiling. New `util/RouteGeometry.kt`
+(hand-rolled nearest-point-on-polyline projection, no new Maps-utils
+dependency).
+
+Doc 92 flagged one explicit gap — no admin UI for the three new
+settings — closed same day: `backend/admin/route-recalc-settings.php`,
+new sidebar entry under Settings, gated `settings_manage`, same
+one-small-page shape `directions-settings.php` established.
+
+Not build/device-verified — same standing sandbox limitation (no
+Android SDK/PHP CLI/live DB here). Next step: real device test of the
+trim/recalc feel, then tune the three defaults from what's observed.
+
+
+## Rider Earnings — Admin settings page, then full ledger screen (2026-09-05, sessions 22-23)
+
+Full detail: `docs/93_Handover_2026-09-05_RouteRecalc_AdminSettings_Built.md`
+and `docs/rider/94_Handover_2026-09-05_RiderEarnings_FullLedgerScreen_Built.md`.
+
+Session 23 closed doc 90's flagged "natural next slice": a rider-facing
+Earnings screen (today total + balance + share% + last-20 ledger list),
+reached by tapping the dashboard's TODAY card (now clickable — was a
+static info card before). New `EarningsActivity` + the rider app's
+first `RecyclerView.Adapter` (`EarningsLedgerAdapter`, modeled on the
+customer app's `WalletWithdrawalAdapter`). Required adding
+`recyclerview`/`cardview`/`swiperefreshlayout` to the rider module's
+`build.gradle` — none existed there before, versions matched to the
+customer app's own.
+
+Not build/device-verified — same standing sandbox limitation. This
+slice is a slightly higher-than-usual build-risk item since it adds
+new Gradle dependencies for the first time in this module — a real
+build check matters more here than for a pure-code-edit session.
+Next: Rider Documents (deep-plan §22) or the Payouts self-service
+request flow (deep-plan §21), owner's choice.
+
+
+## Rider Notifications — backend, Android built across five sessions, now complete (2026-09-05, sessions 24-28)
+
+Full detail: `docs/rider/99_Handover_2026-09-05_RiderNotifications_Backend_Partial.md`
+through `docs/rider/103_Handover_2026-09-05_RiderNotifications_Android_Complete.md`.
+
+Deep-plan §23's account-notification bell, end to end: backend
+(`rider/fcm-token-update.php`, `rider/notifications-list.php`,
+`rider/notifications-read.php`, `rider/notifications-read-all.php`,
+`create_notification()` call sites in `backend/admin/riders.php`),
+then the Android side across four sessions — `RiderNotificationHelper`
++ `RiderFirebaseMessagingService` (system-tray push), the list-screen
+layouts and drawables, and finally this session's
+`NotificationListActivity`/`NotificationAdapter`, the dashboard's
+bell+badge (`RiderDashboardActivity.updateNotificationBadge()`),
+post-login FCM token registration (`OtpVerifyActivity`), the
+`POST_NOTIFICATIONS` runtime permission request, and the
+`AndroidManifest.xml`/`strings.xml` wiring the four prior sessions'
+layouts were already depending on.
+
+**Hard blocker, unchanged across all five sessions:** Firebase project
+registration for `com.anydrop.rider` — `rider/app/google-services.json`
+still does not exist. Nothing in this sandbox can create it; needs a
+human with Firebase console access to register the app under the
+project's existing Firebase project and commit the downloaded file.
+Until then this entire slice is source that won't compile into a
+working push path.
+
+Not build/device-verified — same standing sandbox limitation. Next,
+once Firebase is registered: log in, confirm the FCM token
+round-trips, trigger one of the four `create_notification('rider',
+...)` call sites from the admin panel, confirm both the system-tray
+push and the in-app bell/badge update. Otherwise, owner's choice of
+Rider Documents/Payouts follow-ups (both already Android-complete) or
+deep-plan §23's Order category, still entirely unbuilt.
+
+
+## Firebase blocker closed — google-services.json for com.anydrop.rider received (2026-09-05, session 29)
+
+Full detail: `docs/rider/104_Handover_2026-09-05_Firebase_GoogleServicesJson_Received.md`.
+
+Owner registered `com.anydrop.rider` in the Firebase console and
+supplied the downloaded config file — same shared multi-app project
+(`anydrop-2d917`) the customer/restaurant apps already use, confirmed
+byte-identical to their copies except for the added rider client
+entry. Placed at `rider/app/google-services.json`; the Gradle plugin
+wiring (doc 101) and `applicationId` (`com.anydrop.rider`) were already
+correct, so this was the only missing piece.
+
+This closes the standing blocker every Rider Notifications handover
+(docs 99-103) carried forward — a real Gradle build of the rider
+module can now succeed. **Not build/device-verified yet** — this
+sandbox still has no Gradle/Android SDK. Next step: a real build +
+device test, specifically confirming the FCM token round-trips and a
+triggered `create_notification('rider', ...)` produces both the
+system-tray push and the in-app bell/badge update.
+
+
+## Rider Order Detail screen built, deep-plan §9 (2026-09-06, session 30)
+
+Full detail: `docs/rider/106_Handover_2026-09-06_RiderOrderDetail_DeepPlan9_Built.md`.
+
+Picked deep-plan §9 (Rider Order Detail), previously fully unbuilt.
+New `backend/api/v1/rider/orders-detail.php` (fuller field set than
+the dashboard's `orders-current.php`: restaurant/customer lat-lng and
+phones, full address detail including house/floor/landmark/receiver/
+door-photo, cost breakdown, COD amount, distance), a new
+`RiderOrderDetailActivity` (pickup/drop cards each with Navigate +
+Call actions — this app's first use of `ACTION_DIAL`/`google.
+navigation:`/`geo:` intents and, after a same-day addendum, its first
+Coil image load), and a "View Details" button wired into the
+dashboard's current-order card.
+
+Not build/device-verified — same standing sandbox limitation. Next:
+owner's choice of a real build+device pass, or another still-unbuilt
+deep-plan section.
+
+
+## COD Cash-Held card added to rider Earnings screen (2026-09-06, session 31)
+
+Full detail: `docs/rider/107_Handover_2026-09-06_CODCashHeld_EarningsCard_Built.md`.
+
+Continued from doc 106's fork, picking deep-plan §17's explicit,
+previously-unactioned line: "the rider app should display the running
+cash-held amount separately from earnings." `earnings-summary.php` now
+also returns `cod_cash_held`/`cod_settlement_limit` (same
+`rider_cod_settlement_limit` setting `dispatch.php` already enforces
+COD-assignment blocking against); `EarningsActivity` renders a new
+three-state card (OK/near-limit/limit-reached, color-matched to
+whether `dispatch.php` would currently block a new COD assignment for
+that rider). Display-only — no change to how cash-held is tracked or
+enforced.
+
+Not build/device-verified — same standing sandbox limitation. Next:
+same fork as doc 106 (a real build+device pass covering three stacked
+untested sessions, or Live Location System §12-15 / Admin Rider
+Command Center §25).
+
+
+## Admin "Rider list" columns added, deep-plan §25 partial (2026-09-06, session 32)
+
+Full detail: `docs/rider/108_Handover_2026-09-06_AdminRiderList_DeepPlan25_Partial.md`.
+
+Checked all three of doc 107's fork options against the actual code
+first: Live Location System (§12-15) turned out already substantially
+built (rider-side polling, customer-side marker/route tracking from
+docs 91-93) — doc 107's framing of it as still-open was stale. Admin
+Rider Command Center (§25) was confirmed genuinely gapped and picked.
+
+`backend/admin/riders.php`'s rider list gains Online/last-seen, Current
+order, and (gated on `payouts_view`) COD held / Earnings columns, all
+reading existing `riders` table columns already written elsewhere
+(`is_online`, `last_location_at`, `cod_cash_held`, `earnings_balance`)
+— no new migration, no new write path, display-only. New
+`admin_time_ago()` helper in `_bootstrap.php`. Manage dialog gains
+links out to the existing `rider-settlements.php`/`rider-earnings.php`
+detail views rather than duplicating them.
+
+**Only the "Rider list" sub-section of §25 was built.** "Rider detail"
+(a unified profile/orders/location-history/audit-log page — no
+existing admin screen has orders history or location history for a
+rider yet) and "Live map" (zero existing admin-side map
+infrastructure) are both real, separately-scoped builds, not started.
+
+Not build/device-verified — same standing sandbox limitation (no PHP
+CLI/live DB here). Next: real DB check of the new columns/joins, then
+owner's choice of Rider detail, Live map, or a different deep-plan
+section.
+
+
+## Admin "Rider detail" page built, deep-plan §25 (2 of 3) (2026-09-06, session 33)
+
+Full detail: `docs/rider/109_Handover_2026-09-06_AdminRiderDetail_DeepPlan25_Built.md`.
+
+Picked up doc 108's fork (owner chose "Rider detail" explicitly). New
+`backend/admin/rider-detail.php` — read-only, consolidates profile
+summary, a new paginated Order History list, a new Location History
+table (reading the already-populated `rider_locations` breadcrumb
+table, active-delivery pings only), and a new Audit Trail (every admin
+action logged against that rider, filtered via
+`JSON_UNQUOTE(JSON_EXTRACT(details_json, '$.rider_id'))`). All three
+are genuinely new admin-viewable surfaces — none existed before this
+session. No new migration, no new write path; every status/document/
+area/COD/earnings action still happens on its existing owning page,
+linked out from here rather than duplicated.
+
+`backend/admin/riders.php` gained two new entry points into this page:
+the rider name in the list is now a link, and the Manage dialog has a
+"View full detail" link above the existing status-lifecycle forms.
+
+Deep-plan §25 now has 2 of its 3 sub-sections built (Rider list, Rider
+detail) — only Live map remains, and it's a genuinely fresh build with
+zero existing admin-map infrastructure to extend.
+
+Not build/device-verified — same standing sandbox limitation. The
+Audit Trail's `JSON_UNQUOTE(JSON_EXTRACT(...))` filter is this
+session's highest-risk untested piece (no existing runtime precedent
+for this exact query in this codebase). Next: real DB check, then
+owner's choice of Live map, a real build+device pass, or a different
+deep-plan section.

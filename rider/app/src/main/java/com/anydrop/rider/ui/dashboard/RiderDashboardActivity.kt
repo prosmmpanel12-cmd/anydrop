@@ -26,7 +26,9 @@ import com.anydrop.rider.network.OnlineStatusBody
 import com.anydrop.rider.network.RejectOrderBody
 import com.anydrop.rider.network.parseApiError
 import com.anydrop.rider.ui.common.InAppNotifier
+import com.anydrop.rider.ui.documents.SubmitDocumentsActivity
 import com.anydrop.rider.ui.login.LoginActivity
+import com.anydrop.rider.ui.orderdetail.RiderOrderDetailActivity
 import com.anydrop.rider.ui.pending.ApplicationStatusActivity
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
@@ -82,6 +84,15 @@ class RiderDashboardActivity : AppCompatActivity() {
             }
         }
 
+    // Deep-plan §23, docs 99-102 — POST_NOTIFICATIONS is a runtime
+    // permission on API 33+; without it RiderNotificationHelper's
+    // account-status pushes never show, silently, no error anywhere.
+    // Same plain registerForActivityResult pattern (and same "either
+    // way, nothing else here depends on it" no-op result handling) as
+    // the restaurant app's MainActivity.notificationPermissionLauncher.
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* no-op either way */ }
+
     // Phase 3 R4 (deep-plan §12) — interval tightens to
     // LOCATION_POLL_INTERVAL_ACTIVE_MS while activeOrder is non-null (an
     // in-progress delivery a customer may be watching) and relaxes back
@@ -132,6 +143,8 @@ class RiderDashboardActivity : AppCompatActivity() {
             return
         }
 
+        requestNotificationPermissionIfNeeded()
+
         binding.dashboardGreeting.text = getString(
             R.string.dashboard_greeting_format,
             tokenManager.getRiderName() ?: ""
@@ -143,6 +156,11 @@ class RiderDashboardActivity : AppCompatActivity() {
             goToLogin()
         }
 
+        binding.btnDocumentsAlert.setOnClickListener {
+            startActivity(Intent(this, SubmitDocumentsActivity::class.java))
+        }
+        renderDocumentsEntryPoint()
+
         binding.onlineSwitch.setOnCheckedChangeListener { _, checked ->
             if (suppressSwitchListener) return@setOnCheckedChangeListener
             if (checked) attemptGoOnline() else setOnlineStatus(false)
@@ -151,6 +169,28 @@ class RiderDashboardActivity : AppCompatActivity() {
         binding.btnAcceptOffer.setOnClickListener { currentOffer?.let { acceptOffer(it) } }
         binding.btnRejectOffer.setOnClickListener { currentOffer?.let { rejectOffer(it) } }
 
+        // Deep-plan §19-20, doc 90's flagged next slice — tapping the
+        // TODAY card opens the full ledger/balance screen instead of
+        // this static figure being a dead end.
+        binding.dashboardEarningsCard.setOnClickListener {
+            startActivity(Intent(this, com.anydrop.rider.ui.earnings.EarningsActivity::class.java))
+        }
+
+        // Deep-plan §23, docs 99-102 — account-notification bell, same
+        // "tap opens the list screen" wiring as the customer app's own
+        // HomeActivity bell.
+        binding.btnNotifications.setOnClickListener {
+            startActivity(Intent(this, com.anydrop.rider.notifications.NotificationListActivity::class.java))
+        }
+
+        binding.btnViewOrderDetail.setOnClickListener {
+            activeOrder?.let { order ->
+                startActivity(
+                    Intent(this, RiderOrderDetailActivity::class.java)
+                        .putExtra(RiderOrderDetailActivity.EXTRA_ORDER_ID, order.id)
+                )
+            }
+        }
         binding.btnMarkPickedUp.setOnClickListener { activeOrder?.let { markPickedUp(it) } }
         binding.btnMarkDelivered.setOnClickListener {
             val order = activeOrder ?: return@setOnClickListener
@@ -170,6 +210,7 @@ class RiderDashboardActivity : AppCompatActivity() {
         refreshFromServer()
         pollDashboardState()
         refreshEarnings()
+        updateNotificationBadge()
     }
 
     override fun onResume() {
@@ -178,6 +219,65 @@ class RiderDashboardActivity : AppCompatActivity() {
             locationPoller.post(locationPollRunnable)
         }
         dashboardPoller.postDelayed(dashboardPollRunnable, DASHBOARD_POLL_INTERVAL_MS)
+        // Re-render off the cached value only — SubmitDocumentsActivity
+        // already updates TokenManager's cached documents_status itself,
+        // so coming back from that screen just needs this re-rendered,
+        // same "cached label, no extra network call" stance
+        // ApplicationStatusActivity.onResume() takes for its own button.
+        renderDocumentsEntryPoint()
+        // Coming back from NotificationListActivity (which auto-marks
+        // everything read on open) should clear the badge without
+        // waiting for the next full dashboard poll — same re-check-on-
+        // resume reasoning as renderDocumentsEntryPoint() above.
+        updateNotificationBadge()
+    }
+
+    /** Account-notification bell badge (deep-plan §23, docs 99-102).
+     * Same "unread_only=1 + per_page=1, only unread_count matters"
+     * cheap-call shape as the customer app's HomeActivity.
+     * updateNotificationBadge() — fire-and-forget, no retry loop; the
+     * next onCreate/onResume call is the retry. */
+    /** See notificationPermissionLauncher's kdoc — requested once, right
+     * when this landing screen is first reached, same timing as the
+     * restaurant app's own MainActivity.startOrderPollingService(). */
+    private fun requestNotificationPermissionIfNeeded() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    private fun updateNotificationBadge() {
+        lifecycleScope.launch {
+            try {
+                val response = api.getNotifications(page = 1, perPage = 1, unreadOnly = "1")
+                val result = if (response.isSuccessful) response.body()?.data else null
+                val count = result?.unreadCount ?: 0
+                if (count > 0) {
+                    binding.notificationBadge.text = if (count > 99) "99+" else count.toString()
+                    binding.notificationBadge.visibility = View.VISIBLE
+                } else {
+                    binding.notificationBadge.visibility = View.GONE
+                }
+            } catch (e: Exception) {
+                // Silent — same "don't interrupt dashboard load over a
+                // badge count" reasoning as this screen's other soft-fail
+                // network calls (refreshEarnings(), etc.). Next
+                // onCreate/onResume retries.
+            }
+        }
+    }
+
+    /** Deep-plan §22 — shows the header-row alert only when this
+     *  approved rider's documents were rejected and need re-submission.
+     *  Not shown for "pending"/"not_submitted" here (unlike
+     *  ApplicationStatusActivity's button) since an approved rider by
+     *  definition already passed the account-approval bar; only a
+     *  rejection actually needs their attention post-approval. */
+    private fun renderDocumentsEntryPoint() {
+        binding.btnDocumentsAlert.visibility =
+            if (tokenManager.getDocumentsStatus() == "rejected") View.VISIBLE else View.GONE
     }
 
     override fun onPause() {
@@ -206,7 +306,9 @@ class RiderDashboardActivity : AppCompatActivity() {
                         return@launch
                     }
                     tokenManager.setIsOnline(result.rider.isOnline)
+                    tokenManager.updateDocumentsStatus(result.rider.documentsStatus)
                     renderOnlineState(result.rider.isOnline)
+                    renderDocumentsEntryPoint()
                     if (result.rider.isOnline) {
                         locationPoller.removeCallbacks(locationPollRunnable)
                         locationPoller.post(locationPollRunnable)

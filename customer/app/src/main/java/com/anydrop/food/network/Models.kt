@@ -685,7 +685,16 @@ data class RouteResult(
     val polyline: String?,
     @SerializedName("distance_km") val distanceKm: Double?,
     @SerializedName("duration_minutes") val durationMinutes: Int?,
-    val leg: String?
+    val leg: String?,
+    // Plan doc 91 (Progress-Trim + Deviation-Based Recalc) — admin-
+    // configurable via app_settings, sent on every response (even the
+    // "no route" ones) so OrderStatusActivity always has current
+    // numbers to drive its deviation-detection loop. Defaults here
+    // match route.php's own get_setting() fallbacks, in case an older
+    // cached response or a stripped test payload ever omits them.
+    @SerializedName("deviation_threshold_m") val deviationThresholdM: Double = 70.0,
+    @SerializedName("deviation_sustain_seconds") val deviationSustainSeconds: Int = 60,
+    @SerializedName("max_recalc_interval_seconds") val maxRecalcIntervalSeconds: Int = 90
 )
 
 // ---- Addresses (§1.8/§2.6 — structured form) ----

@@ -172,6 +172,7 @@ class OtpVerifyActivity : AppCompatActivity() {
                         val status = result.status
                         if (rider != null && token != null && status != null) {
                             tokenManager.saveSession(token, rider.id, rider.name, status, rider.rejectionReason)
+                            registerFcmTokenAfterLogin()
                             goToStatus()
                         } else {
                             // Shouldn't happen per the endpoint's own contract, but
@@ -260,6 +261,25 @@ class OtpVerifyActivity : AppCompatActivity() {
         "otp_max_attempts_exceeded" -> "Too many attempts — request a new code"
         "otp_request_cooldown" -> "Please wait a moment before requesting another code"
         else -> "Something went wrong — please try again"
+    }
+
+    /** Sends this device's current FCM token right after a successful
+     * login — same reasoning as the customer/restaurant apps'
+     * identically-named methods: RiderFirebaseMessagingService.onNewToken()
+     * alone can't cover a token minted before login (no rider_id to
+     * attach to yet), so this fires once, right when one first becomes
+     * available. Best-effort, no user-visible failure. */
+    private fun registerFcmTokenAfterLogin() {
+        com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+            .addOnSuccessListener { token ->
+                lifecycleScope.launch {
+                    try {
+                        api.updateFcmToken(com.anydrop.rider.network.FcmTokenBody(token))
+                    } catch (e: Exception) {
+                        // Non-fatal — see kdoc above.
+                    }
+                }
+            }
     }
 
     private fun goToSignup() {

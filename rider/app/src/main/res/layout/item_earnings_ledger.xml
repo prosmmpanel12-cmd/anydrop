@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    EarningsActivity's ledger list — one row per rider_earnings_ledger
+    entry (deep-plan §19-20, migration 73). Same CardView-row shape as
+    the customer app's item_withdrawal.xml (surface card, two-line text
+    block + trailing value) — this project's established list-row
+    pattern, reused rather than invented fresh for the rider app's
+    first RecyclerView screen.
+
+    Amount is signed at bind time (+ for delivery_earning/incentive,
+    − for adjustment/payout when negative) rather than always shown
+    with a fixed sign, since entry_type alone doesn't tell you the
+    sign — a payout is a debit, an adjustment could be either
+    direction (see rider_earnings_ledger schema, migration 73).
+-->
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="10dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="1dp"
+    app:cardBackgroundColor="@color/surface">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="14dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/ledgerEntryType"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                tools:text="Delivery earning" />
+
+            <TextView
+                android:id="@+id/ledgerOrderCode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:visibility="gone"
+                tools:visibility="visible"
+                tools:text="Order #AD10234" />
+
+            <TextView
+                android:id="@+id/ledgerNote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:visibility="gone"
+                tools:visibility="visible"
+                tools:text="Weekly payout via UPI" />
+
+            <TextView
+                android:id="@+id/ledgerDate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textSize="11sp"
+                android:textColor="@color/text_secondary"
+                tools:text="12 Jul, 8:42 PM" />
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/ledgerAmount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            tools:text="+₹42.00"
+            tools:textColor="@color/success_fg" />
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>

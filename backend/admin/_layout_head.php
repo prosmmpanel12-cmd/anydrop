@@ -16,7 +16,7 @@
  * Expects, from the including page:
  *   $admin       — array from admin_require_login()
  *   $pageTitle   — string, shown in <title> and the topbar
- *   $activeNav   — one of 'dashboard' | 'approvals' | 'orders' | 'analytics' | 'support' | 'review_moderation' | 'customer_feedback' | 'areas' | 'cod_rules' | 'pricing_rules' | 'payment_restrictions' | 'categories' | 'banners' | 'roles' | 'commission_rules' | 'settlements' | 'rider_settlements' | 'rider_earnings' | 'platform_ledger' | 'payment_gateways' | 'email_providers' | 'payment_pending' | 'refunds' | 'wallet_withdrawals' | 'reconciliation' | 'offers' | 'broadcast' | 'app_settings_customer' | 'app_settings_restaurant' | 'app_settings_rider' | 'fcm_settings' | 'directions_settings' | 'riders'
+ *   $activeNav   — one of 'dashboard' | 'approvals' | 'orders' | 'analytics' | 'support' | 'review_moderation' | 'customer_feedback' | 'areas' | 'cod_rules' | 'pricing_rules' | 'payment_restrictions' | 'categories' | 'banners' | 'roles' | 'commission_rules' | 'settlements' | 'rider_settlements' | 'rider_earnings' | 'platform_ledger' | 'payment_gateways' | 'email_providers' | 'payment_pending' | 'refunds' | 'wallet_withdrawals' | 'reconciliation' | 'offers' | 'broadcast' | 'app_settings_customer' | 'app_settings_restaurant' | 'app_settings_rider' | 'fcm_settings' | 'directions_settings' | 'route_recalc_settings' | 'riders' | 'rider_payouts'
  *   $flash       — string|null, shown once as a toast (not a static banner)
  *   $flashType   — 'success' | 'error'
  */
@@ -186,6 +186,11 @@ $navItems = [
         'icon' => '<path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H7"/>',
     ],
     [
+        'key' => 'rider_payouts', 'href' => 'rider-payouts.php', 'label' => 'Rider Payout Requests',
+        'perm' => 'rider_payouts_view', 'group' => 'finance',
+        'icon' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
+    ],
+    [
         'key' => 'platform_ledger', 'href' => 'platform-ledger.php', 'label' => 'Platform Cash Flow',
         'perm' => 'payouts_view', 'group' => 'finance',
         'icon' => '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/><circle cx="7" cy="15" r="1"/>',
@@ -229,6 +234,11 @@ $navItems = [
         'key' => 'directions_settings', 'href' => 'directions-settings.php', 'label' => 'Directions Settings',
         'perm' => 'settings_manage', 'group' => 'settings',
         'icon' => '<path d="M9 20l-5.5-2.5V4.5L9 7m0 13l6-3m-6 3V7m6 10l5.5 2.5V6.5L15 4m0 13V4m0 0L9 7"/>',
+    ],
+    [
+        'key' => 'route_recalc_settings', 'href' => 'route-recalc-settings.php', 'label' => 'Route Recalc Settings',
+        'perm' => 'settings_manage', 'group' => 'settings',
+        'icon' => '<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>',
     ],
     [
         'key' => 'broadcast', 'href' => 'broadcast.php', 'label' => 'Push Notifications',

@@ -3,6 +3,7 @@ package com.anydrop.food.ui.orderstatus
 import android.animation.ValueAnimator
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.View
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -16,6 +17,7 @@ import com.anydrop.food.ui.common.InAppNotifier
 import com.anydrop.food.ui.home.HomeActivity
 import com.anydrop.food.ui.orders.RateOrderDialog
 import com.anydrop.food.util.PolylineDecoder
+import com.anydrop.food.util.RouteGeometry
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
@@ -51,23 +53,65 @@ import java.util.Locale
  *   - startPolling()'s existing 5s loop now also drives the rider
  *     marker, animated (not jumped) from its last position to the new
  *     one over roughly one poll interval — see animateRiderMarker().
- *   - a separate, slower startRouteRecalcLoop() re-fetches/redraws the
- *     route line + refits the camera bounds every
- *     ROUTE_RECALC_INTERVAL_MS (35s, inside the plan's 30-45s target).
- *     Kept independent of the 5s loop rather than "every Nth tick of
- *     the same loop" so the two cadences stay easy to reason about and
- *     tune separately.
+ *   - a separate startRouteRecalcLoop() re-fetches/redraws the route
+ *     line + refits the camera bounds, on the schedule described
+ *     below. Kept independent of the 5s loop rather than "every Nth
+ *     tick of the same loop" so the two cadences stay easy to reason
+ *     about and tune separately.
  * Restaurant/delivery markers are added once, the first time each
  * becomes available, since both are static per order (see
  * [com.anydrop.food.network.TrackRestaurant]/[com.anydrop.food.network.TrackDelivery]
  * kdoc) — no reason to touch them again every poll.
+ *
+ * Plan doc 91 (Progress-Trim Route Line + Deviation-Based Recalc,
+ * 04 Sep 2026) — two further pieces built this session, both driven by
+ * the same [RouteGeometry.nearestPointOnPath] projection of the
+ * rider's position onto the currently-drawn polyline:
+ *   - Piece A (progress trim): [trimPolylineTo] shortens the drawn
+ *     line to "remaining route from rider to destination" instead of
+ *     redrawing the full original route every cycle. Hooked into
+ *     [animateRiderMarker]'s existing per-frame `ValueAnimator`
+ *     listener (the "smooth" option from the plan, confirmed over the
+ *     simpler once-per-poll alternative) so the line visibly shortens
+ *     in sync with the marker's motion rather than in visible 5s
+ *     jumps.
+ *   - Piece B (deviation-triggered recalc): [checkRouteDeviation],
+ *     called once per 5s poll from [updateMap], starts a timer once
+ *     the rider's actual (non-animated) position drifts more than
+ *     `deviationThresholdM` off the drawn line, and fires an immediate
+ *     [fetchAndDrawRoute] once that drift has persisted for
+ *     `deviationSustainMs` — replacing the old fixed-timer-only recalc.
+ *     [startRouteRecalcLoop] still runs as a fallback ceiling
+ *     (`maxRecalcIntervalMs`) in case deviation is never detected (a
+ *     route can go stale for reasons pure drift-distance won't catch,
+ *     e.g. traffic-aware re-routing on Google's side).
+ * All three numbers (`deviationThresholdM`/`deviationSustainMs`/
+ * `maxRecalcIntervalMs`) are admin-configurable via `app_settings`,
+ * refreshed from every successful [fetchAndDrawRoute] response — see
+ * `route.php`'s kdoc — per this codebase's "server-configurable, not
+ * hardcoded" convention for money/business-rule numbers elsewhere
+ * (`rider_earning_share_percent` etc.), matching the person's own
+ * preference when this was planned.
  */
 class OrderStatusActivity : AppCompatActivity(), OnMapReadyCallback {
 
     companion object {
         const val EXTRA_ORDER_ID = "extra_order_id"
         private const val POLL_INTERVAL_MS = 5000L
-        private const val ROUTE_RECALC_INTERVAL_MS = 35_000L
+
+        // Plan doc 91 — startRouteRecalcLoop() now just checks, every
+        // ROUTE_CHECK_INTERVAL_MS, whether maxRecalcIntervalMs has
+        // elapsed since the last fetch (deviation-triggered or
+        // fallback) — a cheap tick, not a fetch itself. The three
+        // *_DEFAULT constants below seed the mutable fields of the
+        // same name until the first route.php response overwrites them
+        // with the admin-configured values; kept in sync with that
+        // endpoint's own get_setting() fallbacks.
+        private const val ROUTE_CHECK_INTERVAL_MS = 5_000L
+        private const val DEVIATION_THRESHOLD_M_DEFAULT = 70.0
+        private const val DEVIATION_SUSTAIN_MS_DEFAULT = 60_000L
+        private const val MAX_RECALC_INTERVAL_MS_DEFAULT = 90_000L
+
         private val TERMINAL_STATUSES = setOf("delivered", "cancelled", "rejected", "refunded", "failed", "expired")
         private val CANCELLABLE_STATUSES = setOf("pending", "accepted")
 
@@ -91,9 +135,31 @@ class OrderStatusActivity : AppCompatActivity(), OnMapReadyCallback {
     private var riderMarker: Marker? = null
     private var riderMarkerAnimator: ValueAnimator? = null
     private var routePolyline: Polyline? = null
+    // Plan doc 91 Piece A — the decoded source points behind
+    // [routePolyline], kept separately from the Polyline overlay
+    // itself so trimming has the original vertex list to re-slice from
+    // on every animation frame (a Polyline's own .points getter would
+    // just hand back whatever was last set, i.e. the already-trimmed
+    // list — not useful as a re-trim source).
+    private var routePoints: List<LatLng>? = null
     private var restaurantLatLng: LatLng? = null
     private var deliveryLatLng: LatLng? = null
     private var mapEverShown = false
+
+    // Plan doc 91 — admin-configurable numbers, refreshed from every
+    // fetchAndDrawRoute() response; see route.php's kdoc for the
+    // app_settings keys behind these.
+    private var deviationThresholdM: Double = DEVIATION_THRESHOLD_M_DEFAULT
+    private var deviationSustainMs: Long = DEVIATION_SUSTAIN_MS_DEFAULT
+    private var maxRecalcIntervalMs: Long = MAX_RECALC_INTERVAL_MS_DEFAULT
+    // Piece B's "deviated since" timer — null when the rider is
+    // currently within threshold of the drawn line.
+    private var deviatedSinceElapsedMs: Long? = null
+    // SystemClock.elapsedRealtime() of the last route fetch (deviation
+    // -triggered or fallback), so startRouteRecalcLoop()'s ceiling
+    // check and checkRouteDeviation()'s immediate trigger don't fire a
+    // redundant second fetch right on top of each other.
+    private var lastRouteFetchElapsedMs: Long = 0L
     // Last track() response — kept around so onMapReady() (which can
     // fire after a poll has already landed) can draw the current state
     // immediately instead of waiting up to POLL_INTERVAL_MS for the
@@ -443,9 +509,20 @@ class OrderStatusActivity : AppCompatActivity(), OnMapReadyCallback {
                 MarkerOptions().position(newPos).title(track.rider.name ?: "Your rider")
                     .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN))
             )
+            // First marker placement — also trim once immediately in
+            // case a route was already drawn before the rider's first
+            // position arrived (e.g. this activity resumed mid-delivery).
+            trimPolylineTo(newPos)
         } else {
             animateRiderMarker(existing, existing.position, newPos)
         }
+
+        // Piece B (plan doc 91) — deviation check runs off the rider's
+        // real, non-animated position (this 5s poll value), not the
+        // interpolated per-frame position trimPolylineTo() uses below —
+        // deviation is about where the rider's GPS actually is, not
+        // where the marker is mid-tween.
+        checkRouteDeviation(newPos)
 
         if (!mapEverShown) {
             mapEverShown = true
@@ -471,9 +548,63 @@ class OrderStatusActivity : AppCompatActivity(), OnMapReadyCallback {
                 val t = anim.animatedValue as Float
                 val lat = from.latitude + (to.latitude - from.latitude) * t
                 val lng = from.longitude + (to.longitude - from.longitude) * t
-                marker.position = LatLng(lat, lng)
+                val pos = LatLng(lat, lng)
+                marker.position = pos
+                // Plan doc 91 Piece A — piggyback the progress-trim
+                // recompute onto this same per-frame callback the
+                // marker lerp already fires, so the route line
+                // visibly shortens continuously in sync with the
+                // marker's motion (the "smooth" option, confirmed over
+                // trimming only once per 5s poll).
+                trimPolylineTo(pos)
             }
             start()
+        }
+    }
+
+    /** Plan doc 91 Piece A — redraws [routePolyline] as the remaining
+     * sub-path from [pos] onward, using [routePoints] (the untrimmed
+     * source list) as the basis so every call re-slices from the full
+     * route rather than compounding trims onto an already-trimmed
+     * list. No-ops if there's no route drawn yet, or if [pos] is too
+     * far from the line to trim meaningfully — that "rider is nowhere
+     * near the line" case is exactly what [checkRouteDeviation] exists
+     * to handle instead (a fresh route, not a misleading trim). */
+    private fun trimPolylineTo(pos: LatLng) {
+        val points = routePoints ?: return
+        val polyline = routePolyline ?: return
+        val nearest = RouteGeometry.nearestPointOnPath(points, pos) ?: return
+        if (nearest.distanceMeters > deviationThresholdM) return
+        polyline.points = RouteGeometry.trimToNearest(points, nearest)
+    }
+
+    /** Plan doc 91 Piece B — called once per 5s poll (from [updateMap])
+     * with the rider's real reported position. Starts a "deviated
+     * since" timer the first time the rider is found more than
+     * [deviationThresholdM] off the currently-drawn line; if that
+     * drift is still present [deviationSustainMs] later, fires an
+     * immediate route recalc rather than waiting for
+     * [startRouteRecalcLoop]'s fallback ceiling. A momentary blip back
+     * within threshold (GPS jitter, a brief stop slightly off the
+     * drawn line) resets the timer rather than accumulating toward
+     * it — matches the plan's own "sustained drift, not any single
+     * off-route sample" framing. */
+    private fun checkRouteDeviation(riderPos: LatLng) {
+        val points = routePoints ?: return
+        val nearest = RouteGeometry.nearestPointOnPath(points, riderPos) ?: return
+
+        if (nearest.distanceMeters <= deviationThresholdM) {
+            deviatedSinceElapsedMs = null
+            return
+        }
+
+        val now = SystemClock.elapsedRealtime()
+        val since = deviatedSinceElapsedMs
+        if (since == null) {
+            deviatedSinceElapsedMs = now
+        } else if (now - since >= deviationSustainMs) {
+            deviatedSinceElapsedMs = null
+            lifecycleScope.launch { fetchAndDrawRoute() }
         }
     }
 
@@ -505,9 +636,16 @@ class OrderStatusActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    /** Separate, slower loop (deep-plan §15: ~30-45s) that re-fetches
-     * the route polyline and redraws it, alongside a camera refit —
-     * kept independent of the 5s rider-position poll in startPolling()
+    /** Plan doc 91 Piece B's fallback ceiling loop. Ticks every
+     * [ROUTE_CHECK_INTERVAL_MS] (cheap — just a clock comparison, not a
+     * fetch) and only actually calls [fetchAndDrawRoute] once
+     * [maxRecalcIntervalMs] has elapsed since the last fetch, whichever
+     * triggered it — this loop's own ceiling, or [checkRouteDeviation]'s
+     * earlier deviation-triggered call. That shared [lastRouteFetchElapsedMs]
+     * timestamp is what keeps the two trigger paths from double-firing
+     * a fetch right on top of each other.
+     *
+     * Kept independent of the 5s rider-position poll in startPolling()
      * so the two cadences don't have to share one interval. Runs for
      * the Activity's full lifetime and just no-ops when the map isn't
      * currently shown (checked via [lastTrack] each cycle) rather than
@@ -519,22 +657,43 @@ class OrderStatusActivity : AppCompatActivity(), OnMapReadyCallback {
             while (polling) {
                 val track = lastTrack
                 if (track != null && shouldShowMap(track) && mapReady) {
-                    fetchAndDrawRoute()
+                    val elapsedSinceLastFetch = SystemClock.elapsedRealtime() - lastRouteFetchElapsedMs
+                    if (elapsedSinceLastFetch >= maxRecalcIntervalMs) {
+                        fetchAndDrawRoute()
+                    }
                 }
-                delay(ROUTE_RECALC_INTERVAL_MS)
+                delay(ROUTE_CHECK_INTERVAL_MS)
             }
         }
     }
 
     private suspend fun fetchAndDrawRoute() {
         val map = googleMap ?: return
+        // Marked at call time (not just on success) so a slow/failed
+        // network call doesn't leave the ceiling loop free to retry on
+        // every single ROUTE_CHECK_INTERVAL_MS tick while one request
+        // is already in flight.
+        lastRouteFetchElapsedMs = SystemClock.elapsedRealtime()
         try {
             val result = api.getOrderRoute(orderId).body()?.data ?: return
+            // Plan doc 91 — pick up any admin change to the three
+            // deviation-recalc numbers on every successful fetch,
+            // rather than only reading them once at Activity start.
+            deviationThresholdM = result.deviationThresholdM
+            deviationSustainMs = result.deviationSustainSeconds * 1000L
+            maxRecalcIntervalMs = result.maxRecalcIntervalSeconds * 1000L
+            // Fresh route means Piece A's trim baseline resets to
+            // index 0 and Piece B's deviation timer clears — both
+            // documented edge cases from the plan.
+            deviatedSinceElapsedMs = null
+
             routePolyline?.remove()
             routePolyline = null
+            routePoints = null
             if (!result.polyline.isNullOrBlank()) {
                 val points = PolylineDecoder.decode(result.polyline)
                 if (points.size >= 2) {
+                    routePoints = points
                     routePolyline = map.addPolyline(
                         PolylineOptions().addAll(points).width(10f).color(getColorCompat(R.color.anydrop_primary))
                     )

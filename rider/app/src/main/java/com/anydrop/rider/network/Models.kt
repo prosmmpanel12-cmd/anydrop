@@ -100,7 +100,39 @@ data class RiderMeProfile(
     // Phase 3 (doc 83) additions — additive only, everything above is unchanged.
     @SerializedName("is_online") val isOnline: Boolean = false,
     @SerializedName("vehicle_type") val vehicleType: String? = null,
-    @SerializedName("vehicle_number") val vehicleNumber: String? = null
+    @SerializedName("vehicle_number") val vehicleNumber: String? = null,
+    // Migration 75 (deep-plan §22, Rider Documents) additions — additive only.
+    @SerializedName("documents_status") val documentsStatus: String = "not_submitted",
+    @SerializedName("documents_reject_reason") val documentsRejectReason: String? = null,
+    @SerializedName("profile_photo_url") val profilePhotoUrl: String? = null
+)
+
+// ---- Rider documents (deep-plan §22, migration 75) ----
+
+/** Response from GET /api/v1/rider/documents-get.php. documentsStatus is
+ *  one of "not_submitted" | "pending" | "verified" | "rejected" — see
+ *  migration 75's own header for why this is a 4-state enum distinct
+ *  from the rider's account-level `status`. hasIdDoc/hasVehicleDoc are
+ *  presence flags, not URLs — see that endpoint's own kdoc for why the
+ *  raw filenames are never sent to the client; SubmitDocumentsActivity
+ *  fetches the actual bytes via documents-view.php when it needs to
+ *  show a "here's what you submitted" preview. */
+data class RiderDocumentsResult(
+    @SerializedName("documents_status") val documentsStatus: String,
+    @SerializedName("documents_reject_reason") val documentsRejectReason: String?,
+    @SerializedName("has_id_doc") val hasIdDoc: Boolean,
+    @SerializedName("has_vehicle_doc") val hasVehicleDoc: Boolean,
+    @SerializedName("profile_photo_url") val profilePhotoUrl: String?,
+    @SerializedName("vehicle_type") val vehicleType: String?,
+    @SerializedName("vehicle_number") val vehicleNumber: String?
+)
+
+/** Response from POST /api/v1/rider/documents-upload.php (multipart —
+ *  see ApiService.uploadRiderDocuments()'s own kdoc for the actual
+ *  call shape; this is just the JSON body that comes back). */
+data class RiderDocumentsUploadResult(
+    @SerializedName("documents_status") val documentsStatus: String,
+    @SerializedName("profile_photo_url") val profilePhotoUrl: String?
 )
 
 // ---- Phase 3: dashboard online toggle + location ping (doc 83) ----
@@ -166,6 +198,47 @@ data class AcceptOrderResult(@SerializedName("order_id") val orderId: Int, val s
 
 data class RejectOrderBody(val reason: String? = null)
 
+// Rider Order Detail (deep-plan §9). Deliberately a separate model from
+// CurrentOrder above, not an extension of it — CurrentOrder backs the
+// dashboard's compact card and orders-current.php intentionally omits
+// fields (restaurant lat/lng, phones, customer name, distance, cost
+// breakdown) that this dedicated detail screen needs. Two backend
+// endpoints, two models, matching each response shape exactly rather
+// than forcing one bloated model to serve both screens.
+data class OrderDetailResult(val order: OrderDetail?)
+
+data class OrderDetail(
+    val id: Int,
+    @SerializedName("order_code") val orderCode: String,
+    val status: String,
+    @SerializedName("restaurant_name") val restaurantName: String,
+    @SerializedName("restaurant_address") val restaurantAddress: String?,
+    @SerializedName("restaurant_lat") val restaurantLat: Double?,
+    @SerializedName("restaurant_lng") val restaurantLng: Double?,
+    @SerializedName("restaurant_phone") val restaurantPhone: String?,
+    @SerializedName("customer_name") val customerName: String?,
+    @SerializedName("customer_phone") val customerPhone: String?,
+    @SerializedName("delivery_address") val deliveryAddress: String?,
+    @SerializedName("house_flat_no") val houseFlatNo: String?,
+    val floor: String?,
+    val landmark: String?,
+    @SerializedName("receiver_name") val receiverName: String?,
+    @SerializedName("receiver_phone") val receiverPhone: String?,
+    @SerializedName("address_photo_url") val addressPhotoUrl: String?,
+    @SerializedName("delivery_lat") val deliveryLat: Double?,
+    @SerializedName("delivery_lng") val deliveryLng: Double?,
+    @SerializedName("delivery_instructions") val deliveryInstructions: String?,
+    @SerializedName("item_count") val itemCount: Int,
+    @SerializedName("item_total") val itemTotal: Double,
+    @SerializedName("delivery_charge") val deliveryCharge: Double,
+    @SerializedName("grand_total") val grandTotal: Double,
+    @SerializedName("payment_method") val paymentMethod: String,
+    @SerializedName("cod_amount") val codAmount: Double?,
+    @SerializedName("distance_km") val distanceKm: Double?,
+    @SerializedName("delivery_otp_required") val deliveryOtpRequired: Boolean,
+    @SerializedName("accepted_at") val acceptedAt: String?
+)
+
 // ---- Pickup / drop-off flow (this session — deep-plan §9-16) ----
 
 data class PickupOrderResult(@SerializedName("order_id") val orderId: Int, val status: String)
@@ -188,6 +261,15 @@ data class EarningsSummaryResult(
     @SerializedName("today_total") val todayTotal: Double,
     val balance: Double,
     @SerializedName("share_percent") val sharePercent: Double,
+    // Deep-plan §17-18 — cash the rider is currently holding from COD
+    // deliveries (owed TO the platform, opposite direction from
+    // `balance`) and the admin-configurable ceiling before new COD
+    // assignments get blocked server-side (dispatch.php). Kept as two
+    // separate fields rather than a single "percent used" number so
+    // EarningsActivity can show both the raw rupee amount and compute
+    // its own warning threshold.
+    @SerializedName("cod_cash_held") val codCashHeld: Double = 0.0,
+    @SerializedName("cod_settlement_limit") val codSettlementLimit: Double = 2000.0,
     val recent: List<EarningsLedgerEntry>
 )
 
@@ -199,6 +281,66 @@ data class EarningsLedgerEntry(
     @SerializedName("order_code") val orderCode: String?,
     val note: String?,
     @SerializedName("created_at") val createdAt: String
+)
+
+// ---- Rider payout requests (deep-plan §21, migration 74) ----
+// Field shapes deliberately mirror the customer app's wallet-withdrawal
+// models (BankDetailsResult/SaveBankDetailsBody/WalletWithdrawal/
+// RequestWithdrawalBody) — same backend design, same JSON shape.
+
+data class RiderBankDetails(
+    @SerializedName("account_holder_name") val accountHolderName: String,
+    @SerializedName("bank_name") val bankName: String?,
+    @SerializedName("account_number_masked") val accountNumberMasked: String?,
+    @SerializedName("ifsc_code") val ifscCode: String?,
+    @SerializedName("upi_id") val upiId: String?,
+    @SerializedName("updated_at") val updatedAt: String?
+)
+
+data class RiderBankDetailsResult(
+    @SerializedName("bank_details") val bankDetails: RiderBankDetails?
+)
+
+data class SaveRiderBankDetailsBody(
+    @SerializedName("payout_method") val payoutMethod: String, // "bank" | "upi"
+    @SerializedName("account_holder_name") val accountHolderName: String,
+    @SerializedName("bank_name") val bankName: String? = null,
+    @SerializedName("account_number") val accountNumber: String? = null,
+    @SerializedName("ifsc_code") val ifscCode: String? = null,
+    @SerializedName("upi_id") val upiId: String? = null
+)
+
+data class RiderPayoutRequest(
+    val id: Int,
+    val amount: Double,
+    @SerializedName("payout_method") val payoutMethod: String, // "bank" | "upi"
+    val status: String, // "requested" | "approved" | "processing" | "completed" | "rejected"
+    @SerializedName("payout_reference") val payoutReference: String?,
+    @SerializedName("reject_reason") val rejectReason: String?,
+    @SerializedName("requested_at") val requestedAt: String,
+    @SerializedName("approved_at") val approvedAt: String?,
+    @SerializedName("processing_at") val processingAt: String?,
+    @SerializedName("completed_at") val completedAt: String?,
+    @SerializedName("rejected_at") val rejectedAt: String?
+)
+
+data class RiderPayoutHistoryResult(
+    val requests: List<RiderPayoutRequest> = emptyList()
+)
+
+data class RequestRiderPayoutBody(
+    val amount: Double,
+    @SerializedName("payout_method") val payoutMethod: String,
+    @SerializedName("account_holder_name") val accountHolderName: String,
+    @SerializedName("bank_name") val bankName: String? = null,
+    @SerializedName("account_number") val accountNumber: String? = null,
+    @SerializedName("ifsc_code") val ifscCode: String? = null,
+    @SerializedName("upi_id") val upiId: String? = null
+)
+
+data class RequestRiderPayoutResult(
+    @SerializedName("request_id") val requestId: Int,
+    val balance: Double
 )
 
 // ---- Service areas (backend/api/v1/system/service-areas.php) ----
@@ -213,3 +355,33 @@ data class ServiceArea(
 data class ServiceAreasResult(
     val areas: List<ServiceArea>
 )
+
+// ---- FCM push token registration + notification bell (doc 99/100's
+// backend, this session's Android side). Field-for-field mirror of the
+// customer/restaurant apps' own FcmTokenBody/FcmTokenResult/
+// NotificationItem/NotificationsResult/MarkReadResult/MarkAllReadResult
+// (see e.g. customer/app/.../network/Models.kt) — same response
+// envelope shape, just re-declared here since this is a separate
+// Gradle module with no shared code module in this project. ----
+
+data class FcmTokenBody(@SerializedName("fcm_token") val fcmToken: String)
+data class FcmTokenResult(val ok: Boolean)
+
+data class NotificationItem(
+    val id: Int,
+    val title: String,
+    val body: String?,
+    val type: String, // "order" | "promo" | "system" | "security" — matches schema ENUM
+    @SerializedName("is_read") val isRead: Boolean,
+    val data: Map<String, Any?>?, // deep-link payload, e.g. {screen: "dashboard"}
+    @SerializedName("created_at") val createdAt: String
+)
+
+data class NotificationsResult(
+    val items: List<NotificationItem>,
+    @SerializedName("has_more") val hasMore: Boolean,
+    @SerializedName("unread_count") val unreadCount: Int
+)
+
+data class MarkReadResult(val id: Int, @SerializedName("is_read") val isRead: Boolean)
+data class MarkAllReadResult(@SerializedName("marked_read") val markedRead: Int)

@@ -114,4 +114,130 @@
     <string name="error_delivery_otp_empty">Enter the delivery code</string>
     <string name="error_delivery_otp_locked">Too many incorrect attempts \u2014 contact support</string>
     <string name="error_order_state_changed">This order has moved on \u2014 refreshing</string>
+
+    <!-- Rider Order Detail (deep-plan §9) -->
+    <string name="dashboard_view_details">View Details</string>
+    <string name="order_detail_title">Order Details</string>
+    <string name="order_detail_restaurant_heading">PICKUP FROM</string>
+    <string name="order_detail_customer_heading">DELIVER TO</string>
+    <string name="order_detail_bill_heading">BILL SUMMARY</string>
+    <string name="order_detail_distance_format">%.1f km</string>
+    <string name="order_detail_item_total">Item total</string>
+    <string name="order_detail_delivery_charge">Delivery charge</string>
+    <string name="order_detail_grand_total">Order total</string>
+    <string name="order_detail_cod_to_collect">Collect (COD)</string>
+    <string name="order_detail_paid_online">Paid online</string>
+    <string name="order_detail_instructions_heading">DELIVERY INSTRUCTIONS</string>
+    <string name="order_detail_items_format">%1$d items</string>
+    <string name="btn_navigate">Navigate</string>
+    <string name="btn_call">Call</string>
+    <string name="cd_call_restaurant">Call restaurant</string>
+    <string name="cd_call_customer">Call customer</string>
+    <string name="cd_navigate_restaurant">Navigate to restaurant</string>
+    <string name="cd_navigate_customer">Navigate to customer</string>
+    <string name="order_detail_load_failed">Couldn\'t load order details</string>
+    <string name="order_detail_no_phone">Phone number not available</string>
+    <string name="order_detail_no_location">Location not available</string>
+    <string name="order_detail_house_format">House/Flat: %1$s</string>
+    <string name="order_detail_floor_format">Floor: %1$s</string>
+    <string name="order_detail_landmark_format">Landmark: %1$s</string>
+    <string name="order_detail_receiver_format">Receiver: %1$s</string>
+    <string name="cd_address_photo">Door/building photo</string>
+
+    <!-- EarningsActivity (deep-plan §19-20, doc 90's "natural next slice") -->
+    <string name="cd_back">Back</string>
+    <string name="earnings_title">Earnings</string>
+    <string name="earnings_today_label">Today</string>
+    <string name="earnings_balance_label">Balance</string>
+    <string name="earnings_share_note_format">You earn %.0f%% of each delivery fee</string>
+    <string name="earnings_recent_heading">RECENT ACTIVITY</string>
+    <string name="earnings_empty">No earnings activity yet</string>
+    <string name="earnings_order_code_format">Order #%1$s</string>
+    <string name="earnings_type_delivery">Delivery earning</string>
+    <string name="earnings_type_incentive">Incentive</string>
+    <string name="earnings_type_payout">Payout</string>
+    <string name="earnings_type_adjustment">Adjustment</string>
+    <string name="earnings_load_error">Couldn\'t load earnings \u2014 pull down to retry</string>
+    <string name="earnings_request_payout_button">Request Payout</string>
+
+    <!-- Deep-plan §17-18 COD cash-held card, added same session as the
+         earnings screen's other cards. Three pill/note states depending
+         on codCashHeld vs codSettlementLimit (see
+         EarningsActivity.renderCodCard()): normal (well under limit),
+         warning (\u226580% of limit \u2014 approaching), blocked (\u2265100% \u2014
+         matches dispatch.php's own \u2265 comparison exactly, so this label
+         never claims "blocked" while the server would still assign a
+         COD order, or vice versa). -->
+    <string name="cod_cash_held_label">CASH TO SETTLE</string>
+    <string name="cod_cash_held_pill_ok">OK</string>
+    <string name="cod_cash_held_pill_warning">NEAR LIMIT</string>
+    <string name="cod_cash_held_pill_blocked">LIMIT REACHED</string>
+    <string name="cod_cash_held_limit_note_format">Limit \u20b9%1$s \u2014 settle this cash with admin to keep receiving COD orders.</string>
+    <string name="cod_cash_held_limit_note_blocked_format">Limit \u20b9%1$s reached \u2014 new COD deliveries are paused until you settle with admin.</string>
+
+    <!-- RequestPayoutActivity (deep-plan §21, migration 74) — field
+         names/strings mirror the customer app's withdraw_* block naming,
+         renamed payout_* for this app. -->
+    <string name="payout_title">Request Payout</string>
+    <string name="payout_available_balance_format">Available: ₹%1$s</string>
+    <string name="payout_amount_hint">Amount to withdraw</string>
+    <string name="payout_method_bank">Bank Transfer</string>
+    <string name="payout_method_upi">UPI</string>
+    <string name="payout_holder_name_hint">Account holder name</string>
+    <string name="payout_bank_name_hint">Bank name</string>
+    <string name="payout_account_number_hint">Account number</string>
+    <string name="payout_ifsc_hint">IFSC code</string>
+    <string name="payout_upi_id_hint">UPI ID</string>
+    <string name="payout_submit_button">Request Payout</string>
+    <string name="payout_success_message">Payout request submitted</string>
+    <string name="payout_failed_generic">Couldn\'t submit payout request</string>
+    <string name="payout_insufficient_balance">Not enough earnings balance</string>
+    <string name="payout_below_minimum_format">Minimum payout amount is ₹%1$s</string>
+    <string name="payout_history_title">PAYOUT HISTORY</string>
+    <string name="payout_empty_history">No payout requests yet</string>
+    <string name="payout_status_requested">Requested</string>
+    <string name="payout_status_approved">Approved</string>
+    <string name="payout_status_processing">Processing</string>
+    <string name="payout_status_completed">Completed</string>
+    <string name="payout_status_rejected">Rejected</string>
+    <string name="payout_load_failed">Couldn\'t load payout history</string>
+    <string name="payout_error_invalid_amount">Enter a valid amount</string>
+    <string name="payout_error_holder_name">Enter the account holder name</string>
+    <string name="payout_error_bank_name">Enter the bank name</string>
+    <string name="payout_error_account_number">Enter a valid account number</string>
+    <string name="payout_error_ifsc">Enter a valid IFSC code</string>
+    <string name="payout_error_upi_id">Enter a valid UPI ID</string>
+
+    <!-- Deep-plan §22, migration 75 — Rider Documents -->
+    <string name="documents_button_not_submitted">Complete Profile</string>
+    <string name="documents_button_pending">Documents Under Review</string>
+    <string name="documents_button_rejected">Documents Rejected \u2014 Resubmit</string>
+    <string name="documents_button_verified">Documents Verified \u2714</string>
+    <string name="documents_title">Rider Documents</string>
+    <string name="documents_status_not_submitted">NOT SUBMITTED</string>
+    <string name="documents_status_pending">PENDING REVIEW</string>
+    <string name="documents_status_verified">VERIFIED</string>
+    <string name="documents_status_rejected">REJECTED</string>
+    <string name="documents_intro">Submit your ID document so we can verify your account. A vehicle document and profile photo are optional but help speed up approval.</string>
+    <string name="documents_reason_format">Reason: %1$s</string>
+    <string name="documents_id_doc_label">ID Document *</string>
+    <string name="documents_vehicle_doc_label">Vehicle Document (optional)</string>
+    <string name="documents_profile_photo_label">Profile Photo (optional)</string>
+    <string name="documents_pick_file">Choose file</string>
+    <string name="documents_file_selected_format">Selected: %1$s</string>
+    <string name="documents_already_on_file">Already on file \u2014 pick a new file to replace it</string>
+    <string name="documents_resubmit_note">Re-upload your ID document to submit again \u2014 required on every submission.</string>
+    <string name="documents_vehicle_type_hint">Vehicle type (e.g. Bike, Scooter)</string>
+    <string name="documents_vehicle_number_hint">Vehicle number</string>
+    <string name="documents_submit_button">Submit Documents</string>
+    <string name="documents_submitted_success">Documents submitted \u2014 pending review</string>
+    <string name="documents_error_id_doc_required">Please select your ID document</string>
+    <string name="documents_error_submit_failed">Couldn\'t submit documents \u2014 try again</string>
+    <string name="documents_load_failed">Couldn\'t load your document status</string>
+
+    <!-- Deep-plan §23, docs 99-102 — account-notification bell -->
+    <string name="notifications_title">Notifications</string>
+    <string name="notifications_empty">No notifications yet</string>
+    <string name="notifications_mark_all_read_cd">Mark all as read</string>
+    <string name="notifications_load_error">Couldn\'t load notifications \u2014 pull down to retry</string>
 </resources>

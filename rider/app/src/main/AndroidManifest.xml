@@ -9,6 +9,12 @@
          for their own location pickers. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Deep-plan §23, docs 99-102 — runtime-requested on API 33+ for
+         RiderNotificationHelper's account-status pushes to show at all.
+         Same "silently never shows, no error anywhere" risk the
+         restaurant app's own manifest comment flags for this
+         permission. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -66,6 +72,63 @@
         <activity
             android:name=".ui.dashboard.RiderDashboardActivity"
             android:exported="false" />
+
+        <!-- Deep-plan §19-20, doc 90's flagged "natural next slice" —
+             read-only earnings ledger, reached only by tapping the
+             dashboard's TODAY earnings card. -->
+        <activity
+            android:name=".ui.earnings.EarningsActivity"
+            android:exported="false" />
+
+        <!-- Deep-plan §21, migration 74 — rider self-service payout
+             requests. Reached only via EarningsActivity's "Request
+             Payout" button. -->
+        <activity
+            android:name=".ui.earnings.RequestPayoutActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Deep-plan §22, migration 75 — submit/re-submit compliance
+             documents. Reached from ApplicationStatusActivity (pending/
+             rejected rider) and RiderDashboardActivity (approved rider
+             whose documents were rejected). -->
+        <activity
+            android:name=".ui.documents.SubmitDocumentsActivity"
+            android:exported="false" />
+
+        <!-- Deep-plan §9 — Rider Order Detail. Reached only via
+             RiderDashboardActivity's current-order card "View Details"
+             tap; expects EXTRA_ORDER_ID as an Intent extra. -->
+        <activity
+            android:name=".ui.orderdetail.RiderOrderDetailActivity"
+            android:exported="false" />
+
+        <!-- Deep-plan §23, docs 99-102 — account-notification bell list.
+             Reached only via RiderDashboardActivity's header bell. -->
+        <activity
+            android:name=".notifications.NotificationListActivity"
+            android:exported="false" />
+
+        <!-- Deep-plan §23, docs 99-102 — FCM push receiver for this app's
+             one notification_type ("account"). Same standard
+             MESSAGING_EVENT intent-filter as the customer/restaurant
+             apps' own services. -->
+        <service
+            android:name=".notifications.RiderFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Default small icon for a push that arrives while the app is
+             fully killed — same reasoning/pattern as the restaurant
+             app's own manifest meta-data (FCM's system-tray auto-display
+             uses this when no code runs to build a
+             NotificationCompat.Builder at all). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
 
     </application>
 

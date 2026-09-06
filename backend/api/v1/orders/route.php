@@ -14,6 +14,36 @@
  * division of responsibility rider/location.php's kdoc already
  * documents for its own poll interval).
  *
+ * DEVIATION-RECALC CONFIG (added 2026-09-04, plan doc 91 — Progress-
+ * Trim Route Line + Deviation-Based Recalc): Android no longer polls
+ * this endpoint on a bare fixed timer alone — it also recalculates as
+ * soon as the rider drifts off the currently-drawn line by more than a
+ * threshold distance for a sustained duration, falling back to a max
+ * interval ceiling if no deviation is ever detected (see plan doc 91's
+ * Piece B). Three admin-configurable numbers drive that client-side
+ * logic, following the same `app_settings`-backed convention as
+ * `rider_earning_share_percent` etc. (deep-plan's own "server-
+ * configurable, not hardcoded" pattern) rather than baking first-guess
+ * constants into the APK:
+ *   rider_route_deviation_threshold_m       default 70 (metres off the
+ *                                            drawn line before a
+ *                                            deviation timer starts)
+ *   rider_route_deviation_sustain_seconds   default 60 (how long the
+ *                                            deviation must persist
+ *                                            before triggering a recalc)
+ *   rider_route_max_recalc_interval_seconds default 90 (fallback
+ *                                            ceiling recalc even with
+ *                                            no detected deviation —
+ *                                            replaces the old fixed
+ *                                            35s-only timer)
+ * Folded into this response (rather than a new endpoint) per plan doc
+ * 91's "folding it into an existing config response" option — this is
+ * the only network call Android already makes on the relevant cadence,
+ * so no extra round trip is needed just to carry three numbers. Sent
+ * on every response, including the various early "no route yet"
+ * returns below, so Android has these even before a rider/route
+ * exists.
+ *
  * `leg` picks the destination based on where the rider actually is in
  * the delivery, same active-delivery framing rider/location.php uses:
  *   - status = rider_assigned            → leg to_restaurant (rider is
@@ -68,9 +98,25 @@ if ((int) $order['customer_id'] !== (int) $owner['owner_id']) {
     respond_error('forbidden', 403);
 }
 
+/**
+ * Merges the three deviation-recalc config numbers (see file kdoc)
+ * into every payload this endpoint sends, success or degraded —
+ * single point of truth so a future admin-panel change to any default
+ * only needs updating here, not at each of the six respond_ok() call
+ * sites below.
+ */
+function with_route_config(array $payload): array
+{
+    return $payload + [
+        'deviation_threshold_m' => (float) get_setting('rider_route_deviation_threshold_m', 70),
+        'deviation_sustain_seconds' => (int) get_setting('rider_route_deviation_sustain_seconds', 60),
+        'max_recalc_interval_seconds' => (int) get_setting('rider_route_max_recalc_interval_seconds', 90),
+    ];
+}
+
 function respond_no_route(): void
 {
-    respond_ok(['polyline' => null, 'distance_km' => null, 'duration_minutes' => null, 'leg' => null]);
+    respond_ok(with_route_config(['polyline' => null, 'distance_km' => null, 'duration_minutes' => null, 'leg' => null]));
 }
 
 if (!$order['rider_id']) {
@@ -123,7 +169,7 @@ if ($apiKey === '') {
     // would have been, so the map can at least draw a straight line
     // between origin/destination as a low-fidelity fallback if it
     // chooses to (Android's own decision, not this endpoint's).
-    respond_ok(['polyline' => null, 'distance_km' => null, 'duration_minutes' => null, 'leg' => $leg]);
+    respond_ok(with_route_config(['polyline' => null, 'distance_km' => null, 'duration_minutes' => null, 'leg' => $leg]));
 }
 
 $url = 'https://maps.googleapis.com/maps/api/directions/json'
@@ -148,7 +194,7 @@ if ($response === false || $response === '') {
     // never worth surfacing as an error to the customer's tracking
     // screen, the previously-drawn route (if any) just stays on screen
     // until the next successful recalc.
-    respond_ok(['polyline' => null, 'distance_km' => null, 'duration_minutes' => null, 'leg' => $leg]);
+    respond_ok(with_route_config(['polyline' => null, 'distance_km' => null, 'duration_minutes' => null, 'leg' => $leg]));
 }
 
 $decoded = json_decode($response, true);
@@ -160,16 +206,16 @@ if (!$route || !$leg0) {
     // OVER_QUERY_LIMIT, etc. — all "no usable route right now", same
     // graceful null response rather than distinguishing every Google
     // status string for the Android side to handle.
-    respond_ok(['polyline' => null, 'distance_km' => null, 'duration_minutes' => null, 'leg' => $leg]);
+    respond_ok(with_route_config(['polyline' => null, 'distance_km' => null, 'duration_minutes' => null, 'leg' => $leg]));
 }
 
 $polyline = $route['overview_polyline']['points'] ?? null;
 $distanceKm = isset($leg0['distance']['value']) ? round($leg0['distance']['value'] / 1000, 1) : null;
 $durationMinutes = isset($leg0['duration']['value']) ? (int) round($leg0['duration']['value'] / 60) : null;
 
-respond_ok([
+respond_ok(with_route_config([
     'polyline' => $polyline,
     'distance_km' => $distanceKm,
     'duration_minutes' => $durationMinutes,
     'leg' => $leg,
-]);
+]));
