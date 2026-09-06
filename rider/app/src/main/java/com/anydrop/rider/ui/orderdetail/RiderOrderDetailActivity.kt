@@ -1,7 +1,7 @@
 package com.anydrop.rider.ui.orderdetail
 
 import android.content.ActivityNotFoundException
-import android.content.ColorStateList
+import android.content.res.ColorStateList
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
