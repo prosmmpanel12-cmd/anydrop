@@ -4762,3 +4762,34 @@ session's highest-risk untested piece (no existing runtime precedent
 for this exact query in this codebase). Next: real DB check, then
 owner's choice of Live map, a real build+device pass, or a different
 deep-plan section.
+
+
+## Admin "Live map" built — deep-plan §25 COMPLETE, all 3 sub-sections (2026-09-06, session 34)
+
+Full detail: `docs/rider/110_Handover_2026-09-06_AdminRiderMap_DeepPlan25_Complete.md`.
+
+New `backend/admin/rider-map.php` — Leaflet + OSM tiles (no API key,
+same stack `areas.php`'s own map picker already uses; the platform's
+one server-side Google Directions key was deliberately NOT reused
+client-side, since it was never scoped as a browser-embeddable key).
+Plots every online rider (plus any rider on an active delivery even if
+`is_online` is stale/off) as a colour-coded marker — green idle,
+orange on-delivery, red stale (>10 min since last location update
+while flagged online) — with a popup linking into `rider-detail.php`
+(doc 109). Riders with no location yet are listed separately rather
+than silently dropped. Area filter + a plain-reload auto-refresh
+(Off/30s/60s). New `rider_map` nav entry in `_layout_head.php`, gated
+on the same `riders_view` permission as the rest of §25.
+
+Deep-plan §25 (Admin Rider Command Center) is now **fully built**
+across three sessions (docs 108-110): Rider list, Rider detail, Live
+map — all reading existing tables, zero new migrations across all
+three.
+
+Not build/device-verified — same standing sandbox limitation, but
+flagged as the highest rendering-risk page in this project's history
+so far: this is the first Leaflet-on-a-full-page (not a `<dialog>`
+picker) surface, never opened in an actual browser even once. Next:
+a real build/DB/browser pass (now covering five stacked untested
+rider-admin sessions), or Delivery OTP §16 / Live Location System
+re-verification, or a different still-unbuilt deep-plan section.

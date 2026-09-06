@@ -16,7 +16,7 @@
  * Expects, from the including page:
  *   $admin       — array from admin_require_login()
  *   $pageTitle   — string, shown in <title> and the topbar
- *   $activeNav   — one of 'dashboard' | 'approvals' | 'orders' | 'analytics' | 'support' | 'review_moderation' | 'customer_feedback' | 'areas' | 'cod_rules' | 'pricing_rules' | 'payment_restrictions' | 'categories' | 'banners' | 'roles' | 'commission_rules' | 'settlements' | 'rider_settlements' | 'rider_earnings' | 'platform_ledger' | 'payment_gateways' | 'email_providers' | 'payment_pending' | 'refunds' | 'wallet_withdrawals' | 'reconciliation' | 'offers' | 'broadcast' | 'app_settings_customer' | 'app_settings_restaurant' | 'app_settings_rider' | 'fcm_settings' | 'directions_settings' | 'route_recalc_settings' | 'riders' | 'rider_payouts'
+ *   $activeNav   — one of 'dashboard' | 'approvals' | 'orders' | 'analytics' | 'support' | 'review_moderation' | 'customer_feedback' | 'areas' | 'cod_rules' | 'pricing_rules' | 'payment_restrictions' | 'categories' | 'banners' | 'roles' | 'commission_rules' | 'settlements' | 'rider_settlements' | 'rider_earnings' | 'platform_ledger' | 'payment_gateways' | 'email_providers' | 'payment_pending' | 'refunds' | 'wallet_withdrawals' | 'reconciliation' | 'offers' | 'broadcast' | 'app_settings_customer' | 'app_settings_restaurant' | 'app_settings_rider' | 'fcm_settings' | 'directions_settings' | 'route_recalc_settings' | 'riders' | 'rider_map' | 'rider_payouts'
  *   $flash       — string|null, shown once as a toast (not a static banner)
  *   $flashType   — 'success' | 'error'
  */
@@ -67,6 +67,17 @@ $navItems = [
         'key' => 'riders', 'href' => 'riders.php', 'label' => 'Riders',
         'perm' => 'riders_view', 'group' => 'operations',
         'icon' => '<circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 0 1 1 1v5l3.5 4"/><path d="M9 17.5H5.5L8 10h6"/>',
+    ],
+    [
+        // Deep-plan §25, third sub-section ("Live map") — the one
+        // piece of the Admin Rider Command Center that had zero
+        // existing admin infra to extend (docs 108/109 built Rider
+        // list / Rider detail first). Same riders_view gate as the
+        // Riders list itself rather than a new permission key, since
+        // this is the same data just plotted instead of tabulated.
+        'key' => 'rider_map', 'href' => 'rider-map.php', 'label' => 'Rider Map',
+        'perm' => 'riders_view', 'group' => 'operations',
+        'icon' => '<path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/><path d="M8 2v16"/><path d="M16 6v16"/>',
     ],
     [
         'key' => 'customers', 'href' => 'customers.php', 'label' => 'Customers',
