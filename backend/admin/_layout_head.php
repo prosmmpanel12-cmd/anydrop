@@ -16,7 +16,7 @@
  * Expects, from the including page:
  *   $admin       — array from admin_require_login()
  *   $pageTitle   — string, shown in <title> and the topbar
- *   $activeNav   — one of 'dashboard' | 'approvals' | 'orders' | 'analytics' | 'support' | 'review_moderation' | 'customer_feedback' | 'areas' | 'cod_rules' | 'pricing_rules' | 'payment_restrictions' | 'categories' | 'banners' | 'roles' | 'commission_rules' | 'settlements' | 'rider_settlements' | 'rider_earnings' | 'platform_ledger' | 'payment_gateways' | 'email_providers' | 'payment_pending' | 'refunds' | 'wallet_withdrawals' | 'reconciliation' | 'offers' | 'broadcast' | 'app_settings_customer' | 'app_settings_restaurant' | 'app_settings_rider' | 'fcm_settings' | 'directions_settings' | 'route_recalc_settings' | 'riders' | 'rider_map' | 'rider_payouts'
+ *   $activeNav   — one of 'dashboard' | 'approvals' | 'orders' | 'analytics' | 'support' | 'review_moderation' | 'customer_feedback' | 'areas' | 'cod_rules' | 'pricing_rules' | 'payment_restrictions' | 'categories' | 'banners' | 'roles' | 'commission_rules' | 'settlements' | 'rider_settlements' | 'rider_earnings' | 'platform_ledger' | 'payment_gateways' | 'email_providers' | 'payment_pending' | 'refunds' | 'wallet_withdrawals' | 'reconciliation' | 'offers' | 'broadcast' | 'app_settings_customer' | 'app_settings_restaurant' | 'app_settings_rider' | 'fcm_settings' | 'directions_settings' | 'route_recalc_settings' | 'otp_settings' | 'riders' | 'rider_map' | 'rider_payouts'
  *   $flash       — string|null, shown once as a toast (not a static banner)
  *   $flashType   — 'success' | 'error'
  */
@@ -250,6 +250,11 @@ $navItems = [
         'key' => 'route_recalc_settings', 'href' => 'route-recalc-settings.php', 'label' => 'Route Recalc Settings',
         'perm' => 'settings_manage', 'group' => 'settings',
         'icon' => '<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>',
+    ],
+    [
+        'key' => 'otp_settings', 'href' => 'otp-settings.php', 'label' => 'OTP Settings',
+        'perm' => 'settings_manage', 'group' => 'settings',
+        'icon' => '<path d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5zm-3 8V6a3 3 0 0 1 6 0v3z"/>',
     ],
     [
         'key' => 'broadcast', 'href' => 'broadcast.php', 'label' => 'Push Notifications',

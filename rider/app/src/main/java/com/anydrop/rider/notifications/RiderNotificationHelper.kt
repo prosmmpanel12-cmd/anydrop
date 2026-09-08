@@ -12,9 +12,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.anydrop.rider.R
-import com.anydrop.rider.ui.dashboard.RiderDashboardActivity
 import com.anydrop.rider.ui.documents.SubmitDocumentsActivity
-import com.anydrop.rider.ui.earnings.EarningsActivity
+import com.anydrop.rider.ui.main.RiderMainActivity
 import com.anydrop.rider.ui.pending.ApplicationStatusActivity
 
 /**
@@ -53,9 +52,18 @@ object RiderNotificationHelper {
     const val CHANNEL_ACCOUNT = "anydrop_rider_account"
     const val CHANNEL_ORDER = "anydrop_rider_order_updates"
     const val CHANNEL_PAYOUT = "anydrop_rider_payout_updates"
+    // RiderOrderPollingService fix (v24) — same "quiet, ongoing, LOW
+    // importance" monitoring channel shape as the restaurant app's own
+    // order_monitoring_v1 channel. Deliberately separate from
+    // CHANNEL_ORDER: this channel's own notification is the persistent
+    // "watching for deliveries" icon a foreground service is required
+    // to show, not an alert — it must never interrupt/sound, unlike a
+    // real new-offer push, which still goes through CHANNEL_ORDER.
+    const val CHANNEL_MONITORING = "anydrop_rider_order_monitoring"
     private const val NOTIF_ID_ACCOUNT = 6001
     private const val NOTIF_ID_ORDER = 6002
     private const val NOTIF_ID_PAYOUT = 6003
+    const val MONITORING_NOTIFICATION_ID = 6004
 
     fun ensureChannels(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -81,6 +89,31 @@ object RiderNotificationHelper {
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply { description = "Earnings posted and payout status updates" }
         )
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_MONITORING,
+                "Delivery monitoring",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply { description = "Ongoing icon shown while watching for new delivery offers in the background" }
+        )
+    }
+
+    /** RiderOrderPollingService's required persistent notification
+     * (Android mandates one for any foreground service). Same
+     * IMPORTANCE_LOW/PRIORITY_LOW/setOngoing(true) shape as the
+     * restaurant app's buildMonitoringNotification() — silent, no
+     * sound/vibration, just the small watching-for-deliveries icon
+     * riders see confirms the background check is actually running. */
+    fun buildMonitoringNotification(context: Context): android.app.Notification {
+        val openAppIntent = contentIntentFor(context, "dashboard")
+        return NotificationCompat.Builder(context, CHANNEL_MONITORING)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("AnyDrop Rider")
+            .setContentText("Watching for new delivery offers")
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .setContentIntent(openAppIntent)
+            .build()
     }
 
     private fun hasPermission(context: Context): Boolean {
@@ -96,21 +129,29 @@ object RiderNotificationHelper {
      * `order_offer`/`order_status` (order, doc 105), `earnings`
      * (payout, already sent by `rider_payout.php`/`orders-deliver.php`
      * since before this session but never actually routed correctly —
-     * see this object's header). `order_offer`/`order_status` both
-     * land on [RiderDashboardActivity] rather than a dedicated order-
-     * detail screen, since deep-plan §9's Rider Order Detail screen
-     * isn't built yet (Android side) — the dashboard is this app's own
-     * "what's happening with my current delivery" landing screen in
-     * the meantime, same honest-fallback spirit as this function's
-     * original account-only design. Anything else (unmapped/malformed)
-     * still falls back to [ApplicationStatusActivity], preserving the
-     * original account-flow behavior exactly. */
+     * see this object's header). `dashboard`/`order_offer`/
+     * `order_status`/`earnings` all land on [RiderMainActivity] (the
+     * bottom-nav shell — v24 Part 2; this fallback set used to point at
+     * a mix of [com.anydrop.rider.ui.dashboard.RiderDashboardActivity]
+     * and [com.anydrop.rider.ui.earnings.EarningsActivity] directly, see
+     * this file's git history). A system-tray tap always starts a fresh
+     * task, so there's no already-running shell instance whose tab this
+     * PendingIntent could select — it always opens straight to the
+     * shell's default Home tab, same honest-fallback spirit as this
+     * function's original account-only design. (A tap on an in-app
+     * notification row, as opposed to a system-tray one, still switches
+     * to the exact right tab — see
+     * NotificationsFragment.onNotificationClick(), which doesn't go
+     * through this PendingIntent path at all.) Anything else
+     * (unmapped/malformed) still falls back to
+     * [ApplicationStatusActivity], preserving the original account-flow
+     * behavior exactly. */
     private fun contentIntentFor(context: Context, screen: String?): PendingIntent {
         val targetClass = when (screen) {
-            "dashboard" -> RiderDashboardActivity::class.java
+            "dashboard" -> RiderMainActivity::class.java
             "submit_documents" -> SubmitDocumentsActivity::class.java
-            "order_offer", "order_status" -> RiderDashboardActivity::class.java
-            "earnings" -> EarningsActivity::class.java
+            "order_offer", "order_status" -> RiderMainActivity::class.java
+            "earnings" -> RiderMainActivity::class.java
             else -> ApplicationStatusActivity::class.java
         }
         val intent = Intent(context, targetClass).apply {

@@ -15,6 +15,16 @@
          restaurant app's own manifest comment flags for this
          permission. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- RiderOrderPollingService (v24 bug fix) — foreground service so
+         delivery-offer polling survives the app being backgrounded or
+         the screen locking, same fix already applied in the Restaurant
+         and Customer apps' own polling services. Without
+         FOREGROUND_SERVICE the service can't call startForeground() at
+         all on API 28+; FOREGROUND_SERVICE_DATA_SYNC is the specific
+         type required on API 34+ for a service whose job is
+         periodically syncing/polling data from the backend. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
         android:allowBackup="true"
@@ -64,18 +74,32 @@
             android:name=".ui.pending.ApplicationStatusActivity"
             android:exported="false" />
 
-        <!-- Approved rider's real landing screen (Phase 3, doc 83) — reached
-             only via ApplicationStatusActivity's redirect, never launched
-             directly by Splash/Login/Signup themselves. Online/offline
-             toggle + placeholder delivery/earnings cards; the full
-             delivery-assignment flow (R3) is a separate, later build. -->
+        <!-- Bottom-nav shell (v24 Part 2) — approved rider's real landing
+             screen, reached only via ApplicationStatusActivity's redirect,
+             never launched directly by Splash/Login/Signup themselves.
+             Replaces RiderDashboardActivity below in that role: Home /
+             Earnings / Alerts / Account tabs, same shape as the
+             restaurant app's own MainActivity. See this class's own kdoc
+             for the full port. -->
+        <activity
+            android:name=".ui.main.RiderMainActivity"
+            android:exported="false" />
+
+        <!-- Superseded by RiderMainActivity's Home tab (HomeFragment) —
+             v24 Part 2. Left registered but no longer reachable from
+             anywhere in the app; kept in place rather than deleted, same
+             "leave the old screen's code alone" call as EarningsActivity/
+             NotificationListActivity below. Phase 3, doc 83 — see this
+             class's own kdoc for its original feature history. -->
         <activity
             android:name=".ui.dashboard.RiderDashboardActivity"
             android:exported="false" />
 
-        <!-- Deep-plan §19-20, doc 90's flagged "natural next slice" —
-             read-only earnings ledger, reached only by tapping the
-             dashboard's TODAY earnings card. -->
+        <!-- Superseded by RiderMainActivity's Earnings tab
+             (EarningsFragment) — v24 Part 2. Left registered but no
+             longer reachable from anywhere in the app. Deep-plan §19-20,
+             doc 90's flagged "natural next slice" — read-only earnings
+             ledger. -->
         <activity
             android:name=".ui.earnings.EarningsActivity"
             android:exported="false" />
@@ -103,8 +127,10 @@
             android:name=".ui.orderdetail.RiderOrderDetailActivity"
             android:exported="false" />
 
-        <!-- Deep-plan §23, docs 99-102 — account-notification bell list.
-             Reached only via RiderDashboardActivity's header bell. -->
+        <!-- Superseded by RiderMainActivity's Alerts tab
+             (NotificationsFragment) — v24 Part 2. Left registered but no
+             longer reachable from anywhere in the app. Deep-plan §23,
+             docs 99-102 — account-notification bell list. -->
         <activity
             android:name=".notifications.NotificationListActivity"
             android:exported="false" />
@@ -120,6 +146,16 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- v24 bug fix — "orders not received" root cause. See
+             RiderOrderPollingService's own kdoc. foregroundServiceType
+             ="dataSync" matches its actual behavior (periodically
+             polling order data from the backend), required on API 34+
+             for any foreground service. -->
+        <service
+            android:name=".service.RiderOrderPollingService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <!-- Default small icon for a push that arrives while the app is
              fully killed — same reasoning/pattern as the restaurant

@@ -18,17 +18,28 @@
  *      to price an actual order/preview. Resolves the rate/base-fee
  *      rule from the DELIVERY ADDRESS's lat/lng (same resolution
  *      pattern as get_effective_cod_rule() — nearest service_areas
- *      node, then its parent), because delivery fee is fundamentally
- *      about "what does it cost to deliver INTO this area", not about
- *      the restaurant's own area assignment. Falls back to the old
- *      flat delivery_charge_flat setting whenever a distance can't be
+ *      node, then its parent). Falls back to the old flat
+ *      delivery_charge_flat setting whenever a distance can't be
  *      computed (restaurant or delivery address missing lat/lng) —
  *      same "don't hide behind unresolved data" stance as every other
  *      geo feature in this project.
  *
- * Both never let the app itself decide these numbers — server is the
- * only source of truth, per recall.md rule 34.8 ("never hardcode
- * area-specific rules... inside the Customer/Restaurant App").
+ *      2026-09-07 (app owner decision — same "combine both sides,
+ *      strictest wins" call as cod_rules.php/payment_restrictions.php's
+ *      identical change today): calculate_delivery_fee() now optionally
+ *      also takes the restaurant's own admin-assigned area_id and, if
+ *      given, also resolves THAT area's own area_pricing_rules row
+ *      (via resolve_area_pricing_rule_row() below — same full-parent-
+ *      chain walk get_min_order_floor_for_area_id() already uses for a
+ *      known area_id, not the nearest-node lat/lng resolution). Both
+ *      sides' rate/base produce their own fee for the same distance;
+ *      "stricter" for a fee is simply the HIGHER one, so whichever side
+ *      would charge the customer more wins. Omit $restaurantAreaId to
+ *      keep the old address-only behaviour untouched.
+ *
+ * Neither function ever lets the app itself decide these numbers —
+ * server is the only source of truth, per recall.md rule 34.8 ("never
+ * hardcode area-specific rules... inside the Customer/Restaurant App").
  */
 
 require_once __DIR__ . '/../config/database.php';
@@ -105,51 +116,23 @@ if (!function_exists('get_min_order_floor_for_area_id')) {
     }
 }
 
-if (!function_exists('calculate_delivery_fee')) {
-    /**
-     * @return array{fee: float, source: string, distance_km: ?float, rate_per_km: ?float, base_fee: ?float, area_id: ?int}
+if (!function_exists('resolve_delivery_rate_for_address')) {
+    /** The delivery-address half of calculate_delivery_fee() — nearest
+     *  node + its parent, unchanged logic from before this session's
+     *  change, pulled out so it can be combined with the restaurant-side
+     *  half below.
      *
-     * source is one of:
-     *   'distance_area_rule'   — real distance, area-specific rate/base
-     *   'distance_platform_default' — real distance, platform default rate/base
-     *   'flat_fallback'        — couldn't compute a distance at all
-     *     (restaurant or delivery address missing lat/lng); uses the
-     *     original flat delivery_charge_flat setting untouched, so
-     *     nothing regresses for any caller that still can't supply
-     *     coordinates.
+     * @return array{rate_per_km: float, base_fee: float, area_id: ?int, source: string}
      */
-    function calculate_delivery_fee(
-        PDO $db,
-        ?float $restaurantLat,
-        ?float $restaurantLng,
-        ?float $deliveryLat,
-        ?float $deliveryLng
-    ): array {
-        if ($restaurantLat === null || $restaurantLng === null || $deliveryLat === null || $deliveryLng === null) {
-            return [
-                'fee' => (float) get_setting('delivery_charge_flat', 25),
-                'source' => 'flat_fallback',
-                'distance_km' => null,
-                'rate_per_km' => null,
-                'base_fee' => null,
-                'area_id' => null,
-            ];
-        }
-
-        $distanceKm = haversine_km($restaurantLat, $restaurantLng, $deliveryLat, $deliveryLng);
-
-        $platformRate = (float) get_setting('default_delivery_rate_per_km', 8);
-        $platformBase = (float) get_setting('default_delivery_base_fee', 0);
-
-        $ratePerKm = $platformRate;
-        $baseFee = $platformBase;
+    function resolve_delivery_rate_for_address(PDO $db, float $deliveryLat, float $deliveryLng): array
+    {
+        $ratePerKm = (float) get_setting('default_delivery_rate_per_km', 8);
+        $baseFee = (float) get_setting('default_delivery_base_fee', 0);
         $source = 'distance_platform_default';
         $matchedAreaId = null;
 
         $resolved = resolve_service_area($db, $deliveryLat, $deliveryLng);
         if (!empty($resolved)) {
-            // Nearest node first, then its parent — same eligible-set
-            // walk as get_effective_cod_rule()/resolve_pricing_rule_for_area_id.
             $candidateIds = [$resolved[0]['id']];
             if ($resolved[0]['level'] === 'area' && $resolved[0]['parent_id'] !== null) {
                 $candidateIds[] = $resolved[0]['parent_id'];
@@ -172,16 +155,123 @@ if (!function_exists('calculate_delivery_fee')) {
             }
         }
 
-        $rawFee = $baseFee + ($distanceKm * $ratePerKm);
-        $fee = ceil_to_nearest_5($rawFee);
+        return ['rate_per_km' => $ratePerKm, 'base_fee' => $baseFee, 'area_id' => $matchedAreaId, 'source' => $source];
+    }
+}
+
+if (!function_exists('resolve_delivery_rate_for_restaurant_area')) {
+    /** The restaurant-side half — resolves from restaurants.area_id
+     *  (already assigned by an admin), same full-parent-chain walk as
+     *  get_min_order_floor_for_area_id() uses for the same kind of
+     *  known-area_id lookup. */
+    function resolve_delivery_rate_for_restaurant_area(PDO $db, ?int $restaurantAreaId): array
+    {
+        $ratePerKm = (float) get_setting('default_delivery_rate_per_km', 8);
+        $baseFee = (float) get_setting('default_delivery_base_fee', 0);
+
+        if ($restaurantAreaId === null) {
+            return ['rate_per_km' => $ratePerKm, 'base_fee' => $baseFee, 'area_id' => null, 'source' => 'platform_default'];
+        }
+
+        $rule = resolve_area_pricing_rule_row($db, $restaurantAreaId);
+        if (!$rule) {
+            return ['rate_per_km' => $ratePerKm, 'base_fee' => $baseFee, 'area_id' => null, 'source' => 'platform_default'];
+        }
+
+        if ($rule['delivery_rate_per_km'] !== null) {
+            $ratePerKm = (float) $rule['delivery_rate_per_km'];
+        }
+        if ($rule['delivery_base_fee'] !== null) {
+            $baseFee = (float) $rule['delivery_base_fee'];
+        }
+        return ['rate_per_km' => $ratePerKm, 'base_fee' => $baseFee, 'area_id' => (int) $rule['area_id'], 'source' => 'distance_area_rule'];
+    }
+}
+
+if (!function_exists('calculate_delivery_fee')) {
+    /**
+     * @return array{fee: float, source: string, distance_km: ?float, rate_per_km: ?float, base_fee: ?float, area_id: ?int, restaurant_area_id: ?int}
+     *
+     * source is one of:
+     *   'distance_area_rule'   — real distance, area-specific rate/base
+     *   'distance_platform_default' — real distance, platform default rate/base
+     *   'combined_strictest'   — real distance, restaurant-area rule given
+     *     AND it produced the higher (stricter) fee of the two sides
+     *   'flat_fallback'        — couldn't compute a distance at all
+     *     (restaurant or delivery address missing lat/lng); uses the
+     *     original flat delivery_charge_flat setting untouched, so
+     *     nothing regresses for any caller that still can't supply
+     *     coordinates.
+     *
+     * $restaurantAreaId is optional — omit it (or pass null) to keep
+     * the old address-only behaviour exactly as it was before this
+     * session's "combine both sides, strictest wins" change. When
+     * given, the fee is computed twice (once per side's rate/base) for
+     * the same distance, and the HIGHER of the two — the stricter one
+     * for the customer's wallet — is what's actually charged.
+     */
+    function calculate_delivery_fee(
+        PDO $db,
+        ?float $restaurantLat,
+        ?float $restaurantLng,
+        ?float $deliveryLat,
+        ?float $deliveryLng,
+        ?int $restaurantAreaId = null
+    ): array {
+        if ($restaurantLat === null || $restaurantLng === null || $deliveryLat === null || $deliveryLng === null) {
+            return [
+                'fee' => (float) get_setting('delivery_charge_flat', 25),
+                'source' => 'flat_fallback',
+                'distance_km' => null,
+                'rate_per_km' => null,
+                'base_fee' => null,
+                'area_id' => null,
+                'restaurant_area_id' => null,
+            ];
+        }
+
+        $distanceKm = haversine_km($restaurantLat, $restaurantLng, $deliveryLat, $deliveryLng);
+
+        $addressRate = resolve_delivery_rate_for_address($db, $deliveryLat, $deliveryLng);
+        $addressFee = ceil_to_nearest_5($addressRate['base_fee'] + ($distanceKm * $addressRate['rate_per_km']));
+
+        if ($restaurantAreaId === null) {
+            return [
+                'fee' => $addressFee,
+                'source' => $addressRate['source'],
+                'distance_km' => round($distanceKm, 2),
+                'rate_per_km' => $addressRate['rate_per_km'],
+                'base_fee' => $addressRate['base_fee'],
+                'area_id' => $addressRate['area_id'],
+                'restaurant_area_id' => null,
+            ];
+        }
+
+        $restaurantRate = resolve_delivery_rate_for_restaurant_area($db, $restaurantAreaId);
+        $restaurantFee = ceil_to_nearest_5($restaurantRate['base_fee'] + ($distanceKm * $restaurantRate['rate_per_km']));
+
+        // Stricter = higher fee. Ties keep the address side's rate/base
+        // in the response for continuity with the pre-combine shape.
+        if ($restaurantFee > $addressFee) {
+            $winner = $restaurantRate;
+            $fee = $restaurantFee;
+            $source = $addressRate['source'] === 'distance_platform_default' && $restaurantRate['source'] === 'distance_area_rule'
+                ? 'distance_area_rule'
+                : 'combined_strictest';
+        } else {
+            $winner = $addressRate;
+            $fee = $addressFee;
+            $source = $addressRate['source'];
+        }
 
         return [
             'fee' => $fee,
             'source' => $source,
             'distance_km' => round($distanceKm, 2),
-            'rate_per_km' => $ratePerKm,
-            'base_fee' => $baseFee,
-            'area_id' => $matchedAreaId,
+            'rate_per_km' => $winner['rate_per_km'],
+            'base_fee' => $winner['base_fee'],
+            'area_id' => $addressRate['area_id'],
+            'restaurant_area_id' => $restaurantRate['area_id'],
         ];
     }
 }

@@ -95,8 +95,17 @@ if ($order['delivery_address_id'] !== null) {
     }
 }
 
+// This order's restaurant's own admin-assigned area_id (2026-09-07 —
+// same combine-both-sides addition as orders/create.php's identical
+// checks) — the order already carries restaurant_id, no extra lookup
+// risk of resolving the "wrong" restaurant.
+$restaurantAreaStmt = $db->prepare('SELECT area_id FROM restaurants WHERE id = :id LIMIT 1');
+$restaurantAreaStmt->execute(['id' => $order['restaurant_id']]);
+$restaurantAreaRow = $restaurantAreaStmt->fetch();
+$restaurantAreaId = ($restaurantAreaRow && $restaurantAreaRow['area_id'] !== null) ? (int) $restaurantAreaRow['area_id'] : null;
+
 // Same general gate orders/create.php runs first, for 'cod' specifically.
-$paymentRestriction = get_effective_payment_restrictions($db, $addressLat, $addressLng);
+$paymentRestriction = get_effective_payment_restrictions($db, $addressLat, $addressLng, $restaurantAreaId);
 $methodAllowed = is_payment_method_allowed_in_area($paymentRestriction, 'cod');
 if (!$methodAllowed['allowed']) {
     respond_error('payment_method_not_allowed', 422, ['reason' => $methodAllowed['reason']]);
@@ -104,7 +113,7 @@ if (!$methodAllowed['allowed']) {
 
 // Same fine-grained COD rule orders/create.php runs, single pass since
 // grand_total is already known (order was priced at creation time).
-$codRule = get_effective_cod_rule($db, $addressLat, $addressLng);
+$codRule = get_effective_cod_rule($db, $addressLat, $addressLng, $restaurantAreaId);
 $codCheck = evaluate_cod_eligibility($db, $codRule, $customerId, (float) $order['grand_total']);
 if (!$codCheck['eligible']) {
     respond_error('cod_not_eligible', 422, ['reason' => $codCheck['reason']]);

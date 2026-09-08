@@ -107,6 +107,20 @@ if ($addressId !== null) {
     $addressLng = $addressRow['longitude'] !== null ? (float) $addressRow['longitude'] : null;
 }
 
+// Restaurant's own admin-assigned area_id (recall.md item 2) — fetched
+// here, ahead of price_cart()'s own full restaurant load below, only
+// because the payment-restriction/COD checks that follow need it too
+// and run before price_cart() does. Left null if the restaurant row
+// doesn't exist (or has no area assigned yet) — price_cart() below is
+// still the actual "restaurant not found" source of truth and will
+// reject the order properly either way; this lookup existing or not
+// only affects which side(s) contribute to the combined COD/payment
+// rule, not whether the restaurant itself gets validated.
+$restaurantAreaStmt = $db->prepare('SELECT area_id FROM restaurants WHERE id = :id AND deleted_at IS NULL LIMIT 1');
+$restaurantAreaStmt->execute(['id' => $restaurantId]);
+$restaurantAreaRow = $restaurantAreaStmt->fetch();
+$restaurantAreaId = ($restaurantAreaRow && $restaurantAreaRow['area_id'] !== null) ? (int) $restaurantAreaRow['area_id'] : null;
+
 // recall.md Phase B item 15 / migration 37 — general area-wide payment
 // method gate, checked BEFORE the COD-specific fine-grained rule below.
 // This is the coarser "is this method allowed in this area at all"
@@ -123,7 +137,11 @@ if ($addressId !== null) {
 // payment RAILS a launch area trusts (prepaid-only, no-COD-fraud-risk
 // areas, etc) — a wallet debit is the customer spending their own
 // already-verified balance, not a new rail the area needs to vet.
-$paymentRestriction = get_effective_payment_restrictions($db, $addressLat, $addressLng);
+//
+// 2026-09-07 — now also passes the restaurant's own area_id so this
+// combines BOTH the delivery address's area AND the restaurant's own
+// area, strictest (AND) wins — see payment_restrictions.php's header.
+$paymentRestriction = get_effective_payment_restrictions($db, $addressLat, $addressLng, $restaurantAreaId);
 $methodAllowed = is_payment_method_allowed_in_area($paymentRestriction, $paymentMethod);
 if (!$methodAllowed['allowed']) {
     respond_error('payment_method_not_allowed', 422, ['reason' => $methodAllowed['reason']]);
@@ -135,8 +153,11 @@ if (!$methodAllowed['allowed']) {
 // checked again after price_cart() below (grand_total isn't known
 // yet at this point) — this first pass only covers the checks that
 // don't need the priced total (enabled/disabled, order-count checks).
+//
+// 2026-09-07 — same combine-both-sides, strictest-wins change as the
+// payment-restriction gate just above (see cod_rules.php's header).
 if ($paymentMethod === 'cod') {
-    $codRule = get_effective_cod_rule($db, $addressLat, $addressLng);
+    $codRule = get_effective_cod_rule($db, $addressLat, $addressLng, $restaurantAreaId);
     $codCheck = evaluate_cod_eligibility($db, $codRule, $customerId, null);
     if (!$codCheck['eligible']) {
         respond_error('cod_not_eligible', 422, ['reason' => $codCheck['reason']]);

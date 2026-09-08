@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bottom-nav shell (v24 Part 2) — replaces RiderDashboardActivity as
+     the approved-rider landing screen. Four always-visible tabs: Home /
+     Earnings / Alerts / Account. Same overall shape as the restaurant
+     app's own activity_main.xml (shared top bar above a
+     FragmentContainerView above a BottomNavigationView), adapted to
+     this app's dark theme and simpler top bar — no OPEN/CLOSED pill
+     here (that's a restaurant-only concept); just the rider's name +
+     the documents-rejected alert + the notification bell, all ported
+     as-is from the old activity_rider_dashboard.xml header row. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/surface"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="14dp"
+        android:elevation="2dp">
+
+        <TextView
+            android:id="@+id/mainGreetingText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="Hi, Rahul" />
+
+        <!-- Ported from activity_rider_dashboard.xml's header row
+             unchanged — visibility still driven by
+             HomeFragment.renderDocumentsEntryPoint() (moved here since
+             the shell, not any one tab, is the natural single place for
+             a badge that should be visible regardless of which tab is
+             currently showing... but kept tab-local for this pass, see
+             RiderMainActivity's kdoc for why). -->
+        <TextView
+            android:id="@+id/btnDocumentsAlert"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:text="@string/documents_button_rejected"
+            android:textColor="@color/doc_rejected_fg"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:padding="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+        <FrameLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="4dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:padding="8dp">
+
+            <ImageView
+                android:id="@+id/btnNotifications"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:padding="2dp"
+                android:src="@drawable/ic_notification"
+                app:tint="@color/text_primary"
+                android:contentDescription="@string/notifications_title"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless" />
+
+            <TextView
+                android:id="@+id/notificationBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|end"
+                android:minWidth="17dp"
+                android:minHeight="17dp"
+                android:gravity="center"
+                android:paddingHorizontal="3dp"
+                android:background="@drawable/bg_notification_badge"
+                android:text="0"
+                android:textColor="@color/white"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                android:elevation="4dp"
+                tools:visibility="visible" />
+
+        </FrameLayout>
+
+    </LinearLayout>
+
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/navHostContainer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/surface"
+        app:itemIconTint="@color/bottom_nav_item_color"
+        app:itemTextColor="@color/bottom_nav_item_color"
+        app:menu="@menu/bottom_nav_menu" />
+
+</LinearLayout>

@@ -488,10 +488,13 @@ function price_cart(PDO $db, int $restaurantId, array $items, ?string $couponCod
     // calculate_delivery_fee() itself when a distance can't be computed).
     // Restaurant's own latitude/longitude (already exists, set via
     // restaurant/profile-update.php's map-picker flow) + the delivery
-    // address's lat/lng passed into this function.
+    // address's lat/lng passed into this function. Restaurant's own
+    // area_id passed too (2026-09-07) so calculate_delivery_fee() can
+    // combine both sides and charge whichever is stricter (higher).
     $restaurantLat = $restaurant['latitude'] !== null ? (float) $restaurant['latitude'] : null;
     $restaurantLng = $restaurant['longitude'] !== null ? (float) $restaurant['longitude'] : null;
-    $deliveryPricing = calculate_delivery_fee($db, $restaurantLat, $restaurantLng, $deliveryLat, $deliveryLng);
+    $restaurantAreaId = $restaurant['area_id'] !== null ? (int) $restaurant['area_id'] : null;
+    $deliveryPricing = calculate_delivery_fee($db, $restaurantLat, $restaurantLng, $deliveryLat, $deliveryLng, $restaurantAreaId);
     $deliveryCharge = $deliveryPricing['fee'];
 
     // Free-delivery offer — its own stacking slot (doc 20 §13), never

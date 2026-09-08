@@ -5,8 +5,11 @@
  * "Admin should see every order" — a single searchable/filterable
  * table across every restaurant/customer/rider, with a full detail
  * view per order (customer, restaurant, items, pricing, payment,
- * timeline, rider, location, OTP, cancellation, refund) and one
- * heavily-gated override action (Force-Cancel).
+ * timeline, rider, location, OTP, cancellation, refund) and three
+ * heavily-gated override actions: Force-Cancel, and (docs/111 §16
+ * re-audit gap 1) Reset OTP attempts / Force-Deliver for an order
+ * that's hit otp_max_attempts and would otherwise be stuck at
+ * out_for_delivery forever with no resolution path.
  *
  * List/filter/pagination follows the same shape as customers.php
  * (dynamic $where/$params, LIMIT/OFFSET, http_build_query pagination
@@ -37,6 +40,10 @@ require_once __DIR__ . '/../lib/audit.php';
 require_once __DIR__ . '/../lib/orders.php';
 require_once __DIR__ . '/../lib/refunds.php';
 require_once __DIR__ . '/../lib/notifications.php';
+require_once __DIR__ . '/../lib/settings.php';
+require_once __DIR__ . '/../lib/ledger.php';
+require_once __DIR__ . '/../lib/rider_ledger.php';
+require_once __DIR__ . '/../lib/rider_earnings.php';
 
 $admin = admin_require_login();
 admin_require_permission($admin, 'orders_view');
@@ -57,6 +64,7 @@ $statusLabels = [
 
 $flash = null;
 $flashType = 'success';
+$otpMaxAttempts = (int) get_setting('otp_max_attempts', 3);
 
 // ---------- POST: Force-Cancel override ----------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -159,6 +167,136 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'reason' => $reason,
             ]);
             $flash = 'Order #' . admin_escape($order['order_code']) . ' force-cancelled.';
+        }
+    } elseif (($_POST['form_action'] ?? '') === 'otp_reset_attempts') {
+        // docs/111 re-audit gap 1 — an order that hit otp_max_attempts
+        // was previously stuck at out_for_delivery forever (deep-plan
+        // §16's "never change order status" on a wrong OTP applies to
+        // the rider-facing endpoint, not to a deliberate admin action).
+        // This is the "customer re-reads/gives the right code, rider
+        // just fat-fingered it" resolution: give the rider fresh
+        // attempts without touching status/payment/ledger at all —
+        // orders-deliver.php's own OTP check runs exactly as before on
+        // the rider's next real attempt, so no verification logic is
+        // duplicated here.
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+
+        $stmt = $db->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $orderId]);
+        $order = $stmt->fetch();
+
+        $maxAttempts = (int) get_setting('otp_max_attempts', 3);
+
+        if (!$order) {
+            $flash = 'Order not found.';
+            $flashType = 'error';
+        } elseif ($order['status'] !== 'out_for_delivery' || $order['delivery_otp'] === null) {
+            $flash = 'This order isn\'t awaiting OTP delivery, so there\'s nothing to reset.';
+            $flashType = 'error';
+        } elseif ((int) $order['otp_attempts'] < $maxAttempts) {
+            $flash = 'This order isn\'t OTP-locked yet — nothing to reset.';
+            $flashType = 'error';
+        } else {
+            $db->prepare(
+                "UPDATE orders SET otp_attempts = 0 WHERE id = :id AND status = 'out_for_delivery'"
+            )->execute(['id' => $orderId]);
+
+            write_audit_log('admin', $admin['id'], 'order_otp_attempts_reset', [
+                'order_id' => $orderId,
+                'order_code' => $order['order_code'],
+                'rider_id' => $order['rider_id'] !== null ? (int) $order['rider_id'] : null,
+                'previous_attempts' => (int) $order['otp_attempts'],
+            ]);
+            $flash = 'OTP attempts reset for order #' . admin_escape($order['order_code']) . ' — the rider can try again.';
+        }
+    } elseif (($_POST['form_action'] ?? '') === 'force_deliver') {
+        // docs/111 re-audit gap 1, other half — the "customer genuinely
+        // handed the code over but it's unrecoverable now (lost/can't
+        // reread it), support has otherwise confirmed the delivery
+        // happened" resolution: mark delivered without ever checking
+        // the OTP. Runs the SAME downstream effects
+        // orders-deliver.php's own success path does (status flip, COD
+        // ledger entry, rider earning entry, customer notification) so
+        // money/notifications aren't silently skipped just because this
+        // took the admin path instead of the rider app — only the OTP
+        // check itself and otp_verified_at are skipped/left null, and
+        // the reason is recorded on the status-history row so it's
+        // clearly distinguishable from a normal rider-confirmed
+        // delivery in the order's own timeline.
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        $reason = trim($_POST['reason'] ?? '');
+
+        $stmt = $db->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $orderId]);
+        $order = $stmt->fetch();
+
+        $maxAttempts = (int) get_setting('otp_max_attempts', 3);
+
+        if (!$order) {
+            $flash = 'Order not found.';
+            $flashType = 'error';
+        } elseif ($order['status'] !== 'out_for_delivery') {
+            $flash = 'This order is already in a final or earlier state (' . ($statusLabels[$order['status']] ?? $order['status']) . ') and can\'t be force-delivered from here.';
+            $flashType = 'error';
+        } elseif ((int) $order['otp_attempts'] < $maxAttempts) {
+            $flash = 'This order isn\'t OTP-locked — use the normal rider app flow, or reset attempts instead of bypassing verification.';
+            $flashType = 'error';
+        } elseif ($reason === '') {
+            $flash = 'A reason is required to force-deliver an order without OTP verification.';
+            $flashType = 'error';
+        } else {
+            $db->beginTransaction();
+
+            $isCod = $order['payment_method'] === 'cod';
+            $upd = $db->prepare(
+                "UPDATE orders SET status = 'delivered', delivered_at = NOW()"
+                . ($isCod ? ", payment_status = 'paid'" : "")
+                . " WHERE id = :id AND status = 'out_for_delivery'"
+            );
+            $upd->execute(['id' => $orderId]);
+
+            if ($upd->rowCount() !== 1) {
+                $db->rollBack();
+                $flash = 'This order changed state before the override could be applied — please re-check it.';
+                $flashType = 'error';
+            } else {
+                insert_status_history($db, $orderId, 'delivered', 'admin', (int) $admin['id'], 'Force-delivered (OTP bypassed): ' . $reason);
+
+                if ($isCod) {
+                    record_cod_order_ledger_entry($db, $order);
+                    record_rider_cod_collected($db, $order);
+                }
+                $earningResult = record_rider_delivery_earning($db, $order);
+
+                $db->commit();
+
+                create_notification(
+                    'customer',
+                    (int) $order['customer_id'],
+                    'Order delivered',
+                    "Order {$order['order_code']} has been delivered. Enjoy!",
+                    'order',
+                    ['order_id' => $orderId, 'screen' => 'order_status']
+                );
+                if ($order['rider_id'] !== null) {
+                    create_notification(
+                        'rider',
+                        (int) $order['rider_id'],
+                        'Earning posted',
+                        'You earned ₹' . number_format((float) $earningResult['amount'], 2) . " for order {$order['order_code']}.",
+                        'payout',
+                        ['order_id' => $orderId, 'screen' => 'earnings']
+                    );
+                }
+
+                write_audit_log('admin', $admin['id'], 'order_force_delivered', [
+                    'order_id' => $orderId,
+                    'order_code' => $order['order_code'],
+                    'rider_id' => $order['rider_id'] !== null ? (int) $order['rider_id'] : null,
+                    'reason' => $reason,
+                ]);
+                $flash = 'Order #' . admin_escape($order['order_code']) . ' force-delivered (OTP bypassed).';
+            }
         }
     }
 }
@@ -530,16 +668,40 @@ require __DIR__ . '/_layout_head.php';
             <?= strtoupper($ord['payment_method']) ?> · <?= ucfirst($ord['payment_status']) ?>
         </div>
 
+        <?php $otpLocked = $ord['delivery_otp'] && (int) $ord['otp_attempts'] >= $otpMaxAttempts; ?>
         <div class="section-title" style="margin-top:10px;">Delivery OTP</div>
         <div class="muted">
             <?php if ($ord['delivery_otp']): ?>
                 <span class="otp-masked" data-otp="<?= admin_escape($ord['delivery_otp']) ?>" style="cursor:pointer;" title="Click to reveal">••••</span>
                 <?= $ord['otp_verified_at'] ? ' · Verified at ' . admin_escape($ord['otp_verified_at']) : ' · Not yet verified' ?>
                 <?php if ((int) $ord['otp_attempts'] > 0): ?> · <?= (int) $ord['otp_attempts'] ?> attempt(s)<?php endif; ?>
+                <?php if ($otpLocked): ?>
+                    <br><span class="badge inactive">Locked — max attempts reached</span>
+                <?php endif; ?>
             <?php else: ?>
                 No OTP generated for this order.
             <?php endif; ?>
         </div>
+        <?php if ($canManage && $otpLocked && $ord['status'] === 'out_for_delivery'): ?>
+        <div style="margin-top:8px; display:flex; gap:8px;">
+            <form method="post" style="flex:1;" onsubmit="return confirm('Reset OTP attempts for this order? The rider will be able to try entering the code again.');">
+                <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
+                <input type="hidden" name="order_id" value="<?= $orderId ?>">
+                <input type="hidden" name="form_action" value="otp_reset_attempts">
+                <button type="submit" class="btn btn-outline" style="width:100%;">Reset attempts</button>
+            </form>
+            <form method="post" style="flex:1;" onsubmit="return promptForceDeliverReason(this);">
+                <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
+                <input type="hidden" name="order_id" value="<?= $orderId ?>">
+                <input type="hidden" name="form_action" value="force_deliver">
+                <input type="hidden" name="reason" class="force-deliver-reason-field">
+                <button type="submit" class="btn btn-outline danger" style="width:100%;">Force-deliver (bypass OTP)</button>
+            </form>
+        </div>
+        <p class="muted" style="font-size:12px; margin-top:4px;">
+            Reset lets the rider retry the real code. Force-deliver skips verification entirely — use only once you've confirmed the delivery some other way.
+        </p>
+        <?php endif; ?>
 
         <div class="section-title" style="margin-top:10px;">Timeline</div>
         <div class="muted" style="line-height:1.7;">
@@ -592,6 +754,12 @@ function promptForceCancelReason(form) {
     if (!reason || !reason.trim()) { return false; }
     form.querySelector('.force-cancel-reason-field').value = reason.trim();
     return confirm('Force-cancel this order? This cannot be undone from here, and will queue a refund automatically if the order was already paid.');
+}
+function promptForceDeliverReason(form) {
+    var reason = prompt('Reason for force-delivering this order without OTP verification (visible in the audit log):');
+    if (!reason || !reason.trim()) { return false; }
+    form.querySelector('.force-deliver-reason-field').value = reason.trim();
+    return confirm('Force-deliver this order without checking the OTP? This marks it delivered, records the COD/earning entries as usual, and cannot be undone from here.');
 }
 document.querySelectorAll('.otp-masked').forEach(function (el) {
     el.addEventListener('click', function () {

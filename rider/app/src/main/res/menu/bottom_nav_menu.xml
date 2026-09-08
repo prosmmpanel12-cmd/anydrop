@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bottom-nav shell (v24 Part 2) — four tabs per the handover plan:
+     Home / Earnings / Notifications / Account. Same shape as the
+     restaurant app's own bottom_nav_menu.xml. -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_home"
+        android:icon="@drawable/ic_nav_home"
+        android:title="@string/nav_home" />
+    <item
+        android:id="@+id/nav_earnings"
+        android:icon="@drawable/ic_nav_earnings"
+        android:title="@string/nav_earnings" />
+    <item
+        android:id="@+id/nav_notifications"
+        android:icon="@drawable/ic_notification"
+        android:title="@string/nav_notifications" />
+    <item
+        android:id="@+id/nav_account"
+        android:icon="@drawable/ic_person"
+        android:title="@string/nav_account" />
+</menu>

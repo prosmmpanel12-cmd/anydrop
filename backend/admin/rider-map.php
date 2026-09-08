@@ -65,6 +65,20 @@
  * playback (that's `rider-detail.php`'s Location History table, doc
  * 109 — this page is live/current-state only, not a scrubber).
  *
+ * 2026-09-07 (app owner request): click-anywhere-for-address — same
+ * bonik.in reverse-geocode-on-click behaviour areas.php's "Choose on
+ * map" picker already has (see that file's fetchBonikAddress()).
+ * Clicking any point on this map (not just a rider circleMarker) drops
+ * a plain pin and shows the reverse-geocoded address in a popup — lets
+ * an admin looking at where a rider actually is right now immediately
+ * see what locality that point is in, without leaving this page.
+ * Read-only lookup only; unlike areas.php's picker there's nothing to
+ * "use this point" for here, so no dialog/form, just the popup.
+ * Rider circleMarkers get `bubblingMouseEvents: false` so opening a
+ * rider's own popup doesn't also drop an address pin on top of it —
+ * Leaflet's vector layers (circleMarker included) bubble click events
+ * up to the map by default, unlike L.Marker.
+ *
  * Gated on `riders_view` — same base gate `riders.php`/
  * `rider-detail.php` both already use, since this is the same
  * rider-location data just plotted instead of tabulated, not a new
@@ -219,6 +233,7 @@ require __DIR__ . '/_layout_head.php';
             <span><span class="badge" style="background:#e6521f22;color:#e6521f;">● On delivery</span></span>
             <span><span class="badge" style="background:#c0392b22;color:#c0392b;">● Stale (no update &gt; <?= STALE_MINUTES ?>m)</span></span>
         </div>
+        <p class="muted" style="margin:0 0 10px; font-size:13px;">Click anywhere on the map to look up that point's address.</p>
         <div id="riderMapCanvas" style="height:520px; border-radius:8px; overflow:hidden;"></div>
         <?php if (empty($mapPoints)): ?>
             <p class="muted" style="margin-top:10px;">No online rider currently has a plottable location.</p>
@@ -281,7 +296,8 @@ require __DIR__ . '/_layout_head.php';
                     color: p.color,
                     fillColor: p.color,
                     fillOpacity: 0.85,
-                    weight: 2
+                    weight: 2,
+                    bubblingMouseEvents: false
                 }).addTo(map);
 
                 var popupHtml = '<strong>' + escapeHtml(p.name) + '</strong><br>'
@@ -302,6 +318,50 @@ require __DIR__ . '/_layout_head.php';
                 return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
             });
         }
+
+        // Click-anywhere-for-address — same bonik.in reverse-geocode
+        // areas.php's "Choose on map" picker uses (see this file's own
+        // header). Read-only: drops/moves one plain pin and shows the
+        // address in its popup, nothing to save. bubblingMouseEvents:false
+        // on the rider circleMarkers above keeps opening a rider's own
+        // popup from also firing this.
+        var pickMarker = null;
+        var addressFetchToken = 0;
+        map.on('click', function (e) {
+            var lat = e.latlng.lat.toFixed(6);
+            var lng = e.latlng.lng.toFixed(6);
+            var loadingHtml = '<div style="font-size:13px;">Loading address…</div>';
+
+            if (pickMarker) {
+                pickMarker.setLatLng(e.latlng);
+            } else {
+                pickMarker = L.marker(e.latlng).addTo(map);
+            }
+            pickMarker.bindPopup(loadingHtml).openPopup();
+
+            var token = ++addressFetchToken;
+            fetch('https://bonik.in/api/google/address?lat=' + lat + '&lng=' + lng)
+                .then(function (res) { return res.json(); })
+                .then(function (data) {
+                    if (token !== addressFetchToken || !pickMarker) return; // stale/superseded click
+                    var line1 = data.formatted_address || data.address1 || '';
+                    var line2 = [data.address2, data.city, data.state].filter(Boolean).join(', ');
+                    var line3 = [data.country, data.pincode].filter(Boolean).join(' - ');
+                    var html = '<div style="font-size:13px; max-width:220px;">'
+                        + '<strong>' + (line1 ? escapeHtml(line1) : 'Address unavailable') + '</strong>'
+                        + (line2 ? '<br>' + escapeHtml(line2) : '')
+                        + (line3 ? '<br>' + escapeHtml(line3) : '')
+                        + '<br><span class="muted">' + lat + ', ' + lng + '</span>'
+                        + '</div>';
+                    pickMarker.setPopupContent(html);
+                })
+                .catch(function () {
+                    if (token !== addressFetchToken || !pickMarker) return;
+                    pickMarker.setPopupContent(
+                        '<div style="font-size:13px;">Address lookup failed.<br><span class="muted">' + lat + ', ' + lng + '</span></div>'
+                    );
+                });
+        });
 
         // Auto-refresh — plain full-page reload on a timer, see file
         // header for why this doesn't warrant a separate polling

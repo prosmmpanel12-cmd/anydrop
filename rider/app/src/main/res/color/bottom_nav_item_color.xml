@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bottom-nav shell (v24 Part 2) — same selected/unselected selector
+     shape as the restaurant app's own bottom_nav_item_color.xml, colors
+     swapped for this app's dark theme: brand green when selected,
+     text_secondary otherwise (matches this app's existing muted-grey
+     unselected-icon convention elsewhere, e.g. ic_info tinting). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/anydrop_green" android:state_checked="true" />
+    <item android:color="@color/text_secondary" />
+</selector>

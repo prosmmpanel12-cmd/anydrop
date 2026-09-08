@@ -30,6 +30,24 @@
  * assigning a restaurant to a State/District would be meaningless for
  * the area-match check recall.md item 3 will use.
  *
+ * 2026-09-07 — Auto-detect + bulk assign (app owner: "script mat do,
+ * admin panel mai button de assign area ka, aur saath mai filter bhi
+ * jese ki Osian mein aane wale restaurant ka area auto assign ho
+ * jaye"). The Area filter dropdown gained an "Unassigned" option; when
+ * selected, every matching restaurant with a lat/lng gets its likely
+ * area computed live via resolve_service_area() (same function the
+ * signup-time auto-resolve and the customer-address backfill already
+ * use) and shown as a "Detected area" column, with a per-row "Assign"
+ * button — and a further "Detected area" dropdown lets the admin
+ * narrow down to exactly the restaurants that would resolve to one
+ * specific area (e.g. Osian), then "Auto-assign area to all shown"
+ * assigns all of them in one click. Nothing here bypasses admin
+ * review — this only ever runs when an admin is looking at this page
+ * and explicitly clicks a button, same "admin stays in the loop"
+ * reasoning cod_rules.php/etc.'s combined-area-rules change documented
+ * for why restaurant/profile-update.php still never auto-reassigns
+ * area_id on its own.
+ *
  * Gated: `restaurants_view` to see this page at all; `restaurants_edit`
  * for area/commission changes; `restaurants_approve` for every status
  * transition (approve/reject/suspend/reactivate); `restaurants_delete`
@@ -39,6 +57,7 @@
 
 require_once __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../lib/audit.php';
+require_once __DIR__ . '/../lib/geo.php';
 
 $admin = admin_require_login();
 admin_require_permission($admin, 'restaurants_view');
@@ -46,6 +65,71 @@ $canEdit = admin_has_permission($admin['id'], 'restaurants_edit');
 $canApprove = admin_has_permission($admin['id'], 'restaurants_approve');
 $canDelete = admin_has_permission($admin['id'], 'restaurants_delete');
 $db = Database::get();
+
+// Full node map + assignable area options — moved up (was previously
+// built further down, right before the display section) so the new
+// bulk-auto-assign POST handler and the unassigned-restaurants lookup
+// function below can both use them too, not just the table render.
+$areaNodeById = [];
+foreach ($db->query('SELECT id, name, parent_id FROM service_areas')->fetchAll() as $row) {
+    $areaNodeById[(int) $row['id']] = $row;
+}
+$areaOptions = $db->query(
+    "SELECT id, name, level FROM service_areas WHERE level IN ('city_village','area') AND is_active = 1 ORDER BY name"
+)->fetchAll();
+
+if (!function_exists('admin_unassigned_restaurants_with_detected_area')) {
+    /**
+     * Every non-deleted restaurant with area_id IS NULL matching the
+     * given search/status filters, each with a 'detected_area_id'
+     * (and null 'detected_area_id' when there's no lat/lng to resolve
+     * from, or nothing covers that point) computed live via
+     * resolve_service_area() — the SAME resolution function
+     * restaurant-signup.php's auto-assign-at-signup and the customer-
+     * address backfill already use, just run on demand here instead of
+     * once at signup. Read-only: never writes anything itself, callers
+     * (the bulk-assign POST handler, the display section) decide what
+     * to do with the result.
+     */
+    function admin_unassigned_restaurants_with_detected_area(PDO $db, string $q, string $statusFilter): array
+    {
+        $where = ['deleted_at IS NULL', 'area_id IS NULL'];
+        $params = [];
+        if ($q !== '') {
+            $where[] = '(name LIKE :q OR owner_name LIKE :q OR owner_email LIKE :q OR owner_mobile LIKE :q)';
+            $params['q'] = '%' . $q . '%';
+        }
+        if ($statusFilter !== '') {
+            $where[] = 'status = :status';
+            $params['status'] = $statusFilter;
+        }
+        $whereSql = implode(' AND ', $where);
+
+        $stmt = $db->prepare(
+            "SELECT id, name, owner_name, owner_mobile, owner_email, status, operational_status,
+                    area_id, current_due, commission_percent, rating_avg, created_at, rejection_reason,
+                    latitude, longitude
+             FROM restaurants
+             WHERE {$whereSql}
+             ORDER BY created_at DESC"
+        );
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+
+        foreach ($rows as &$row) {
+            $row['detected_area_id'] = null;
+            if ($row['latitude'] !== null && $row['longitude'] !== null) {
+                $matches = resolve_service_area($db, (float) $row['latitude'], (float) $row['longitude']);
+                if (!empty($matches)) {
+                    $row['detected_area_id'] = (int) $matches[0]['id'];
+                }
+            }
+        }
+        unset($row);
+
+        return $rows;
+    }
+}
 
 $flash = null;
 $flashType = 'success';
@@ -57,6 +141,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $flashType = 'error';
     } else {
         $formAction = $_POST['form_action'] ?? '';
+
+        if ($formAction === 'bulk_auto_assign') {
+            if (!$canEdit) {
+                $flash = 'Your role doesn\'t have the restaurants_edit permission.';
+                $flashType = 'error';
+            } else {
+                // Re-derives the exact same filtered set from $_GET
+                // (the admin's current filter — a plain <form
+                // method="post"> with no action= attribute posts back
+                // to the same URL, so the query string, and therefore
+                // $_GET, is unchanged) rather than trusting any list of
+                // ids the client might have sent, so this can never act
+                // on a stale/tampered set.
+                $bulkQ = trim($_GET['q'] ?? '');
+                $bulkStatus = $_GET['status'] ?? '';
+                if (!in_array($bulkStatus, ['pending', 'approved', 'rejected', 'suspended'], true)) {
+                    $bulkStatus = '';
+                }
+                $bulkDetectedFilter = trim($_GET['detected_area_id'] ?? '') !== ''
+                    ? (int) $_GET['detected_area_id'] : null;
+
+                $candidates = admin_unassigned_restaurants_with_detected_area($db, $bulkQ, $bulkStatus);
+                $updStmt = $db->prepare('UPDATE restaurants SET area_id = :a WHERE id = :id');
+                $assigned = 0;
+                $skipped = 0;
+
+                foreach ($candidates as $c) {
+                    if ($bulkDetectedFilter !== null && $c['detected_area_id'] !== $bulkDetectedFilter) {
+                        continue; // outside the narrowed-down set the admin was actually looking at
+                    }
+                    if ($c['detected_area_id'] === null) {
+                        $skipped++;
+                        continue; // no coordinates, or nothing covers that point yet
+                    }
+                    $updStmt->execute(['a' => $c['detected_area_id'], 'id' => $c['id']]);
+                    write_audit_log('admin', $admin['id'], 'restaurant_area_auto_assigned', [
+                        'restaurant_id' => $c['id'],
+                        'area_id' => $c['detected_area_id'],
+                    ]);
+                    $assigned++;
+                }
+
+                $flash = "Auto-assigned area to {$assigned} restaurant(s).";
+                if ($skipped > 0) {
+                    $flash .= " {$skipped} skipped — no coordinates set, or no service area covers that point yet.";
+                }
+            }
+        } else {
+
         $restaurantId = (int) ($_POST['restaurant_id'] ?? 0);
 
         $stmt = $db->prepare('SELECT id, name, status FROM restaurants WHERE id = :id AND deleted_at IS NULL LIMIT 1');
@@ -156,13 +289,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $flash = admin_escape($restaurant['name']) . ' removed.';
             }
         }
+
+        }
     }
 }
 
 // ---------- Filters ----------
 $q = trim($_GET['q'] ?? '');
 $statusFilter = $_GET['status'] ?? '';
-$areaFilter = trim($_GET['area_id'] ?? '') !== '' ? (int) $_GET['area_id'] : null;
+$areaFilterRaw = $_GET['area_id'] ?? '';
+$isUnassignedFilter = ($areaFilterRaw === 'unassigned');
+$areaFilter = (!$isUnassignedFilter && trim($areaFilterRaw) !== '') ? (int) $areaFilterRaw : null;
+// Only meaningful alongside $isUnassignedFilter — narrows "show
+// unassigned restaurants" down to "show unassigned restaurants that
+// would resolve to THIS specific area" (2026-09-07, the "Osian mein
+// aane wale restaurant" case from the app owner's own example).
+$detectedAreaFilter = ($isUnassignedFilter && trim($_GET['detected_area_id'] ?? '') !== '')
+    ? (int) $_GET['detected_area_id'] : null;
 $validStatuses = ['pending', 'approved', 'rejected', 'suspended'];
 if (!in_array($statusFilter, $validStatuses, true)) {
     $statusFilter = '';
@@ -172,54 +315,78 @@ $page = max(1, (int) ($_GET['page'] ?? 1));
 $perPage = 20;
 $offset = ($page - 1) * $perPage;
 
-$where = ['deleted_at IS NULL'];
-$params = [];
-if ($q !== '') {
-    $where[] = '(name LIKE :q OR owner_name LIKE :q OR owner_email LIKE :q OR owner_mobile LIKE :q)';
-    $params['q'] = '%' . $q . '%';
-}
-if ($statusFilter !== '') {
-    $where[] = 'status = :status';
-    $params['status'] = $statusFilter;
-}
-if ($areaFilter !== null) {
-    $where[] = 'area_id = :area_id';
-    $params['area_id'] = $areaFilter;
-}
-$whereSql = implode(' AND ', $where);
+// detectedAreaOptions — populated below only in the unassigned branch,
+// used to render the "Detected area" narrowing dropdown; stays empty
+// (and hidden) for the normal filter branch.
+$detectedAreaOptions = [];
 
-$countStmt = $db->prepare("SELECT COUNT(*) AS c FROM restaurants WHERE {$whereSql}");
-$countStmt->execute($params);
-$totalCount = (int) $countStmt->fetch()['c'];
-$totalPages = max(1, (int) ceil($totalCount / $perPage));
-$page = min($page, $totalPages);
-$offset = ($page - 1) * $perPage;
+if ($isUnassignedFilter) {
+    // Not a plain SQL WHERE — "detected area" is computed per-row via
+    // resolve_service_area(), not a column we can filter/paginate in
+    // SQL. Restaurant volumes on this platform are small enough that
+    // fetching every currently-unassigned match and doing the
+    // resolution + pagination in PHP is simpler and fast enough,
+    // rather than adding a cached/denormalized column for this.
+    $allUnassigned = admin_unassigned_restaurants_with_detected_area($db, $q, $statusFilter);
 
-$listStmt = $db->prepare(
-    "SELECT r.id, r.name, r.owner_name, r.owner_mobile, r.owner_email, r.status,
-            r.operational_status, r.area_id, r.current_due, r.commission_percent,
-            r.rating_avg, r.created_at, r.rejection_reason
-     FROM restaurants r
-     WHERE {$whereSql}
-     ORDER BY r.created_at DESC
-     LIMIT {$perPage} OFFSET {$offset}"
-);
-$listStmt->execute($params);
-$restaurants = $listStmt->fetchAll();
+    // Build the narrowing dropdown from what's actually present among
+    // ALL currently-unassigned matches (before applying
+    // $detectedAreaFilter itself) — so an admin picking from it always
+    // sees real, non-empty options with counts.
+    $detectedCounts = [];
+    foreach ($allUnassigned as $row) {
+        if ($row['detected_area_id'] !== null) {
+            $detectedCounts[$row['detected_area_id']] = ($detectedCounts[$row['detected_area_id']] ?? 0) + 1;
+        }
+    }
+    foreach ($detectedCounts as $id => $count) {
+        $detectedAreaOptions[] = ['id' => $id, 'count' => $count];
+    }
 
-// Area dropdown options — City/Village and Area levels are both
-// assignable now that Area is optional (whichever is deepest in a
-// given branch is the meaningful one to assign a restaurant to).
-$areaOptions = $db->query(
-    "SELECT id, name, level FROM service_areas WHERE level IN ('city_village','area') AND is_active = 1 ORDER BY name"
-)->fetchAll();
+    $filteredUnassigned = $detectedAreaFilter === null
+        ? $allUnassigned
+        : array_values(array_filter($allUnassigned, fn($row) => $row['detected_area_id'] === $detectedAreaFilter));
 
-// Full node map (id => row), just for walking parent_id chains to build
-// each dropdown option's breadcrumb below — not filtered by level like
-// $areaOptions, since a breadcrumb needs the ancestors too.
-$areaNodeById = [];
-foreach ($db->query('SELECT id, name, parent_id FROM service_areas')->fetchAll() as $row) {
-    $areaNodeById[(int) $row['id']] = $row;
+    $totalCount = count($filteredUnassigned);
+    $totalPages = max(1, (int) ceil($totalCount / $perPage));
+    $page = min($page, $totalPages);
+    $offset = ($page - 1) * $perPage;
+    $restaurants = array_slice($filteredUnassigned, $offset, $perPage);
+} else {
+    $where = ['deleted_at IS NULL'];
+    $params = [];
+    if ($q !== '') {
+        $where[] = '(name LIKE :q OR owner_name LIKE :q OR owner_email LIKE :q OR owner_mobile LIKE :q)';
+        $params['q'] = '%' . $q . '%';
+    }
+    if ($statusFilter !== '') {
+        $where[] = 'status = :status';
+        $params['status'] = $statusFilter;
+    }
+    if ($areaFilter !== null) {
+        $where[] = 'area_id = :area_id';
+        $params['area_id'] = $areaFilter;
+    }
+    $whereSql = implode(' AND ', $where);
+
+    $countStmt = $db->prepare("SELECT COUNT(*) AS c FROM restaurants WHERE {$whereSql}");
+    $countStmt->execute($params);
+    $totalCount = (int) $countStmt->fetch()['c'];
+    $totalPages = max(1, (int) ceil($totalCount / $perPage));
+    $page = min($page, $totalPages);
+    $offset = ($page - 1) * $perPage;
+
+    $listStmt = $db->prepare(
+        "SELECT r.id, r.name, r.owner_name, r.owner_mobile, r.owner_email, r.status,
+                r.operational_status, r.area_id, r.current_due, r.commission_percent,
+                r.rating_avg, r.created_at, r.rejection_reason
+         FROM restaurants r
+         WHERE {$whereSql}
+         ORDER BY r.created_at DESC
+         LIMIT {$perPage} OFFSET {$offset}"
+    );
+    $listStmt->execute($params);
+    $restaurants = $listStmt->fetchAll();
 }
 
 $statusCounts = [];
@@ -251,20 +418,45 @@ require __DIR__ . '/_layout_head.php';
             </div>
             <div>
                 <label class="field-label">Area</label>
-                <select name="area_id">
+                <select name="area_id" id="areaFilterSelect" onchange="document.getElementById('detectedAreaRow').style.display = this.value === 'unassigned' ? '' : 'none';">
                     <option value="">All areas</option>
+                    <option value="unassigned" <?= $isUnassignedFilter ? 'selected' : '' ?>>Unassigned</option>
                     <?php foreach ($areaOptions as $a): ?>
                         <option value="<?= (int) $a['id'] ?>" <?= $areaFilter === (int) $a['id'] ? 'selected' : '' ?>><?= admin_escape(admin_area_breadcrumb_compact($areaNodeById[(int) $a['id']] ?? $a, $areaNodeById)) ?> (<?= $a['level'] === 'area' ? 'Area' : 'City/Village' ?>)</option>
                     <?php endforeach; ?>
                 </select>
             </div>
+            <div id="detectedAreaRow" style="<?= $isUnassignedFilter ? '' : 'display:none;' ?>">
+                <label class="field-label">Detected area</label>
+                <select name="detected_area_id">
+                    <option value="">Any (<?= array_sum(array_column($detectedAreaOptions, 'count')) ?>)</option>
+                    <?php foreach ($detectedAreaOptions as $d): ?>
+                        <option value="<?= $d['id'] ?>" <?= $detectedAreaFilter === $d['id'] ? 'selected' : '' ?>>
+                            <?= admin_escape(admin_area_breadcrumb_compact($areaNodeById[$d['id']] ?? ['name' => '#' . $d['id']], $areaNodeById)) ?> (<?= $d['count'] ?>)
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
             <div>
                 <button type="submit" class="btn btn-primary" data-no-loading>Filter</button>
-                <?php if ($q !== '' || $statusFilter !== '' || $areaFilter !== null): ?>
+                <?php if ($q !== '' || $statusFilter !== '' || $areaFilter !== null || $isUnassignedFilter): ?>
                     <a href="restaurants.php" class="btn btn-outline">Clear</a>
                 <?php endif; ?>
             </div>
         </form>
+
+        <?php if ($isUnassignedFilter && $canEdit && $totalCount > 0): ?>
+            <form method="post" style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
+                <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
+                <input type="hidden" name="form_action" value="bulk_auto_assign">
+                <button type="submit" class="btn btn-approve"
+                    data-confirm-title="Auto-assign area to <?= $totalCount ?> restaurant(s)?"
+                    data-confirm-text="This acts on all <?= $totalCount ?> restaurant(s) matching the current filter, not just this page. Each one's likely area is detected live from its own lat/lng (resolve_service_area — same function used everywhere else). Restaurants with no coordinates, or no service area covering their point yet, are left unassigned and skipped."
+                    data-confirm-ok-label="Auto-assign">
+                    Auto-assign area — all <?= $totalCount ?> matching this filter
+                </button>
+            </form>
+        <?php endif; ?>
     </div>
 
     <?php if (empty($restaurants)): ?>
@@ -277,7 +469,7 @@ require __DIR__ . '/_layout_head.php';
                     <th>Restaurant</th>
                     <th>Contact</th>
                     <th>Status</th>
-                    <th>Area</th>
+                    <th><?= $isUnassignedFilter ? 'Detected area' : 'Area' ?></th>
                     <th>Due</th>
                     <th>Commission</th>
                     <th>Rating</th>
@@ -297,7 +489,28 @@ require __DIR__ . '/_layout_head.php';
                             </span>
                             <div class="muted" style="margin-top:3px;"><?= ucfirst(str_replace('_', ' ', $r['operational_status'])) ?></div>
                         </td>
-                        <td><?= $r['area_id'] && isset($areaNodeById[(int) $r['area_id']]) ? admin_escape(admin_area_breadcrumb_compact($areaNodeById[(int) $r['area_id']], $areaNodeById)) : '<span class="muted">Unassigned</span>' ?></td>
+                        <td>
+                            <?php if ($isUnassignedFilter): ?>
+                                <?php if ($r['detected_area_id'] !== null && isset($areaNodeById[$r['detected_area_id']])): ?>
+                                    <?= admin_escape(admin_area_breadcrumb_compact($areaNodeById[$r['detected_area_id']], $areaNodeById)) ?>
+                                    <?php if ($canEdit): ?>
+                                        <form method="post" style="margin-top:4px;">
+                                            <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
+                                            <input type="hidden" name="restaurant_id" value="<?= (int) $r['id'] ?>">
+                                            <input type="hidden" name="form_action" value="assign_area">
+                                            <input type="hidden" name="area_id" value="<?= $r['detected_area_id'] ?>">
+                                            <button type="submit" class="btn btn-outline" style="padding:2px 8px; font-size:12px;">Assign</button>
+                                        </form>
+                                    <?php endif; ?>
+                                <?php elseif ($r['latitude'] === null || $r['longitude'] === null): ?>
+                                    <span class="muted">No coordinates set</span>
+                                <?php else: ?>
+                                    <span class="muted">No service area covers this point</span>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <?= $r['area_id'] && isset($areaNodeById[(int) $r['area_id']]) ? admin_escape(admin_area_breadcrumb_compact($areaNodeById[(int) $r['area_id']], $areaNodeById)) : '<span class="muted">Unassigned</span>' ?>
+                            <?php endif; ?>
+                        </td>
                         <td>₹<?= number_format((float) $r['current_due'], 2) ?></td>
                         <td><?= admin_escape((string) $r['commission_percent']) ?>%</td>
                         <td><?= $r['rating_avg'] > 0 ? number_format((float) $r['rating_avg'], 1) . ' ★' : '—' ?></td>

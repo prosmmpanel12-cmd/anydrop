@@ -12,8 +12,8 @@ import com.anydrop.rider.databinding.ActivityApplicationStatusBinding
 import com.anydrop.rider.network.ApiClient
 import com.anydrop.rider.network.parseApiError
 import com.anydrop.rider.ui.common.InAppNotifier
-import com.anydrop.rider.ui.dashboard.RiderDashboardActivity
 import com.anydrop.rider.ui.documents.SubmitDocumentsActivity
+import com.anydrop.rider.ui.main.RiderMainActivity
 import com.anydrop.rider.ui.login.LoginActivity
 import kotlinx.coroutines.launch
 
@@ -22,7 +22,10 @@ import kotlinx.coroutines.launch
  * point in the app (Splash, post-signup, post-login) still routes here
  * first — rather than teach all four of those call sites the
  * approved-vs-not branch, this screen is the single choke point:
- * `status == "approved"` redirects straight to RiderDashboardActivity
+ * `status == "approved"` redirects straight to RiderMainActivity (the
+ * bottom-nav shell — v24 Part 2; was RiderDashboardActivity directly
+ * before this session, see that Activity's own kdoc and
+ * RiderMainActivity's kdoc for the port)
  * (Phase 3, doc 83) before any UI here is even shown. Non-approved
  * statuses render normally below, unchanged from before Phase 3.
  *
@@ -203,7 +206,9 @@ class ApplicationStatusActivity : AppCompatActivity() {
     }
 
     private fun goToDashboard() {
-        val intent = Intent(this, RiderDashboardActivity::class.java).apply {
+        // Bottom-nav shell (v24 Part 2) — was RiderDashboardActivity
+        // directly; see RiderMainActivity's kdoc.
+        val intent = Intent(this, RiderMainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
         startActivity(intent)

@@ -24,6 +24,15 @@
  * still runs. `delivery_address_id` is optional too — omit it (no
  * address picked yet) and the platform-wide default rule applies, same
  * as get_effective_cod_rule()'s null-lat/lng fallback.
+ *
+ * `restaurant_id` is optional too (2026-09-07) — when given, this also
+ * combines the restaurant's own admin-assigned area into the rule
+ * (strictest wins, see cod_rules.php's header), same as
+ * orders/create.php's server-side enforcement now does. Omit it (older
+ * app builds, or a screen that doesn't have a restaurant in context
+ * yet) and this stays the address-only pre-check it always was — still
+ * a convenience only, orders/create.php remains the actual source of
+ * truth either way.
  */
 
 require_once __DIR__ . '/../../../config/database.php';
@@ -46,6 +55,8 @@ $addressId = isset($_GET['delivery_address_id']) && $_GET['delivery_address_id']
     ? (int) $_GET['delivery_address_id'] : null;
 $orderAmount = isset($_GET['order_amount']) && $_GET['order_amount'] !== ''
     ? (float) $_GET['order_amount'] : null;
+$restaurantId = isset($_GET['restaurant_id']) && $_GET['restaurant_id'] !== ''
+    ? (int) $_GET['restaurant_id'] : null;
 
 $lat = null;
 $lng = null;
@@ -60,7 +71,21 @@ if ($addressId !== null) {
     $lng = $addressRow['longitude'] !== null ? (float) $addressRow['longitude'] : null;
 }
 
-$rule = get_effective_cod_rule($db, $lat, $lng);
+// A bad/unknown restaurant_id here just means no restaurant-side rule
+// contributes (null area_id, same as an unassigned restaurant) rather
+// than a hard validation error — this is a convenience pre-check that
+// tolerates a stale/mismatched id better than rejecting the whole
+// checkout-screen call over it. orders/create.php's own restaurant_id
+// still gets properly validated when the order is actually placed.
+$restaurantAreaId = null;
+if ($restaurantId !== null) {
+    $raStmt = $db->prepare('SELECT area_id FROM restaurants WHERE id = :id AND deleted_at IS NULL LIMIT 1');
+    $raStmt->execute(['id' => $restaurantId]);
+    $raRow = $raStmt->fetch();
+    $restaurantAreaId = ($raRow && $raRow['area_id'] !== null) ? (int) $raRow['area_id'] : null;
+}
+
+$rule = get_effective_cod_rule($db, $lat, $lng, $restaurantAreaId);
 $eligibility = evaluate_cod_eligibility($db, $rule, $customerId, $orderAmount);
 
 respond_ok([

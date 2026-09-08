@@ -30,6 +30,7 @@ import com.anydrop.rider.ui.documents.SubmitDocumentsActivity
 import com.anydrop.rider.ui.login.LoginActivity
 import com.anydrop.rider.ui.orderdetail.RiderOrderDetailActivity
 import com.anydrop.rider.ui.pending.ApplicationStatusActivity
+import com.anydrop.rider.service.RiderOrderPollingService
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
@@ -58,6 +59,17 @@ import kotlinx.coroutines.launch
  * scope" re: background service) — a periodic ping via postDelayed,
  * stopped in onPause so it never runs with the screen off/backgrounded.
  * 30s interval per the doc's stated default.
+ *
+ * BUG FIX (v24 update) — that foreground-only limitation turned out to
+ * be the exact cause of a real "orders not received" report: a rider
+ * who backgrounds the app while waiting for a delivery (completely
+ * normal) stopped polling entirely until manually reopening it. This
+ * screen's own pollers are UNCHANGED (still the fast in-app cadence
+ * while actually visible) — the fix is [RiderOrderPollingService], a
+ * separate foreground Service started/stopped alongside the online
+ * switch (see setOnlineStatus()/refreshFromServer() below) that covers
+ * the same /rider/orders-available check independent of this Activity's
+ * lifecycle. See that service's own kdoc for the full trace.
  *
  * Phase 3 R3 (doc 85) added the assignment engine on top: a second,
  * faster poller (5s) checks /rider/orders-available for an incoming
@@ -152,6 +164,10 @@ class RiderDashboardActivity : AppCompatActivity() {
         renderOnlineState(tokenManager.getIsOnline())
 
         binding.btnLogout.setOnClickListener {
+            // Bug fix (v24) — a logged-out rider has no business still
+            // running a background poll for someone else's delivery
+            // offers. See RiderOrderPollingService's own kdoc.
+            RiderOrderPollingService.stop(this)
             tokenManager.clear()
             goToLogin()
         }
@@ -312,6 +328,15 @@ class RiderDashboardActivity : AppCompatActivity() {
                     if (result.rider.isOnline) {
                         locationPoller.removeCallbacks(locationPollRunnable)
                         locationPoller.post(locationPollRunnable)
+                        // Bug fix (v24) — covers "app reopened while
+                        // still online from a previous session": without
+                        // this, the background poller would only ever
+                        // start from a fresh setOnlineStatus(true) call,
+                        // never from discovering an already-online state
+                        // on load. RiderOrderPollingService.start() is
+                        // idempotent, so this is safe even if it's
+                        // already running.
+                        RiderOrderPollingService.start(this@RiderDashboardActivity)
                     }
                 } else {
                     val parsed = parseApiError(response.errorBody())
@@ -450,10 +475,19 @@ class RiderDashboardActivity : AppCompatActivity() {
                         locationPoller.removeCallbacks(locationPollRunnable)
                         locationPoller.post(locationPollRunnable)
                         pollDashboardState()
+                        // Bug fix (v24) — the actual "orders not
+                        // received" fix. Without this, a new offer
+                        // could only ever be seen while this Activity
+                        // is in onResume(); backgrounding the app (lock
+                        // screen, switch apps to wait) silently stopped
+                        // all polling until the rider manually reopened
+                        // it. See RiderOrderPollingService's own kdoc.
+                        RiderOrderPollingService.start(this@RiderDashboardActivity)
                     } else {
                         locationPoller.removeCallbacks(locationPollRunnable)
                         clearOffer()
                         if (!hasActiveOrder) showNoActiveDelivery()
+                        RiderOrderPollingService.stop(this@RiderDashboardActivity)
                     }
                 } else {
                     val parsed = parseApiError(response.errorBody())

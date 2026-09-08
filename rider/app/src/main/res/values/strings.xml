@@ -240,4 +240,24 @@
     <string name="notifications_empty">No notifications yet</string>
     <string name="notifications_mark_all_read_cd">Mark all as read</string>
     <string name="notifications_load_error">Couldn\'t load notifications \u2014 pull down to retry</string>
+
+    <!-- Bottom-nav shell (v24 Part 2) — RiderMainActivity's four tab labels. -->
+    <string name="nav_home">Home</string>
+    <string name="nav_earnings">Earnings</string>
+    <string name="nav_notifications">Alerts</string>
+    <string name="nav_account">Account</string>
+
+    <!-- Bottom-nav shell (v24 Part 2) — new Account tab. First real
+         Account/Profile hub screen in this app (previously only a
+         header-row documents alert + a bare logout button existed —
+         see RiderDashboardActivity's old header row and the Rider
+         Documents handover's "No Account/Profile hub screen exists in
+         this app yet" note). -->
+    <string name="account_title">Account</string>
+    <string name="account_profile_load_failed">Couldn\'t load your profile \u2014 pull down to retry</string>
+    <string name="account_documents_row_label">Documents</string>
+    <string name="account_service_area_label">Service area</string>
+    <string name="account_vehicle_label">Vehicle</string>
+    <string name="account_member_since_format">Rider since %1$s</string>
+    <string name="account_not_set">Not set</string>
 </resources>

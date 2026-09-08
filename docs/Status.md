@@ -4793,3 +4793,197 @@ picker) surface, never opened in an actual browser even once. Next:
 a real build/DB/browser pass (now covering five stacked untested
 rider-admin sessions), or Delivery OTP §16 / Live Location System
 re-verification, or a different still-unbuilt deep-plan section.
+
+
+## Rider App — "Orders not received" bug fixed; multi-screen shell planned, not built (2026-09-06, session 35)
+
+Full detail: `docs/rider/112_Handover_2026-09-06_OrdersNotReceived_BackgroundPollingFix_And_MainShell_Started.md`.
+
+Owner report: rider app wasn't receiving orders. Traced the full
+dispatch chain (`dispatch.php`, `orders-available.php`,
+`orders-accept.php`, `location.php`) — all correct, unchanged. Root
+cause was Android-side only: `RiderDashboardActivity`'s dashboard
+poller only runs between `onResume()`/`onPause()`, so backgrounding
+the app (locking the screen, switching apps to wait — normal rider
+behavior) silently stopped all offer-polling until the app was
+manually reopened. Same class of bug the Restaurant/Customer apps
+already fixed via their own background polling services; the Rider
+app was the one app that never got it.
+
+Fix: new `RiderOrderPollingService` (foreground service, ported from
+the restaurant app's `OrderPollingService` pattern) — polls
+`/rider/orders-current` + `/rider/orders-available` every 15s
+independent of any Activity lifecycle, fires a real status-bar alert
+on a genuinely new offer (tracked by `assignment_id`, not `order_id`).
+Started/stopped alongside the online switch and on logout. New
+`CHANNEL_MONITORING` channel + manifest service registration +
+`FOREGROUND_SERVICE`/`FOREGROUND_SERVICE_DATA_SYNC` permissions.
+
+Also scoped (not built): a `RiderMainActivity` bottom-nav shell
+(Home/Earnings/Notifications/Account tabs), matching the restaurant
+app's `MainActivity` pattern, per the owner's separate request for the
+rider app to have distinct screens instead of one flat dashboard.
+Deliberately deferred to its own session — large enough (converting
+~900 lines of dashboard logic into a Fragment, two more screen ports,
+one new Account screen, repointing every existing dashboard-Activity
+reference) that doing it alongside a live-flow bug fix, with no real
+device/Gradle build available to verify it, risked breaking the fix
+that was just made.
+
+Not build/device-verified — same standing sandbox limitation as every
+other handover in this project. Next: verify the polling fix on a real
+device, then a dedicated session for the bottom-nav shell.
+
+
+## Rider App — Bottom-nav shell (v24 Part 2) fully built and wired (2026-09-07, session 36)
+
+Full detail: `docs/rider/113_Handover_2026-09-07_RiderBottomNavShell_Part2_Complete.md`.
+
+Picked up doc 112's deferred Part 2 exactly as scoped: converted the
+rider app's approved-rider landing screen from one flat
+`RiderDashboardActivity` into a 4-tab bottom-nav shell
+(`RiderMainActivity` — Home/Earnings/Alerts/Account), mirroring the
+restaurant app's own `MainActivity` + `BottomNavigationView` + Fragments
+pattern exactly. `HomeFragment`/`EarningsFragment`/`NotificationsFragment`
+are line-for-line ports of the three old Activities they replace; a new
+`AccountFragment` (profile summary, Documents-row, Logout) is the one
+genuinely new screen. `ApplicationStatusActivity.goToDashboard()` and
+`RiderNotificationHelper`'s notification-tap targets were repointed to
+`RiderMainActivity` — the only two places that ever launched the old
+landing screen. Old Activities (`RiderDashboardActivity`,
+`EarningsActivity`, `NotificationListActivity`) left registered but
+unreachable, per this project's "don't delete superseded screens"
+convention.
+
+Not build/device-verified — no Android SDK/Gradle available in this
+sandbox. Extensive manual cross-reference done instead (every API call,
+model field, string/color/drawable resource, and View Binding class
+name checked against its real definition — see doc 113 for the full
+list). Next: a real `./gradlew assembleDebug` + on-device smoke test.
+
+
+## Independent re-verification of the bottom-nav shell + small cleanup (2026-09-07, session 37)
+
+Full detail: `docs/rider/114_Handover_2026-09-07_RiderBottomNavShell_IndependentVerification_And_StringCleanup.md`.
+
+A fresh pass re-checked doc 113's own manual-verification claims by
+reading the code directly rather than trusting the handover doc — every
+view-binding reference, color/string resource, `RiderMeProfile` field,
+manifest entry, and fragment lifecycle pattern re-diffed against the
+actual files on disk. No discrepancies found; doc 113 holds up. Removed
+the one loose end doc 113 flagged: the unused `account_earnings_row_label`
+string (no shortcut row was ever built since Earnings already has its
+own tab).
+
+Not build/device-verified — same standing gap; still needs the real
+Gradle build + device pass doc 113 already called for.
+
+
+## Admin "Live Rider Map" gains click-anywhere-for-address (bonik.in) (2026-09-07, session 38)
+
+Full detail: `docs/115_Handover_2026-09-07_RiderMap_ClickForAddress_Bonik.md`.
+
+App owner asked for the rider map to show location details on click,
+"same as Service Area's map." Ported `areas.php`'s existing "Choose on
+map" bonik.in reverse-geocode-on-click behaviour onto
+`backend/admin/rider-map.php` (doc 110) — clicking anywhere on the live
+rider map now drops a pin and shows the reverse-geocoded address in a
+popup. Read-only (no save/use-this-point step, unlike areas.php's
+picker). Rider `circleMarker`s gained `bubblingMouseEvents: false` so
+opening a rider's own popup doesn't also fire the new map-wide click
+handler.
+
+Not build/device-verified — no browser available in this sandbox, and
+`rider-map.php` was already this project's single least-visually-
+confirmed page (first full-page Leaflet surface, per doc 110). Verified
+via brace/paren balance and close comparison against `areas.php`'s
+already-working equivalent only.
+
+
+## COD/Payment/Delivery-fee rules now combine the customer's area AND the restaurant's own area — strictest wins (2026-09-07, session 39)
+
+Full detail: `docs/116_Handover_2026-09-07_CombinedAreaRules_CustomerAndRestaurant_StrictestWins.md`.
+
+App owner decision, asked directly and answered via the elicitation
+tool: COD/pricing rules should check both sides, whichever is stricter
+applies. Previously `get_effective_cod_rule()`,
+`get_effective_payment_restrictions()`, and `calculate_delivery_fee()`
+all resolved purely from the delivery address's area — the
+restaurant's own admin-assigned `area_id` was never consulted for
+these three (this was itself a deliberate original design choice,
+now superseded by the app owner's explicit decision today).
+
+All three `lib/*.php` functions gained an optional restaurant-area
+parameter and now combine field-by-field: COD/payment booleans use AND
+(either side disabling something disables it), numeric caps use
+MIN/MAX toward whichever is more restrictive (null-safe — no cap on one
+side never weakens a real cap on the other), and delivery fee takes the
+higher of the two computed fees. Five call sites updated to pass the
+restaurant side through: `orders/create.php`, `orders/payment-switch-
+cod.php`, `lib/orders.php`'s `price_cart()`, and two customer-facing
+pre-check endpoints (`cod-eligibility.php`, `payment-methods.php`) which
+gained a new **optional** `restaurant_id` query param — omitting it
+(e.g. an older Customer App build) reproduces the exact old address-only
+behaviour, nothing breaks.
+
+Not build/device-verified — no PHP interpreter/DB in this sandbox.
+Verified via brace/paren balance on every touched file and re-grepping
+every real call site to confirm it passes the new parameter; no
+duplicate function definitions.
+
+
+## Restaurant area_id=NULL effects documented; auto-resolve backfill engine built as a standalone script (2026-09-07, session 40 — SUPERSEDED by session 41 below)
+
+Full detail: `docs/117_Handover_2026-09-07_RestaurantAreaNull_Explained_And_BackfillEngine.md`.
+
+Explained every place `restaurants.area_id=NULL` matters given
+session 39's change (restaurant side just contributes platform
+defaults everywhere: discovery filter skipped, COD/payment/pricing
+combine as customer-side-only, commission resolution skips its
+area-specific tiers). Built a CLI script
+(`backend/scripts/backfill-restaurant-areas.php`) + a one-time admin
+web wrapper (`backend/admin/run-restaurant-area-backfill.php`),
+mirroring the existing `backfill-address-areas.php` pattern, to bulk
+auto-resolve `area_id` for restaurants that predate the signup-time
+auto-resolve feature or whose location didn't match any Area at signup
+time but would now.
+
+**Superseded the same day** — the app owner asked for this to live in
+the admin panel as a button + filter instead of a standalone script.
+Both files from this session were deleted in session 41. Kept in
+Status.md for the record, same as this file's own top-of-file pattern
+of documenting superseded work rather than silently erasing the trail.
+
+
+## Restaurant area auto-assign moved into the Restaurants admin page — button + filter, script deleted (2026-09-07, session 41)
+
+Full detail: `docs/118_Handover_2026-09-07_RestaurantAreaAutoAssign_AdminPanelButtonAndFilter.md`.
+
+Replaces session 40's standalone script/one-time-page approach entirely
+(`backfill-restaurant-areas.php` and `run-restaurant-area-backfill.php`
+deleted) with a proper feature inside `backend/admin/restaurants.php`
+itself: the existing Area filter dropdown gained an "Unassigned"
+option; selecting it swaps the Area column for a live-computed
+"Detected area" (via the same `resolve_service_area()` signup-time and
+address-backfill already use) with a per-row "Assign" button, plus a
+second "Detected area" narrowing dropdown (e.g. "Osian (7)") built from
+whatever's actually present among the currently-unassigned restaurants,
+and a single "Auto-assign area — all N matching this filter" button
+that bulk-assigns the entire filtered set (all pages, not just the
+visible 20) in one click with a confirm dialog first. New
+`admin_unassigned_restaurants_with_detected_area()` helper and a
+`bulk_auto_assign` POST branch (checked before the existing single-
+restaurant lookup, since it needs no `restaurant_id`) are the only
+additions; the normal (non-Unassigned) filter path is unchanged.
+
+Same "admin stays in the loop" principle as before: nothing here runs
+automatically or as a side effect of a restaurant editing its own pin
+in `profile-update.php` (still deliberately untouched) — only ever
+triggered by an admin explicitly clicking a button on this page.
+
+Not build/device-verified — no PHP interpreter/DB in this sandbox.
+Verified via brace/paren balance on the full file, and
+`resolve_service_area()`'s signature / `restaurants.latitude`/
+`longitude` column names / `admin_area_breadcrumb_compact()`'s
+signature all re-confirmed against source before relying on them.
+

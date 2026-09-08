@@ -31,6 +31,14 @@
  * and the platform-wide default restriction applies, same as
  * get_effective_payment_restrictions()'s null-lat/lng fallback.
  *
+ * `restaurant_id` is optional too (2026-09-07) — when given, combines
+ * the restaurant's own admin-assigned area into the restriction
+ * (strictest/AND wins, see payment_restrictions.php's header), same
+ * as orders/create.php's server-side enforcement now does. A bad or
+ * unknown id is tolerated (contributes nothing) rather than rejected,
+ * same pre-check-not-source-of-truth reasoning as cod-eligibility.php's
+ * identical addition.
+ *
  * 2026-08-23 (item 26 §D.13) — also returns `wallet_allowed` +
  * `wallet_balance`. Unlike upi_allowed/cod_allowed, wallet has no
  * area-restriction concept at all (orders/create.php's own §D.12
@@ -68,6 +76,8 @@ $db = Database::get();
 
 $addressId = isset($_GET['delivery_address_id']) && $_GET['delivery_address_id'] !== ''
     ? (int) $_GET['delivery_address_id'] : null;
+$restaurantId = isset($_GET['restaurant_id']) && $_GET['restaurant_id'] !== ''
+    ? (int) $_GET['restaurant_id'] : null;
 
 $lat = null;
 $lng = null;
@@ -82,7 +92,15 @@ if ($addressId !== null) {
     $lng = $addressRow['longitude'] !== null ? (float) $addressRow['longitude'] : null;
 }
 
-$restriction = get_effective_payment_restrictions($db, $lat, $lng);
+$restaurantAreaId = null;
+if ($restaurantId !== null) {
+    $raStmt = $db->prepare('SELECT area_id FROM restaurants WHERE id = :id AND deleted_at IS NULL LIMIT 1');
+    $raStmt->execute(['id' => $restaurantId]);
+    $raRow = $raStmt->fetch();
+    $restaurantAreaId = ($raRow && $raRow['area_id'] !== null) ? (int) $raRow['area_id'] : null;
+}
+
+$restriction = get_effective_payment_restrictions($db, $lat, $lng, $restaurantAreaId);
 
 $walletBalance = get_wallet_balance($db, $customerId);
 
