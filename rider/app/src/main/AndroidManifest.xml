@@ -22,9 +22,15 @@
          FOREGROUND_SERVICE the service can't call startForeground() at
          all on API 28+; FOREGROUND_SERVICE_DATA_SYNC is the specific
          type required on API 34+ for a service whose job is
-         periodically syncing/polling data from the backend. -->
+         periodically syncing/polling data from the backend.
+         FOREGROUND_SERVICE_LOCATION (2026-09-07) — this same service
+         now also sends the periodic location ping (moved here from
+         HomeFragment, see that service's own kdoc for why), so it needs
+         the location foreground-service type too, alongside dataSync,
+         not instead of it. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
     <application
         android:allowBackup="true"
@@ -112,6 +118,14 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
+        <!-- Statement (Deep Plan Phase 3, docs/00_Deep_Plan_...
+             2026-09-09.md). Reached via EarningsFragment's "View
+             Statement" button. -->
+        <activity
+            android:name=".ui.statement.StatementActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- Deep-plan §22, migration 75 — submit/re-submit compliance
              documents. Reached from ApplicationStatusActivity (pending/
              rejected rider) and RiderDashboardActivity (approved rider
@@ -125,6 +139,13 @@
              tap; expects EXTRA_ORDER_ID as an Intent extra. -->
         <activity
             android:name=".ui.orderdetail.RiderOrderDetailActivity"
+            android:exported="false" />
+
+        <!-- Deep Plan Phase 5 (docs/00_Deep_Plan_Statement_CODLimit_QRPay_
+             CashFlow_2026-09-09.md §5) — "Pay COD Amount" QR deposit
+             screen, launched from EarningsFragment's cod_pay_amount_button. -->
+        <activity
+            android:name=".ui.earnings.PayCodDepositActivity"
             android:exported="false" />
 
         <!-- Superseded by RiderMainActivity's Alerts tab
@@ -149,13 +170,17 @@
 
         <!-- v24 bug fix — "orders not received" root cause. See
              RiderOrderPollingService's own kdoc. foregroundServiceType
-             ="dataSync" matches its actual behavior (periodically
-             polling order data from the backend), required on API 34+
-             for any foreground service. -->
+             ="dataSync|location" — dataSync matches the order-offer
+             polling behavior, location was added 2026-09-07 alongside
+             it when this same service took over the periodic location
+             ping HomeFragment used to send itself (only while its own
+             screen was open — see that service's kdoc for the gap this
+             closed). Both required declared together on API 34+ since
+             this one service genuinely does both jobs now. -->
         <service
             android:name=".service.RiderOrderPollingService"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="dataSync|location" />
 
         <!-- Default small icon for a push that arrives while the app is
              fully killed — same reasoning/pattern as the restaurant

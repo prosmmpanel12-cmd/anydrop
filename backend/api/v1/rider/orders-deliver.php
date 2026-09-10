@@ -61,6 +61,7 @@ require_once __DIR__ . '/../../../lib/notifications.php';
 require_once __DIR__ . '/../../../lib/ledger.php';
 require_once __DIR__ . '/../../../lib/rider_ledger.php';
 require_once __DIR__ . '/../../../lib/rider_earnings.php';
+require_once __DIR__ . '/../../../lib/settlement_status.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -145,6 +146,13 @@ if ($isCod) {
 // rider is being paid for the DELIVERY, not for handling cash; a UPI
 // order's rider earns exactly the same way a COD order's rider does).
 $earningResult = record_rider_delivery_earning($db, $order);
+
+// Deep Plan Phase 1 (docs/00_Deep_Plan_...2026-09-09.md) — starts this
+// order's settlement-status clock (delivered_at + 1 day) so the new
+// Restaurant/Rider Statement screens can show "Pending T+1" / "Settled".
+// Purely a status label, no money calculation here — additive, doesn't
+// touch anything above.
+initialize_order_settlement_status($orderId);
 
 $db->commit();
 

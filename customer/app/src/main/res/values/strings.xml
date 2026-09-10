@@ -24,6 +24,8 @@
     <string name="otp_subtitle">We sent a 6-digit code to %1$s</string>
     <string name="btn_verify_otp">Verify &amp; Continue</string>
     <string name="btn_resend_otp">Resend code</string>
+    <!-- App-owner ask, 2026-09-09 — 30s resend cooldown -->
+    <string name="otp_resend_countdown">Resend in %1$ds</string>
 
     <!-- Complete Profile — shown once after OTP verify if name/mobile
          are still null on the customer row (first-time signup only). -->

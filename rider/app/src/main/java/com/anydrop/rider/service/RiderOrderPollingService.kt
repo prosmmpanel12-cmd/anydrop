@@ -1,19 +1,28 @@
 package com.anydrop.rider.service
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.location.Location
 import android.os.IBinder
 import androidx.core.content.ContextCompat
 import com.anydrop.rider.data.TokenManager
 import com.anydrop.rider.network.ApiClient
+import com.anydrop.rider.network.LocationBody
 import com.anydrop.rider.notifications.RiderNotificationHelper
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 /**
  * Root-cause fix for "rider app mein orders receive nahi ho rahe" (v24
@@ -53,6 +62,38 @@ import kotlinx.coroutines.launch
  * moment a genuinely new offer shows up — not just an in-app card the
  * rider has to have the screen open to see.
  *
+ * 2026-09-07 — Also now sends the periodic LOCATION ping (moved here
+ * from HomeFragment, which used to run this itself via a
+ * Handler/Runnable tied to onResume()/onPause() — see that class's own
+ * kdoc). Exactly the same class of gap the order-offer polling fix
+ * above already closed, just for location: a rider who locks their
+ * screen or switches apps mid-delivery would stop updating their live
+ * position on the admin map / customer tracking screen the instant
+ * HomeFragment's onPause() fired, even though nothing about an actual
+ * delivery in progress should ever stop needing a fresh location.
+ * Same adaptive cadence as before (30s idle / 7s while an active
+ * delivery is in progress — see LOCATION_POLL_INTERVAL_MS /
+ * LOCATION_POLL_INTERVAL_ACTIVE_MS below, unchanged values, just
+ * relocated), same `FusedLocationProviderClient.getCurrentLocation()`
+ * call, same `POST /rider/location` request shape. Runs as a SEPARATE
+ * coroutine loop/job from `pollForOffer()`'s (different cadence, 15s
+ * fixed vs 30s/7s adaptive — merging them would mean either polling
+ * orders too slowly or pinging location too often), but both loops
+ * share this service's single `hasActiveOrder`/`activeOrderIdForLocation`
+ * fields rather than each independently calling `/rider/orders-current`
+ * on their own schedule — `pollForOffer()`'s existing call already
+ * tells us this every 15s, which is frequent enough for the location
+ * loop's own adaptive-interval decision to just read rather than
+ * re-fetch.
+ *
+ * HomeFragment keeps ONLY its one-shot `sendLocationThenGoOnline()`
+ * ping (needed synchronously before the "go online" API call), not an
+ * ongoing loop of its own anymore — running both this service's loop
+ * AND a duplicate foreground-only one in the fragment at the same time
+ * would just double the GPS reads/API calls with zero freshness
+ * benefit, unlike order-offer polling where a faster in-focus cadence
+ * genuinely improves the UX of seeing a new offer appear.
+ *
  * `startForeground()` reduces (does not guarantee — see the restaurant
  * service's own kdoc for the same OEM battery-management caveat,
  * unchanged here) the odds Android kills this process while
@@ -71,13 +112,24 @@ import kotlinx.coroutines.launch
  *   online from a previous session").
  * - Stopped when the rider goes offline (setOnlineStatus()'s "went
  *   offline" branch) and on logout — an offline or logged-out rider
- *   has no business still polling for someone else's delivery offers.
+ *   has no business still polling for someone else's delivery offers,
+ *   or still sending location pings nobody has any use for.
  */
 class RiderOrderPollingService : Service() {
 
     private var job: Job? = null
+    private var locationJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.IO + Job())
     private lateinit var prefs: android.content.SharedPreferences
+    private val fusedLocationClient by lazy { LocationServices.getFusedLocationProviderClient(applicationContext) }
+
+    // Set by pollForOffer()'s own /rider/orders-current call (already
+    // running every POLL_INTERVAL_MS) and read by the location loop to
+    // pick its adaptive interval + populate LocationBody.orderId —
+    // deliberately NOT a second independent /rider/orders-current call
+    // on the location loop's own faster cadence, which would just be
+    // redundant load for information the order-poll loop already has.
+    @Volatile private var activeOrderIdForLocation: Int? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -95,17 +147,34 @@ class RiderOrderPollingService : Service() {
         // RiderDashboardActivity.onCreate()/setOnlineStatus() success
         // while already online calling start() again) — don't stack a
         // second poll loop on top of an already-running one.
-        if (job?.isActive == true) return START_STICKY
-
-        job = scope.launch {
-            while (true) {
-                val tokenManager = TokenManager(applicationContext)
-                if (!tokenManager.isLoggedIn() || !tokenManager.getIsOnline()) {
-                    stopSelf()
-                    return@launch
+        if (job?.isActive != true) {
+            job = scope.launch {
+                while (true) {
+                    val tokenManager = TokenManager(applicationContext)
+                    if (!tokenManager.isLoggedIn() || !tokenManager.getIsOnline()) {
+                        stopSelf()
+                        return@launch
+                    }
+                    pollForOffer()
+                    delay(POLL_INTERVAL_MS)
                 }
-                pollForOffer()
-                delay(POLL_INTERVAL_MS)
+            }
+        }
+
+        // Separate loop, separate cadence (30s idle / 7s active vs the
+        // order-poll loop's fixed 15s) — see this class's own kdoc for
+        // why these aren't merged into one loop.
+        if (locationJob?.isActive != true) {
+            locationJob = scope.launch {
+                while (true) {
+                    val tokenManager = TokenManager(applicationContext)
+                    if (!tokenManager.isLoggedIn() || !tokenManager.getIsOnline()) {
+                        return@launch // job above already calls stopSelf() in this case
+                    }
+                    sendLocationPing()
+                    val interval = if (activeOrderIdForLocation != null) LOCATION_POLL_INTERVAL_ACTIVE_MS else LOCATION_POLL_INTERVAL_MS
+                    delay(interval)
+                }
             }
         }
 
@@ -132,8 +201,11 @@ class RiderOrderPollingService : Service() {
             // orders-available anyway (dispatch.php's own eligibility
             // query excludes a rider with one) — skip the extra call.
             val currentResponse = api.getCurrentOrder()
-            val hasActiveOrder = currentResponse.isSuccessful && currentResponse.body()?.data?.order != null
-            if (hasActiveOrder) {
+            val currentOrder = if (currentResponse.isSuccessful) currentResponse.body()?.data?.order else null
+            // Shared with the location loop — see this field's own kdoc
+            // above for why that loop doesn't make its own separate call.
+            activeOrderIdForLocation = currentOrder?.id
+            if (currentOrder != null) {
                 return
             }
 
@@ -165,13 +237,59 @@ class RiderOrderPollingService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    /** Same shape as HomeFragment's former `sendLocationPing()`/
+     *  `sendLocationPingInternal()` (now removed from that class — see
+     *  its own kdoc) — permission check, then
+     *  `FusedLocationProviderClient.getCurrentLocation()`, then
+     *  `POST /rider/location`. The only real difference: this runs in a
+     *  suspend function inside this service's own coroutine loop rather
+     *  than a Fragment's `lifecycleScope`, so the callback-based
+     *  Play Services `Task` is bridged into a suspend call via
+     *  `suspendCancellableCoroutine` (this module has no
+     *  kotlinx-coroutines-play-services dependency for `.await()`,
+     *  and adding one for this alone isn't worth it). */
+    @SuppressLint("MissingPermission")
+    private suspend fun sendLocationPing() {
+        if (ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.ACCESS_FINE_LOCATION) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return // rider went online before this was granted somehow — next tick tries again
+        }
+
+        try {
+            val location = getCurrentLocationOrNull() ?: return
+            val speedKmh = if (location.hasSpeed()) (location.speed * 3.6).toDouble() else null
+            val api = ApiClient.create(applicationContext)
+            api.updateLocation(
+                LocationBody(location.latitude, location.longitude, activeOrderIdForLocation, speedKmh)
+            )
+        } catch (e: Exception) {
+            // Transient network/location error — next poll cycle tries again.
+        }
+    }
+
+    /** Bridges FusedLocationProviderClient's callback-based Task into a
+     *  suspend call. Cancelling the coroutine (e.g. this service's scope
+     *  being cancelled in onDestroy()) cancels the underlying location
+     *  request too, rather than leaving it running with nothing waiting
+     *  on the result. */
+    private suspend fun getCurrentLocationOrNull(): Location? = suspendCancellableCoroutine { cont ->
+        val cancellationSource = CancellationTokenSource()
+        cont.invokeOnCancellation { cancellationSource.cancel() }
+        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cancellationSource.token)
+            .addOnSuccessListener { location -> if (cont.isActive) cont.resumeWith(Result.success(location)) }
+            .addOnFailureListener { if (cont.isActive) cont.resumeWith(Result.success(null)) }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
-        scope.cancel()
+        scope.cancel() // cancels both job and locationJob — same shared scope
     }
 
     companion object {
         private const val POLL_INTERVAL_MS = 15_000L
+        private const val LOCATION_POLL_INTERVAL_MS = 30_000L
+        private const val LOCATION_POLL_INTERVAL_ACTIVE_MS = 7_000L
         private const val PREFS_NAME = "anydrop_rider_order_polling"
         private const val KEY_LAST_ALERTED_ASSIGNMENT_ID = "last_alerted_assignment_id"
 

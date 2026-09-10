@@ -475,6 +475,17 @@
 
     <!-- Restaurant Bank Details (PENDING.md §15, migration 59) -->
     <string name="account_row_bank_details">Bank Details</string>
+    <string name="account_row_statement">Statement</string>
+
+    <!-- Statement screen (Deep Plan Phase 2) -->
+    <string name="statement_title">Statement</string>
+    <string name="statement_settled_label">Settled</string>
+    <string name="statement_pending_label">Pending T+1</string>
+    <string name="statement_empty">No orders on this day</string>
+    <string name="statement_badge_settled">Settled</string>
+    <string name="statement_badge_eligible">Ready to settle</string>
+    <string name="statement_badge_pending">Pending T+1</string>
+    <string name="statement_load_error">Could not load statement</string>
     <string name="bank_details_title">Bank Details</string>
     <string name="label_account_holder_name">Account Holder Name</string>
     <string name="hint_account_holder_name">As per bank records</string>
@@ -493,6 +504,12 @@
     <string name="bank_details_saved">Bank details submitted for verification</string>
     <string name="bank_details_save_failed">Couldn\'t save bank details</string>
     <string name="bank_details_load_failed">Couldn\'t load bank details</string>
+    <!-- App-owner ask, 2026-09-09 — password re-confirm before bank/UPI save -->
+    <string name="hint_confirm_password">Password</string>
+    <string name="dialog_confirm_password_title">Confirm your password</string>
+    <string name="dialog_confirm_password_bank_message">Re-enter your login password to save these bank/UPI details.</string>
+    <string name="error_password_required">Enter your password</string>
+    <string name="error_incorrect_password">Incorrect password</string>
     <string name="bank_status_pending">Pending Review</string>
     <string name="bank_status_verified">Verified</string>
     <string name="bank_status_rejected">Rejected</string>
@@ -514,6 +531,9 @@
     <string name="error_working_days_required">Select at least one working day</string>
     <string name="profile_save_failed">Couldn\'t save — check the details and try again</string>
     <string name="profile_saved">Profile updated</string>
+    <!-- Migration 79 — restaurant address admin-review notice (EditProfileActivity) -->
+    <string name="address_update_pending_review">Update pending review by admin</string>
+    <string name="address_update_rejected_reason">Last address change was rejected: %1$s</string>
     <string name="min_order_below_area_floor">Minimum order can\'t be below ₹%1$s for your area</string>
     <string name="logo_upload_failed">Couldn\'t upload the logo — try again</string>
     <string name="btn_add_photo">Add photo</string>

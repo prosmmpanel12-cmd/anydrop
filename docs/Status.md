@@ -4987,3 +4987,216 @@ Verified via brace/paren balance on the full file, and
 `longitude` column names / `admin_area_breadcrumb_compact()`'s
 signature all re-confirmed against source before relying on them.
 
+
+## New `admin_base_url` setting — every admin-panel file link rewired to use it (2026-09-07, session 42)
+
+Full detail: `docs/119_Handover_2026-09-07_AdminBaseUrl_Setting_And_FileLinksRewired.md`.
+
+Triggered by the same-day `riders.php` document-link 404 (an absolute
+root path broke because this backend is deployed under a subdirectory,
+not the domain root — hotfixed to a relative `../` path in that
+session). App owner asked for a proper fix: one platform-wide base URL,
+in `app_settings`, that every admin-panel link to an uploaded file or
+private-document endpoint is built from — no more each page separately
+guessing a relative path depth.
+
+New `admin_base_url()` helper in `_bootstrap.php` (every admin page
+already gets it for free), new `base-url-settings.php` page (same shape
+as `directions-settings.php`, gated on the existing `settings_manage`
+permission, added to the Settings nav group), no seed migration (falls
+back to the local-dev default already baked into the three apps' own
+`ApiClient.kt` until an admin saves a real value, same convention
+`google_directions_api_key` already uses). Every existing relative-path
+file link across `riders.php`, `banners.php`, `settlements.php`,
+`support.php` rewired to use it.
+
+Not build/device-verified — same standing sandbox limitation. **An
+admin still needs to visit the new settings page once per real
+deployment and paste the actual live domain** — until then every link
+still resolves against the same local-dev default it always implicitly
+assumed.
+
+
+## Broadcast page's own base URL consolidated into admin_base_url; Rider targeting added (2026-09-07, session 43)
+
+Full detail: `docs/120_Handover_2026-09-07_BroadcastBaseUrlConsolidated_And_RiderTargeting.md`.
+
+App owner asked whether the notification/FCM settings pages still
+needed their own base URL now that `admin_base_url` (session 42)
+exists, and to add a Rider option to the Push Notification Broadcast
+page's targeting. `fcm-settings.php` never needed one (just a
+credential, no image/link/upload path). `broadcast.php` **did** have
+its own separate `app_base_url` setting — the same underlying concept
+under a different name, exactly the drift risk the shared setting
+exists to prevent. Removed that page's own base-URL card/form entirely;
+image URLs now build from the shared `admin_base_url()`.
+
+Added `all_riders`/`area_riders` as new broadcast targets alongside the
+existing customer/restaurant ones. New migration 78 widens
+`notification_broadcasts.target_type`'s ENUM (it's strict — the old
+values-only ENUM would have rejected the first rider-targeted send
+outright). No other schema change needed: riders already had
+`fcm_token` and `notifications.recipient_type` already included
+`'rider'` from `01_schema.sql`. One naming trap avoided — riders' area
+column is `service_area_id` (migration 69), not `area_id` like
+restaurants/`customer_addresses`; the new `area_riders` query uses the
+correct column, checked directly against the migration rather than
+assumed from the more common pattern.
+
+Not build/device-verified — same standing sandbox limitation. Migration
+78 needs to actually run on the live DB before the first rider-targeted
+broadcast can be sent.
+
+
+## Rider location pings now survive backgrounding — moved into RiderOrderPollingService (2026-09-07, session 44)
+
+Full detail: `docs/rider/121_Handover_2026-09-07_LocationPing_MovedToBackgroundService.md`.
+
+Found while auditing what's genuinely still open in the Rider App
+(`recall.md`/`PENDING.md`/`Rider_Deep_Plan.md` are all stale — none
+reflect recent sessions' actual state, `Status.md` is the only current
+source of truth). `HomeFragment`'s periodic location ping was still the
+exact same "foreground-only, dies on backgrounding" bug class doc 112
+already fixed for order-offer polling — a rider locking their screen or
+switching apps mid-delivery would freeze their position on the admin
+Live Rider Map / customer tracking screen instantly, with nothing
+updating again until they reopened the app.
+
+Moved the periodic ping into `RiderOrderPollingService` (the same
+foreground Service doc 112 built) as a second, independent coroutine
+loop alongside the existing order-poll loop — same adaptive cadence
+(30s idle / 7s active) as before, sharing one field with the order-poll
+loop instead of each independently re-fetching current-order state.
+`HomeFragment` keeps only its one-shot pre-"go online" location fetch;
+the ongoing Handler-based loop, and now-dead `sendLocationPing()`/
+`sendLocationPingInternal()`, were removed entirely — running both the
+service's loop and a duplicate foreground one at once would've just
+doubled GPS reads/API calls for zero benefit (unlike order-polling,
+where the faster in-focus cadence has a real UX reason to exist).
+Manifest gained `FOREGROUND_SERVICE_LOCATION` + widened the service's
+`foregroundServiceType` to `"dataSync|location"`; the persistent
+"online" notification text now honestly mentions location sharing too
+(Play Store's foreground-service policy expects this, and it's the
+right transparency call for the rider regardless).
+
+Not build/device-verified — same standing sandbox limitation. One
+accepted small staleness window documented in the full doc (up to ~15s
+before the location loop's interval reacts to a just-accepted order) —
+not worth extra cross-signaling machinery to close.
+
+
+---
+
+## 2026-09-09 — Deep Plan Phase 1: Order Settlement Status Tracking (backend only) — NOT build/device-verified
+
+New deep plan: `docs/00_Deep_Plan_Statement_CODLimit_QRPay_CashFlow_2026-09-09.md`.
+This session built Phase 1 only — backend foundation for the
+Restaurant/Rider Statement screens:
+
+- Migration 80 (`settlement_eligible_at`/`settlement_status` on
+  `orders`, new `restaurant_payment_orders` table).
+- `lib/settlement_status.php` (new).
+- `orders-deliver.php` now starts the T+1 clock on delivery.
+- `lib/ledger.php`'s `record_settlement()` now marks orders settled on
+  an `admin_to_restaurant` Pay Now.
+- New endpoints: `restaurant/statement.php`, `rider/statement.php`.
+
+No Android screens touched yet (Phase 2/3, next sessions). No PHP
+runtime available in this session's sandbox — migration has not
+actually been run against a live DB, endpoints have not been hit.
+Needs a real run + smoke test before Phase 1 is considered done per
+`done.md`'s rules.
+
+---
+
+## 2026-09-09 (continued) — Deep Plan Phase 2: Restaurant App Statement screen — NOT build/device-verified
+
+New "Statement" row in Account tab → `StatementActivity` — date-wise
+order list + settlement badge, consuming Phase 1's `statement.php`.
+See `recall.md`'s matching entry for full file list. No Android SDK
+available this session to build/run — flagged, not verified.
+
+---
+
+## 2026-09-09 (continued) — Deep Plan Phase 3: Rider App Statement screen — NOT build/device-verified
+
+New "View Statement" button in Earnings tab → `StatementActivity` —
+date-wise delivered orders + COD/earnings breakdown, consuming Phase
+1's `rider/statement.php`. See `recall.md`'s matching entry for full
+file list. Phases 1-3 of the Deep Plan are now code-complete but none
+build/device-verified — needs a real pass before any is marked done.
+
+---
+
+## 2026-09-09 (continued) — Deep Plan Phase 4: Area-wise Rider COD Cash-Hold Limit + Block — NOT build/device-verified
+
+New `area_rider_cod_limits` table (migration 81) + `lib/rider_cod_
+limit.php`, wired into `lib/dispatch.php`'s `find_eligible_riders()`
+so the COD cash-hold cap is per-service-area (falling back to the
+existing platform-wide `rider_cod_settlement_limit`) instead of one
+flat number for every rider. New admin page
+`admin/rider-cod-limits.php` (platform default + area overrides).
+`rider/me.php` now returns `cod_cash_held`/`cod_limit`/`cod_blocked`;
+Rider App's Home tab shows a persistent warning banner when blocked.
+Full detail: `docs/rider/122_Handover_2026-09-09_DeepPlan_Phase4_
+AreaRiderCodLimit_Built.md`. No PHP CLI/MySQL/Android SDK available
+this session — same standing sandbox limitation, not verified. Deep
+Plan Phases 1-4 are now code-complete; Phase 5 (Pay COD QR +
+auto-verify) is next.
+
+---
+
+## 2026-09-09 (continued) — Deep Plan Phase 5: Rider App "Pay COD Amount" (QR + Auto-Verify) — NOT build/device-verified
+
+Migration 82 (`payment_transactions` widened for `purpose = 'rider_cod_deposit'`),
+`rider/cod-deposit-initiate.php` + status-poll reuse of the existing
+UPIPE auto-verify flow, `PayCodDepositActivity.kt` (Rider App) +
+layout + `EarningsFragment` wiring. Owner confirmed partial deposits
+are allowed (not full-amount-only). Full detail:
+`docs/rider/123_Handover_2026-09-09_DeepPlan_Phase5_RiderCodDeposit_
+BackendComplete_AndroidPartial.md`. Same-day re-check found the
+Android UI was already fully built — only `AndroidManifest.xml`'s
+activity registration was missing, since fixed. Phase 5 is feature-
+complete end to end (backend + Android), not build/device-verified.
+
+---
+
+## 2026-09-10 — Deep Plan Phase 6: Rider App Deposit Tracking History — NOT build/device-verified
+
+New "Deposits" tab inside the Rider App's `StatementActivity` +
+`rider/cod-deposit-history.php` (reads `rider_cod_ledger WHERE
+entry_type = 'settlement_to_admin'`, classifies each row auto-
+verified/manual-review/manual-settlement). Full detail:
+`docs/rider/124_Handover_2026-09-10_DeepPlan_Phase6_
+RiderCodDepositHistory_Built_NotVerified.md`. Open question flagged
+to owner: the deep-plan's own wording listed "pending" as a possible
+status, but no ledger row exists for an in-flight deposit — only the
+3 confirmed-money statuses are shown; not resolved yet.
+
+---
+
+## 2026-09-10 (continued) — Deep Plan Phase 7: Admin Cash Flow Dashboard — NOT build/device-verified
+
+New `admin/cash-flow.php` — per-rider COD cash table (cash held,
+total collected, total deposited, last deposit, over-limit status)
+plus a Restaurant Settlement Summary block, both reading existing
+Phase 1-6 ledger tables, no new writes. Full detail:
+`docs/rider/125_Handover_2026-09-10_DeepPlan_Phase7_
+AdminCashFlowDashboard_Built_NotVerified.md`. **The Deep Plan's Build
+Order Recap (Phases 1-7) is now fully built end-to-end** — no phases
+remain in `docs/00_Deep_Plan_Statement_CODLimit_QRPay_CashFlow_
+2026-09-09.md`; only real-environment verification is left.
+
+---
+
+## 2026-09-10 (same day, immediate follow-up) — Cash Flow pages merged (owner request)
+
+Owner asked to merge rather than have two separate "cash flow" pages.
+`cash-flow.php` gained a third section (Platform Cash Flow / UPIPE
+merchant account) moved in verbatim from the old standalone
+`platform-ledger.php`, which is now just a thin redirect to
+`cash-flow.php`. Nav collapsed to a single "Cash Flow" link. Full
+detail: `docs/rider/126_Handover_2026-09-10_CashFlowPages_Merged_
+NotVerified.md`. Same standing sandbox limitation — static checks
+only (brace/paren balance, manual read-through), nothing run against a
+real PHP/MySQL instance.

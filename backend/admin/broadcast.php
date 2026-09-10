@@ -38,15 +38,36 @@
  * FCM needs an ABSOLUTE, publicly-fetchable URL (Google's own servers
  * fetch the image, not the recipient device via this backend's
  * relative-path convention every other image_url/logo_url in this
- * schema uses) — see the new app_base_url setting below.
+ * schema uses) — built from the shared admin_base_url() helper (see
+ * below).
  *
- * app_base_url: this codebase has never needed an absolute base URL
- * before (checked — no email-sending feature, no other external-
- * fetch-a-URL feature exists anywhere in backend/lib/). Rather than
- * build a whole new general Settings admin page for one value, it's
- * configured right on this page (stored in app_settings, read via
- * get_setting()) — a real gap, not a design choice, flagged as such in
- * the settings card below and in the handover doc.
+ * 2026-09-07 — Consolidated onto the shared admin_base_url() setting.
+ * This page originally had its OWN separate `app_base_url`
+ * app_settings key/UI (this file's own header used to explain why —
+ * "this codebase has never needed an absolute base URL before"). That
+ * became a real duplication risk the same day a platform-wide
+ * `admin_base_url` was built for a different bug (admin/riders.php's
+ * document-view links 404ing): two separately-set values that both
+ * mean "this backend's own public root URL" is exactly the kind of
+ * drift the new shared setting exists to prevent — an admin updating
+ * one and forgetting the other silently breaks broadcast images again.
+ * The dedicated "Base URL" card on this page and the `save_base_url`
+ * form action are both removed; image URLs are now built from
+ * `admin_base_url()` (backend/admin/_bootstrap.php), configured once
+ * platform-wide at `base-url-settings.php`. `fcm-settings.php` (the
+ * Firebase service-account credential page) never needed a base URL
+ * at all — it has no image/link/upload path — so nothing there
+ * changed.
+ *
+ * 2026-09-07 — Added Rider as a broadcast target (all_riders /
+ * area_riders), alongside the existing customer/restaurant targeting.
+ * Riders already had an `fcm_token` column (01_schema.sql, ahead of
+ * the Rider App itself) and an area assignment
+ * (`riders.service_area_id` — NOT `area_id`, unlike restaurants; see
+ * migration 69) to filter by, so no schema change was needed, just
+ * wiring this page's existing target/recipient/token-count logic to
+ * cover a third recipient type instead of assuming a binary
+ * customer/restaurant split throughout.
  *
  * Gated on notifications_send (migration 29 — this key already
  * existed, unused until now) for sending, notifications_view isn't
@@ -56,12 +77,15 @@
  *
  * STATUS: 🆕 BUILT 2026-08-29 (doc 66) — NOT build/device-verified (no
  * PHP CLI or live DB in this sandbox, same standing gap as every other
- * admin page this session). Needs migration 60 + 61 run live, then:
- * set app_base_url, send a test broadcast with an image to "All
- * customers" on a real device with the Customer app installed and
- * logged in, confirm the push arrives with the image visible
- * (BigPictureStyle) and the notification_broadcasts row's
- * recipient_count/delivered_count look sane.
+ * admin page this session). Needs migration 60 + 61 run live (plus
+ * migration 78 for the 2026-09-07 rider-targeting addition), then: set
+ * a real value at base-url-settings.php, send a test broadcast with an
+ * image to "All customers" on a real device with the Customer app
+ * installed and logged in, confirm the push arrives with the image
+ * visible (BigPictureStyle) and the notification_broadcasts row's
+ * recipient_count/delivered_count look sane. Repeat once for "All
+ * riders" against a real Rider app device once that app exists enough
+ * to receive a push at all.
  */
 
 require_once __DIR__ . '/_bootstrap.php';
@@ -176,28 +200,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $formAction = $_POST['form_action'] ?? '';
 
-        if ($formAction === 'save_base_url') {
-            $newBaseUrl = trim((string) ($_POST['app_base_url'] ?? ''));
-            if ($newBaseUrl !== '' && !filter_var($newBaseUrl, FILTER_VALIDATE_URL)) {
-                $flash = 'Enter a valid URL (e.g. https://yourdomain.com/anydrop/).';
-                $flashType = 'error';
-            } else {
-                $upsert = $db->prepare(
-                    "INSERT INTO app_settings (`key`, `value`, description) VALUES ('app_base_url', :v, 'Public base URL used to build absolute image links for FCM push notifications')
-                     ON DUPLICATE KEY UPDATE `value` = :v2"
-                );
-                $upsert->execute(['v' => $newBaseUrl, 'v2' => $newBaseUrl]);
-                write_audit_log('admin', $admin['id'], 'settings.app_base_url_updated', ['value' => $newBaseUrl]);
-                $flash = 'Base URL saved.';
-            }
-        } elseif ($formAction === 'send_broadcast') {
+        if ($formAction === 'send_broadcast') {
             $title = trim((string) ($_POST['title'] ?? ''));
             $body = trim((string) ($_POST['body'] ?? ''));
             $linkUrl = trim((string) ($_POST['link_url'] ?? ''));
             $targetType = (string) ($_POST['target_type'] ?? '');
             $targetAreaId = trim((string) ($_POST['target_area_id'] ?? '')) !== '' ? (int) $_POST['target_area_id'] : null;
 
-            $allowedTargets = ['all_customers', 'all_restaurants', 'area_customers', 'area_restaurants'];
+            $allowedTargets = ['all_customers', 'all_restaurants', 'all_riders', 'area_customers', 'area_restaurants', 'area_riders'];
 
             if ($title === '' || $body === '') {
                 $flash = 'Title and message are both required.';
@@ -221,18 +231,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     $imageAbsoluteUrl = null;
                     if ($imagePath !== null) {
-                        $baseUrl = rtrim((string) get_setting('app_base_url', ''), '/');
-                        if ($baseUrl === '') {
-                            $flash = 'Set the Base URL below before sending a broadcast with an image — FCM needs a full public link to fetch it.';
-                            $flashType = 'error';
-                        } else {
-                            $imageAbsoluteUrl = $baseUrl . '/' . $imagePath;
-                        }
+                        $imageAbsoluteUrl = admin_base_url() . '/' . $imagePath;
                     }
 
                     if ($flash === null) {
                         // ---- Resolve the recipient id list ----
-                        $recipientType = str_ends_with($targetType, '_customers') ? 'customer' : 'restaurant';
+                        if (str_ends_with($targetType, '_customers')) {
+                            $recipientType = 'customer';
+                        } elseif (str_ends_with($targetType, '_restaurants')) {
+                            $recipientType = 'restaurant';
+                        } else {
+                            $recipientType = 'rider';
+                        }
                         $recipientIds = [];
 
                         if ($targetType === 'all_customers') {
@@ -243,6 +253,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         } elseif ($targetType === 'all_restaurants') {
                             $recipientIds = array_column(
                                 $db->query("SELECT id FROM restaurants WHERE deleted_at IS NULL AND status = 'approved'")->fetchAll(),
+                                'id'
+                            );
+                        } elseif ($targetType === 'all_riders') {
+                            $recipientIds = array_column(
+                                $db->query("SELECT id FROM riders WHERE deleted_at IS NULL AND status = 'approved'")->fetchAll(),
                                 'id'
                             );
                         } elseif ($targetType === 'area_customers') {
@@ -260,12 +275,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             );
                             $stmt->execute($areaIds);
                             $recipientIds = array_column($stmt->fetchAll(), 'id');
-                        } else { // area_restaurants
+                        } elseif ($targetType === 'area_restaurants') {
                             $areaIds = area_and_descendant_ids($targetAreaId, $allAreas);
                             $placeholders = implode(',', array_fill(0, count($areaIds), '?'));
                             $stmt = $db->prepare(
                                 "SELECT id FROM restaurants
                                  WHERE deleted_at IS NULL AND status = 'approved' AND area_id IN ($placeholders)"
+                            );
+                            $stmt->execute($areaIds);
+                            $recipientIds = array_column($stmt->fetchAll(), 'id');
+                        } else { // area_riders — riders' area column is
+                            // service_area_id, NOT area_id (migration 69),
+                            // unlike restaurants/customer_addresses above.
+                            $areaIds = area_and_descendant_ids($targetAreaId, $allAreas);
+                            $placeholders = implode(',', array_fill(0, count($areaIds), '?'));
+                            $stmt = $db->prepare(
+                                "SELECT id FROM riders
+                                 WHERE deleted_at IS NULL AND status = 'approved' AND service_area_id IN ($placeholders)"
                             );
                             $stmt->execute($areaIds);
                             $recipientIds = array_column($stmt->fetchAll(), 'id');
@@ -293,7 +319,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         // itself reads — an honest approximation, not a
                         // guaranteed delivery receipt.
                         $tokenColumn = 'fcm_token';
-                        $tokenTable = $recipientType === 'customer' ? 'customers' : 'restaurants';
+                        $tokenTable = ['customer' => 'customers', 'restaurant' => 'restaurants', 'rider' => 'riders'][$recipientType];
                         $tokenCounts = [];
                         if ($recipientCount > 0) {
                             $placeholders = implode(',', array_fill(0, $recipientCount, '?'));
@@ -344,7 +370,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $csrf = admin_csrf_token();
-$appBaseUrl = (string) get_setting('app_base_url', '');
 
 // Only area/city_village/district/state nodes that could plausibly be
 // picked from a flat <select> — same list areas.php's own pickers use,
@@ -371,28 +396,12 @@ require __DIR__ . '/_layout_head.php';
     <h1>Push Notification Broadcast</h1>
 </div>
 
-<?php if (!$appBaseUrl): ?>
-<div class="card" style="border-left: 4px solid #e0a800;">
-    <h2>Base URL not set</h2>
-    <p class="muted">Needed only if a broadcast includes an image — FCM fetches the image directly from a public URL, not through the app. Text-only broadcasts work without this.</p>
-    <form method="post">
-        <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
-        <input type="hidden" name="form_action" value="save_base_url">
-        <input type="url" name="app_base_url" placeholder="https://yourdomain.com/anydrop/" style="width: 100%; max-width: 480px;" required>
-        <button type="submit" class="btn btn-primary">Save</button>
-    </form>
-</div>
-<?php else: ?>
-<div class="card">
-    <h2>Base URL</h2>
-    <form method="post" style="display:flex; gap:8px; align-items:center;">
-        <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
-        <input type="hidden" name="form_action" value="save_base_url">
-        <input type="url" name="app_base_url" value="<?= admin_escape($appBaseUrl) ?>" style="width: 100%; max-width: 480px;" required>
-        <button type="submit" class="btn btn-outline">Update</button>
-    </form>
-</div>
-<?php endif; ?>
+<p class="muted" style="margin-bottom:16px;">
+    Broadcast images are served from
+    <a href="base-url-settings.php">Base URL Settings</a> — text-only
+    broadcasts don't need it at all; an image-attached broadcast needs
+    that value set correctly there once, platform-wide, before sending.
+</p>
 
 <div class="card">
     <h2>Send a broadcast</h2>
@@ -425,8 +434,10 @@ require __DIR__ . '/_layout_head.php';
             <select name="target_type" id="broadcastTargetType" required>
                 <option value="all_customers">All customers</option>
                 <option value="all_restaurants">All restaurants</option>
+                <option value="all_riders">All riders</option>
                 <option value="area_customers">Customers in a specific area</option>
                 <option value="area_restaurants">Restaurants in a specific area</option>
+                <option value="area_riders">Riders in a specific area</option>
             </select>
         </div>
 
@@ -469,8 +480,10 @@ document.getElementById('broadcastTargetType').addEventListener('change', functi
                 $targetLabel = [
                     'all_customers' => 'All customers',
                     'all_restaurants' => 'All restaurants',
+                    'all_riders' => 'All riders',
                     'area_customers' => 'Customers in ' . ($b['area_name'] ?? '—'),
                     'area_restaurants' => 'Restaurants in ' . ($b['area_name'] ?? '—'),
+                    'area_riders' => 'Riders in ' . ($b['area_name'] ?? '—'),
                 ][$b['target_type']] ?? $b['target_type'];
                 echo admin_escape($targetLabel);
                 ?>

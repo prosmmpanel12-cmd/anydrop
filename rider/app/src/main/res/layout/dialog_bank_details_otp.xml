@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App-owner ask, 2026-09-09: confirm-before-save on bank/UPI changes,
+     rider-style (OTP, not a password) — see payout-bank-details-save.php's
+     kdoc. Modeled on dialog_delivery_otp.xml's plain single-field style
+     (this is the rider's own email OTP, single 6-digit text entry, not
+     the boxed 6-digit grid activity_otp_verify.xml uses for login), with
+     a Resend row added since — unlike the delivery-OTP dialog — this OTP
+     is requested via a separate endpoint the rider may need to retrigger. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="24dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/bank_otp_dialog_subtitle"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        app:boxCornerRadiusTopStart="12dp"
+        app:boxCornerRadiusTopEnd="12dp"
+        app:boxCornerRadiusBottomStart="12dp"
+        app:boxCornerRadiusBottomEnd="12dp"
+        app:boxStrokeColor="@color/anydrop_green"
+        app:hintTextColor="@color/anydrop_green"
+        app:startIconDrawable="@drawable/ic_lock"
+        app:startIconTint="@color/text_secondary">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/inputBankOtp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/hint_bank_otp"
+            android:textColor="@color/text_primary"
+            android:inputType="number"
+            android:maxLength="6"
+            android:letterSpacing="0.3"
+            android:textSize="18sp" />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <TextView
+        android:id="@+id/bankOtpError"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textColor="@color/error_fg"
+        android:textSize="12sp"
+        android:visibility="gone"
+        tools:text="Incorrect code — 2 attempts remaining" />
+
+    <TextView
+        android:id="@+id/bankOtpResend"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:textColor="@color/anydrop_green"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:padding="4dp"
+        tools:text="Resend code" />
+
+</LinearLayout>

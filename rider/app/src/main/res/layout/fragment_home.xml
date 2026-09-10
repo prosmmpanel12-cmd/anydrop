@@ -71,6 +71,46 @@
                 android:indeterminateTint="@color/anydrop_green" />
         </LinearLayout>
 
+        <!-- Deep Plan Phase 4 (2026-09-09) — area-wise COD cash-hold
+             limit banner. Gone by default; shown by refreshFromServer()
+             whenever /rider/me's cod_blocked is true (mirrors exactly
+             what lib/dispatch.php's find_eligible_riders() enforces
+             server-side — this is a reflection of that block, not a
+             separate client-side rule). No new orders are pushed while
+             blocked, same as an offline rider — going online again
+             still flips is_online, but dispatch.php's own COD-limit
+             check keeps such a rider out of the COD candidate pool
+             until they deposit and their cod_cash_held drops back
+             under the limit. -->
+        <LinearLayout
+            android:id="@+id/codBlockedBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_banner_warning"
+            android:padding="14dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_warning"
+                app:tint="@color/warning_fg" />
+
+            <TextView
+                android:id="@+id/codBlockedBannerText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="10dp"
+                android:textColor="@color/warning_fg"
+                android:textSize="13sp"
+                tools:text="You've reached your cash hold limit (₹2,000). Deposit your COD cash to receive new orders." />
+        </LinearLayout>
+
         <!-- Current delivery placeholder -->
         <TextView
             android:layout_width="wrap_content"

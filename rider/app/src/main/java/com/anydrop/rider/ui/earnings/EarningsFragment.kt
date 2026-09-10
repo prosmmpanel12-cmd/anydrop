@@ -36,6 +36,14 @@ class EarningsFragment : Fragment() {
     private val api by lazy { ApiClient.create(requireContext()) }
     private val adapter = EarningsLedgerAdapter()
 
+    // Deep Plan Phase 5 — last-known cod_cash_held, kept only so
+    // btnPayCodAmount's click handler has a starting value to hand
+    // PayCodDepositActivity; that screen re-fetches/re-validates the
+    // real number server-side before doing anything with it (see its
+    // own kdoc), so a value that's gone stale between refreshes here
+    // is harmless.
+    private var latestCodCashHeld: Double = 0.0
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -50,6 +58,26 @@ class EarningsFragment : Fragment() {
 
         binding.btnRequestPayout.setOnClickListener {
             startActivity(android.content.Intent(requireContext(), RequestPayoutActivity::class.java))
+        }
+
+        // Statement (Deep Plan Phase 3) — same one-line launch pattern
+        // as btnRequestPayout above.
+        binding.btnViewStatement.setOnClickListener {
+            startActivity(android.content.Intent(requireContext(), com.anydrop.rider.ui.statement.StatementActivity::class.java))
+        }
+
+        // Deep Plan Phase 5 — "Pay COD Amount". codCashHeld is passed
+        // as a display-only starting value for PayCodDepositActivity's
+        // own amount field; that screen re-validates against the
+        // server's own current cod_cash_held before ever calling
+        // initiateCodDeposit() (see its own kdoc) rather than trusting
+        // this snapshot, same reasoning RequestPayoutActivity's kdoc
+        // gives for re-fetching balance instead of trusting a passed
+        // value.
+        binding.btnPayCodAmount.setOnClickListener {
+            val intent = android.content.Intent(requireContext(), PayCodDepositActivity::class.java)
+            intent.putExtra(PayCodDepositActivity.EXTRA_COD_CASH_HELD, latestCodCashHeld)
+            startActivity(intent)
         }
 
         binding.earningsLedgerList.layoutManager =
@@ -123,12 +151,14 @@ class EarningsFragment : Fragment() {
     private fun renderCodCard(result: EarningsSummaryResult) {
         val b = _binding ?: return
         val held = result.codCashHeld
+        latestCodCashHeld = held
         val limit = if (result.codSettlementLimit > 0) result.codSettlementLimit else 1.0
         val ratio = (held / limit).coerceIn(0.0, 1.0)
 
         b.codCashHeldValue.text =
             getString(R.string.dashboard_earnings_amount_format, held)
         b.codCashHeldBar.progress = (ratio * 100).toInt()
+        b.btnPayCodAmount.visibility = if (held > 0) View.VISIBLE else View.GONE
 
         val limitLabel = if (result.codSettlementLimit == result.codSettlementLimit.toLong().toDouble())
             result.codSettlementLimit.toLong().toString()

@@ -4,10 +4,20 @@
  * Auth: Restaurant token
  * Request: { "account_holder_name": "...", "bank_name": "...",
  *            "account_number": "...", "ifsc_code": "...",
- *            "upi_id"?: "..." }
+ *            "upi_id"?: "...", "password": "..." }
  * Response: { "bank_details": {...} } — account_number_masked here
  *           reflects the value just saved, same masking as
  *           bank-details-get.php.
+ *
+ * App-owner ask, 2026-09-09: confirm-before-save on bank/UPI changes,
+ * restaurant-style (email+password login) — re-enter the current login
+ * password in the request body. Verified with password_verify() against
+ * restaurants.password_hash, the exact same check restaurant-login.php
+ * does, since manage_bank_details is owner-only (lib/permissions.php) —
+ * there's no staff-password case to plumb through here, only the
+ * restaurant row's own password. A wrong/missing password fails the
+ * whole request (invalid_password, 401) before anything is written —
+ * no partial save, no verification_status reset on a bad confirm.
  *
  * PENDING.md §15, migration 59. Every restaurant-initiated save
  * (create OR edit of an existing row) resets verification_status to
@@ -41,7 +51,7 @@ require_restaurant_permission($owner, 'manage_bank_details');
 $restaurantId = $owner['owner_id'];
 
 $body = get_json_body();
-require_fields($body, ['account_holder_name', 'bank_name', 'account_number', 'ifsc_code']);
+require_fields($body, ['account_holder_name', 'bank_name', 'account_number', 'ifsc_code', 'password']);
 
 [$holder, $bank, $accountNumber, $ifsc, $upi] = validate_bank_fields(
     (string) $body['account_holder_name'],
@@ -52,6 +62,21 @@ require_fields($body, ['account_holder_name', 'bank_name', 'account_number', 'if
 );
 
 $db = Database::get();
+
+// Confirm-before-save — same password_hash check restaurant-login.php
+// uses. Checked before anything is written; a failed check writes an
+// audit row (for visibility into repeated bad attempts) but never
+// touches restaurant_bank_details.
+$authCheck = $db->prepare('SELECT password_hash FROM restaurants WHERE id = :id LIMIT 1');
+$authCheck->execute(['id' => $restaurantId]);
+$passwordHash = $authCheck->fetchColumn();
+
+if ($passwordHash === false || !password_verify((string) $body['password'], $passwordHash)) {
+    write_audit_log('restaurant', $restaurantId, 'bank_details_save_password_failed', [
+        'restaurant_id' => $restaurantId,
+    ]);
+    respond_error('invalid_password', 401);
+}
 
 // INSERT ... ON DUPLICATE KEY UPDATE, same pattern as
 // admin/settlements.php's save_bank_details action — restaurant_id is

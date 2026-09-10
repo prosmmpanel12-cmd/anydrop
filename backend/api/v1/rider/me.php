@@ -49,6 +49,7 @@
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
+require_once __DIR__ . '/../../../lib/rider_cod_limit.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -68,7 +69,8 @@ $stmt = $db->prepare(
     'SELECT r.id, r.name, r.email, r.mobile, r.status, r.rejection_reason,
             r.service_area_id, sa.name AS service_area_name, r.created_at,
             r.is_online, r.vehicle_type, r.vehicle_number,
-            r.documents_status, r.documents_reject_reason, r.profile_photo_url
+            r.documents_status, r.documents_reject_reason, r.profile_photo_url,
+            r.cod_cash_held
      FROM riders r
      LEFT JOIN service_areas sa ON sa.id = r.service_area_id
      WHERE r.id = :id AND r.deleted_at IS NULL
@@ -82,6 +84,19 @@ if (!$rider) {
     // the rider row exists. Treat it as the account being gone.
     respond_error('account_suspended', 403);
 }
+
+// Deep Plan Phase 4 — area-wise COD cash-hold limit (migration 81,
+// lib/rider_cod_limit.php). Surfaced here (rather than a separate
+// endpoint) so RiderDashboardActivity/HomeFragment can show the
+// "cash hold limit reached" banner from data it already fetches on
+// every resume, same reasoning is_online/vehicle_type were added to
+// this response for in the Phase 3 comment above. Mirrors exactly what
+// lib/dispatch.php's find_eligible_riders() checks server-side — a
+// rider only ever sees a banner for a block that's actually being
+// enforced, never a client-only approximation of it.
+$codCashHeld = (float) $rider['cod_cash_held'];
+$riderAreaId = $rider['service_area_id'] !== null ? (int) $rider['service_area_id'] : null;
+$codLimit = get_effective_rider_cod_limit($db, $riderAreaId)['limit'];
 
 respond_ok([
     'rider' => [
@@ -100,6 +115,9 @@ respond_ok([
         'documents_status'    => $rider['documents_status'],
         'documents_reject_reason' => $rider['documents_reject_reason'],
         'profile_photo_url'   => $rider['profile_photo_url'],
+        'cod_cash_held'       => $codCashHeld,
+        'cod_limit'           => $codLimit,
+        'cod_blocked'         => $codCashHeld >= $codLimit,
     ],
     'status' => $rider['status'],
 ]);

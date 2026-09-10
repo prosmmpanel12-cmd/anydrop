@@ -2,6 +2,7 @@ package com.anydrop.food.ui.login
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.CountDownTimer
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.method.LinkMovementMethod
@@ -34,6 +35,13 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var tokenManager: TokenManager
     private val api by lazy { ApiClient.create(this) }
     private var currentEmail: String = ""
+
+    // App-owner ask, 2026-09-09: 30s cooldown on "Resend code" so it can't
+    // be spammed. Re-armed on every successful send/resend (see
+    // onSendOtp()'s success branch below) and cancelled in onDestroy() so
+    // a late tick doesn't touch btnResendOtp after the Activity is gone.
+    private var resendOtpTimer: CountDownTimer? = null
+    private val resendOtpCooldownMillis = 30_000L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -139,6 +147,7 @@ class LoginActivity : AppCompatActivity() {
                     binding.otpStepGroup.visibility = android.view.View.VISIBLE
                     binding.otpSubtitle.text = getString(com.anydrop.food.R.string.otp_subtitle, currentEmail)
                     InAppNotifier.show(this@LoginActivity, "OTP sent to $currentEmail", InAppNotifier.Type.SUCCESS)
+                    startResendOtpCooldown()
                 } else {
                     // Same root-cause fix as CheckoutActivity's placeOrder() —
                     // response.body() is null on this non-2xx branch; the real
@@ -207,6 +216,34 @@ class LoginActivity : AppCompatActivity() {
                 )
             }
         }
+    }
+
+    /** Starts (or restarts) the 30s "Resend code" cooldown — disables
+     * btnResendOtp and shows "Resend in Ns" while it counts down, then
+     * restores the original tappable "Resend code" label at 0. Called
+     * from onSendOtp()'s success branch for both the first send and every
+     * subsequent resend, so the button can never be spammed. */
+    private fun startResendOtpCooldown() {
+        resendOtpTimer?.cancel()
+        binding.btnResendOtp.isEnabled = false
+        resendOtpTimer = object : CountDownTimer(resendOtpCooldownMillis, 1_000L) {
+            override fun onTick(millisUntilFinished: Long) {
+                val secondsLeft = (millisUntilFinished / 1_000L).coerceAtLeast(1L)
+                binding.btnResendOtp.text = getString(com.anydrop.food.R.string.otp_resend_countdown, secondsLeft)
+            }
+
+            override fun onFinish() {
+                binding.btnResendOtp.isEnabled = true
+                binding.btnResendOtp.text = getString(com.anydrop.food.R.string.btn_resend_otp)
+            }
+        }.start()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Avoid a leaked callback ticking against a dead Activity/binding.
+        resendOtpTimer?.cancel()
+        resendOtpTimer = null
     }
 
     private fun setLoading(loading: Boolean) {

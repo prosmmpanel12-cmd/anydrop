@@ -118,6 +118,13 @@ class AccountFragment : Fragment() {
             startActivity(Intent(requireContext(), BankDetailsActivity::class.java))
         }
 
+        // Statement (Deep Plan Phase 2, docs/00_Deep_Plan_...
+        // 2026-09-09.md) — same one-line row-launch pattern as the
+        // rows above.
+        binding.btnStatementRow.setOnClickListener {
+            startActivity(Intent(requireContext(), com.anydrop.restaurant.ui.statement.StatementActivity::class.java))
+        }
+
         // Staff Management (doc 71, migration 63, PENDING.md item 3) —
         // row is gone by default in fragment_account.xml and only shown
         // here for an owner session; canManageStaff() is the same

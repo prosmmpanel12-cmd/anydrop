@@ -1,0 +1,327 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Deep Plan Phase 5 (docs/00_Deep_Plan_Statement_CODLimit_QRPay_
+    CashFlow_2026-09-09.md §5) — "Pay COD Amount". Two states in one
+    screen, toggled by visibility (no fragment/navigation swap, same
+    "one Activity, sections shown/hidden" convention
+    RequestPayoutActivity's own layout already uses for bank/UPI
+    fields):
+
+      1. amountEntrySection — NEW, no equivalent in the customer app's
+         activity_upi_payment.xml, because a customer order's amount is
+         fixed by the order total but a rider's COD deposit is
+         partial-amount by app-owner decision (2026-09-09). Shown first.
+      2. qrSection — near-identical structure to the customer app's
+         activity_upi_payment.xml (header row + this app's dark theme
+         restyle instead of that file's own colors), shown after
+         initiateCodDeposit() succeeds. No order-summary block exists
+         here since there's no order behind this transaction, and the
+         "switch to COD" button has no equivalent either (see
+         PayCodDepositActivity.kt's own kdoc on cancelling instead).
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="20dp"
+        android:paddingBottom="12dp">
+
+        <ImageView
+            android:id="@+id/btnBack"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:src="@drawable/ic_back"
+            app:tint="@color/text_primary"
+            android:contentDescription="@string/cd_back"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackgroundBorderless" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:text="@string/cod_deposit_title"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <!-- ==================== State 1: amount entry ==================== -->
+        <LinearLayout
+            android:id="@+id/amountEntrySection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
+                android:text="@string/cod_deposit_held_label" />
+
+            <TextView
+                android:id="@+id/codHeldValueText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="@color/anydrop_green"
+                android:textSize="26sp"
+                android:textStyle="bold"
+                tools:text="₹850.00" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/depositAmountLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                app:boxCornerRadiusTopStart="12dp" app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp" app:boxCornerRadiusBottomEnd="12dp"
+                app:boxStrokeColor="@color/anydrop_green"
+                app:hintTextColor="@color/anydrop_green"
+                android:hint="@string/cod_deposit_amount_hint">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/depositAmountInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text_primary"
+                    android:inputType="numberDecimal" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Partial deposits are allowed (app owner decision,
+                 2026-09-09) — this is a convenience shortcut, not the
+                 only way to fill the field; depositAmountInput stays
+                 freely editable up to codHeldValueText's value. -->
+            <TextView
+                android:id="@+id/btnDepositFullAmount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:padding="4dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:textColor="@color/anydrop_green"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:text="@string/cod_deposit_use_full_amount" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnGetDepositQr"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="20dp"
+                android:text="@string/cod_deposit_get_qr_button" />
+
+            <ProgressBar
+                android:id="@+id/depositInitProgress"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginTop="16dp"
+                android:visibility="gone" />
+
+        </LinearLayout>
+
+        <!-- ==================== State 2: QR / poll / UTR ==================== -->
+        <LinearLayout
+            android:id="@+id/qrSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <!-- Doc 23 §7 "test mode watermark" equivalent — hidden
+                 unless is_test_mode comes back true. -->
+            <TextView
+                android:id="@+id/testModeBanner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/error_bg"
+                android:textColor="@color/error_fg"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:padding="8dp"
+                android:layout_marginBottom="12dp"
+                android:text="@string/upi_test_mode_banner"
+                android:visibility="gone" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:textSize="14sp"
+                android:textColor="@color/text_secondary"
+                android:text="@string/cod_deposit_scan_subtitle" />
+
+            <TextView
+                android:id="@+id/depositAmountText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:layout_marginTop="4dp"
+                android:textSize="28sp"
+                android:textStyle="bold"
+                android:textColor="@color/anydrop_green"
+                tools:text="₹500.00" />
+
+            <FrameLayout
+                android:layout_width="220dp"
+                android:layout_height="220dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="20dp"
+                android:background="@color/surface">
+
+                <ImageView
+                    android:id="@+id/qrImage"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="8dp"
+                    android:contentDescription="@string/upi_qr_content_description" />
+
+                <ProgressBar
+                    android:id="@+id/qrLoadingSpinner"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_gravity="center" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/expiryText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:layout_marginTop="10dp"
+                android:textSize="13sp"
+                android:textColor="@color/text_secondary" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:text="@string/upi_instructions_title" />
+
+            <TextView
+                android:id="@+id/instructionsText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textSize="14sp"
+                android:lineSpacingExtra="4dp"
+                android:textColor="@color/text_secondary" />
+
+            <!-- Live poll status row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="18dp"
+                android:background="@drawable/bg_card_rounded"
+                android:padding="12dp">
+
+                <ProgressBar
+                    android:id="@+id/pollingSpinner"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_marginEnd="10dp" />
+
+                <TextView
+                    android:id="@+id/statusText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_secondary"
+                    android:text="@string/upi_status_checking" />
+            </LinearLayout>
+
+            <!-- UTR fallback — hidden until the poll reports utr_available -->
+            <LinearLayout
+                android:id="@+id/utrSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="16dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_secondary"
+                    android:text="@string/upi_utr_hint" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    app:boxStrokeColor="@color/anydrop_green"
+                    app:hintTextColor="@color/anydrop_green">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/utrInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/text_primary"
+                        android:hint="@string/upi_utr_input_hint"
+                        android:inputType="number"
+                        android:maxLength="12" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSubmitUtr"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/upi_submit_utr" />
+            </LinearLayout>
+
+            <!-- No "switch to COD" equivalent here (see class kdoc) —
+                 cancelling just abandons the transaction, it expires on
+                 its own server-side, nothing to actively undo. -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCancelDeposit"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/cod_deposit_cancel_button" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+    </ScrollView>
+
+</LinearLayout>

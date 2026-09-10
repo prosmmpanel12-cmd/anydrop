@@ -37,6 +37,7 @@ require_once __DIR__ . '/geo.php';
 require_once __DIR__ . '/settings.php';
 require_once __DIR__ . '/notifications.php';
 require_once __DIR__ . '/orders.php';
+require_once __DIR__ . '/rider_cod_limit.php';
 
 /**
  * Finds eligible online riders for an order's restaurant, nearest first.
@@ -60,9 +61,8 @@ function find_eligible_riders(PDO $db, array $order): array
     $freshnessSeconds = (int) get_setting('rider_location_freshness_seconds', 300);
     $radiusKm = (float) get_setting('rider_dispatch_radius_km', 8);
     $isCod = $order['payment_method'] === 'cod';
-    $codLimit = (float) get_setting('rider_cod_settlement_limit', 2000);
 
-    $sql = "SELECT r.id, r.last_lat, r.last_lng, r.cod_cash_held
+    $sql = "SELECT r.id, r.last_lat, r.last_lng, r.cod_cash_held, r.service_area_id
             FROM riders r
             WHERE r.status = 'approved'
               AND r.is_online = 1
@@ -83,10 +83,28 @@ function find_eligible_riders(PDO $db, array $order): array
     $stmt->execute(['freshness' => $freshnessSeconds, 'order_id' => $order['id']]);
     $rows = $stmt->fetchAll();
 
+    // Deep Plan Phase 4 — the flat platform-wide COD limit is now only
+    // the fallback; an area may have its own, stricter (or looser)
+    // override (area_rider_cod_limits, migration 81). Cached per
+    // area_id (keyed 0 for "no area assigned") within this one call so
+    // a batch of candidates sharing an area only walks the parent
+    // chain once, not once per rider.
+    $codLimitCache = [];
+    $resolveCodLimit = function (?int $riderAreaId) use ($db, &$codLimitCache): float {
+        $cacheKey = $riderAreaId ?? 0;
+        if (!array_key_exists($cacheKey, $codLimitCache)) {
+            $codLimitCache[$cacheKey] = get_effective_rider_cod_limit($db, $riderAreaId)['limit'];
+        }
+        return $codLimitCache[$cacheKey];
+    };
+
     $candidates = [];
     foreach ($rows as $row) {
-        if ($isCod && (float) $row['cod_cash_held'] >= $codLimit) {
-            continue; // deep-plan §4.1 item 8 — COD cash-held limit
+        if ($isCod) {
+            $riderAreaId = $row['service_area_id'] !== null ? (int) $row['service_area_id'] : null;
+            if ((float) $row['cod_cash_held'] >= $resolveCodLimit($riderAreaId)) {
+                continue; // deep-plan §4.1 item 8 — COD cash-held limit, area-wise as of Phase 4
+            }
         }
         $distance = haversine_km(
             (float) $rest['latitude'],

@@ -559,13 +559,13 @@ require __DIR__ . '/_layout_head.php';
                     <div class="row-actions" style="margin-bottom:10px;">
                         <?php if ($r['id_doc_url']): ?>
                             <a class="btn btn-outline" target="_blank" rel="noopener"
-                               href="/api/v1/rider/documents-view.php?rider_id=<?= (int) $r['id'] ?>&doc=id">View ID Doc</a>
+                               href="<?= admin_escape(admin_base_url()) ?>/api/v1/rider/documents-view.php?rider_id=<?= (int) $r['id'] ?>&doc=id">View ID Doc</a>
                         <?php else: ?>
                             <span class="muted">No ID doc submitted</span>
                         <?php endif; ?>
                         <?php if ($r['vehicle_doc_url']): ?>
                             <a class="btn btn-outline" target="_blank" rel="noopener"
-                               href="/api/v1/rider/documents-view.php?rider_id=<?= (int) $r['id'] ?>&doc=vehicle">View Vehicle Doc</a>
+                               href="<?= admin_escape(admin_base_url()) ?>/api/v1/rider/documents-view.php?rider_id=<?= (int) $r['id'] ?>&doc=vehicle">View Vehicle Doc</a>
                         <?php else: ?>
                             <span class="muted">No vehicle doc submitted</span>
                         <?php endif; ?>

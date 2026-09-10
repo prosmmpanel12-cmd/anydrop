@@ -33,6 +33,43 @@ session_start();
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../lib/admin_auth.php';
+require_once __DIR__ . '/../lib/settings.php';
+
+/**
+ * Anydrop's backend root URL — e.g. "http://localhost:8080/anydrop" in
+ * this project's local/sandbox setup, matching the same host+path the
+ * Customer/Restaurant/Rider apps' own ApiClient.kt BASE_URL constants
+ * point at (minus the trailing `api/v1/`, since admin pages need to
+ * reach `uploads/`, `rider_documents/`-adjacent private endpoints,
+ * etc. too — not just the API).
+ *
+ * 2026-09-07 (app owner: "pure admin panel ke liye ek base url banao
+ * settings table mein, sari files is base url se chale"): every
+ * admin/*.php link to an uploaded file or a private-document endpoint
+ * should be built from THIS, not a hand-rolled relative `../` guess.
+ * The immediate trigger was admin/riders.php's document-view links
+ * using an absolute root path (`/api/v1/...`) that 404'd because this
+ * backend isn't deployed at the domain root — but a relative path is
+ * itself fragile the same way (it silently depends on how many
+ * folders deep the *calling* page happens to be, which every one of
+ * banners.php/settlements.php/support.php/riders.php had to separately
+ * guess right). One admin-configured absolute value removes the
+ * guessing for every page, forever, in one place.
+ *
+ * Stored in app_settings under 'admin_base_url', edited via
+ * base-url-settings.php — no seed migration needed, same "falls back
+ * to this in-code default until an admin saves a real value" pattern
+ * google_directions_api_key/route_recalc_*/fcm_service_account_json
+ * already use (get_setting()'s own $default parameter). Always
+ * returned WITHOUT a trailing slash, so every call site can safely do
+ * `admin_base_url() . '/uploads/...'` without ever risking a doubled
+ * `//`.
+ */
+function admin_base_url(): string
+{
+    $url = trim((string) get_setting('admin_base_url', 'http://localhost:8080/anydrop'));
+    return rtrim($url, '/');
+}
 
 /**
  * Redirects to login.php unless an admin is currently signed in AND

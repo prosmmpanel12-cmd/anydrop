@@ -104,12 +104,24 @@ object RiderNotificationHelper {
      * restaurant app's buildMonitoringNotification() — silent, no
      * sound/vibration, just the small watching-for-deliveries icon
      * riders see confirms the background check is actually running. */
+    /** Same "silent, no sound/vibration, just confirms it's running" role
+     * as the restaurant app's buildMonitoringNotification().
+     *
+     * 2026-09-07: text updated to also mention location, now that this
+     * same foreground service sends the periodic location ping too
+     * (moved here from HomeFragment — see RiderOrderPollingService's own
+     * kdoc). A location-type foreground service's persistent
+     * notification should say so — both for the rider's own
+     * transparency about being tracked while online, and because Google
+     * Play's foreground-service policy expects the notification to
+     * honestly reflect what's actually running, not just the
+     * order-polling half of it. */
     fun buildMonitoringNotification(context: Context): android.app.Notification {
         val openAppIntent = contentIntentFor(context, "dashboard")
         return NotificationCompat.Builder(context, CHANNEL_MONITORING)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("AnyDrop Rider")
-            .setContentText("Watching for new delivery offers")
+            .setContentTitle("AnyDrop Rider — Online")
+            .setContentText("Watching for delivery offers and sharing your location")
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
             .setContentIntent(openAppIntent)

@@ -108,7 +108,8 @@ if (!function_exists('admin_unassigned_restaurants_with_detected_area')) {
         $stmt = $db->prepare(
             "SELECT id, name, owner_name, owner_mobile, owner_email, status, operational_status,
                     area_id, current_due, commission_percent, rating_avg, created_at, rejection_reason,
-                    latitude, longitude
+                    latitude, longitude, address, pending_address, pending_latitude, pending_longitude,
+                    address_review_status, address_review_remarks
              FROM restaurants
              WHERE {$whereSql}
              ORDER BY created_at DESC"
@@ -192,7 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $restaurantId = (int) ($_POST['restaurant_id'] ?? 0);
 
-        $stmt = $db->prepare('SELECT id, name, status FROM restaurants WHERE id = :id AND deleted_at IS NULL LIMIT 1');
+        $stmt = $db->prepare('SELECT id, name, status, address_review_status, pending_address, pending_latitude, pending_longitude FROM restaurants WHERE id = :id AND deleted_at IS NULL LIMIT 1');
         $stmt->execute(['id' => $restaurantId]);
         $restaurant = $stmt->fetch();
 
@@ -238,6 +239,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $upd->execute(['r' => $reason, 'id' => $restaurantId]);
                         write_audit_log('admin', $admin['id'], 'restaurant_suspended', ['restaurant_id' => $restaurantId, 'reason' => $reason]);
                         $flash = admin_escape($restaurant['name']) . ' suspended.';
+                    }
+                }
+            }
+        } elseif ($formAction === 'review_address') {
+            // Migration 79 — approve/reject a restaurant-submitted address
+            // change. Gated by restaurants_approve (not restaurants_edit)
+            // since this is the same kind of trust decision as
+            // approve/reject/suspend above, not a plain data edit an
+            // admin might make on the restaurant's behalf.
+            if (!$canApprove) {
+                $flash = 'Your role doesn\'t have the restaurants_approve permission.';
+                $flashType = 'error';
+            } elseif ($restaurant['address_review_status'] !== 'pending') {
+                $flash = 'No pending address change for this restaurant.';
+                $flashType = 'error';
+            } else {
+                $addressAction = $_POST['address_action'] ?? '';
+                $addressReason = trim($_POST['address_reason'] ?? '');
+
+                if ($addressAction === 'approve') {
+                    // Copy pending_* into the live columns and clear the
+                    // pending state — same "copy over, then clear" shape
+                    // as settlements.php's verify_bank_details action.
+                    $upd = $db->prepare(
+                        "UPDATE restaurants
+                            SET address = pending_address,
+                                latitude = COALESCE(pending_latitude, latitude),
+                                longitude = COALESCE(pending_longitude, longitude),
+                                pending_address = NULL, pending_latitude = NULL, pending_longitude = NULL,
+                                address_review_status = 'none', address_review_remarks = NULL,
+                                address_reviewed_by_admin_id = :admin_id, address_reviewed_at = NOW()
+                            WHERE id = :id"
+                    );
+                    $upd->execute(['admin_id' => $admin['id'], 'id' => $restaurantId]);
+                    write_audit_log('admin', $admin['id'], 'restaurant_address_approved', [
+                        'restaurant_id' => $restaurantId,
+                        'address' => $restaurant['pending_address'],
+                    ]);
+                    $flash = 'Address change approved for ' . admin_escape($restaurant['name']) . '.';
+                } elseif ($addressAction === 'reject') {
+                    if ($addressReason === '') {
+                        $flash = 'A reason is required to reject an address change.';
+                        $flashType = 'error';
+                    } else {
+                        // Live address is untouched — only the pending
+                        // draft + status change, so the restaurant sees
+                        // exactly why their submitted address didn't
+                        // take effect (address_review_status = 'rejected'),
+                        // same "keep the record so the reason is visible"
+                        // reasoning as verification_status = 'rejected'
+                        // on restaurant_bank_details.
+                        $upd = $db->prepare(
+                            "UPDATE restaurants
+                                SET address_review_status = 'rejected', address_review_remarks = :reason,
+                                    address_reviewed_by_admin_id = :admin_id, address_reviewed_at = NOW()
+                                WHERE id = :id"
+                        );
+                        $upd->execute(['reason' => $addressReason, 'admin_id' => $admin['id'], 'id' => $restaurantId]);
+                        write_audit_log('admin', $admin['id'], 'restaurant_address_rejected', [
+                            'restaurant_id' => $restaurantId,
+                            'reason' => $addressReason,
+                        ]);
+                        $flash = 'Address change rejected for ' . admin_escape($restaurant['name']) . '.';
                     }
                 }
             }
@@ -379,7 +443,9 @@ if ($isUnassignedFilter) {
     $listStmt = $db->prepare(
         "SELECT r.id, r.name, r.owner_name, r.owner_mobile, r.owner_email, r.status,
                 r.operational_status, r.area_id, r.current_due, r.commission_percent,
-                r.rating_avg, r.created_at, r.rejection_reason
+                r.rating_avg, r.created_at, r.rejection_reason,
+                r.address, r.pending_address, r.pending_latitude, r.pending_longitude,
+                r.address_review_status, r.address_review_remarks
          FROM restaurants r
          WHERE {$whereSql}
          ORDER BY r.created_at DESC
@@ -488,6 +554,9 @@ require __DIR__ . '/_layout_head.php';
                                 <?= ucfirst($r['status']) ?>
                             </span>
                             <div class="muted" style="margin-top:3px;"><?= ucfirst(str_replace('_', ' ', $r['operational_status'])) ?></div>
+                            <?php if (($r['address_review_status'] ?? 'none') === 'pending'): ?>
+                                <div class="badge system" style="margin-top:3px;">Address update pending review</div>
+                            <?php endif; ?>
                         </td>
                         <td>
                             <?php if ($isUnassignedFilter): ?>
@@ -579,6 +648,42 @@ require __DIR__ . '/_layout_head.php';
                             <button type="submit" class="btn btn-approve" style="width:100%;">Reactivate (set Approved)</button>
                         </form>
                     <?php endif; ?>
+                <?php endif; ?>
+
+                <?php if (($r['address_review_status'] ?? 'none') === 'pending'): ?>
+                    <hr style="margin:14px 0; border:none; border-top:1px solid var(--border);">
+                    <p class="modal-text"><strong>Address update pending review</strong></p>
+                    <p class="modal-text">
+                        Current: <?= admin_escape($r['address'] ?: '—') ?><br>
+                        Requested: <?= admin_escape($r['pending_address'] ?: '—') ?>
+                        <?php if ($r['pending_latitude'] !== null && $r['pending_longitude'] !== null): ?>
+                            <br><span class="muted">Pin: <?= admin_escape((string) $r['pending_latitude']) ?>, <?= admin_escape((string) $r['pending_longitude']) ?></span>
+                        <?php endif; ?>
+                    </p>
+                    <?php if ($canApprove): ?>
+                        <form method="post" style="margin-bottom:10px;">
+                            <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
+                            <input type="hidden" name="restaurant_id" value="<?= (int) $r['id'] ?>">
+                            <input type="hidden" name="form_action" value="review_address">
+                            <input type="hidden" name="address_action" value="approve">
+                            <button type="submit" class="btn btn-approve" style="width:100%;">Approve address</button>
+                        </form>
+                        <form method="post">
+                            <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
+                            <input type="hidden" name="restaurant_id" value="<?= (int) $r['id'] ?>">
+                            <input type="hidden" name="form_action" value="review_address">
+                            <input type="hidden" name="address_action" value="reject">
+                            <label class="field-label">Rejection reason</label>
+                            <textarea name="address_reason" style="width:100%; min-height:60px;" required></textarea>
+                            <button type="submit" class="btn btn-outline danger" style="width:100%; margin-top:8px;">Reject address</button>
+                        </form>
+                    <?php endif; ?>
+                <?php elseif (($r['address_review_status'] ?? 'none') === 'rejected'): ?>
+                    <hr style="margin:14px 0; border:none; border-top:1px solid var(--border);">
+                    <p class="modal-text">
+                        <strong>Last address change was rejected</strong><br>
+                        Reason: <?= admin_escape($r['address_review_remarks'] ?: '—') ?>
+                    </p>
                 <?php endif; ?>
 
                 <?php if ($canEdit): ?>

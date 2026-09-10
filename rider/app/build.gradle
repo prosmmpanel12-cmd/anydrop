@@ -111,4 +111,12 @@ dependencies {
     // app's H6 door-photo feature). Same version as the customer app's
     // own build.gradle, not re-guessed.
     implementation 'io.coil-kt:coil:2.6.0'
+
+    // Deep Plan Phase 5 — "Pay COD Amount" QR screen. Same reasoning
+    // as the customer app's own build.gradle: ZXing renders the actual
+    // scannable QR client-side, fully offline, from the upi_link
+    // string the backend returns — no server-generated QR image
+    // exists (see backend/lib/payment/UpipeProvider.php's own
+    // doc-comment). Same version, not re-guessed.
+    implementation 'com.google.zxing:core:3.5.3'
 }

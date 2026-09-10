@@ -336,6 +336,28 @@ class EditProfileActivity : AppCompatActivity() {
         pickedLng = profile.longitude
         renderLocationRowState()
 
+        // Migration 79 — surface the pending/rejected admin-review state
+        // for the restaurant's address. The address field above always
+        // shows the current LIVE address (profile.address); this notice
+        // is the only UI signal that a submitted change is sitting in
+        // review (or was bounced back) so the owner isn't confused about
+        // why their public listing still shows the old address after
+        // saving.
+        when (profile.addressReviewStatus) {
+            "pending" -> {
+                binding.addressReviewNotice.visibility = android.view.View.VISIBLE
+                binding.addressReviewNotice.text = getString(R.string.address_update_pending_review)
+            }
+            "rejected" -> {
+                binding.addressReviewNotice.visibility = android.view.View.VISIBLE
+                binding.addressReviewNotice.text = getString(
+                    R.string.address_update_rejected_reason,
+                    profile.addressReviewRemarks ?: "—"
+                )
+            }
+            else -> binding.addressReviewNotice.visibility = android.view.View.GONE
+        }
+
         val selectedDays = (profile.workingDays ?: "1,2,3,4,5,6,7")
             .split(",")
             .mapNotNull { it.trim().toIntOrNull() }

@@ -551,8 +551,8 @@ if ($restaurantId !== null) {
                 <td class="muted"><?= admin_escape($p['remarks'] ?? '') ?></td>
                 <td>
                     <?php if (!empty($p['screenshot_url'])): ?>
-                        <a href="../<?= admin_escape($p['screenshot_url']) ?>" target="_blank" rel="noopener">
-                            <img src="../<?= admin_escape($p['screenshot_url']) ?>" alt="Settlement screenshot" style="height:40px;border-radius:4px;vertical-align:middle;">
+                        <a href="<?= admin_escape(admin_base_url()) ?>/<?= admin_escape($p['screenshot_url']) ?>" target="_blank" rel="noopener">
+                            <img src="<?= admin_escape(admin_base_url()) ?>/<?= admin_escape($p['screenshot_url']) ?>" alt="Settlement screenshot" style="height:40px;border-radius:4px;vertical-align:middle;">
                         </a>
                     <?php else: ?>
                         <span class="muted">—</span>

@@ -345,8 +345,25 @@ if (!function_exists('approve_rider_payout_request')) {
 }
 
 if (!function_exists('mark_rider_payout_request_processing')) {
-    function mark_rider_payout_request_processing(PDO $db, int $requestId, int $adminId, string $reference): array
-    {
+    /**
+     * App-owner ask, 2026-09-09 (migration 76): $screenshotUrl and
+     * $batchId are new optional params, both default null so any
+     * existing single-row call site keeps working unchanged.
+     * $screenshotUrl mirrors settlements.php's optional transfer-proof
+     * upload; $batchId is a lightweight grouping tag for the admin UI's
+     * new "Batch Process" flow (see admin/rider-payouts.php) — NOT a
+     * shared reference, every request still carries its OWN
+     * $reference/UTR (a single bank transfer can't cover N different
+     * riders with one reference number).
+     */
+    function mark_rider_payout_request_processing(
+        PDO $db,
+        int $requestId,
+        int $adminId,
+        string $reference,
+        ?string $screenshotUrl = null,
+        ?string $batchId = null
+    ): array {
         if (trim($reference) === '') {
             return ['ok' => false, 'error' => 'reference_required'];
         }
@@ -359,14 +376,25 @@ if (!function_exists('mark_rider_payout_request_processing')) {
         }
 
         $upd = $db->prepare(
-            "UPDATE rider_payout_requests SET status = 'processing', processing_at = NOW(), admin_id = :aid, payout_reference = :ref WHERE id = :id AND status = 'approved'"
+            "UPDATE rider_payout_requests SET status = 'processing', processing_at = NOW(), admin_id = :aid, payout_reference = :ref, payout_screenshot_url = :shot, payout_batch_id = :batch WHERE id = :id AND status = 'approved'"
         );
-        $upd->execute(['aid' => $adminId, 'ref' => trim($reference), 'id' => $requestId]);
+        $upd->execute([
+            'aid' => $adminId,
+            'ref' => trim($reference),
+            'shot' => $screenshotUrl,
+            'batch' => $batchId,
+            'id' => $requestId,
+        ]);
         if ($upd->rowCount() === 0) {
             return ['ok' => false, 'error' => 'not_found_or_wrong_state'];
         }
 
-        write_audit_log('admin', $adminId, 'rider_payout_processing', ['request_id' => $requestId, 'rider_id' => (int) $p['rider_id'], 'reference' => $reference]);
+        write_audit_log('admin', $adminId, 'rider_payout_processing', [
+            'request_id' => $requestId,
+            'rider_id' => (int) $p['rider_id'],
+            'reference' => $reference,
+            'batch_id' => $batchId,
+        ]);
 
         return ['ok' => true];
     }
@@ -437,6 +465,62 @@ if (!function_exists('complete_rider_payout_request')) {
             }
             throw $e;
         }
+    }
+}
+
+if (!function_exists('generate_rider_payout_batch_id')) {
+    /**
+     * App-owner ask, 2026-09-09: monthly batch pay. A batch id is just
+     * a human-scannable grouping tag stamped onto every request the
+     * admin processes together in one "Batch Process" submission — see
+     * migration 76's kdoc for why this is NOT a shared payout
+     * reference (each request keeps its own UTR/reference).
+     */
+    function generate_rider_payout_batch_id(): string
+    {
+        return 'BATCH-' . date('Ymd-His') . '-' . strtoupper(substr(bin2hex(random_bytes(2)), 0, 4));
+    }
+}
+
+if (!function_exists('list_rider_payout_batches')) {
+    /**
+     * Groups completed/processing requests by payout_batch_id for a
+     * simple "past batches" history view — individually-processed
+     * requests (payout_batch_id IS NULL) are excluded, same as they'd
+     * have nothing to group into. Newest batch first.
+     */
+    function list_rider_payout_batches(PDO $db, int $limit = 30): array
+    {
+        $stmt = $db->prepare(
+            "SELECT payout_batch_id,
+                    COUNT(*) AS request_count,
+                    SUM(amount) AS total_amount,
+                    MIN(processing_at) AS processed_at,
+                    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_count
+             FROM rider_payout_requests
+             WHERE payout_batch_id IS NOT NULL
+             GROUP BY payout_batch_id
+             ORDER BY MIN(processing_at) DESC
+             LIMIT :lim"
+        );
+        $stmt->bindValue(':lim', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+}
+
+if (!function_exists('list_rider_payout_requests_by_batch')) {
+    function list_rider_payout_requests_by_batch(PDO $db, string $batchId): array
+    {
+        $stmt = $db->prepare(
+            'SELECT p.*, r.name AS rider_name, r.mobile AS rider_mobile
+             FROM rider_payout_requests p
+             JOIN riders r ON r.id = p.rider_id
+             WHERE p.payout_batch_id = :batch
+             ORDER BY p.id ASC'
+        );
+        $stmt->execute(['batch' => $batchId]);
+        return $stmt->fetchAll();
     }
 }
 

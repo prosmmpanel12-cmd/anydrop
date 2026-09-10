@@ -76,6 +76,12 @@ interface ApiService {
     @GET("restaurant/insights.php")
     suspend fun getInsights(@Query("range") range: String = "week"): Response<ApiResponse<InsightsResult>>
 
+    // Statement (Deep Plan Phase 2, docs/00_Deep_Plan_...2026-09-09.md).
+    // `date` defaults server-side to today when omitted — see
+    // statement.php's own kdoc.
+    @GET("restaurant/statement.php")
+    suspend fun getStatement(@Query("date") date: String? = null): Response<ApiResponse<StatementResult>>
+
     // First @Streaming/raw-ResponseBody call in this app — every other
     // endpoint returns JSON wrapped in ApiResponse<T>, but a CSV export
     // is a raw file download, not a JSON envelope. @Streaming stops

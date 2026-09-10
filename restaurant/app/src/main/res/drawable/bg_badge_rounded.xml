@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generic rounded pill for status badges — used by Statement screen's
+     settlementBadge (Deep Plan Phase 2). Background color is set at
+     runtime via setBackgroundTintList (success_bg / warning_amber_bg),
+     same "one shape, tint per state" approach as bg_pill_open/bg_pill_closed
+     already use for the operational-status pill. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/success_bg" />
+    <corners android:radius="6dp" />
+</shape>

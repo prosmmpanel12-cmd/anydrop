@@ -158,6 +158,12 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
+        <!-- Statement (Deep Plan Phase 2, docs/00_Deep_Plan_...2026-09-09.md). -->
+        <activity
+            android:name=".ui.statement.StatementActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- Account tab / Edit Profile (docs/restorent/19 §7, §10 item 5,
              NEXT_SESSION_PROMPT.md item 1). -->
         <activity

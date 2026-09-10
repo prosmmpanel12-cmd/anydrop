@@ -191,7 +191,15 @@ data class RestaurantProfileDetail(
     // whatever area_pricing_rules/platform-default floor applies to
     // this restaurant's assigned area. Nullable like every other field
     // here in case an older cached row predates this column read.
-    @SerializedName("min_order_amount") val minOrderAmount: Double? = null
+    @SerializedName("min_order_amount") val minOrderAmount: Double? = null,
+    // Migration 79 — a submitted address/pin change waits here for admin
+    // review; `address`/`latitude`/`longitude` above stay the current,
+    // already-approved values the whole time (see profile-update.php's
+    // kdoc). "none" = no pending change, "pending" = awaiting review,
+    // "rejected" = an admin rejected it (see address_review_remarks).
+    @SerializedName("pending_address") val pendingAddress: String? = null,
+    @SerializedName("address_review_status") val addressReviewStatus: String? = null,
+    @SerializedName("address_review_remarks") val addressReviewRemarks: String? = null
 )
 
 data class ProfileResult(val restaurant: RestaurantProfileDetail)
@@ -624,6 +632,34 @@ data class InsightsResult(
     @SerializedName("peak_hours") val peakHours: InsightPeakHours
 )
 
+// ---- Statement (Deep Plan Phase 2, docs/00_Deep_Plan_...2026-09-09.md) ----
+// Backend: backend/api/v1/restaurant/statement.php.
+
+data class StatementSummary(
+    @SerializedName("total_orders") val totalOrders: Int,
+    @SerializedName("total_amount") val totalAmount: Double,
+    @SerializedName("settled_amount") val settledAmount: Double,
+    @SerializedName("pending_amount") val pendingAmount: Double
+)
+
+data class StatementOrder(
+    @SerializedName("order_id") val orderId: Int,
+    @SerializedName("order_code") val orderCode: String,
+    @SerializedName("created_at") val createdAt: String,
+    val status: String,
+    @SerializedName("grand_total") val grandTotal: Double,
+    @SerializedName("payment_method") val paymentMethod: String,
+    @SerializedName("commission_amount") val commissionAmount: Double,
+    @SerializedName("settlement_status") val settlementStatus: String,
+    @SerializedName("settlement_eligible_at") val settlementEligibleAt: String?
+)
+
+data class StatementResult(
+    val date: String,
+    val summary: StatementSummary,
+    val orders: List<StatementOrder>
+)
+
 // ---- Menu Management (Tier 1, docs/18) ----
 
 data class MenuCategory(
@@ -869,7 +905,12 @@ data class BankDetailsSaveBody(
     @SerializedName("bank_name") val bankName: String,
     @SerializedName("account_number") val accountNumber: String,
     @SerializedName("ifsc_code") val ifscCode: String,
-    @SerializedName("upi_id") val upiId: String? = null
+    @SerializedName("upi_id") val upiId: String? = null,
+    // App-owner ask, 2026-09-09 — restaurant login is email+password, so
+    // the confirm-before-save step here is a re-entered login password,
+    // verified server-side against restaurants.password_hash
+    // (bank-details-save.php) before anything is written.
+    @SerializedName("password") val password: String
 )
 
 // ---- Notification bell (Type 1 — system-generated, docs/Status.md

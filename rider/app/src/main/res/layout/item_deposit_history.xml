@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One rider_cod_ledger 'settlement_to_admin' row on the Statement
+     screen's "Deposits" tab (Deep Plan Phase 6). Same CardView-row
+     shape as item_statement_order.xml / item_rider_payout.xml, status
+     pill reuses @drawable/bg_status_pill exactly like item_rider_payout.xml. -->
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="10dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="1dp"
+    app:cardBackgroundColor="@color/surface">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="14dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/depositAmount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                tools:text="\u20b9500" />
+
+            <TextView
+                android:id="@+id/depositDate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                tools:text="9 Sep 2026, 6:40 PM" />
+
+            <TextView
+                android:id="@+id/depositReference"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                tools:text="UTR 402918233145" />
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/depositStatusChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp"
+            android:background="@drawable/bg_status_pill"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            tools:textColor="@color/status_approved_fg"
+            tools:text="Auto-verified" />
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>

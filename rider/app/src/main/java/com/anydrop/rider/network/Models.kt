@@ -104,7 +104,14 @@ data class RiderMeProfile(
     // Migration 75 (deep-plan §22, Rider Documents) additions — additive only.
     @SerializedName("documents_status") val documentsStatus: String = "not_submitted",
     @SerializedName("documents_reject_reason") val documentsRejectReason: String? = null,
-    @SerializedName("profile_photo_url") val profilePhotoUrl: String? = null
+    @SerializedName("profile_photo_url") val profilePhotoUrl: String? = null,
+    // Deep Plan Phase 4 (2026-09-09) — area-wise COD cash-hold limit.
+    // codBlocked mirrors exactly what lib/dispatch.php's
+    // find_eligible_riders() enforces server-side; the app only ever
+    // reflects it, never re-derives it from codCashHeld/codLimit itself.
+    @SerializedName("cod_cash_held") val codCashHeld: Double = 0.0,
+    @SerializedName("cod_limit") val codLimit: Double = 0.0,
+    @SerializedName("cod_blocked") val codBlocked: Boolean = false
 )
 
 // ---- Rider documents (deep-plan §22, migration 75) ----
@@ -273,6 +280,50 @@ data class EarningsSummaryResult(
     val recent: List<EarningsLedgerEntry>
 )
 
+// ---- Statement (Deep Plan Phase 3, docs/00_Deep_Plan_...2026-09-09.md) ----
+// Backend: backend/api/v1/rider/statement.php.
+
+data class RiderStatementSummary(
+    @SerializedName("orders_delivered") val ordersDelivered: Int,
+    @SerializedName("cod_collected") val codCollected: Double,
+    @SerializedName("total_earnings") val totalEarnings: Double,
+    @SerializedName("cod_cash_held_now") val codCashHeldNow: Double
+)
+
+data class RiderStatementOrder(
+    @SerializedName("order_id") val orderId: Int,
+    @SerializedName("order_code") val orderCode: String,
+    @SerializedName("delivered_at") val deliveredAt: String,
+    @SerializedName("payment_method") val paymentMethod: String,
+    @SerializedName("cod_amount_collected") val codAmountCollected: Double,
+    @SerializedName("delivery_earning") val deliveryEarning: Double,
+    @SerializedName("running_cod_cash_held") val runningCodCashHeld: Double?
+)
+
+data class RiderStatementResult(
+    val date: String,
+    val summary: RiderStatementSummary,
+    val orders: List<RiderStatementOrder>
+)
+
+// ---- Deposit history (Deep Plan Phase 6, backend: cod-deposit-history.php) ----
+// `status` is one of "auto_verified" | "manual_review" | "manual_settlement" —
+// see that endpoint's own kdoc for what distinguishes them. Lives inside
+// StatementActivity as a second tab, not a separate screen.
+
+data class RiderDepositHistoryItem(
+    val id: Int,
+    @SerializedName("created_at") val createdAt: String,
+    val amount: Double,
+    val status: String,
+    val reference: String?,
+    val note: String?
+)
+
+data class RiderDepositHistoryResult(
+    val deposits: List<RiderDepositHistoryItem>
+)
+
 data class EarningsLedgerEntry(
     val id: Int,
     @SerializedName("entry_type") val entryType: String,
@@ -307,7 +358,18 @@ data class SaveRiderBankDetailsBody(
     @SerializedName("bank_name") val bankName: String? = null,
     @SerializedName("account_number") val accountNumber: String? = null,
     @SerializedName("ifsc_code") val ifscCode: String? = null,
-    @SerializedName("upi_id") val upiId: String? = null
+    @SerializedName("upi_id") val upiId: String? = null,
+    // App-owner ask, 2026-09-09: confirm-before-save via OTP (rider login
+    // is OTP-based, so the confirm step is an OTP too, not a password —
+    // see payout-bank-details-save.php's kdoc). Caller must first hit
+    // requestPayoutBankDetailsOtp() to get one sent to the rider's own
+    // registered email, then include it here.
+    @SerializedName("otp") val otp: String
+)
+
+data class RequestPayoutBankDetailsOtpResult(
+    val message: String? = null,
+    @SerializedName("debug_otp") val debugOtp: String? = null
 )
 
 data class RiderPayoutRequest(
@@ -385,3 +447,50 @@ data class NotificationsResult(
 
 data class MarkReadResult(val id: Int, @SerializedName("is_read") val isRead: Boolean)
 data class MarkAllReadResult(@SerializedName("marked_read") val markedRead: Int)
+
+// ---- Deep Plan Phase 5 — "Pay COD Amount" (backend/api/v1/rider/
+// cod-deposit-*.php). Field-for-field mirror of the customer app's own
+// UpiPaymentInitResult/UpiPaymentStatusResult/SubmitUtrBody/
+// SubmitUtrResult (customer/app/.../network/Models.kt) — same
+// PaymentService/UpipeProvider backend underneath, just reached from
+// a rider-side endpoint with no order behind it. `txnId` is the one
+// real addition: the customer flow keys everything off the order's
+// own id (already known from the URL), but a deposit has no order, so
+// initiate's response carries its own payment_transactions row id for
+// the status-poll/UTR-submit calls to key off instead. ----
+
+data class DepositInitBody(val amount: Double)
+
+data class DepositInitResult(
+    val method: String, // "upi_qr" or "unavailable"
+    @SerializedName("txn_id") val txnId: Int = 0,
+    @SerializedName("txn_ref") val txnRef: String? = null,
+    @SerializedName("upi_link") val upiLink: String? = null,
+    @SerializedName("upi_id") val upiId: String? = null,
+    @SerializedName("payee_name") val payeeName: String? = null,
+    val amount: Double? = null,
+    @SerializedName("expires_in_sec") val expiresInSec: Int = 0,
+    @SerializedName("utr_required") val utrRequired: Boolean = true,
+    @SerializedName("utr_window_sec") val utrWindowSec: Int = 300,
+    @SerializedName("poll_interval_sec") val pollIntervalSec: Int = 10,
+    @SerializedName("is_test_mode") val isTestMode: Boolean = false,
+    val instructions: List<String> = emptyList(),
+    val message: String? = null // populated when method == "unavailable"
+)
+
+// GET .../cod-deposit-status.php — polled every pollIntervalSec.
+// `status` is one of: not_found | initiated | utr_pending_window |
+// utr_available | utr_submitted | success | failed | expired — same
+// vocabulary as the customer UPI flow (doc 23 §4). NEVER trust a
+// client-side "I paid" claim — this is purely a server-driven poll.
+data class DepositStatusResult(
+    val status: String,
+    @SerializedName("utr_allowed_in_sec") val utrAllowedInSec: Int? = null,
+    @SerializedName("reject_reason") val rejectReason: String? = null,
+    @SerializedName("txn_ref") val txnRef: String? = null
+)
+
+data class DepositSubmitUtrBody(val utr: String)
+
+// status: utr_submitted | utr_window_not_open | invalid_utr | utr_already_used
+data class DepositSubmitUtrResult(val status: String)

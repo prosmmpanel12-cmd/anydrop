@@ -3187,3 +3187,492 @@ and its menu-item cards, after first getting the owner's confirmation
 that this session's Home changes actually read correctly on-device.
 Otherwise, standing priority list unchanged from session 19's note
 above (§37 live testing, then Rider App).
+
+---
+
+**2026-09-09 (session — Deep Plan Phase 1) — Order Settlement Status Tracking built.**
+
+Full deep plan written first: `docs/00_Deep_Plan_Statement_CODLimit_QRPay_CashFlow_2026-09-09.md`
+(7 phases — Restaurant/Rider Statement screens, area-wise rider COD
+hold limit + block, rider "Pay COD Amount" QR + auto-verify reusing
+the existing UPIPE flow, rider deposit history, and a unified Admin
+Cash Flow dashboard). Build order is sequential, one phase per
+session, starting with the backend foundation.
+
+**Phase 1 (this session) — DONE, not build/device-verified:**
+
+- **Migration** `backend/sql/80_migration_order_settlement_tracking.sql`
+  — `orders.settlement_eligible_at` / `settlement_status` (`not_applicable
+  /pending/eligible/settled`), backfilled for existing delivered orders;
+  new `restaurant_payment_orders` join table (payment_id ↔ order_id) so
+  a Pay Now settlement becomes order-traceable — it never was before
+  (migration 38's settlement schema settles a running balance, not
+  specific orders).
+- **`backend/lib/settlement_status.php`** (new) — `initialize_order_settlement_status()`
+  (called from `orders-deliver.php` right after `record_rider_delivery_earning()`,
+  sets eligible_at = delivered_at + 1 calendar day), `refresh_settlement_eligibility()`
+  (lazy pending→eligible flip on read, no cron job — v1 scope),
+  `mark_orders_settled()` (called from `lib/ledger.php`'s `record_settlement()`,
+  only on the `admin_to_restaurant` direction — flips every currently-
+  `eligible` order of that restaurant to `settled` and links it to the
+  new payment row).
+- **New endpoints:**
+  - `GET /api/v1/restaurant/statement.php?date=` — day's orders +
+    summary (total/settled/pending ₹), scoped by `created_at`.
+  - `GET /api/v1/rider/statement.php?date=` — day's delivered orders +
+    COD collected / earnings per order (pulled from the actual ledger
+    rows, not re-derived) + running `cod_cash_held`, scoped by
+    `delivered_at`.
+- T+1 = calendar days (owner's plain "T+1 hai", no business-day
+  qualifier — flagged in the deep plan doc as revisit-if-wrong).
+
+**Not done yet (do not mark Phase 1 complete until):** no PHP CLI/DB
+available in this sandbox to actually run the migration or hit the
+endpoints — needs a real run against a DB with existing orders data,
+plus a check that `record_settlement()`'s new `mark_orders_settled()`
+call doesn't throw on a restaurant with zero eligible orders (guarded
+with an early return on empty array, but untested).
+
+**NEXT SESSION:** Phase 2 — Restaurant App Statement screen (Kotlin),
+consuming `statement.php` above.
+
+---
+
+**2026-09-09 (session — Deep Plan Phase 2) — Restaurant App Statement screen built.**
+
+Backend Phase 1 (previous session) was left unverified — this session
+proceeded to Phase 2 anyway per the owner's "continue" instruction,
+building against the `statement.php` contract as-designed. Still needs
+a real DB/build pass to confirm both together.
+
+**New:**
+- `restaurant/app/.../ui/statement/StatementActivity.kt` +
+  `StatementOrderAdapter.kt` — day-wise order list (date picker
+  defaults to today), 4-stat summary card (total ₹, order count,
+  settled ₹, pending ₹), per-row settlement badge (Settled / Ready to
+  settle / Pending T+1, hidden for non-delivered orders).
+- `layout/activity_statement.xml`, `layout/item_statement_order.xml`,
+  `drawable/bg_badge_rounded.xml` (generic pill, tinted at runtime —
+  same "one shape, tint per state" approach `bg_pill_open`/`bg_pill_closed`
+  already use).
+- `network/Models.kt` — `StatementResult`/`StatementSummary`/`StatementOrder`.
+- `network/ApiService.kt` — `getStatement(date)`.
+- Entry point: AccountFragment's new "Statement" row (placed right
+  after Bank Details — money-related rows grouped together), visible
+  to every restaurant (not an owner-only row).
+- `AndroidManifest.xml` — activity registered.
+
+**Not done yet:** no Android SDK in this sandbox — not build-verified,
+not device-tested. Needs a real build + a device run against a live
+backend with Phase 1's migration actually applied before either phase
+is marked done per `done.md`'s rules.
+
+**NEXT SESSION:** Phase 3 — Rider App Statement screen, consuming
+`rider/statement.php` (already built in Phase 1).
+
+---
+
+**2026-09-09 (session — Deep Plan Phase 3) — Rider App Statement screen built.**
+
+**New:**
+- `rider/app/.../ui/statement/StatementActivity.kt` + `StatementOrderAdapter.kt`
+  — day-wise delivered-order list (date picker defaults to today),
+  summary card (orders delivered, earnings, COD collected, cash held
+  now), per-row COD-collected + delivery-earning breakdown.
+- `layout/activity_statement.xml`, `layout/item_statement_order.xml`.
+- `network/Models.kt` — `RiderStatementResult`/`RiderStatementSummary`/
+  `RiderStatementOrder`.
+- `network/ApiService.kt` — `getRiderStatement(date)`.
+- Entry point: EarningsFragment's new "View Statement" outlined button,
+  placed right under "Request Payout".
+- `AndroidManifest.xml` — activity registered.
+
+Consumes `rider/statement.php` built in Phase 1 — no backend changes
+this session.
+
+**Not done yet:** no Android SDK in this sandbox — not build-verified,
+not device-tested, same standing limitation as Phase 2.
+
+**Deep Plan status after this session:** Phases 1-3 (backend + both
+Statement screens) code-complete, none device-verified. Remaining:
+Phase 4 (area-wise COD hold limit + block), Phase 5 (Pay COD QR +
+auto-verify), Phase 6 (rider deposit history), Phase 7 (admin Cash
+Flow dashboard).
+
+**NEXT SESSION:** Phase 4 — area-wise rider COD cash-hold limit +
+block enforcement (backend: new area-limit table/admin screen +
+dispatch.php block, mirroring restaurant_due_limit's existing pattern;
+rider app: persistent "limit reached" banner).
+
+---
+
+**2026-09-09 (session — Deep Plan Phase 4) — Area-wise Rider COD
+Cash-Hold Limit + block enforcement built.**
+
+Full detail: `docs/rider/122_Handover_2026-09-09_DeepPlan_Phase4_
+AreaRiderCodLimit_Built.md`.
+
+**New:**
+- Migration 81 (`area_rider_cod_limits` — one row per service area,
+  falls back to the existing platform-wide `rider_cod_settlement_limit`
+  setting, same shape `area_cod_rules` migration 35 already
+  established for the *separate* customer-COD-eligibility system —
+  these two tables/concerns are not the same thing, see the handover
+  doc's own "important distinction" note).
+- `backend/lib/rider_cod_limit.php` (new) — `get_effective_rider_cod_
+  limit()`, walking the area parent chain the same way `cod_rules.php`
+  does for a known area_id.
+- `backend/lib/dispatch.php`'s `find_eligible_riders()` — the old flat
+  `$codLimit = get_setting('rider_cod_settlement_limit', 2000)` check
+  is now per-candidate, area-aware, and memoized per area_id within one
+  dispatch call.
+- `backend/api/v1/rider/me.php` — additive `cod_cash_held`/`cod_limit`/
+  `cod_blocked` fields.
+- `backend/admin/rider-cod-limits.php` (new) — platform-default editor
+  (the first admin UI `rider_cod_settlement_limit` has ever had) +
+  per-area override CRUD, gated on `riders_view`/`riders_edit`, added
+  to the Operations nav group.
+- Rider App: `Models.kt` (additive fields), new
+  `drawable/bg_banner_warning.xml` (reusing colors.xml's existing but
+  previously-unused `warning_bg`/`warning_fg`), new
+  `dashboard_cod_blocked_banner` string, `fragment_home.xml`'s new
+  `codBlockedBanner` view, `HomeFragment.kt`'s new
+  `renderCodBlockedBanner()` called from the existing
+  `refreshFromServer()` — no new network call added, reuses the same
+  `/rider/me` response the online-switch bootstrap already fetches.
+
+**Not done yet:** no PHP CLI/MySQL/Android SDK in this sandbox — same
+standing limitation as every prior session. Did brace/paren balance +
+XML-parse checks as a substitute; migration 81 has not touched a real
+DB, `dispatch.php`'s new per-candidate logic has not been exercised
+against real rider rows, and the Android side has not compiled. Full
+verification checklist is in the handover doc's own closing section —
+do not mark Phase 4 done per `done.md`'s rules until that passes.
+**Deliberately not touched:** `admin/riders.php`/`rider-settlements.php`
+still display the flat platform number, not each rider's effective
+area-aware limit — flagged as a worthwhile small follow-up, not part
+of this phase's stated scope.
+
+**NEXT SESSION:** Phase 5 — Rider App "Pay COD Amount" button (QR +
+auto-verify, reusing the existing UPIPE flow) per the Deep Plan §5.
+Two open questions still need the owner's answer first: full-amount-
+only deposit vs. partial, and which endpoint path the deposit-initiate
+call should live at.
+
+---
+
+## 2026-09-09 (same day) — Phase 5 started: backend + Android data
+## layer complete, Android UI screen NOT built. Full detail in
+## `docs/rider/123_Handover_2026-09-09_DeepPlan_Phase5_RiderCodDeposit_
+## BackendComplete_AndroidPartial.md` — read that file first, this is
+## just the short version.
+
+**Owner answered:** partial deposits ARE allowed (not full-amount-only).
+The second open question (endpoint path) was never asked — I picked
+`backend/api/v1/rider/cod-deposit-{initiate,status,submit-utr}.php`
+(matches every other rider endpoint's direct-filename convention, no
+`.htaccess` route exists for rider endpoints at all). Flag to the owner
+if they'd rather it live elsewhere before building more on top of it.
+
+**Built (backend, believed correct, NOT run against a real DB):**
+- `backend/sql/82_migration_rider_cod_deposit.sql` — `payment_
+  transactions.order_id` now nullable, new `purpose` enum (
+  'customer_order' default | 'rider_cod_deposit') + nullable `rider_id`
+  FK; `rider_cod_ledger` gets a new nullable+unique `payment_
+  transaction_id` FK for idempotency.
+- `backend/lib/rider_ledger.php` — `write_rider_cod_ledger_entry()`/
+  `record_rider_settlement()` both gained a backward-compatible
+  optional `$paymentTransactionId` param; added `rider_cod_ledger_
+  has_payment_transaction()` and `record_rider_cod_deposit_via_upi()`.
+- `backend/lib/payment/PaymentService.php` — added `initiateRiderCod
+  Deposit()`, `getRiderDepositClientStatus()`, `submitRiderDepositUtr()`,
+  private `promoteRiderDepositIfNeeded()`. **Also fixed a real bug**
+  while extending this: `adminPendingTransactions()`/`adminDecide()`
+  used an inner-join-shaped assumption that every `payment_
+  transactions` row has an `orders` row — a deposit row (order_id
+  NULL) would have 404'd in `adminDecide()` and been invisible in the
+  admin queue. Now `LEFT JOIN`, with `t.rider_id` etc. explicitly
+  aliased in `adminDecide()`'s SELECT so `orders.rider_id` (an
+  unrelated column — the delivery rider on that order) can't silently
+  clobber the deposit's real rider_id in PDO's associative fetch. If
+  you touch `adminDecide()` again, keep those aliases.
+- Three new endpoints under `backend/api/v1/rider/`: `cod-deposit-
+  initiate.php`, `cod-deposit-status.php`, `cod-deposit-submit-utr.php`.
+- `backend/admin/payment-pending.php` — now shows rider-deposit rows
+  (rider name + "COD Deposit" badge) in the same manual-review queue
+  as customer orders; Approve/Reject unchanged, `adminDecide()` itself
+  branches internally.
+
+**Built (Android, data layer only — NO SCREEN YET, do not consider
+this phase's Android side started in any user-visible sense):**
+- `rider/app/build.gradle` — added ZXing (same version customer app
+  uses for its own UPI QR).
+- `network/Models.kt` — `DepositInitBody/Result`, `DepositStatusResult`,
+  `DepositSubmitUtrBody/Result` — deliberately mirror the customer
+  app's own UPI models field-for-field, same backend underneath.
+- `network/ApiService.kt` — three matching Retrofit methods.
+
+**NOT built — start here next session:**
+1. `PayCodDepositActivity.kt` + layout — adapt customer app's
+   `UpiPaymentActivity.kt`/`activity_upi_payment.xml` (both already
+   read this session). No order-summary section needed (no order
+   behind this transaction).
+2. A NEW amount-entry step before calling `initiateCodDeposit()` —
+   doesn't exist anywhere to copy, since the customer flow's amount is
+   fixed by the order total but a COD deposit is partial-amount by
+   owner decision. Plain EditText pre-filled with `cod_cash_held`,
+   client-capped at that value.
+3. "Pay COD Amount" button in `fragment_earnings.xml` next to the
+   existing `btnViewStatement`, wired in `EarningsFragment.kt`.
+4. New strings + `AndroidManifest.xml` activity registration.
+5. Everything is unverified — no PHP CLI/MySQL/Android SDK in this
+   sandbox, same standing limitation as every prior session. Full
+   verification checklist is in the handover doc's closing section —
+   don't mark Phase 5 done per `done.md`'s rules until that passes.
+
+---
+
+## 2026-09-09 (same day, continued) — Phase 5 Android UI found already
+## built (PayCodDepositActivity.kt, its layout, EarningsFragment wiring,
+## all strings) — only the AndroidManifest.xml registration was
+## missing. Fixed that; did a full re-check instead of re-building from
+## scratch.
+
+**What was actually missing:** just `<activity
+android:name=".ui.earnings.PayCodDepositActivity" android:exported="false" />`
+in `rider/app/src/main/AndroidManifest.xml` — added, right after
+`RiderOrderDetailActivity`'s entry.
+
+**Verified this session (not previously checked):**
+- `PayCodDepositActivity.kt` (329 lines) — two-state single-Activity
+  screen (amount entry → QR/poll/UTR), models itself directly on the
+  customer app's `UpiPaymentActivity.kt`, adds its own pre-initiate
+  amount-entry step (client-capped at `EXTRA_COD_CASH_HELD`, server
+  re-validates independently — this class's own kdoc is explicit that
+  the client cap is UX only). Correctly treats the status poll as the
+  ONLY source of truth for a completed deposit (never a client-side
+  assumption) — same spoof-safety rule as the customer flow.
+- `activity_pay_cod_deposit.xml` (327 lines) — every view id the
+  Activity's Kotlin references (`btnBack`, `amountEntrySection`,
+  `codHeldValueText`, `depositAmountLayout`/`depositAmountInput`,
+  `btnDepositFullAmount`, `btnGetDepositQr`, `depositInitProgress`,
+  `qrSection`, `testModeBanner`, `depositAmountText`, `qrImage`,
+  `qrLoadingSpinner`, `expiryText`, `instructionsText`,
+  `pollingSpinner`, `statusText`, `utrSection`/`utrInput`,
+  `btnSubmitUtr`, `btnCancelDeposit`) is present and spelled exactly
+  right — cross-checked id-by-id, no mismatches.
+- `fragment_earnings.xml` — has `btnPayCodAmount` right next to the
+  existing COD-cash-held card (`codCashHeldPill`/`Value`/`Bar`/
+  `LimitNote`), visibility toggled by `renderCodCard()` (only shown
+  once `held > 0`).
+- `EarningsFragment.kt` — `btnPayCodAmount`'s click handler launches
+  `PayCodDepositActivity` with `latestCodCashHeld` (updated every
+  `renderCodCard()` call, so it's the freshest value this fragment has
+  seen, even though the deposit screen re-validates it server-side
+  regardless).
+- `strings.xml` — every string both files reference (`cod_pay_amount_
+  button`, `cod_deposit_*`, `upi_status_*`, `upi_expiry_format`,
+  `upi_utr_invalid`, `upi_qr_content_description`) already exists with
+  sensible copy.
+- Re-ran XML well-formedness (`AndroidManifest.xml`,
+  `activity_pay_cod_deposit.xml`, `fragment_earnings.xml`,
+  `strings.xml`) and brace/paren balance on both `.kt` files — all
+  clean.
+
+**Phase 5 is now feature-complete end to end** (backend + Android UI),
+still with the SAME standing caveat as every phase before it: nothing
+has touched a real PHP runtime, MySQL instance, or been compiled by
+the Android Gradle/SDK toolchain in this sandbox. Do not mark this
+phase "done" per `done.md`'s rules until migration 82 has been run for
+real and a live click-through (rider deposits partial amount → auto-
+verify or manual UTR + admin approval → `cod_cash_held` decrements by
+exactly the deposited amount → ledger idempotency holds on a repeat
+poll) has actually been performed. The full checklist is in
+`docs/rider/123_Handover_...md`'s closing section.
+
+**NEXT SESSION:** either (a) get this into a real build/test
+environment and run that checklist, or, if staying in this sandbox,
+Phase 6 — Rider App Deposit Tracking History (new section, can live
+inside the existing Statement screen — list of past deposits: date,
+amount, status auto-verified/manual/pending, reference; pulls from
+`rider_cod_ledger WHERE entry_type = 'settlement_to_admin'`). Phase 7
+after that is the Admin Cash Flow overhaul, which explicitly wants
+Phases 1-6 done first.
+
+---
+
+## 2026-09-10 — Phase 6 built: Rider Deposit Tracking History
+## (backend + Android, "Deposits" tab inside StatementActivity). Full
+## detail in `docs/rider/124_Handover_2026-09-10_DeepPlan_Phase6_
+## RiderCodDepositHistory_Built_NotVerified.md` — read that file first,
+## this is just the short version.
+
+Re-checked the standing sandbox limitation first (still no `php`/
+`mysql`/`adb`, `curl` still 403) before building anything.
+
+**Built (backend, believed correct, NOT run against a real DB):**
+- `backend/api/v1/rider/cod-deposit-history.php` (new) — reads
+  `rider_cod_ledger WHERE entry_type = 'settlement_to_admin'` for the
+  authed rider, LEFT JOINs `payment_transactions` on
+  `payment_transaction_id` to classify each row: `payment_transaction_id
+  IS NULL` (admin's manual "Record Settlement" button) →
+  `manual_settlement`; set + `verified_by_admin_id IS NULL` →
+  `auto_verified`; set + `verified_by_admin_id IS NOT NULL` →
+  `manual_review`. Read-only, capped at last 200 rows, no writes, no
+  existing file touched.
+
+**Built (Android — full screen, not just data layer this time):**
+- `network/Models.kt` / `network/ApiService.kt` — `RiderDepositHistoryItem`/
+  `Result`, `getRiderDepositHistory()`.
+- `ui/statement/DepositHistoryAdapter.kt` (new) +
+  `res/layout/item_deposit_history.xml` (new) — status pill reuses the
+  existing `bg_status_pill` drawable + bg/fg color-pair convention
+  (`RiderPayoutAdapter`'s pattern), not a new drawable or raw fill
+  color.
+- `res/layout/activity_statement.xml` + `ui/statement/StatementActivity.kt`
+  (both modified) — added an Orders/Deposits tab toggle inside the
+  existing Statement screen (per the deep-plan's own "can live inside
+  Statement screen" wording) rather than a new Activity. Tab switch
+  swaps the shared `contentList`/`emptyState` between the two
+  adapters, hides the date-picker + daily-summary card on the Deposits
+  tab (that list isn't date-scoped), and lazy-loads deposit history
+  once per screen open.
+- `res/values/strings.xml` — 7 new strings for the tab labels, empty/
+  error states, and the three status labels.
+
+**Design note flagged to the owner** (full reasoning in the handover
+doc): the deep-plan's example statuses included "pending", but a
+`rider_cod_ledger` row is only ever written after a deposit is already
+confirmed — there's no ledger row for an in-flight deposit to show a
+"pending" state for. Current build shows only the three confirmed-
+money statuses; an in-flight deposit is a `payment_transactions`
+row the rider is polling on `PayCodDepositActivity` (Phase 5), a
+different screen. Flagged as an open question rather than guessed at
+silently.
+
+**Static-only checks this session** (same standing sandbox limitation
+as every phase before it — no live compile): brace/paren balance on
+every touched `.kt`/`.php` file, XML well-formedness on every touched
+layout/strings file, and every `binding.*` view-id reference manually
+cross-checked against its XML — all clean, no mismatches found. **Not**
+run against a real PHP/MySQL instance, **not** compiled by Android
+Studio/Gradle, **not** click-through tested. Do not mark Phase 6 done
+per `done.md`'s rules until that verification checklist (in the
+handover doc's closing section) actually passes.
+
+**NEXT SESSION:** either (a) get this into a real build/test
+environment and run that checklist, and resolve the "pending" status
+open question with the owner, or, staying in this sandbox, Phase 7 —
+Admin Cash Flow Page Overhaul (deep-plan §7), which the deep-plan's
+own Build Order Recap places last on purpose since it aggregates what
+Phases 1-6 already write.
+
+---
+
+## 2026-09-10 (same day, continued) — Phase 7 built: Admin Cash Flow
+## Dashboard (new `admin/cash-flow.php`). Full detail in
+## `docs/rider/125_Handover_2026-09-10_DeepPlan_Phase7_
+## AdminCashFlowDashboard_Built_NotVerified.md` — read that file first,
+## this is just the short version. **The Deep Plan's Build Order Recap
+## (Phases 1-7) is now fully built end-to-end — no phases remain in
+## that plan.**
+
+Re-checked the standing sandbox limitation first (still no `php`/
+`mysql`/`adb`) before building anything.
+
+**Built (read-only, no schema/lib changes):**
+- `backend/admin/cash-flow.php` (new) — Rider COD Cash section
+  (per-rider table: cash held, total collected, total deposited, last
+  deposit, over-limit status, sourced from `riders.cod_cash_held` +
+  one `GROUP BY rider_id` query over `rider_cod_ledger`) and a
+  separately-visible Restaurant Settlement Summary section (payable/
+  due totals from `SUM(restaurants.current_due)` split by sign — see
+  design note below; paid/received-this-period from
+  `restaurant_payments`, optional From/To filter). Gated on
+  `payouts_view`, no POST handler — read-only.
+- `backend/admin/_layout_head.php` — added a `cash_flow` nav entry
+  (finance group, right after `platform_ledger`) and updated the
+  `$activeNav` doc-comment enum list.
+
+**Design decision flagged to the owner** (full reasoning in the
+handover doc): the deep-plan's own §7 table said the two restaurant
+totals should be "SUM `payout_payable` unsettled" / "SUM
+`commission_cod` unsettled" — built instead from
+`restaurants.current_due` directly (the already-authoritative signed
+running balance `settlements.php` itself already sorts by) so this
+page can never independently drift from what Settlements shows. If
+the owner actually wants period-scoped accrual totals rather than a
+running balance, that's a different, additive query — flagged as an
+open question, not guessed at.
+
+**Static-only checks this session** (same standing limitation as
+every phase before it): brace/paren balance (6/6, 115/115) on
+`cash-flow.php`, and every table/column name in its SQL manually
+cross-checked against the actual schema/migration files
+(`01_schema.sql`, migrations 38/53/82). **Not** run against a real
+PHP/MySQL instance — no live query execution, no confirmation the
+GROUP BY / JOIN shapes actually return what's expected. Do not mark
+Phase 7 done per `done.md`'s rules until that verification checklist
+(in the handover doc's closing section) actually passes.
+
+**Also flagged, not fixed this session** (out of scope for a
+read-only UI page): grepped and confirmed `record_cod_order_ledger_
+entry()` and `record_rider_cod_collected()` **are** now called (from
+`backend/admin/orders.php` and `backend/api/v1/rider/orders-
+deliver.php`) — but the kdoc comments in `rider-settlements.php`,
+`settlements.php`, and `platform-ledger.php` still describe these as
+"not wired up yet" / "never called". Stale per recall.md's own rule;
+left uncorrected only because fixing three unrelated file kdocs wasn't
+this session's task — a quick, low-risk fix for whoever picks this up
+next.
+
+**NEXT SESSION:** the Deep Plan (`docs/00_Deep_Plan_Statement_
+CODLimit_QRPay_CashFlow_2026-09-09.md`) has no phases left to build.
+Either (a) get everything from Phases 1-7 into a real build/test
+environment and work through each phase's still-open verification
+checklist in order, resolving the open design questions flagged along
+the way (T+1 calendar-vs-business days, Phase 6's "pending" status
+wording, Phase 7's current_due-vs-raw-sum and created_at-vs-payment_
+date questions) with the owner, or (b) staying in this sandbox: fix
+the three stale kdocs flagged just above (small, Claude-actionable, no
+DB needed), or pick up whatever the owner raises next — recall.md's
+"Current Reality" list at the top of this file has other untouched
+areas (Production security/payment hardening, selected customer UX
+edge cases) if nothing else is raised.
+
+---
+
+## 2026-09-10 (same day, immediate follow-up) — owner asked to merge
+## the two "cash flow" pages into one rather than have both. Full
+## detail in `docs/rider/126_Handover_2026-09-10_CashFlowPages_
+## Merged_NotVerified.md`.
+
+Merged (not deleted) — `cash-flow.php` now has a third section,
+**Platform Cash Flow (UPIPE Merchant Account)**, moved in verbatim
+from the old standalone `platform-ledger.php` (same totals query,
+same reconciliation check, same entries list — logic unchanged, only
+relocated). `platform-ledger.php` is now a thin redirect (still
+checks login/permission first) to `cash-flow.php`, kept as a file
+only so an existing bookmark/link doesn't 404 — query params aren't
+forwarded since the two pages' filter param shapes differ.
+`_layout_head.php`'s nav now has a single "Cash Flow" entry instead of
+two separate finance-group links.
+
+Section 3 reuses the page's existing From/To filter (Section 2's
+"Paid this cycle" range) instead of a second redundant date-filter
+form, and keeps its own restaurant-dropdown filter
+(`pl_restaurant_id`) since that's specific to `platform_ledger`
+entries.
+
+**Static-only checks** (same standing sandbox limitation as every
+session before this): brace/paren balance on the updated
+`cash-flow.php` (9/9, 207/207), manual read-through confirming every
+opened `<div>`/`<form>` in the new section closes correctly, and a
+grep confirming no other file hardcodes a link to
+`platform-ledger.php` besides comments and the now-removed nav entry.
+**Not** run against a real PHP/MySQL instance — same standing
+limitation as everything else in Phases 1-7.
+
+**NEXT SESSION:** same as the Phase 7 entry above — real-environment
+verification is the only work left. No further build-order items
+remain in the Deep Plan.

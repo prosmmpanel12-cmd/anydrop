@@ -380,7 +380,7 @@ require __DIR__ . '/_layout_head.php';
             $isScheduled = !empty($b['start_date']) && $b['start_date'] > $today;
         ?>
         <tr>
-            <td><img src="../<?= admin_escape($b['image_url']) ?>" alt="" style="width:64px; height:36px; object-fit:cover; border-radius:4px;"></td>
+            <td><img src="<?= admin_escape(admin_base_url()) ?>/<?= admin_escape($b['image_url']) ?>" alt="" style="width:64px; height:36px; object-fit:cover; border-radius:4px;"></td>
             <td><?= admin_escape($b['title'] ?? '') ?: '<span class="muted">—</span>' ?></td>
             <td><?= BANNER_TYPE_LABEL[$b['banner_type']] ?></td>
             <td><?= $b['area_id'] ? admin_escape($areaNameById[$b['area_id']] ?? ('#' . $b['area_id'])) : '<span class="muted">All areas</span>' ?></td>
@@ -438,7 +438,7 @@ require __DIR__ . '/_layout_head.php';
             <label class="field-label">Image <?= $editingBanner ? '(leave empty to keep current)' : '' ?></label>
             <input type="file" id="bannerImageInput" name="image" accept="image/jpeg,image/png,image/webp" <?= $editingBanner ? '' : 'required' ?>>
             <?php if ($editingBanner): ?>
-                <div style="margin-top:6px;"><img src="../<?= admin_escape($editingBanner['image_url']) ?>" alt="" style="width:120px; height:auto; border-radius:4px;"></div>
+                <div style="margin-top:6px;"><img src="<?= admin_escape(admin_base_url()) ?>/<?= admin_escape($editingBanner['image_url']) ?>" alt="" style="width:120px; height:auto; border-radius:4px;"></div>
             <?php endif; ?>
 
             <div id="cropSection" style="display:none; margin-top:10px;">

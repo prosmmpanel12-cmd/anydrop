@@ -40,7 +40,8 @@ if (!function_exists('write_rider_cod_ledger_entry')) {
         string $entryType,
         float $amount,
         ?string $note,
-        string $createdBy
+        string $createdBy,
+        ?int $paymentTransactionId = null
     ): int {
         $lockStmt = $db->prepare('SELECT cod_cash_held FROM riders WHERE id = :id FOR UPDATE');
         $lockStmt->execute(['id' => $riderId]);
@@ -52,12 +53,13 @@ if (!function_exists('write_rider_cod_ledger_entry')) {
             ->execute(['h' => $newHeld, 'id' => $riderId]);
 
         $ins = $db->prepare(
-            'INSERT INTO rider_cod_ledger (rider_id, order_id, entry_type, amount, running_balance, note, created_by)
-             VALUES (:rid, :oid, :type, :amount, :bal, :note, :by)'
+            'INSERT INTO rider_cod_ledger (rider_id, order_id, payment_transaction_id, entry_type, amount, running_balance, note, created_by)
+             VALUES (:rid, :oid, :ptxn, :type, :amount, :bal, :note, :by)'
         );
         $ins->execute([
             'rid' => $riderId,
             'oid' => $orderId,
+            'ptxn' => $paymentTransactionId,
             'type' => $entryType,
             'amount' => $amount,
             'bal' => $newHeld,
@@ -107,7 +109,8 @@ if (!function_exists('record_rider_settlement')) {
         int $riderId,
         float $amount,
         int $adminId,
-        ?string $remarks
+        ?string $remarks,
+        ?int $paymentTransactionId = null
     ): int {
         if ($amount <= 0) {
             throw new InvalidArgumentException('settlement_amount_must_be_positive');
@@ -121,7 +124,8 @@ if (!function_exists('record_rider_settlement')) {
         try {
             $id = write_rider_cod_ledger_entry(
                 $db, $riderId, null, 'settlement_to_admin', -$amount,
-                'Rider handed over COD cash' . ($remarks ? " — $remarks" : ''), 'admin'
+                'Rider handed over COD cash' . ($remarks ? " — $remarks" : ''), 'admin',
+                $paymentTransactionId
             );
 
             if ($ownTransaction) {
@@ -134,6 +138,58 @@ if (!function_exists('record_rider_settlement')) {
             }
             throw $e;
         }
+    }
+}
+
+if (!function_exists('rider_cod_ledger_has_payment_transaction')) {
+    /**
+     * Idempotency check for PaymentService::promoteRiderDepositIfNeeded()
+     * — a customer-app-style status poll can call that function many
+     * times after the underlying payment_transactions row already
+     * flipped to 'success'; this is what stops a second ledger entry
+     * (and a second double-decrement of cod_cash_held) from ever being
+     * written for the same deposit. Relies on migration 82's UNIQUE
+     * index on rider_cod_ledger.payment_transaction_id as the real
+     * backstop — this function is just the cheap pre-check.
+     */
+    function rider_cod_ledger_has_payment_transaction(PDO $db, int $paymentTransactionId): bool
+    {
+        $stmt = $db->prepare('SELECT id FROM rider_cod_ledger WHERE payment_transaction_id = :ptxn LIMIT 1');
+        $stmt->execute(['ptxn' => $paymentTransactionId]);
+        return $stmt->fetch() !== false;
+    }
+}
+
+if (!function_exists('record_rider_cod_deposit_via_upi')) {
+    /**
+     * Deep Plan Phase 5 — the SYSTEM-side counterpart to
+     * record_rider_settlement() above: same ledger direction
+     * (settlement_to_admin, negative amount, decrements cod_cash_held),
+     * but fired automatically once a rider's self-service UPI deposit
+     * transaction is confirmed (auto-verify OR admin manual approval —
+     * both paths funnel through PaymentService::adminDecide() /
+     * getRiderDepositClientStatus(), see that file), not from an admin
+     * clicking a button. `created_by = 'system'` distinguishes this
+     * row from record_rider_settlement()'s 'admin' rows in the ledger
+     * UI even though the money direction is identical.
+     *
+     * Caller MUST have already confirmed (via
+     * rider_cod_ledger_has_payment_transaction()) that this
+     * payment_transactions row hasn't been recorded yet — this
+     * function does not re-check, it only writes.
+     */
+    function record_rider_cod_deposit_via_upi(
+        PDO $db,
+        int $riderId,
+        int $paymentTransactionId,
+        float $amount,
+        string $providerTxnRef
+    ): int {
+        return write_rider_cod_ledger_entry(
+            $db, $riderId, null, 'settlement_to_admin', -$amount,
+            'Rider self-deposit via UPI QR (txn ' . $providerTxnRef . ')', 'system',
+            $paymentTransactionId
+        );
     }
 }
 

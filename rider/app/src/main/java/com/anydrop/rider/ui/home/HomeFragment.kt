@@ -66,9 +66,27 @@ import kotlinx.coroutines.launch
  *   RiderMainActivity's kdoc for why those specific four elements
  *   became shell-level instead of per-tab.
  *
- * Everything else — online/offline toggle, location pings, the
- * assignment-engine poller, offer accept/reject, pickup/deliver +
- * OTP dialog — is line-for-line the same as the Activity version.
+ * Everything else — online/offline toggle, the assignment-engine
+ * poller, offer accept/reject, pickup/deliver + OTP dialog — is
+ * line-for-line the same as the Activity version.
+ *
+ * 2026-09-07 — Periodic location pings MOVED to RiderOrderPollingService.
+ * This fragment used to run its own `locationPoller`/`locationPollRunnable`
+ * Handler loop (30s idle / 7s with an active order), the exact same
+ * "foreground-only, dies on backgrounding" gap RiderOrderPollingService
+ * itself was built to fix for order-offer polling (see that class's own
+ * kdoc) — a rider who locks their screen or switches apps mid-delivery
+ * would stop updating their live location on the admin map / customer
+ * tracking screen the instant onPause() fired, exactly the "rider ka
+ * live tracking accuracy" gap flagged this session. RiderOrderPollingService
+ * now runs the same adaptive-interval location loop itself, independent
+ * of any Activity/Fragment lifecycle, so it keeps working whether this
+ * screen is open, backgrounded, or the phone is locked. This fragment
+ * keeps ONLY the one-shot `sendLocationThenGoOnline()` ping (needed
+ * synchronously before the "go online" API call can succeed) — the
+ * ongoing periodic pings are the service's job now, not this
+ * fragment's, avoiding the two ever running redundantly in parallel
+ * while this screen happens to be visible.
  */
 class HomeFragment : Fragment() {
 
@@ -89,14 +107,6 @@ class HomeFragment : Fragment() {
             }
         }
 
-    private val locationPoller = Handler(Looper.getMainLooper())
-    private val locationPollRunnable = object : Runnable {
-        override fun run() {
-            sendLocationPing()
-            val interval = if (activeOrder != null) LOCATION_POLL_INTERVAL_ACTIVE_MS else LOCATION_POLL_INTERVAL_MS
-            locationPoller.postDelayed(this, interval)
-        }
-    }
     private var suppressSwitchListener = false
 
     private val dashboardPoller = Handler(Looper.getMainLooper())
@@ -164,15 +174,11 @@ class HomeFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        if (tokenManager.getIsOnline()) {
-            locationPoller.post(locationPollRunnable)
-        }
         dashboardPoller.postDelayed(dashboardPollRunnable, DASHBOARD_POLL_INTERVAL_MS)
     }
 
     override fun onPause() {
         super.onPause()
-        locationPoller.removeCallbacks(locationPollRunnable)
         dashboardPoller.removeCallbacks(dashboardPollRunnable)
         offerCountdownRunnable?.let { offerCountdown.removeCallbacks(it) }
     }
@@ -200,9 +206,8 @@ class HomeFragment : Fragment() {
                     tokenManager.updateDocumentsStatus(result.rider.documentsStatus)
                     renderOnlineState(result.rider.isOnline)
                     (activity as? RiderMainActivity)?.renderDocumentsEntryPoint()
+                    renderCodBlockedBanner(result.rider.codBlocked, result.rider.codLimit)
                     if (result.rider.isOnline) {
-                        locationPoller.removeCallbacks(locationPollRunnable)
-                        locationPoller.post(locationPollRunnable)
                         RiderOrderPollingService.start(requireContext())
                     }
                 } else {
@@ -276,36 +281,6 @@ class HomeFragment : Fragment() {
             }
     }
 
-    private fun sendLocationPing() {
-        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) !=
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
-        sendLocationPingInternal()
-    }
-
-    @SuppressLint("MissingPermission")
-    private fun sendLocationPingInternal() {
-        val orderId = activeOrder?.id
-        val cancellationSource = CancellationTokenSource()
-        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cancellationSource.token)
-            .addOnSuccessListener { location ->
-                if (location != null) {
-                    val speedKmh = if (location.hasSpeed()) (location.speed * 3.6).toDouble() else null
-                    lifecycleScope.launch {
-                        try {
-                            api.updateLocation(
-                                LocationBody(location.latitude, location.longitude, orderId, speedKmh)
-                            )
-                        } catch (e: Exception) {
-                            // Silent — next poll tries again.
-                        }
-                    }
-                }
-            }
-    }
-
     private fun setOnlineStatus(online: Boolean) {
         setSwitchLoading(true)
         lifecycleScope.launch {
@@ -323,12 +298,9 @@ class HomeFragment : Fragment() {
                         InAppNotifier.Type.SUCCESS
                     )
                     if (isOnline) {
-                        locationPoller.removeCallbacks(locationPollRunnable)
-                        locationPoller.post(locationPollRunnable)
                         pollDashboardState()
                         RiderOrderPollingService.start(requireContext())
                     } else {
-                        locationPoller.removeCallbacks(locationPollRunnable)
                         clearOffer()
                         if (!hasActiveOrder) showNoActiveDelivery()
                         RiderOrderPollingService.stop(requireContext())
@@ -369,6 +341,19 @@ class HomeFragment : Fragment() {
         } else {
             b.onlineStatusTitle.text = getString(R.string.dashboard_offline_title)
             b.onlineStatusSubtitle.text = getString(R.string.dashboard_offline_subtitle)
+        }
+    }
+
+    /** Deep Plan Phase 4 (2026-09-09) — shows/hides the persistent
+     *  cash-hold-limit banner per /rider/me's cod_blocked flag. Purely
+     *  a reflection of the server-side block lib/dispatch.php's
+     *  find_eligible_riders() already enforces — this never decides
+     *  eligibility itself, only reports it. */
+    private fun renderCodBlockedBanner(codBlocked: Boolean, codLimit: Double) {
+        val b = _binding ?: return
+        b.codBlockedBanner.visibility = if (codBlocked) View.VISIBLE else View.GONE
+        if (codBlocked) {
+            b.codBlockedBannerText.text = getString(R.string.dashboard_cod_blocked_banner, codLimit)
         }
     }
 
@@ -640,8 +625,6 @@ class HomeFragment : Fragment() {
     }
 
     companion object {
-        private const val LOCATION_POLL_INTERVAL_MS = 30_000L
-        private const val LOCATION_POLL_INTERVAL_ACTIVE_MS = 7_000L
         private const val DASHBOARD_POLL_INTERVAL_MS = 5_000L
     }
 }

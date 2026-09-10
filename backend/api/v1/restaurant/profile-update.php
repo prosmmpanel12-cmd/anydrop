@@ -24,6 +24,19 @@
  * lone lat with no lng, or vice versa, is rejected as malformed rather
  * than silently half-applied).
  *
+ * 2026-09-09 — Admin review for address changes (app owner: "restorents
+ * ka address change karne par wapis admin review mai jaye"). address /
+ * latitude / longitude are no longer written to their live columns
+ * here — same "self-submitted change with real financial/operational
+ * consequences starts pending" reasoning as migration 59's
+ * restaurant_bank_details verification workflow. Instead, whenever the
+ * request touches any of those three, the proposed values go into
+ * pending_address / pending_latitude / pending_longitude and
+ * address_review_status flips to 'pending'; the live `address` column
+ * (and latitude/longitude) is untouched until an admin approves it via
+ * admin/restaurants.php, at which point pending_* is copied over and
+ * cleared. See migration 79 for the schema this depends on.
+ *
  * logo_url/cover_url are plain string fields here, same pattern as H6's
  * address-photo.php + addresses.php split: logo-upload.php does the
  * actual file upload and returns a relative path, the app then sends
@@ -36,6 +49,7 @@ require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/permissions.php';
 require_once __DIR__ . '/../../../lib/delivery_pricing.php';
+require_once __DIR__ . '/../../../lib/audit.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -60,13 +74,17 @@ if (array_key_exists('name', $body) && $body['name'] !== null) {
     $params['name'] = $name;
 }
 
+// address is no longer applied to the live column here — it goes to
+// admin review instead. See kdoc above / migration 79.
+$addressChangeRequested = false;
+$pendingAddress = null;
 if (array_key_exists('address', $body)) {
     $address = trim((string) $body['address']);
     if ($address === '') {
         respond_error('validation_error', 422, ['fields' => ['address']]);
     }
-    $fields[] = 'address = :address';
-    $params['address'] = $address;
+    $addressChangeRequested = true;
+    $pendingAddress = $address;
 }
 
 if (array_key_exists('cuisine_tags', $body)) {
@@ -174,11 +192,17 @@ if (array_key_exists('cover_url', $body)) {
 // — a plain numeric-range sanity check (-90..90 / -180..180) here catches
 // an obviously malformed payload before it hits the DB; MySQL's own
 // column precision handles the rest.
+// Also routed to pending_* / admin review — a moved pin is the same
+// kind of "where this restaurant physically is" claim as a typed
+// address, and the two are meant to move together (map-picker flow
+// sets both from one tap). See kdoc above / migration 79.
 $hasLat = array_key_exists('latitude', $body);
 $hasLng = array_key_exists('longitude', $body);
 if ($hasLat !== $hasLng) {
     respond_error('validation_error', 422, ['fields' => ['latitude', 'longitude']]);
 }
+$pendingLat = null;
+$pendingLng = null;
 if ($hasLat && $hasLng) {
     $lat = $body['latitude'];
     $lng = $body['longitude'];
@@ -188,16 +212,17 @@ if ($hasLat && $hasLng) {
             (float) $lng < -180 || (float) $lng > 180) {
             respond_error('validation_error', 422, ['fields' => ['latitude', 'longitude']]);
         }
-        $fields[] = 'latitude = :latitude';
-        $fields[] = 'longitude = :longitude';
-        $params['latitude'] = (float) $lat;
-        $params['longitude'] = (float) $lng;
+        $addressChangeRequested = true;
+        $pendingLat = (float) $lat;
+        $pendingLng = (float) $lng;
     } else {
-        // Both explicitly null — clears a previously-set location.
-        $fields[] = 'latitude = :latitude';
-        $fields[] = 'longitude = :longitude';
-        $params['latitude'] = null;
-        $params['longitude'] = null;
+        // Both explicitly null — clears a previously-set pending pin
+        // only; does NOT touch the restaurant's live/approved
+        // location. If no address text was sent either, there's
+        // nothing to review, so this alone won't flip
+        // address_review_status to 'pending' below.
+        $pendingLat = null;
+        $pendingLng = null;
     }
 }
 
@@ -236,6 +261,28 @@ if (array_key_exists('min_order_amount', $body) && $body['min_order_amount'] !==
     $params['min_order_amount'] = $requestedMinOrder;
 }
 
+// Queue the address/pin change for admin review instead of applying it
+// live — see kdoc above / migration 79. Writing pending_latitude/
+// pending_longitude even when only address text changed (or vice
+// versa) — each pending_* column stores whatever was actually
+// submitted; a field not touched in this request is left NULL, same
+// "not attempting to guess an unsent value" reasoning as the live
+// lat/lng handling above. Every re-submission overwrites any prior
+// pending values and resets to 'pending' — an edited draft replaces
+// the old one rather than queuing up multiple reviews.
+if ($addressChangeRequested) {
+    $fields[] = 'pending_address = :pending_address';
+    $fields[] = 'pending_latitude = :pending_latitude';
+    $fields[] = 'pending_longitude = :pending_longitude';
+    $fields[] = 'address_review_status = \'pending\'';
+    $fields[] = 'address_review_remarks = NULL';
+    $fields[] = 'address_reviewed_by_admin_id = NULL';
+    $fields[] = 'address_reviewed_at = NULL';
+    $params['pending_address'] = $pendingAddress;
+    $params['pending_latitude'] = $pendingLat;
+    $params['pending_longitude'] = $pendingLng;
+}
+
 $db = Database::get();
 
 // If logo_url is being changed, capture the previous value first so the
@@ -254,6 +301,15 @@ if (!empty($fields)) {
     $sql = 'UPDATE restaurants SET ' . implode(', ', $fields) . ' WHERE id = :id';
     $upd = $db->prepare($sql);
     $upd->execute($params);
+}
+
+if ($addressChangeRequested) {
+    write_audit_log('restaurant', $restaurantId, 'address_change_submitted', [
+        'restaurant_id' => $restaurantId,
+        'pending_address' => $pendingAddress,
+        'pending_latitude' => $pendingLat,
+        'pending_longitude' => $pendingLng,
+    ]);
 }
 
 // Delete the old logo file now that the new logo_url (or null, if

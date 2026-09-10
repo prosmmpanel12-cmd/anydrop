@@ -33,6 +33,7 @@
  */
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/settlement_status.php';
 
 if (!function_exists('write_due_ledger_entry')) {
     /**
@@ -203,6 +204,25 @@ if (!function_exists('record_settlement')) {
                     $db, 'restaurant_settlement_in', $amount, $restaurantId, null, $paymentId,
                     'Settlement received from restaurant #' . $restaurantId, 'admin', $adminId
                 );
+            }
+
+            // Deep Plan Phase 1 (docs/00_Deep_Plan_...2026-09-09.md) —
+            // link every currently-'eligible' order of this restaurant to
+            // this payment and flip them to 'settled', so the new
+            // Restaurant Statement screen's per-order badge stays accurate.
+            // Only fires for admin_to_restaurant (the payout direction —
+            // this IS the T+1 payout an order was waiting on); a
+            // restaurant_to_admin payment is the restaurant clearing its
+            // own COD-commission debt, a different thing from "this
+            // specific order got paid out", so it doesn't touch order
+            // settlement_status.
+            if ($direction === 'admin_to_restaurant') {
+                $eligibleStmt = $db->prepare(
+                    "SELECT id FROM orders WHERE restaurant_id = :rid AND settlement_status = 'eligible'"
+                );
+                $eligibleStmt->execute(['rid' => $restaurantId]);
+                $eligibleOrderIds = array_column($eligibleStmt->fetchAll(), 'id');
+                mark_orders_settled($paymentId, $eligibleOrderIds);
             }
 
             if ($ownTransaction) {

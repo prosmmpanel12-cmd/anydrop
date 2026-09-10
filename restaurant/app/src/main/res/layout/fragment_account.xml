@@ -390,6 +390,28 @@
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground" />
 
+                <!-- Statement (Deep Plan Phase 2, docs/00_Deep_Plan_...
+                     2026-09-09.md) — day-wise order list with per-order
+                     ₹ amount and T+1 settlement badge. Placed right
+                     after Bank Details (money-related rows grouped
+                     together) — same row style as btnBankDetailsRow
+                     above, visible to every restaurant (not an
+                     owner-only row like Staff Management below). -->
+                <TextView
+                    android:id="@+id/btnStatementRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_card_rounded"
+                    android:padding="16dp"
+                    android:text="@string/account_row_statement"
+                    android:textColor="@color/anydrop_primary"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground" />
+
                 <!-- Staff Management (doc 71, migration 63, PENDING.md
                      item 3) — owner-only row, visibility set from
                      AccountFragment.kt via tokenManager.canManageStaff()

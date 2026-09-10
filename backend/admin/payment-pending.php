@@ -19,6 +19,16 @@
  * UPI order, submit a UTR from the customer app after the window
  * opens, approve it here, confirm orders.payment_status flips to
  * 'paid' and the customer's next poll reports `success`.
+ *
+ * 2026-09-09 (Deep Plan Phase 5) — this same queue now also carries
+ * rider COD self-deposit transactions (payment_transactions.purpose =
+ * 'rider_cod_deposit', order_id NULL) — PaymentService::
+ * adminPendingTransactions() LEFT JOINs both orders and riders now,
+ * so a row here is either a customer order OR a rider deposit, never
+ * both. The Order column shows whichever applies. Approve/Reject
+ * still go through the same PaymentService::adminDecide() call
+ * unchanged — that function itself branches on purpose to credit the
+ * rider's ledger instead of marking an order paid, see its own kdoc.
  */
 
 require_once __DIR__ . '/_bootstrap.php';
@@ -47,11 +57,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $result = PaymentService::adminDecide($db, $txnId, 'approve', null, $admin['id'], (float) $amountConfirmedRaw);
                 if (!$result['ok'] && ($result['error'] ?? '') === 'amount_mismatch') {
-                    $flash = 'Amount you entered doesn\'t match this order\'s total — approval blocked. If the customer genuinely paid a different amount, reject this and resolve it manually outside the app.';
+                    $flash = 'Amount you entered doesn\'t match the expected total (order grand total, or the rider\'s requested deposit amount) — approval blocked. If it genuinely differs, reject this and resolve it manually outside the app.';
                     $flashType = 'error';
                 } else {
                     $flash = $result['ok'] && ($result['status'] ?? '') === 'success'
-                        ? 'Payment approved — order marked paid.'
+                        ? 'Payment approved — order marked paid, or rider deposit credited to their ledger.'
                         : 'Could not approve (it may have already been resolved).';
                     $flashType = $result['ok'] && ($result['status'] ?? '') === 'success' ? 'success' : 'error';
                 }
@@ -99,18 +109,28 @@ require __DIR__ . '/_layout_head.php';
     <?php else: ?>
     <div class="table-responsive">
     <table>
-        <tr><th>Order</th><th>Amount</th><th>Txn Ref</th><th>UTR</th><th>UTR Attempts</th><th>Status</th><th>Created</th><th></th></tr>
-        <?php foreach ($pending as $t): ?>
+        <tr><th>Order / Rider</th><th>Amount</th><th>Txn Ref</th><th>UTR</th><th>UTR Attempts</th><th>Status</th><th>Created</th><th></th></tr>
+        <?php foreach ($pending as $t):
+            $isDeposit = ($t['purpose'] ?? 'customer_order') === 'rider_cod_deposit';
+            $expectedAmount = $isDeposit ? (float) $t['amount'] : (float) $t['grand_total'];
+        ?>
         <tr>
-            <td><?= admin_escape($t['order_code']) ?></td>
-            <td>₹<?= admin_escape((string) $t['grand_total']) ?></td>
+            <td>
+                <?php if ($isDeposit): ?>
+                    <span class="badge inactive">COD Deposit</span>
+                    <?= admin_escape($t['rider_name'] ?? ('Rider #' . $t['rider_id'])) ?>
+                <?php else: ?>
+                    <?= admin_escape($t['order_code']) ?>
+                <?php endif; ?>
+            </td>
+            <td>₹<?= admin_escape((string) $expectedAmount) ?></td>
             <td><code><?= admin_escape($t['provider_txn_id']) ?></code></td>
             <td><?= $t['utr'] ? '<code>' . admin_escape($t['utr']) . '</code>' : '<span class="muted">Not submitted yet</span>' ?></td>
             <td><?= (int) $t['utr_attempts'] ?></td>
             <td><span class="badge <?= $t['status'] === 'utr_submitted' ? 'active' : 'inactive' ?>"><?= admin_escape($t['status']) ?></span></td>
             <td><?= admin_escape($t['created_at']) ?></td>
             <td class="row-actions">
-                <form method="post" style="display:inline; display:flex; gap:6px; align-items:center;" onsubmit="return promptAmountConfirmed(this, <?= (float) $t['grand_total'] ?>);">
+                <form method="post" style="display:inline; display:flex; gap:6px; align-items:center;" onsubmit="return promptAmountConfirmed(this, <?= $expectedAmount ?>);">
                     <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
                     <input type="hidden" name="form_action" value="approve">
                     <input type="hidden" name="txn_id" value="<?= (int) $t['id'] ?>">

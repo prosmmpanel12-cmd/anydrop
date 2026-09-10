@@ -17,6 +17,7 @@ require_once __DIR__ . '/../ledger.php';
 require_once __DIR__ . '/../notifications.php';
 require_once __DIR__ . '/../audit.php';
 require_once __DIR__ . '/../orders.php';
+require_once __DIR__ . '/../rider_ledger.php';
 
 class PaymentService
 {
@@ -139,6 +140,104 @@ class PaymentService
         ];
     }
 
+    /**
+     * Deep Plan Phase 5 — starts (or idempotently re-returns) a rider's
+     * self-service COD-cash deposit to admin. Same QR/UTR/auto-verify
+     * mechanics as initiatePayment(), reusing the SAME active provider
+     * row (admin's own UPI ID never changes based on who's paying it) —
+     * the only real difference is what gets written to
+     * payment_transactions (rider_id + purpose instead of order_id) and
+     * what happens on success (see promoteRiderDepositIfNeeded() below,
+     * called from getRiderDepositClientStatus()/adminDecide() instead of
+     * promoteOrderIfNeeded()).
+     *
+     * $amount is validated by the caller (cod-deposit-initiate.php)
+     * against the rider's current cod_cash_held — partial deposits are
+     * allowed (app owner decision, 2026-09-09), so this function itself
+     * places no floor/ceiling on $amount beyond ">0", trusting the
+     * caller already checked it against the rider's real balance.
+     */
+    public static function initiateRiderCodDeposit(PDO $db, int $riderId, float $amount): array
+    {
+        if ($amount <= 0.0) {
+            return ['ok' => false, 'error' => 'invalid_amount'];
+        }
+
+        $provider = self::getActiveProvider($db);
+        if (!$provider) {
+            return ['ok' => false, 'error' => 'no_payment_provider_configured'];
+        }
+
+        // Idempotency — same "reuse, don't duplicate" reasoning as
+        // initiatePayment()'s own comment, scoped by rider_id+purpose
+        // instead of order_id (there is no order behind this txn). A
+        // DIFFERENT amount than any in-flight transaction always starts
+        // fresh rather than trying to mutate the old one — a rider who
+        // changed their mind about how much to deposit gets a new QR
+        // for the new amount, the old one is simply left to expire.
+        $existingStmt = $db->prepare(
+            "SELECT * FROM payment_transactions
+             WHERE rider_id = :rid AND purpose = 'rider_cod_deposit' AND provider_id = :pid
+               AND status IN ('initiated','utr_submitted')
+             ORDER BY id DESC LIMIT 1"
+        );
+        $existingStmt->execute(['rid' => $riderId, 'pid' => $provider['row']['id']]);
+        $existing = $existingStmt->fetch();
+
+        if ($existing
+            && $existing['expires_at'] !== null && strtotime($existing['expires_at']) > time()
+            && abs((float) $existing['amount'] - $amount) < 0.01) {
+            $remaining = strtotime($existing['expires_at']) - time();
+            $result = $provider['instance']->verify($existing['provider_txn_id'], $provider['config']);
+            return [
+                'ok' => true,
+                'reused' => true,
+                'txn_id' => (int) $existing['id'],
+                'status' => $result['status'],
+                'client_payload' => self::rebuildClientPayloadFromRow($existing, $provider['config'], $remaining, (bool) $provider['row']['is_test_mode']),
+            ];
+        }
+
+        // Cosmetic-only reference ("Order <this>" ends up in the UPI
+        // app's transaction note per UpipeProvider::initiate()'s own
+        // 'tn=' param) — the interface's $orderId/$orderCode params are
+        // kept unchanged rather than adding a purpose-specific overload,
+        // since nothing besides this note string actually reads them.
+        $depositRef = 'COD-DEP-' . $riderId . '-' . strtoupper(bin2hex(random_bytes(3)));
+        $initResult = $provider['instance']->initiate($amount, 0, $depositRef, $provider['config']);
+
+        if (($initResult['client_payload']['method'] ?? '') === 'unavailable') {
+            return ['ok' => false, 'error' => 'provider_unavailable', 'message' => $initResult['client_payload']['message'] ?? 'Payment unavailable'];
+        }
+
+        $initResult['client_payload']['is_test_mode'] = (bool) $provider['row']['is_test_mode'];
+
+        $expirySec = (int) ($provider['config']['expiry_sec'] ?? 900);
+        $expiresAt = date('Y-m-d H:i:s', time() + $expirySec);
+
+        $ins = $db->prepare(
+            'INSERT INTO payment_transactions (order_id, rider_id, purpose, provider_id, provider_txn_id, amount, status, expires_at, raw_response_json)
+             VALUES (NULL, :rid, "rider_cod_deposit", :pid, :ref, :amt, :st, :exp, :raw)'
+        );
+        $ins->execute([
+            'rid' => $riderId,
+            'pid' => $provider['row']['id'],
+            'ref' => $initResult['provider_txn_id'],
+            'amt' => $amount,
+            'st' => $initResult['status'],
+            'exp' => $expiresAt,
+            'raw' => json_encode($initResult['raw_response']),
+        ]);
+
+        return [
+            'ok' => true,
+            'reused' => false,
+            'txn_id' => (int) $db->lastInsertId(),
+            'status' => $initResult['status'],
+            'client_payload' => $initResult['client_payload'],
+        ];
+    }
+
     private static function rebuildClientPayloadFromRow(array $txnRow, array $config, int $remainingSec, bool $isTestMode): array
     {
         $upiId = trim((string) ($config['upi_id'] ?? ''));
@@ -235,6 +334,124 @@ class PaymentService
         return ['status' => 'utr_available', 'utr_attempts_remaining' => $attemptsLeft];
     }
 
+    /**
+     * Deep Plan Phase 5 — rider-deposit counterpart to getClientStatus().
+     * Polled by the Rider App's deposit screen the same way the
+     * customer app polls order payment status. Keyed on
+     * (rider_id, txn_id) rather than an order id, since there is no
+     * order behind this transaction — $txnId comes from
+     * initiateRiderCodDeposit()'s own return value, not a URL id like
+     * the customer flow's order id.
+     */
+    public static function getRiderDepositClientStatus(PDO $db, int $riderId, int $txnId): array
+    {
+        $stmt = $db->prepare(
+            "SELECT t.*, p.config_json, p.driver_key, p.is_test_mode FROM payment_transactions t
+             JOIN payment_providers p ON p.id = t.provider_id
+             WHERE t.id = :id AND t.rider_id = :rid AND t.purpose = 'rider_cod_deposit' LIMIT 1"
+        );
+        $stmt->execute(['id' => $txnId, 'rid' => $riderId]);
+        $txn = $stmt->fetch();
+
+        if (!$txn) {
+            return ['status' => 'not_found'];
+        }
+
+        $driverKey = $txn['driver_key'];
+        if (!isset(self::DRIVER_CLASSES[$driverKey])) {
+            return ['status' => 'failed'];
+        }
+        require_once self::DRIVER_CLASSES[$driverKey];
+        $className = ucfirst($driverKey) . 'Provider';
+        $config = json_decode($txn['config_json'] ?? '{}', true) ?: [];
+        $config['is_test_mode'] = (bool) $txn['is_test_mode'];
+        $provider = new $className();
+        $verifyResult = $provider->verify($txn['provider_txn_id'], $config);
+        $dbStatus = $verifyResult['status'];
+
+        if ($dbStatus === 'success') {
+            self::promoteRiderDepositIfNeeded($db, $txn);
+            return ['status' => 'success', 'txn_ref' => $txn['provider_txn_id']];
+        }
+
+        if ($dbStatus === 'expired') {
+            return ['status' => 'expired'];
+        }
+
+        if ($dbStatus === 'failed') {
+            return ['status' => 'failed', 'reject_reason' => $txn['reject_reason']];
+        }
+
+        if ($dbStatus === 'utr_submitted') {
+            return ['status' => 'utr_submitted'];
+        }
+
+        $utrWindowSec = (int) ($config['utr_window_sec'] ?? 300);
+        $openAt = strtotime($txn['created_at']) + $utrWindowSec;
+        $maxAttemptsConst = $className . '::MAX_UTR_ATTEMPTS';
+        $maxAttempts = defined($maxAttemptsConst) ? constant($maxAttemptsConst) : 8;
+        $attemptsLeft = max(0, $maxAttempts - (int) $txn['utr_attempts']);
+        if (time() < $openAt) {
+            return ['status' => 'utr_pending_window', 'utr_allowed_in_sec' => $openAt - time(), 'utr_attempts_remaining' => $attemptsLeft];
+        }
+
+        return ['status' => 'utr_available', 'utr_attempts_remaining' => $attemptsLeft];
+    }
+
+    public static function submitRiderDepositUtr(PDO $db, int $riderId, int $txnId, string $utr): array
+    {
+        $provider = self::getActiveProvider($db);
+        if (!$provider || !($provider['instance'] instanceof ManualVerificationProviderInterface)) {
+            return ['ok' => false, 'error' => 'utr_not_supported'];
+        }
+
+        $stmt = $db->prepare(
+            "SELECT * FROM payment_transactions
+             WHERE id = :id AND rider_id = :rid AND purpose = 'rider_cod_deposit' LIMIT 1"
+        );
+        $stmt->execute(['id' => $txnId, 'rid' => $riderId]);
+        $txn = $stmt->fetch();
+        if (!$txn) {
+            return ['ok' => false, 'error' => 'no_transaction'];
+        }
+
+        $result = $provider['instance']->submitUtr($txn, $utr, $provider['config']);
+        return ['ok' => true, 'status' => $result['status'], 'raw' => $result['raw_response']];
+    }
+
+    /**
+     * Idempotent (rider_cod_ledger_has_payment_transaction() pre-check +
+     * migration 82's UNIQUE index as the real backstop against a race)
+     * — writes the settlement_to_admin ledger entry + decrements
+     * cod_cash_held the first time a deposit transaction is observed
+     * as 'success', whether that success came from auto-verify (a
+     * customer-style status poll) or a human admin approval on
+     * admin/payment-pending.php (adminDecide() calls this too, see
+     * below).
+     */
+    private static function promoteRiderDepositIfNeeded(PDO $db, array $txn): void
+    {
+        $txnId = (int) $txn['id'];
+        if (rider_cod_ledger_has_payment_transaction($db, $txnId)) {
+            return;
+        }
+
+        $riderId = (int) $txn['rider_id'];
+        $amount = (float) ($txn['amount_confirmed'] ?? $txn['amount']);
+
+        record_rider_cod_deposit_via_upi($db, $riderId, $txnId, $amount, (string) $txn['provider_txn_id']);
+
+        create_notification(
+            'rider',
+            $riderId,
+            'COD deposit received',
+            'Your deposit of ₹' . number_format($amount, 2) . ' has been confirmed and removed from your cash-held total.',
+            'payout',
+            ['screen' => 'earnings']
+        );
+        write_audit_log('system', null, 'rider_cod_deposit_confirmed', ['rider_id' => $riderId, 'txn_id' => $txnId, 'amount' => $amount]);
+    }
+
     /** Idempotent: only writes orders.payment_status once, guarded by the WHERE clause. */
     private static function promoteOrderIfNeeded(PDO $db, array $order, array $txn): void
     {
@@ -285,10 +502,18 @@ class PaymentService
 
     public static function adminPendingTransactions(PDO $db): array
     {
+        // LEFT JOINs (not the original INNER JOIN) — a Phase 5 rider
+        // deposit row has order_id = NULL, which an INNER JOIN to
+        // orders would have silently excluded from this queue
+        // entirely. o.* and r.* columns are simply NULL for whichever
+        // shape doesn't apply to a given row; callers branch on
+        // t.purpose to know which set to read.
         return $db->query(
-            "SELECT t.*, o.order_code, o.grand_total, o.customer_id, pr.name AS provider_name
+            "SELECT t.*, o.order_code, o.grand_total, o.customer_id,
+                    r.name AS rider_name, pr.name AS provider_name
              FROM payment_transactions t
-             JOIN orders o ON o.id = t.order_id
+             LEFT JOIN orders o ON o.id = t.order_id
+             LEFT JOIN riders r ON r.id = t.rider_id
              JOIN payment_providers pr ON pr.id = t.provider_id
              WHERE t.status IN ('initiated','utr_submitted')
              ORDER BY t.created_at ASC"
@@ -297,9 +522,22 @@ class PaymentService
 
     public static function adminDecide(PDO $db, int $txnId, string $decision, ?string $reason, int $adminId, ?float $amountConfirmed = null): array
     {
+        // LEFT JOIN — a Phase 5 rider-deposit row has order_id = NULL,
+        // which the original INNER JOIN would have excluded from this
+        // lookup entirely (adminDecide() would always 404 on a deposit
+        // txn id). t.rider_id/t.purpose/t.provider_txn_id/t.amount_confirmed
+        // are explicitly aliased because orders has its own same-named
+        // rider_id column (the delivery rider assigned to that order,
+        // an unrelated concept) — without the alias, PDO's associative
+        // fetch would silently overwrite payment_transactions.rider_id
+        // with orders.rider_id (NULL for a deposit row, since the LEFT
+        // JOIN found nothing), losing exactly the value this function
+        // needs to credit the right rider.
         $stmt = $db->prepare(
-            'SELECT t.*, o.* , t.id AS txn_id, t.status AS txn_status, t.amount AS txn_amount
-             FROM payment_transactions t JOIN orders o ON o.id = t.order_id
+            'SELECT t.*, o.* , t.id AS txn_id, t.status AS txn_status, t.amount AS txn_amount,
+                    t.rider_id AS ptxn_rider_id, t.purpose AS ptxn_purpose,
+                    t.provider_txn_id AS ptxn_provider_txn_id, t.amount_confirmed AS ptxn_amount_confirmed
+             FROM payment_transactions t LEFT JOIN orders o ON o.id = t.order_id
              WHERE t.id = :id LIMIT 1'
         );
         $stmt->execute(['id' => $txnId]);
@@ -338,11 +576,21 @@ class PaymentService
         }
 
         if ($result['status'] === 'success') {
-            $orderStmt = $db->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');
-            $orderStmt->execute(['id' => $row['order_id']]);
-            $order = $orderStmt->fetch();
-            if ($order) {
-                self::promoteOrderIfNeeded($db, $order, ['provider_txn_id' => $row['provider_txn_id']]);
+            if (($row['ptxn_purpose'] ?? 'customer_order') === 'rider_cod_deposit') {
+                self::promoteRiderDepositIfNeeded($db, [
+                    'id' => $txnId,
+                    'rider_id' => $row['ptxn_rider_id'],
+                    'provider_txn_id' => $row['ptxn_provider_txn_id'],
+                    'amount' => $row['txn_amount'],
+                    'amount_confirmed' => $row['ptxn_amount_confirmed'],
+                ]);
+            } elseif ($row['order_id'] !== null) {
+                $orderStmt = $db->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');
+                $orderStmt->execute(['id' => $row['order_id']]);
+                $order = $orderStmt->fetch();
+                if ($order) {
+                    self::promoteOrderIfNeeded($db, $order, ['provider_txn_id' => $row['ptxn_provider_txn_id']]);
+                }
             }
         }
 

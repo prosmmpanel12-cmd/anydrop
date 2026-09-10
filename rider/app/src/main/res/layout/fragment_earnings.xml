@@ -162,6 +162,23 @@
             android:textSize="11sp"
             tools:text="Limit ₹2000 — settle with admin once you reach this to keep receiving COD orders." />
 
+        <!-- Deep Plan Phase 5 (docs/00_Deep_Plan_Statement_CODLimit_
+             QRPay_CashFlow_2026-09-09.md §5) — opens PayCodDepositActivity.
+             Visibility toggled in EarningsFragment.renderCodCard(): only
+             shown once codCashHeld > 0, since there's nothing to deposit
+             otherwise. Lives inside this card (not down with Request
+             Payout/View Statement below) because it acts directly on the
+             number displayed just above it. -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnPayCodAmount"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:layout_marginTop="12dp"
+            android:text="@string/cod_pay_amount_button"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
     </LinearLayout>
 
     <TextView
@@ -183,6 +200,21 @@
         android:layout_marginHorizontal="16dp"
         android:layout_marginTop="16dp"
         android:text="@string/earnings_request_payout_button" />
+
+    <!-- Statement (Deep Plan Phase 3, docs/00_Deep_Plan_Statement_
+         CODLimit_QRPay_CashFlow_2026-09-09.md) — day-wise delivered
+         orders with COD collected / earning per order. Placed right
+         under Request Payout as a secondary (outlined) action —
+         same "primary action solid, secondary outlined" convention
+         activity_application_status.xml already uses. -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnViewStatement"
+        style="@style/Widget.Material3.Button.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="10dp"
+        android:text="@string/statement_view_button" />
 
     <TextView
         android:layout_width="wrap_content"

@@ -1,6 +1,7 @@
 package com.anydrop.restaurant.ui.account
 
 import android.os.Bundle
+import android.text.InputType
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -11,6 +12,9 @@ import com.anydrop.restaurant.network.ApiClient
 import com.anydrop.restaurant.network.BankDetails
 import com.anydrop.restaurant.network.BankDetailsSaveBody
 import com.anydrop.restaurant.ui.common.InAppNotifier
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -161,6 +165,69 @@ class BankDetailsActivity : AppCompatActivity() {
             return
         }
 
+        // App-owner ask, 2026-09-09: confirm before saving bank/UPI
+        // changes. Restaurant login is email+password, so the confirm
+        // step here is re-entering that same login password — all field
+        // validation above already passed, this is purely the extra
+        // "are you sure it's you" gate right before the network call.
+        promptForPasswordThenSave(accountHolderName, bankName, accountNumber, ifscCode, upiId)
+    }
+
+    /** Bank/UPI save confirmation (restaurant-style: login password, not
+     * OTP — see rider's payout-bank-details flow for the OTP-based
+     * counterpart). A fresh TextInputLayout/EditText is built
+     * programmatically rather than a new dialog layout resource, since
+     * this dialog is just the one password field — no other screen in
+     * this app needs to reuse it. */
+    private fun promptForPasswordThenSave(
+        accountHolderName: String,
+        bankName: String,
+        accountNumber: String,
+        ifscCode: String,
+        upiId: String
+    ) {
+        val passwordInput = TextInputEditText(this).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            hint = getString(R.string.hint_confirm_password)
+        }
+        val inputLayout = TextInputLayout(this).apply {
+            isPasswordVisibilityToggleEnabled = true
+            val paddingPx = (16 * resources.displayMetrics.density).toInt()
+            setPadding(paddingPx, 0, paddingPx, 0)
+            addView(passwordInput)
+        }
+
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.dialog_confirm_password_title)
+            .setMessage(R.string.dialog_confirm_password_bank_message)
+            .setView(inputLayout)
+            .setPositiveButton(R.string.btn_save, null)
+            .setNegativeButton(R.string.btn_cancel, null)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val password = passwordInput.text?.toString().orEmpty()
+                if (password.isEmpty()) {
+                    inputLayout.error = getString(R.string.error_password_required)
+                    return@setOnClickListener
+                }
+                inputLayout.error = null
+                dialog.dismiss()
+                performSave(accountHolderName, bankName, accountNumber, ifscCode, upiId, password)
+            }
+        }
+        dialog.show()
+    }
+
+    private fun performSave(
+        accountHolderName: String,
+        bankName: String,
+        accountNumber: String,
+        ifscCode: String,
+        upiId: String,
+        password: String
+    ) {
         saveInFlight = true
         binding.btnSaveBankDetails.isEnabled = false
 
@@ -171,7 +238,8 @@ class BankDetailsActivity : AppCompatActivity() {
                     bankName = bankName,
                     accountNumber = accountNumber,
                     ifscCode = ifscCode,
-                    upiId = upiId.ifEmpty { null }
+                    upiId = upiId.ifEmpty { null },
+                    password = password
                 )
                 val response = api.saveBankDetails(body)
                 val saved = response.body()?.data?.bankDetails
@@ -179,6 +247,13 @@ class BankDetailsActivity : AppCompatActivity() {
                     hasExistingRecord = true
                     populate(saved)
                     InAppNotifier.show(this@BankDetailsActivity, getString(R.string.bank_details_saved), InAppNotifier.Type.SUCCESS)
+                } else if (response.code() == 401) {
+                    // invalid_password — the one error worth telling
+                    // apart from the generic failure toast, so the owner
+                    // knows to retype their password rather than
+                    // wondering if their bank details themselves were
+                    // rejected.
+                    InAppNotifier.show(this@BankDetailsActivity, getString(R.string.error_incorrect_password), InAppNotifier.Type.ERROR)
                 } else {
                     InAppNotifier.show(this@BankDetailsActivity, getString(R.string.bank_details_save_failed), InAppNotifier.Type.ERROR)
                 }

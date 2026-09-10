@@ -245,11 +245,31 @@
 
                     </com.google.android.material.textfield.TextInputLayout>
 
+                    <!-- App-owner ask, 2026-09-09: bank/UPI details can be
+                         saved on their own (OTP-confirmed) independent of
+                         submitting a payout request — see
+                         payout-bank-details-save.php's kdoc. -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSaveBankDetails"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:layout_marginTop="20dp"
+                        android:text="@string/payout_save_bank_details_button" />
+
+                    <ProgressBar
+                        android:id="@+id/bankDetailsSaveProgress"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:layout_gravity="center"
+                        android:visibility="gone" />
+
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnSubmitPayout"
                         android:layout_width="match_parent"
                         android:layout_height="52dp"
-                        android:layout_marginTop="24dp"
+                        android:layout_marginTop="16dp"
                         android:text="@string/payout_submit_button" />
 
                     <ProgressBar

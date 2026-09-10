@@ -1,15 +1,19 @@
 package com.anydrop.rider.ui.earnings
 
 import android.os.Bundle
+import android.os.CountDownTimer
 import android.view.View
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.anydrop.rider.R
 import com.anydrop.rider.databinding.ActivityRequestPayoutBinding
+import com.anydrop.rider.databinding.DialogBankDetailsOtpBinding
 import com.anydrop.rider.network.ApiClient
 import com.anydrop.rider.network.ApiErrorParser
 import com.anydrop.rider.network.RequestRiderPayoutBody
+import com.anydrop.rider.network.SaveRiderBankDetailsBody
 import com.anydrop.rider.ui.common.InAppNotifier
 import kotlinx.coroutines.launch
 
@@ -44,6 +48,14 @@ class RequestPayoutActivity : AppCompatActivity() {
 
     private var selectedMethod: String = "bank"
 
+    // App-owner ask, 2026-09-09: bank/UPI save is OTP-confirmed. This
+    // timer only gates the dialog's own "Resend" link (30s, same window
+    // the customer app's login-OTP resend uses this same session) — the
+    // real cooldown enforcement is server-side (otp_request_cooldown_seconds
+    // in payout-bank-details-request-otp.php); this is UX only.
+    private var bankOtpResendTimer: CountDownTimer? = null
+    private val bankOtpResendCooldownMillis = 30_000L
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityRequestPayoutBinding.inflate(layoutInflater)
@@ -64,10 +76,16 @@ class RequestPayoutActivity : AppCompatActivity() {
         updateMethodFieldsVisibility()
 
         binding.btnSubmitPayout.setOnClickListener { onSubmit() }
+        binding.btnSaveBankDetails.setOnClickListener { onSaveBankDetails() }
 
         loadBalance()
         loadSavedBankDetails()
         loadHistory()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        bankOtpResendTimer?.cancel()
     }
 
     private fun updateMethodFieldsVisibility() {
@@ -130,19 +148,26 @@ class RequestPayoutActivity : AppCompatActivity() {
         }
     }
 
-    private fun onSubmit() {
-        val amountText = binding.amountInput.text?.toString()?.trim().orEmpty()
-        val amount = amountText.toDoubleOrNull()
+    /** Holds the payout-method-specific fields read off the form, once
+     *  they've passed [validateBankFields]. Shared by [onSubmit] and
+     *  [onSaveBankDetails] so the two entry points (submit a payout /
+     *  save bank details on their own) never validate differently. */
+    private data class BankFields(
+        val holderName: String,
+        val bankName: String?,
+        val accountNumber: String?,
+        val ifscCode: String?,
+        val upiId: String?
+    )
+
+    /** Validates the holder-name + method-specific fields (amount is
+     *  NOT included — only [onSubmit] needs an amount, [onSaveBankDetails]
+     *  doesn't). Sets/clears each TextInputLayout's inline error as a
+     *  side effect, same convention the original onSubmit used. Returns
+     *  null if any field is invalid. */
+    private fun validateBankFields(): BankFields? {
         val holderName = binding.holderNameInput.text?.toString()?.trim().orEmpty()
-
         var hasError = false
-
-        if (amount == null || amount <= 0) {
-            binding.amountLayout.error = getString(R.string.payout_error_invalid_amount)
-            hasError = true
-        } else {
-            binding.amountLayout.error = null
-        }
 
         if (holderName.isEmpty()) {
             binding.holderNameLayout.error = getString(R.string.payout_error_holder_name)
@@ -190,20 +215,35 @@ class RequestPayoutActivity : AppCompatActivity() {
             }
         }
 
-        if (hasError) return
+        if (hasError) return null
+        return BankFields(holderName, bankName, accountNumber, ifscCode, upiId)
+    }
+
+    private fun onSubmit() {
+        val amountText = binding.amountInput.text?.toString()?.trim().orEmpty()
+        val amount = amountText.toDoubleOrNull()
+
+        if (amount == null || amount <= 0) {
+            binding.amountLayout.error = getString(R.string.payout_error_invalid_amount)
+        } else {
+            binding.amountLayout.error = null
+        }
+
+        val fields = validateBankFields()
+        if (amount == null || amount <= 0 || fields == null) return
 
         setLoading(true)
         lifecycleScope.launch {
             try {
                 val response = api.requestRiderPayout(
                     RequestRiderPayoutBody(
-                        amount = amount!!,
+                        amount = amount,
                         payoutMethod = selectedMethod,
-                        accountHolderName = holderName,
-                        bankName = if (selectedMethod == "bank") bankName else null,
-                        accountNumber = if (selectedMethod == "bank") accountNumber else null,
-                        ifscCode = if (selectedMethod == "bank") ifscCode else null,
-                        upiId = if (selectedMethod == "upi") upiId else null
+                        accountHolderName = fields.holderName,
+                        bankName = fields.bankName,
+                        accountNumber = fields.accountNumber,
+                        ifscCode = fields.ifscCode,
+                        upiId = fields.upiId
                     )
                 )
                 setLoading(false)
@@ -240,5 +280,173 @@ class RequestPayoutActivity : AppCompatActivity() {
     private fun setLoading(loading: Boolean) {
         binding.payoutSubmitProgress.visibility = if (loading) View.VISIBLE else View.GONE
         binding.btnSubmitPayout.isEnabled = !loading
+    }
+
+    // ---- Save Bank Details (OTP-confirmed) — app-owner ask, 2026-09-09.
+    // Flow: validate form → request OTP → show dialog → confirm calls
+    // saveRiderBankDetails() with the entered otp. Two-step because the
+    // OTP-request endpoint has no body of its own (see
+    // payout-bank-details-request-otp.php's kdoc) — validating the form
+    // first avoids sending an email the rider can't actually use yet. ----
+
+    private fun onSaveBankDetails() {
+        val fields = validateBankFields() ?: return
+        setBankDetailsSaveLoading(true)
+        lifecycleScope.launch {
+            try {
+                val response = api.requestPayoutBankDetailsOtp()
+                setBankDetailsSaveLoading(false)
+                val body = response.body()
+                if (response.isSuccessful && body?.success == true) {
+                    showBankOtpDialog(fields)
+                } else {
+                    val err = ApiErrorParser.parse(response)
+                    val message = if (err.code == "otp_request_cooldown") {
+                        getString(R.string.bank_otp_cooldown_message)
+                    } else {
+                        getString(R.string.bank_otp_send_failed)
+                    }
+                    InAppNotifier.show(this@RequestPayoutActivity, message, InAppNotifier.Type.ERROR)
+                }
+            } catch (e: Exception) {
+                setBankDetailsSaveLoading(false)
+                InAppNotifier.show(this@RequestPayoutActivity, getString(R.string.bank_otp_send_failed), InAppNotifier.Type.ERROR)
+            }
+        }
+    }
+
+    /** Same AlertDialog.Builder + setOnShowListener override pattern
+     *  RiderDashboardActivity.showDeliveryOtpDialog() uses (see that
+     *  method's kdoc): the positive button's default dismiss-on-click is
+     *  overridden so an invalid OTP keeps the dialog open for a retry
+     *  instead of closing it. Resend re-fires requestPayoutBankDetailsOtp()
+     *  and restarts the 30s cooldown on its own button, independent of
+     *  the confirm button's enabled state. */
+    private fun showBankOtpDialog(fields: BankFields) {
+        val dialogBinding = DialogBankDetailsOtpBinding.inflate(layoutInflater)
+        dialogBinding.bankOtpResend.text = getString(R.string.btn_resend_bank_otp)
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.bank_otp_dialog_title)
+            .setView(dialogBinding.root)
+            .setCancelable(true)
+            .setPositiveButton(R.string.btn_confirm_save, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+
+        dialog.setOnDismissListener { bankOtpResendTimer?.cancel() }
+
+        dialog.setOnShowListener {
+            val confirmButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            confirmButton.setOnClickListener {
+                val otp = dialogBinding.inputBankOtp.text?.toString()?.trim().orEmpty()
+                if (otp.isEmpty()) {
+                    dialogBinding.bankOtpError.text = getString(R.string.error_bank_otp_empty)
+                    dialogBinding.bankOtpError.visibility = View.VISIBLE
+                    return@setOnClickListener
+                }
+
+                confirmButton.isEnabled = false
+                dialogBinding.bankOtpError.visibility = View.GONE
+
+                lifecycleScope.launch {
+                    try {
+                        val response = api.saveRiderBankDetails(
+                            SaveRiderBankDetailsBody(
+                                payoutMethod = selectedMethod,
+                                accountHolderName = fields.holderName,
+                                bankName = fields.bankName,
+                                accountNumber = fields.accountNumber,
+                                ifscCode = fields.ifscCode,
+                                upiId = fields.upiId,
+                                otp = otp
+                            )
+                        )
+                        val body = response.body()
+                        if (response.isSuccessful && body?.success == true) {
+                            dialog.dismiss()
+                            InAppNotifier.show(this@RequestPayoutActivity, getString(R.string.payout_bank_details_saved), InAppNotifier.Type.SUCCESS)
+                            loadSavedBankDetails()
+                        } else {
+                            val err = ApiErrorParser.parse(response)
+                            when (err.code) {
+                                "invalid_otp" -> {
+                                    confirmButton.isEnabled = true
+                                    val attemptsRemaining = (err.data["attempts_remaining"] as? Number)?.toInt()
+                                    val msg = if (attemptsRemaining != null) {
+                                        getString(R.string.error_bank_otp_invalid_format, attemptsRemaining)
+                                    } else {
+                                        getString(R.string.error_bank_otp_invalid)
+                                    }
+                                    dialogBinding.bankOtpError.text = msg
+                                    dialogBinding.bankOtpError.visibility = View.VISIBLE
+                                }
+                                "otp_expired", "otp_not_found", "otp_max_attempts_exceeded" -> {
+                                    dialog.dismiss()
+                                    InAppNotifier.show(this@RequestPayoutActivity, getString(R.string.payout_bank_details_save_failed), InAppNotifier.Type.ERROR)
+                                }
+                                else -> {
+                                    dialog.dismiss()
+                                    InAppNotifier.show(this@RequestPayoutActivity, getString(R.string.payout_bank_details_save_failed), InAppNotifier.Type.ERROR)
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        dialog.dismiss()
+                        InAppNotifier.show(this@RequestPayoutActivity, getString(R.string.payout_bank_details_save_failed), InAppNotifier.Type.ERROR)
+                    }
+                }
+            }
+        }
+
+        dialogBinding.bankOtpResend.setOnClickListener {
+            dialogBinding.bankOtpResend.isEnabled = false
+            lifecycleScope.launch {
+                try {
+                    val response = api.requestPayoutBankDetailsOtp()
+                    val body = response.body()
+                    if (response.isSuccessful && body?.success == true) {
+                        InAppNotifier.show(this@RequestPayoutActivity, getString(R.string.bank_otp_sent), InAppNotifier.Type.SUCCESS)
+                        startBankOtpResendCooldown(dialogBinding)
+                    } else {
+                        dialogBinding.bankOtpResend.isEnabled = true
+                        val err = ApiErrorParser.parse(response)
+                        val message = if (err.code == "otp_request_cooldown") {
+                            getString(R.string.bank_otp_cooldown_message)
+                        } else {
+                            getString(R.string.bank_otp_send_failed)
+                        }
+                        InAppNotifier.show(this@RequestPayoutActivity, message, InAppNotifier.Type.ERROR)
+                    }
+                } catch (e: Exception) {
+                    dialogBinding.bankOtpResend.isEnabled = true
+                    InAppNotifier.show(this@RequestPayoutActivity, getString(R.string.bank_otp_send_failed), InAppNotifier.Type.ERROR)
+                }
+            }
+        }
+
+        dialog.show()
+        startBankOtpResendCooldown(dialogBinding)
+    }
+
+    private fun startBankOtpResendCooldown(dialogBinding: DialogBankDetailsOtpBinding) {
+        bankOtpResendTimer?.cancel()
+        dialogBinding.bankOtpResend.isEnabled = false
+        bankOtpResendTimer = object : CountDownTimer(bankOtpResendCooldownMillis, 1_000L) {
+            override fun onTick(millisUntilFinished: Long) {
+                val secondsLeft = (millisUntilFinished / 1000L) + 1
+                dialogBinding.bankOtpResend.text = getString(R.string.bank_otp_resend_countdown, secondsLeft)
+            }
+
+            override fun onFinish() {
+                dialogBinding.bankOtpResend.isEnabled = true
+                dialogBinding.bankOtpResend.text = getString(R.string.btn_resend_bank_otp)
+            }
+        }.start()
+    }
+
+    private fun setBankDetailsSaveLoading(loading: Boolean) {
+        binding.bankDetailsSaveProgress.visibility = if (loading) View.VISIBLE else View.GONE
+        binding.btnSaveBankDetails.isEnabled = !loading
     }
 }

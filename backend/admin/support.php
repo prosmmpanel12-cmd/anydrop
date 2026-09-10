@@ -254,8 +254,8 @@ if ($ticketId) {
                 </p>
                 <p style="white-space:pre-wrap;"><?= admin_escape($m['message']) ?></p>
                 <?php if (!empty($m['attachment_url'])): ?>
-                    <a href="../<?= admin_escape($m['attachment_url']) ?>" target="_blank" rel="noopener">
-                        <img src="../<?= admin_escape($m['attachment_url']) ?>" alt="Attachment" style="height:60px;border-radius:4px;">
+                    <a href="<?= admin_escape(admin_base_url()) ?>/<?= admin_escape($m['attachment_url']) ?>" target="_blank" rel="noopener">
+                        <img src="<?= admin_escape(admin_base_url()) ?>/<?= admin_escape($m['attachment_url']) ?>" alt="Attachment" style="height:60px;border-radius:4px;">
                     </a>
                 <?php endif; ?>
             </div>

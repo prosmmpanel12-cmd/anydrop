@@ -83,6 +83,32 @@ interface ApiService {
     @GET("rider/earnings-summary.php")
     suspend fun getEarningsSummary(): Response<ApiResponse<EarningsSummaryResult>>
 
+    /** GET /api/v1/rider/statement.php?date= — Deep Plan Phase 3
+     *  (docs/00_Deep_Plan_Statement_CODLimit_QRPay_CashFlow_2026-09-09.md).
+     *  `date` defaults server-side to today when omitted. */
+    @GET("rider/statement.php")
+    suspend fun getRiderStatement(@Query("date") date: String? = null): Response<ApiResponse<RiderStatementResult>>
+
+    /** GET /api/v1/rider/cod-deposit-history.php — Deep Plan Phase 6, the
+     *  "Deposits" tab inside StatementActivity. No params — server caps
+     *  at the rider's own last 200 rows, see that endpoint's kdoc. */
+    @GET("rider/cod-deposit-history.php")
+    suspend fun getRiderDepositHistory(): Response<ApiResponse<RiderDepositHistoryResult>>
+
+    // ---- Deep Plan Phase 5 — "Pay COD Amount" (QR + auto-verify,
+    // reuses the existing UPIPE flow — see Models.kt's own comment on
+    // DepositInitResult for the shape mirror). Direct-hit .php
+    // filenames, same convention as every rider endpoint above. ----
+
+    @POST("rider/cod-deposit-initiate.php")
+    suspend fun initiateCodDeposit(@Body body: DepositInitBody): Response<ApiResponse<DepositInitResult>>
+
+    @GET("rider/cod-deposit-status.php")
+    suspend fun getCodDepositStatus(@Query("txn_id") txnId: Int): Response<ApiResponse<DepositStatusResult>>
+
+    @POST("rider/cod-deposit-submit-utr.php")
+    suspend fun submitCodDepositUtr(@Query("txn_id") txnId: Int, @Body body: DepositSubmitUtrBody): Response<ApiResponse<DepositSubmitUtrResult>>
+
     // ---- Rider payout requests (deep-plan §21, migration 74). Direct-hit
     // .php filenames, same convention as every endpoint above — mirrors
     // the customer app's getWalletBankDetails()/saveWalletBankDetails()/
@@ -91,6 +117,15 @@ interface ApiService {
     @GET("rider/payout-bank-details-get.php")
     suspend fun getRiderBankDetails(): Response<ApiResponse<RiderBankDetailsResult>>
 
+    /** POST /api/v1/rider/payout-bank-details-request-otp.php — no body,
+     *  sends a confirm-OTP to the rider's own registered email. Call this
+     *  before saveRiderBankDetails(); see that method's kdoc. */
+    @POST("rider/payout-bank-details-request-otp.php")
+    suspend fun requestPayoutBankDetailsOtp(): Response<ApiResponse<RequestPayoutBankDetailsOtpResult>>
+
+    /** Requires body.otp from a prior requestPayoutBankDetailsOtp() call —
+     *  see payout-bank-details-save.php's kdoc (App-owner ask, 2026-09-09:
+     *  confirm-before-save, rider-style OTP instead of a password). */
     @POST("rider/payout-bank-details-save.php")
     suspend fun saveRiderBankDetails(@Body body: SaveRiderBankDetailsBody): Response<ApiResponse<RiderBankDetailsResult>>
 

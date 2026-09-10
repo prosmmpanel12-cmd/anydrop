@@ -16,7 +16,7 @@
  * Expects, from the including page:
  *   $admin       — array from admin_require_login()
  *   $pageTitle   — string, shown in <title> and the topbar
- *   $activeNav   — one of 'dashboard' | 'approvals' | 'orders' | 'analytics' | 'support' | 'review_moderation' | 'customer_feedback' | 'areas' | 'cod_rules' | 'pricing_rules' | 'payment_restrictions' | 'categories' | 'banners' | 'roles' | 'commission_rules' | 'settlements' | 'rider_settlements' | 'rider_earnings' | 'platform_ledger' | 'payment_gateways' | 'email_providers' | 'payment_pending' | 'refunds' | 'wallet_withdrawals' | 'reconciliation' | 'offers' | 'broadcast' | 'app_settings_customer' | 'app_settings_restaurant' | 'app_settings_rider' | 'fcm_settings' | 'directions_settings' | 'route_recalc_settings' | 'otp_settings' | 'riders' | 'rider_map' | 'rider_payouts'
+ *   $activeNav   — one of 'dashboard' | 'approvals' | 'orders' | 'analytics' | 'support' | 'review_moderation' | 'customer_feedback' | 'areas' | 'cod_rules' | 'pricing_rules' | 'payment_restrictions' | 'categories' | 'banners' | 'roles' | 'commission_rules' | 'settlements' | 'rider_settlements' | 'rider_earnings' | 'cash_flow' | 'payment_gateways' | 'email_providers' | 'payment_pending' | 'refunds' | 'wallet_withdrawals' | 'reconciliation' | 'offers' | 'broadcast' | 'app_settings_customer' | 'app_settings_restaurant' | 'app_settings_rider' | 'fcm_settings' | 'directions_settings' | 'route_recalc_settings' | 'otp_settings' | 'riders' | 'rider_map' | 'rider_payouts' | 'rider_cod_limits'
  *   $flash       — string|null, shown once as a toast (not a static banner)
  *   $flashType   — 'success' | 'error'
  */
@@ -120,6 +120,17 @@ $navItems = [
         'icon' => '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/>',
     ],
     [
+        // Deep Plan Phase 4 — distinct from COD Rules above: that one
+        // controls whether a CUSTOMER may pay COD at all; this one
+        // controls how much cash a RIDER may hold before dispatch
+        // excludes them. Placed under Operations (riders_view gate)
+        // rather than Areas & Rules since it's rider cash-handling
+        // policy, not area/service-area configuration.
+        'key' => 'rider_cod_limits', 'href' => 'rider-cod-limits.php', 'label' => 'Rider COD Limits',
+        'perm' => 'riders_view', 'group' => 'operations',
+        'icon' => '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/><circle cx="17" cy="15" r="1"/>',
+    ],
+    [
         'key' => 'pricing_rules', 'href' => 'pricing-rules.php', 'label' => 'Pricing Rules',
         'perm' => 'areas_view', 'group' => 'areas_rules',
         'icon' => '<path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
@@ -202,9 +213,15 @@ $navItems = [
         'icon' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
     ],
     [
-        'key' => 'platform_ledger', 'href' => 'platform-ledger.php', 'label' => 'Platform Cash Flow',
+        // 2026-09-10: was two links (this one + a separate "Platform
+        // Cash Flow" entry pointing at platform-ledger.php) — owner
+        // asked to merge into one page instead of two. cash-flow.php
+        // now has all three sections (rider COD cash, restaurant
+        // settlement, and the former platform-ledger.php content);
+        // platform-ledger.php itself just redirects here now.
+        'key' => 'cash_flow', 'href' => 'cash-flow.php', 'label' => 'Cash Flow',
         'perm' => 'payouts_view', 'group' => 'finance',
-        'icon' => '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/><circle cx="7" cy="15" r="1"/>',
+        'icon' => '<path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H7"/><circle cx="12" cy="12" r="10"/>',
     ],
     [
         'key' => 'reconciliation', 'href' => 'reconciliation.php', 'label' => 'Reconciliation',
@@ -235,6 +252,11 @@ $navItems = [
         'key' => 'app_settings_rider', 'href' => 'app-settings.php?app=rider', 'label' => 'Rider App',
         'perm' => 'app_version_manage', 'group' => 'settings',
         'icon' => '<circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 0 1 1 1v5l3.5 4"/><path d="M9 17.5H5.5L8 10h6"/>',
+    ],
+    [
+        'key' => 'base_url_settings', 'href' => 'base-url-settings.php', 'label' => 'Base URL Settings',
+        'perm' => 'settings_manage', 'group' => 'settings',
+        'icon' => '<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/>',
     ],
     [
         'key' => 'fcm_settings', 'href' => 'fcm-settings.php', 'label' => 'FCM Settings',

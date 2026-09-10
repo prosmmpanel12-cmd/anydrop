@@ -85,6 +85,8 @@
     <string name="dashboard_deliveries_label">Deliveries</string>
     <string name="dashboard_location_required">Turn on location to go online</string>
     <string name="dashboard_location_permission_denied">Location permission is needed to go online</string>
+    <!-- Deep Plan Phase 4 (2026-09-09) — area-wise COD cash-hold limit banner. -->
+    <string name="dashboard_cod_blocked_banner">You\'ve reached your cash hold limit (₹%.0f). Deposit your COD cash to receive new orders.</string>
     <string name="dashboard_went_online">You\'re online ✓</string>
     <string name="dashboard_went_offline">You\'re offline</string>
 
@@ -160,6 +162,25 @@
     <string name="earnings_load_error">Couldn\'t load earnings \u2014 pull down to retry</string>
     <string name="earnings_request_payout_button">Request Payout</string>
 
+    <!-- Statement screen (Deep Plan Phase 3) -->
+    <string name="statement_view_button">View Statement</string>
+    <string name="statement_title">Statement</string>
+    <string name="statement_orders_label">Orders delivered</string>
+    <string name="statement_cod_collected_label">COD collected</string>
+    <string name="statement_earnings_label">Earnings</string>
+    <string name="statement_cash_held_label">Cash held now</string>
+    <string name="statement_empty">No deliveries on this day</string>
+    <string name="statement_load_error">Could not load statement</string>
+
+    <!-- Deep Plan Phase 6 — "Deposits" tab inside StatementActivity -->
+    <string name="statement_tab_orders">Orders</string>
+    <string name="statement_tab_deposits">Deposits</string>
+    <string name="deposit_history_empty">No deposits yet</string>
+    <string name="deposit_history_load_error">Could not load deposit history</string>
+    <string name="deposit_status_auto_verified">Auto-verified</string>
+    <string name="deposit_status_manual_review">Admin approved</string>
+    <string name="deposit_status_manual_settlement">Recorded by admin</string>
+
     <!-- Deep-plan §17-18 COD cash-held card, added same session as the
          earnings screen's other cards. Three pill/note states depending
          on codCashHeld vs codSettlementLimit (see
@@ -174,6 +195,46 @@
     <string name="cod_cash_held_pill_blocked">LIMIT REACHED</string>
     <string name="cod_cash_held_limit_note_format">Limit \u20b9%1$s \u2014 settle this cash with admin to keep receiving COD orders.</string>
     <string name="cod_cash_held_limit_note_blocked_format">Limit \u20b9%1$s reached \u2014 new COD deliveries are paused until you settle with admin.</string>
+
+    <!-- Deep Plan Phase 5 (docs/00_Deep_Plan_Statement_CODLimit_QRPay_
+         CashFlow_2026-09-09.md §5) — "Pay COD Amount". The upi_* keys
+         below are deliberately a near-verbatim mirror of the customer
+         app's own copy for the same states (customer/app/.../values/
+         strings.xml) — same underlying payment mechanic, same wording,
+         reworded only where "order"/"payment" needed to become
+         "deposit" for sense. -->
+    <string name="cod_pay_amount_button">Pay COD Amount</string>
+    <string name="cod_deposit_title">Deposit COD Cash</string>
+    <string name="cod_deposit_held_label">You are currently holding</string>
+    <string name="cod_deposit_amount_hint">Amount to deposit (\u20b9)</string>
+    <string name="cod_deposit_use_full_amount">Deposit full amount</string>
+    <string name="cod_deposit_get_qr_button">Get Deposit QR</string>
+    <string name="cod_deposit_scan_subtitle">Scan this QR from any UPI app to deposit</string>
+    <string name="cod_deposit_cancel_button">Cancel</string>
+    <string name="cod_deposit_error_amount_required">Enter an amount to deposit</string>
+    <string name="cod_deposit_error_amount_exceeds_held">You can\'t deposit more than you\'re currently holding</string>
+    <string name="cod_deposit_qr_generation_failed">Couldn\'t generate the deposit QR. Please try again.</string>
+    <string name="cod_deposit_success_message">Deposit confirmed \u2014 your COD cash-held balance has been updated.</string>
+    <string name="cod_deposit_nothing_to_deposit">You have no COD cash held right now.</string>
+
+    <string name="upi_test_mode_banner">TEST MODE \u2014 this is not a real payment</string>
+    <string name="upi_qr_content_description">UPI payment QR code</string>
+    <string name="upi_instructions_title">How to pay</string>
+    <string name="upi_status_checking">Checking payment status\u2026</string>
+    <string name="upi_status_utr_pending_window">You can also enter your UTR in %1$d sec if this doesn\'t confirm automatically</string>
+    <string name="upi_status_utr_available">Already paid but not confirmed yet? Enter your UTR below.</string>
+    <string name="upi_status_utr_submitted">Thanks \u2014 your deposit is being verified. This can take a little while.</string>
+    <string name="upi_status_success">Deposit confirmed!</string>
+    <string name="upi_status_failed">This deposit couldn\'t be confirmed.</string>
+    <string name="upi_status_failed_with_reason">This deposit couldn\'t be confirmed: %1$s</string>
+    <string name="upi_status_expired">This QR has expired.</string>
+    <string name="upi_status_too_many_attempts">Too many UTR attempts on this deposit. Please contact support.</string>
+    <string name="upi_utr_hint">Already paid? Enter the 12-digit UTR / UPI reference number from your payment app so we can verify it manually.</string>
+    <string name="upi_utr_input_hint">12-digit UTR</string>
+    <string name="upi_submit_utr">Submit UTR</string>
+    <string name="upi_expiry_format">QR expires in %1$s</string>
+    <string name="upi_utr_invalid">Enter a valid 12-digit UTR</string>
+
 
     <!-- RequestPayoutActivity (deep-plan §21, migration 74) — field
          names/strings mirror the customer app's withdraw_* block naming,
@@ -207,6 +268,23 @@
     <string name="payout_error_account_number">Enter a valid account number</string>
     <string name="payout_error_ifsc">Enter a valid IFSC code</string>
     <string name="payout_error_upi_id">Enter a valid UPI ID</string>
+    <string name="payout_save_bank_details_button">Save Bank Details</string>
+    <string name="payout_bank_details_saved">Bank details saved</string>
+    <string name="payout_bank_details_save_failed">Couldn\'t save bank details</string>
+
+    <!-- Bank details OTP confirm dialog (app-owner ask, 2026-09-09) -->
+    <string name="bank_otp_dialog_title">Confirm It\'s You</string>
+    <string name="bank_otp_dialog_subtitle">Enter the code sent to your registered email to save these bank details.</string>
+    <string name="hint_bank_otp">Enter code</string>
+    <string name="btn_confirm_save">Confirm &amp; Save</string>
+    <string name="error_bank_otp_empty">Enter the code</string>
+    <string name="error_bank_otp_invalid">Incorrect code</string>
+    <string name="error_bank_otp_invalid_format">Incorrect code — %1$d attempts remaining</string>
+    <string name="bank_otp_resend_countdown">Resend in %1$ds</string>
+    <string name="btn_resend_bank_otp">Resend code</string>
+    <string name="bank_otp_sent">Code sent to your email</string>
+    <string name="bank_otp_send_failed">Couldn\'t send code — try again</string>
+    <string name="bank_otp_cooldown_message">Please wait before requesting another code</string>
 
     <!-- Deep-plan §22, migration 75 — Rider Documents -->
     <string name="documents_button_not_submitted">Complete Profile</string>
