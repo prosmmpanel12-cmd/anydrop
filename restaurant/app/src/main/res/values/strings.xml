@@ -505,7 +505,7 @@
     <string name="bank_details_save_failed">Couldn\'t save bank details</string>
     <string name="bank_details_load_failed">Couldn\'t load bank details</string>
     <!-- App-owner ask, 2026-09-09 — password re-confirm before bank/UPI save -->
-    <string name="hint_confirm_password">Password</string>
+    <string name="hint_reconfirm_password">Password</string>
     <string name="dialog_confirm_password_title">Confirm your password</string>
     <string name="dialog_confirm_password_bank_message">Re-enter your login password to save these bank/UPI details.</string>
     <string name="error_password_required">Enter your password</string>

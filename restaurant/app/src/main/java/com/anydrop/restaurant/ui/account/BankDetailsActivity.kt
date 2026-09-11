@@ -188,7 +188,7 @@ class BankDetailsActivity : AppCompatActivity() {
     ) {
         val passwordInput = TextInputEditText(this).apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-            hint = getString(R.string.hint_confirm_password)
+            hint = getString(R.string.hint_reconfirm_password)
         }
         val inputLayout = TextInputLayout(this).apply {
             isPasswordVisibilityToggleEnabled = true
