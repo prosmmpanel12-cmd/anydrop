@@ -26,7 +26,11 @@ import okhttp3.ResponseBody
 data class ParsedApiError(
     val code: String?,
     val fields: List<String>?,
-    val reason: String?
+    val reason: String?,
+    // Pickup-OTP resend (2026-09-11) — pickup-otp-resend.php's
+    // resend_cooldown error carries this in `data`. Null for every
+    // other error code, which just omit the key.
+    val retryAfterSeconds: Int? = null
 )
 
 fun parseApiError(errorBody: ResponseBody?): ParsedApiError {
@@ -39,7 +43,11 @@ fun parseApiError(errorBody: ResponseBody?): ParsedApiError {
         @Suppress("UNCHECKED_CAST")
         val fields = (data?.get("fields") as? List<*>)?.map { it.toString() }
         val reason = data?.get("reason") as? String
-        ParsedApiError(code, fields, reason)
+        // Gson decodes JSON numbers as Double via the raw Map::class.java
+        // path used here (no typed data class) — same reasoning as the
+        // fields/reason fields above, just numeric.
+        val retryAfterSeconds = (data?.get("retry_after_seconds") as? Double)?.toInt()
+        ParsedApiError(code, fields, reason, retryAfterSeconds)
     } catch (e: Exception) {
         ParsedApiError(null, null, null)
     }

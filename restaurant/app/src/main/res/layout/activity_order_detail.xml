@@ -131,6 +131,69 @@
                     android:textColor="@color/anydrop_primary" />
             </LinearLayout>
 
+            <!-- Pickup OTP (2026-09-11, migration 83) — shown only while
+                 status == rider_assigned and orders-detail.php actually
+                 reveals a code (see that endpoint's kdoc). Hidden again
+                 once pickup_otp_verified flips true or the order moves
+                 past rider_assigned — configureActions()/render() own
+                 the visibility, this is just the layout shell. -->
+            <LinearLayout
+                android:id="@+id/pickupOtpCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="18dp"
+                android:background="@drawable/bg_card_rounded"
+                android:padding="14dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/pickup_otp_label"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/pickup_otp_hint"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="8dp">
+
+                    <TextView
+                        android:id="@+id/pickupOtpValueText"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textSize="28sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.2"
+                        android:textColor="@color/anydrop_primary" />
+
+                    <TextView
+                        android:id="@+id/btnResendPickupOtp"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/btn_resend_pickup_otp"
+                        android:textColor="@color/info_fg"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="4dp" />
+                </LinearLayout>
+            </LinearLayout>
+
             <!-- Reject reason (shown only when rejecting) -->
             <LinearLayout
                 android:id="@+id/rejectGroup"

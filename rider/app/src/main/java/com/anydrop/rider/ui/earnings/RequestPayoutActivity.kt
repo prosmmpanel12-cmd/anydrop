@@ -3,7 +3,6 @@ package com.anydrop.rider.ui.earnings
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.view.View
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -315,30 +314,32 @@ class RequestPayoutActivity : AppCompatActivity() {
         }
     }
 
-    /** Same AlertDialog.Builder + setOnShowListener override pattern
-     *  RiderDashboardActivity.showDeliveryOtpDialog() uses (see that
-     *  method's kdoc): the positive button's default dismiss-on-click is
-     *  overridden so an invalid OTP keeps the dialog open for a retry
-     *  instead of closing it. Resend re-fires requestPayoutBankDetailsOtp()
-     *  and restarts the 30s cooldown on its own button, independent of
-     *  the confirm button's enabled state. */
+    /** Custom-button dialog pattern (2026-09-11 restyle — matches
+     *  AccountFragment.kt's dialog_logout_confirm.xml wiring): the old
+     *  AlertDialog.Builder + setPositiveButton/setTitle calls are gone
+     *  now that the title lives inside dialog_bank_details_otp.xml
+     *  itself and Confirm/Cancel are real MaterialButtons in the layout.
+     *  btnBankOtpConfirm's click listener does its own isEnabled
+     *  toggling on invalid OTP (no default dismiss-on-click behavior to
+     *  fight, unlike the old AlertDialog positive button). Resend
+     *  re-fires requestPayoutBankDetailsOtp() and restarts the 30s
+     *  cooldown on its own button, independent of the confirm button's
+     *  enabled state. */
     private fun showBankOtpDialog(fields: BankFields) {
         val dialogBinding = DialogBankDetailsOtpBinding.inflate(layoutInflater)
         dialogBinding.bankOtpResend.text = getString(R.string.btn_resend_bank_otp)
 
-        val dialog = AlertDialog.Builder(this)
-            .setTitle(R.string.bank_otp_dialog_title)
+        val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
             .setView(dialogBinding.root)
             .setCancelable(true)
-            .setPositiveButton(R.string.btn_confirm_save, null)
-            .setNegativeButton(android.R.string.cancel, null)
             .create()
 
         dialog.setOnDismissListener { bankOtpResendTimer?.cancel() }
 
-        dialog.setOnShowListener {
-            val confirmButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            confirmButton.setOnClickListener {
+        dialogBinding.btnBankOtpCancel.setOnClickListener { dialog.dismiss() }
+
+        val confirmButton = dialogBinding.btnBankOtpConfirm
+        confirmButton.setOnClickListener {
                 val otp = dialogBinding.inputBankOtp.text?.toString()?.trim().orEmpty()
                 if (otp.isEmpty()) {
                     dialogBinding.bankOtpError.text = getString(R.string.error_bank_otp_empty)
@@ -396,7 +397,6 @@ class RequestPayoutActivity : AppCompatActivity() {
                         InAppNotifier.show(this@RequestPayoutActivity, getString(R.string.payout_bank_details_save_failed), InAppNotifier.Type.ERROR)
                     }
                 }
-            }
         }
 
         dialogBinding.bankOtpResend.setOnClickListener {

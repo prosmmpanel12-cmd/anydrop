@@ -59,7 +59,7 @@ require_once __DIR__ . '/../lib/settings.php';
  * Stored in app_settings under 'admin_base_url', edited via
  * base-url-settings.php — no seed migration needed, same "falls back
  * to this in-code default until an admin saves a real value" pattern
- * google_directions_api_key/route_recalc_*/fcm_service_account_json
+ * google_directions_api_key/route_recalc_* /fcm_service_account_json
  * already use (get_setting()'s own $default parameter). Always
  * returned WITHOUT a trailing slash, so every call site can safely do
  * `admin_base_url() . '/uploads/...'` without ever risking a doubled

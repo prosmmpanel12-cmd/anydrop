@@ -67,6 +67,14 @@ interface ApiService {
     @POST("restaurant/orders-status.php")
     suspend fun updateStatus(@Query("id") orderId: Int, @Body body: StatusUpdateBody): Response<ApiResponse<OrderResult>>
 
+    /** POST /api/v1/restaurant/pickup-otp-resend.php — no body. Re-sends
+     *  the existing pickup_otp (does not generate a new one) via in-app
+     *  notification + email. 409 invalid_state once the order is past
+     *  rider_assigned, 429 resend_cooldown with retry_after_seconds in
+     *  data inside the 30s window — see that endpoint's own kdoc. */
+    @POST("restaurant/pickup-otp-resend.php")
+    suspend fun resendPickupOtp(@Query("id") orderId: Int): Response<ApiResponse<ResendOtpResult>>
+
     @GET("restaurant/dashboard.php")
     suspend fun getDashboard(): Response<ApiResponse<DashboardResult>>
 

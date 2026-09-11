@@ -134,6 +134,22 @@
             android:textSize="26sp"
             android:textStyle="bold"
             android:textColor="@color/veg_green" />
+
+        <!-- Delivery OTP Resend (2026-09-11) -->
+        <TextView
+            android:id="@+id/btnResendDeliveryOtp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="6dp"
+            android:text="@string/btn_resend_delivery_otp"
+            android:textColor="@color/anydrop_primary"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="4dp" />
     </LinearLayout>
 
     <!-- Item 25 — Refund card. Populated from GET /orders/{id}'s `refund`

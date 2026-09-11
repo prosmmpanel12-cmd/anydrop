@@ -346,6 +346,15 @@
     <string name="btn_cancel_order">Cancel Order</string>
     <string name="btn_back_to_home">Back to Home</string>
 
+    <!-- Delivery OTP Resend (2026-09-11) — customer-side counterpart to
+         the restaurant app's pickup_otp_resend_* strings; names mirror
+         those 1:1 (pickup -> delivery). -->
+    <string name="btn_resend_delivery_otp">Resend</string>
+    <string name="delivery_otp_resend_countdown">Resend in %1$ds</string>
+    <string name="delivery_otp_resend_sent">Delivery code resent to your rider and your email</string>
+    <string name="delivery_otp_resend_cooldown_message">Please wait before resending again</string>
+    <string name="delivery_otp_resend_failed">Couldn\'t resend the delivery code</string>
+
     <!-- Item 25 — Refund System card (recall.md section 19: Amount, Reason,
          Method, Expected date, Reference, Timeline). refund_status_* mirror
          refunds.status ENUM (migration 42) exactly. -->

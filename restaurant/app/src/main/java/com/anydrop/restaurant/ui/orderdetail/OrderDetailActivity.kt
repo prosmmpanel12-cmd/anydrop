@@ -1,6 +1,7 @@
 package com.anydrop.restaurant.ui.orderdetail
 
 import android.os.Bundle
+import android.os.CountDownTimer
 import android.view.View
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -12,6 +13,7 @@ import com.anydrop.restaurant.network.ApiClient
 import com.anydrop.restaurant.network.Order
 import com.anydrop.restaurant.network.RejectBody
 import com.anydrop.restaurant.network.StatusUpdateBody
+import com.anydrop.restaurant.network.parseApiError
 import com.anydrop.restaurant.service.OrderNotificationHelper
 import com.anydrop.restaurant.ui.common.InAppNotifier
 import com.anydrop.restaurant.ui.common.PrepTimeDialog
@@ -34,6 +36,13 @@ class OrderDetailActivity : AppCompatActivity() {
     private var orderId: Int = 0
     private var currentOrder: Order? = null
 
+    // Pickup OTP resend (2026-09-11) — UX-only cooldown, mirrors the
+    // rider app's RequestPayoutActivity.bankOtpResendTimer pattern
+    // (see that class's own kdoc). Real enforcement is server-side
+    // (pickup-otp-resend.php's own 30s cooldown check).
+    private var pickupOtpResendTimer: CountDownTimer? = null
+    private val pickupOtpResendCooldownMillis = 30_000L
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Opening any order counts as "went in and did something" — stop
@@ -53,8 +62,14 @@ class OrderDetailActivity : AppCompatActivity() {
         binding.btnBack.setOnClickListener { finish() }
         binding.btnCancelReject.setOnClickListener { binding.rejectGroup.visibility = View.GONE }
         binding.btnConfirmReject.setOnClickListener { confirmReject() }
+        binding.btnResendPickupOtp.setOnClickListener { resendPickupOtp() }
 
         loadOrder()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        pickupOtpResendTimer?.cancel()
     }
 
     private fun loadOrder() {
@@ -106,7 +121,70 @@ class OrderDetailActivity : AppCompatActivity() {
             binding.instructionsText.visibility = View.GONE
         }
 
+        renderPickupOtp(order)
         configureActions(order.status)
+    }
+
+    /** Pickup OTP (2026-09-11, migration 83) — card only shows while
+     *  orders-detail.php actually reveals a code: status ==
+     *  rider_assigned and not yet verified (matches that endpoint's own
+     *  reveal condition — see its kdoc). Cancels any in-flight resend
+     *  cooldown on re-render (e.g. after a poll/refresh) since a fresh
+     *  render means we don't know if the card is even the same order. */
+    private fun renderPickupOtp(order: Order) {
+        pickupOtpResendTimer?.cancel()
+        val showCard = order.status == "rider_assigned" && !order.pickupOtpVerified && order.pickupOtp != null
+        binding.pickupOtpCard.visibility = if (showCard) View.VISIBLE else View.GONE
+        if (showCard) {
+            binding.pickupOtpValueText.text = order.pickupOtp
+            binding.btnResendPickupOtp.isEnabled = true
+            binding.btnResendPickupOtp.text = getString(R.string.btn_resend_pickup_otp)
+        }
+    }
+
+    private fun resendPickupOtp() {
+        binding.btnResendPickupOtp.isEnabled = false
+        lifecycleScope.launch {
+            try {
+                val response = api.resendPickupOtp(orderId)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    InAppNotifier.show(this@OrderDetailActivity, getString(R.string.pickup_otp_resend_sent), InAppNotifier.Type.SUCCESS)
+                    startPickupOtpResendCooldown()
+                } else {
+                    val parsed = parseApiError(response.errorBody())
+                    val message = if (parsed.code == "resend_cooldown") {
+                        getString(R.string.pickup_otp_resend_cooldown_message)
+                    } else {
+                        getString(R.string.pickup_otp_resend_failed)
+                    }
+                    InAppNotifier.show(this@OrderDetailActivity, message, InAppNotifier.Type.ERROR)
+                    // Cooldown or a stale/invalid_state response both mean
+                    // "don't let them hammer the button" just as much as a
+                    // successful send does — restart the same 30s window
+                    // either way, matching the resend's own server cooldown.
+                    startPickupOtpResendCooldown()
+                }
+            } catch (e: Exception) {
+                binding.btnResendPickupOtp.isEnabled = true
+                InAppNotifier.show(this@OrderDetailActivity, "Network error", InAppNotifier.Type.ERROR)
+            }
+        }
+    }
+
+    private fun startPickupOtpResendCooldown() {
+        pickupOtpResendTimer?.cancel()
+        binding.btnResendPickupOtp.isEnabled = false
+        pickupOtpResendTimer = object : CountDownTimer(pickupOtpResendCooldownMillis, 1_000L) {
+            override fun onTick(millisUntilFinished: Long) {
+                val secondsLeft = (millisUntilFinished / 1000L) + 1
+                binding.btnResendPickupOtp.text = getString(R.string.pickup_otp_resend_countdown, secondsLeft)
+            }
+
+            override fun onFinish() {
+                binding.btnResendPickupOtp.isEnabled = true
+                binding.btnResendPickupOtp.text = getString(R.string.btn_resend_pickup_otp)
+            }
+        }.start()
     }
 
     private fun configureActions(status: String) {

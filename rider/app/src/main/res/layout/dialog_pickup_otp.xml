@@ -4,9 +4,10 @@
      restaurant/dialog_logout_confirm.xml's shape: circular icon badge,
      centered title, centered subtitle, full-width custom buttons (no
      more default AlertDialog title bar / OS-style text buttons).
-     Content still built around the same single manual-entry field as
-     before (see the original kdoc on why: rider is typing a code the
-     customer reads aloud, not autofilling their own SMS). -->
+     Content built around a single manual-entry field: rider is typing a
+     code the restaurant staff reads aloud when handing over the order
+     (migration 83, 2026-09-11 — new pickup OTP, mirrors the existing
+     delivery OTP dialog's shape one-for-one). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -34,7 +35,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/delivery_otp_dialog_title"
+        android:text="@string/pickup_otp_dialog_title"
         android:textSize="18sp"
         android:textStyle="bold"
         android:textColor="@color/text_primary"
@@ -44,7 +45,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
-        android:text="@string/delivery_otp_dialog_subtitle"
+        android:text="@string/pickup_otp_dialog_subtitle"
         android:textColor="@color/text_secondary"
         android:textSize="13sp"
         android:gravity="center" />
@@ -64,10 +65,10 @@
         app:startIconTint="@color/text_secondary">
 
         <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/inputDeliveryOtp"
+            android:id="@+id/inputPickupOtp"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="@string/hint_delivery_otp"
+            android:hint="@string/hint_pickup_otp"
             android:textColor="@color/text_primary"
             android:inputType="number"
             android:maxLength="6"
@@ -78,7 +79,7 @@
     </com.google.android.material.textfield.TextInputLayout>
 
     <TextView
-        android:id="@+id/deliveryOtpError"
+        android:id="@+id/pickupOtpError"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
@@ -95,7 +96,7 @@
         android:layout_marginTop="20dp">
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnDeliveryOtpCancel"
+            android:id="@+id/btnPickupOtpCancel"
             style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -103,13 +104,13 @@
             android:text="@string/btn_cancel" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnDeliveryOtpConfirm"
+            android:id="@+id/btnPickupOtpConfirm"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="10dp"
             android:backgroundTint="@color/anydrop_green"
-            android:text="@string/btn_mark_delivered" />
+            android:text="@string/btn_mark_picked_up_confirm" />
 
     </LinearLayout>
 

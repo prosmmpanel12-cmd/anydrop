@@ -487,6 +487,8 @@
     <string name="statement_badge_pending">Pending T+1</string>
     <string name="statement_load_error">Could not load statement</string>
     <string name="bank_details_title">Bank Details</string>
+    <string name="section_bank_account_details">Bank Account Details</string>
+    <string name="section_upi_details">UPI Details (Optional)</string>
     <string name="label_account_holder_name">Account Holder Name</string>
     <string name="hint_account_holder_name">As per bank records</string>
     <string name="label_bank_name">Bank Name</string>
@@ -574,6 +576,15 @@
     <string name="items_label">Items</string>
     <string name="customer_note_label">Delivery instructions</string>
     <string name="bill_total_label">Item total</string>
+
+    <!-- Pickup OTP (2026-09-11, migration 83) -->
+    <string name="pickup_otp_label">Pickup code</string>
+    <string name="pickup_otp_hint">Share this with the rider when they arrive</string>
+    <string name="btn_resend_pickup_otp">Resend</string>
+    <string name="pickup_otp_resend_countdown">Resend in %1$ds</string>
+    <string name="pickup_otp_resend_sent">Pickup code resent to the rider and your email</string>
+    <string name="pickup_otp_resend_cooldown_message">Please wait before resending again</string>
+    <string name="pickup_otp_resend_failed">Couldn\'t resend the pickup code</string>
 
     <!-- Order Management small addition — prep-time select on Accept
          (docs/18_Restaurant_App_Full_Scope_And_Rating_System.md, Order

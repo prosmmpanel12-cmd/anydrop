@@ -38,13 +38,28 @@ class EmailOtpService
 
     /**
      * @param string $purpose one of: customer_login, restaurant_signup,
-     *                        restaurant_login, email_change, password_reset
+     *                        restaurant_login, email_change, password_reset,
+     *                        rider_pickup_otp_resend, customer_delivery_otp_resend
+     * @param string|null $subject   Override the default subject line
+     *                               (2026-09-11: pickup/delivery OTP resends
+     *                               want an order-specific subject/heading
+     *                               rather than the generic login-code copy).
+     * @param string|null $heading   Override the big heading inside the email.
+     * @param string|null $intro     Override the one-line intro paragraph
+     *                               shown above the code.
      * @return array{success: bool, provider_driver_key: ?string, error: ?string}
      */
-    public function send(string $to, string $otp, string $purpose, int $expiryMinutes): array
-    {
-        $subject = 'Your AnyDrop confirmation code';
-        [$html, $text] = $this->buildEmail($otp, $expiryMinutes);
+    public function send(
+        string $to,
+        string $otp,
+        string $purpose,
+        int $expiryMinutes,
+        ?string $subject = null,
+        ?string $heading = null,
+        ?string $intro = null
+    ): array {
+        $subject = $subject ?? 'Your AnyDrop confirmation code';
+        [$html, $text] = $this->buildEmail($otp, $expiryMinutes, $heading, $intro);
 
         $providers = $this->registry->activeProvidersInOrder();
 
@@ -81,15 +96,85 @@ class EmailOtpService
         return ['success' => false, 'provider_driver_key' => null, 'error' => 'email_delivery_unavailable'];
     }
 
-    private function buildEmail(string $otp, int $expiryMinutes): array
+    /**
+     * 2026-09-11 (app-owner ask, "mail OTPs ko attractive banao HTML use
+     * kar ke") — replaces the old bare-bones single <div> with a proper
+     * branded HTML email: a colored header bar, a white content card
+     * with the OTP in a bordered "pill" box (rather than just large
+     * text), and a muted footer. Table-based layout (not flex/grid) on
+     * purpose — this needs to render correctly inside Gmail/Outlook's
+     * own HTML sanitizers, which strip modern CSS layout properties;
+     * tables + inline styles are the one thing every mail client still
+     * renders consistently. $heading/$intro let call sites (e.g. the
+     * pickup/delivery OTP resend endpoints) customize the copy while
+     * reusing the exact same visual shell as every login/signup OTP
+     * email already sends.
+     */
+    private function buildEmail(string $otp, int $expiryMinutes, ?string $heading = null, ?string $intro = null): array
     {
-        $html = '<div style="font-family:sans-serif;max-width:420px;margin:0 auto;padding:24px">'
-            . '<h2 style="margin:0 0 16px">AnyDrop confirmation code</h2>'
-            . '<p style="font-size:32px;letter-spacing:6px;font-weight:700;margin:0 0 16px">' . htmlspecialchars($otp) . '</p>'
-            . '<p style="color:#555">This code expires in ' . (int) $expiryMinutes . ' minutes. '
-            . 'If you didn\'t request this, you can safely ignore this email.</p>'
-            . '</div>';
-        $text = "Your AnyDrop confirmation code is: {$otp}\nThis code expires in {$expiryMinutes} minutes.\nIf you didn't request this, you can safely ignore this email.";
+        $heading = $heading ?? 'Your confirmation code';
+        $intro = $intro ?? 'Use the code below to continue. Don\'t share it with anyone — AnyDrop staff will never ask you for it over phone or chat.';
+        $brandColor = '#E64A19';
+        $otpEsc = htmlspecialchars($otp);
+        $headingEsc = htmlspecialchars($heading);
+        $introEsc = htmlspecialchars($intro);
+        $expiryLineEsc = $expiryMinutes > 0
+            ? 'This code expires in <strong>' . (int) $expiryMinutes . ' minutes</strong>.'
+            : 'This code <strong>stays valid for this order only</strong>.';
+
+        $html = <<<HTML
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4F4F5;padding:32px 0;font-family:Arial,Helvetica,sans-serif;">
+  <tr>
+    <td align="center">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#FFFFFF;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+        <tr>
+          <td style="background:{$brandColor};padding:22px 28px;">
+            <span style="font-size:20px;font-weight:bold;color:#FFFFFF;letter-spacing:0.5px;">AnyDrop</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px 28px 8px 28px;">
+            <h1 style="margin:0 0 12px 0;font-size:19px;color:#1A1A1A;">{$headingEsc}</h1>
+            <p style="margin:0 0 24px 0;font-size:14px;line-height:1.6;color:#555555;">{$introEsc}</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 28px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFF3EE;border:1px dashed {$brandColor};border-radius:10px;">
+              <tr>
+                <td align="center" style="padding:18px 0;">
+                  <span style="font-size:34px;font-weight:bold;letter-spacing:10px;color:{$brandColor};">{$otpEsc}</span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 28px 32px 28px;">
+            <p style="margin:0;font-size:13px;color:#888888;line-height:1.6;">
+              {$expiryLineEsc}
+              If you didn't request this, you can safely ignore this email —
+              no action is needed on your part.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#FAFAFA;padding:16px 28px;border-top:1px solid #EEEEEE;">
+            <p style="margin:0;font-size:11px;color:#AAAAAA;">
+              &copy; AnyDrop. This is an automated message, please don't reply to this email.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+HTML;
+
+        $expiryLine = $expiryMinutes > 0
+            ? "This code expires in {$expiryMinutes} minutes."
+            : 'This code stays valid for this order only.';
+        $text = "{$heading}\n\n{$intro}\n\nYour code: {$otp}\n{$expiryLine}\nIf you didn't request this, you can safely ignore this email.";
         return [$html, $text];
     }
 

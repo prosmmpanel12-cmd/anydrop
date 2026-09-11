@@ -64,12 +64,14 @@ interface ApiService {
     @POST("rider/orders-reject.php")
     suspend fun rejectOrder(@Query("id") orderId: Int, @Body body: RejectOrderBody = RejectOrderBody()): Response<ApiResponse<OkResult>>
 
-    /** POST /api/v1/rider/orders-pickup — confirms pickup at the restaurant.
-     *  Deep-plan §11 V1: the backend advances rider_assigned straight to
-     *  out_for_delivery in this one call, no separate "picked up" resting
-     *  state on the wire (pickup/drop-off flow, this session). */
+    /** POST /api/v1/rider/orders-pickup — verifies the pickup OTP (given by
+     *  the restaurant to the rider) and confirms pickup at the restaurant.
+     *  Migration 83 (2026-09-11): now always requires a real code, unlike
+     *  deliverOrder's conditional otp. Deep-plan §11 V1: the backend
+     *  advances rider_assigned straight to out_for_delivery in this one
+     *  call, no separate "picked up" resting state on the wire. */
     @POST("rider/orders-pickup.php")
-    suspend fun pickupOrder(@Query("id") orderId: Int): Response<ApiResponse<PickupOrderResult>>
+    suspend fun pickupOrder(@Query("id") orderId: Int, @Body body: PickupOrderBody): Response<ApiResponse<PickupOrderResult>>
 
     /** POST /api/v1/rider/orders-deliver — verifies the delivery OTP (if
      *  this order has one) and marks it delivered. Send an empty body

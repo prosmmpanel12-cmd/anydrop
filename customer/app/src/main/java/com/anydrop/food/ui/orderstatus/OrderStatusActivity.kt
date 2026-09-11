@@ -3,6 +3,7 @@ package com.anydrop.food.ui.orderstatus
 import android.animation.ValueAnimator
 import android.content.Intent
 import android.os.Bundle
+import android.os.CountDownTimer
 import android.os.SystemClock
 import android.view.View
 import android.widget.TextView
@@ -166,6 +167,13 @@ class OrderStatusActivity : AppCompatActivity(), OnMapReadyCallback {
     // next poll.
     private var lastTrack: OrderTrackResult? = null
 
+    // Delivery OTP resend (2026-09-11) — UX-only cooldown, same
+    // pattern as the restaurant app's OrderDetailActivity.
+    // pickupOtpResendTimer (see that class's kdoc). Real enforcement
+    // is server-side (delivery-otp-resend.php's own 30s cooldown check).
+    private var deliveryOtpResendTimer: CountDownTimer? = null
+    private val deliveryOtpResendCooldownMillis = 30_000L
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityOrderStatusBinding.inflate(layoutInflater)
@@ -179,6 +187,7 @@ class OrderStatusActivity : AppCompatActivity(), OnMapReadyCallback {
 
         binding.btnBackHome.setOnClickListener { goHome() }
         binding.btnCancelOrder.setOnClickListener { cancelOrder() }
+        binding.btnResendDeliveryOtp.setOnClickListener { resendDeliveryOtp() }
 
         // Google Maps' MapView needs its own lifecycle forwarded from the
         // Activity's — same requirement MapPinDropActivity's kdoc
@@ -230,6 +239,7 @@ class OrderStatusActivity : AppCompatActivity(), OnMapReadyCallback {
         super.onDestroy()
         polling = false
         riderMarkerAnimator?.cancel()
+        deliveryOtpResendTimer?.cancel()
         binding.trackingMapView.onDestroy()
     }
 
@@ -434,8 +444,26 @@ class OrderStatusActivity : AppCompatActivity(), OnMapReadyCallback {
         if (!track.otp.isNullOrBlank()) {
             binding.otpCard.visibility = View.VISIBLE
             binding.otpText.text = track.otp
+            // Only reset the resend button when no cooldown is running —
+            // otherwise a 5s poll landing mid-cooldown would stomp the
+            // countdown text/disabled state the timer is currently
+            // driving. Same reasoning as the restaurant app's
+            // renderPickupOtp(), just guarded instead of unconditional
+            // since this screen re-renders every poll cycle rather than
+            // once per explicit reload.
+            if (deliveryOtpResendTimer == null) {
+                binding.btnResendDeliveryOtp.isEnabled = true
+                binding.btnResendDeliveryOtp.text = getString(R.string.btn_resend_delivery_otp)
+            }
         } else {
             binding.otpCard.visibility = View.GONE
+            // otpCard's own visibility already gates btnResendDeliveryOtp
+            // (it lives inside that same card), but a cooldown timer
+            // still running for an OTP that just disappeared (order left
+            // rider_assigned/out_for_delivery) should stop rather than
+            // keep ticking against a hidden button.
+            deliveryOtpResendTimer?.cancel()
+            deliveryOtpResendTimer = null
         }
 
         binding.btnCancelOrder.visibility = if (track.status in CANCELLABLE_STATUSES) View.VISIBLE else View.GONE
@@ -778,5 +806,62 @@ class OrderStatusActivity : AppCompatActivity(), OnMapReadyCallback {
                 binding.btnCancelOrder.isEnabled = true
             }
         }
+    }
+
+    /** Delivery OTP Resend (2026-09-11) — customer-side counterpart to
+     *  the restaurant app's OrderDetailActivity.resendPickupOtp(). Same
+     *  two-method shape as that class; see its kdoc. Note this app's
+     *  error parser (ApiErrorParser.parse()) returns a raw
+     *  `Map<String, Any?>` for `data` rather than a typed
+     *  ParsedApiError with its own retryAfterSeconds field like the
+     *  restaurant/rider apps — the cooldown-vs-generic-failure message
+     *  choice below only needs the error `code`, so the map's numeric
+     *  value isn't read here, but it's available at `info.data
+     *  ["retry_after_seconds"]` (a Double, per Gson's raw-map decoding)
+     *  if a future screen wants to display the exact wait time. */
+    private fun resendDeliveryOtp() {
+        binding.btnResendDeliveryOtp.isEnabled = false
+        lifecycleScope.launch {
+            try {
+                val response = api.resendDeliveryOtp(orderId)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    InAppNotifier.show(this@OrderStatusActivity, getString(R.string.delivery_otp_resend_sent), InAppNotifier.Type.SUCCESS)
+                    startDeliveryOtpResendCooldown()
+                } else {
+                    val info = com.anydrop.food.network.ApiErrorParser.parse(response)
+                    val message = if (info.code == "resend_cooldown") {
+                        getString(R.string.delivery_otp_resend_cooldown_message)
+                    } else {
+                        getString(R.string.delivery_otp_resend_failed)
+                    }
+                    InAppNotifier.show(this@OrderStatusActivity, message, InAppNotifier.Type.ERROR)
+                    // Cooldown or a stale/invalid_state response both mean
+                    // "don't let them hammer the button" just as much as a
+                    // successful send does — restart the same 30s window
+                    // either way, matching the resend's own server cooldown.
+                    startDeliveryOtpResendCooldown()
+                }
+            } catch (e: Exception) {
+                binding.btnResendDeliveryOtp.isEnabled = true
+                InAppNotifier.show(this@OrderStatusActivity, "Network error", InAppNotifier.Type.ERROR)
+            }
+        }
+    }
+
+    private fun startDeliveryOtpResendCooldown() {
+        deliveryOtpResendTimer?.cancel()
+        binding.btnResendDeliveryOtp.isEnabled = false
+        deliveryOtpResendTimer = object : CountDownTimer(deliveryOtpResendCooldownMillis, 1_000L) {
+            override fun onTick(millisUntilFinished: Long) {
+                val secondsLeft = (millisUntilFinished / 1000L) + 1
+                binding.btnResendDeliveryOtp.text = getString(R.string.delivery_otp_resend_countdown, secondsLeft)
+            }
+
+            override fun onFinish() {
+                deliveryOtpResendTimer = null
+                binding.btnResendDeliveryOtp.isEnabled = true
+                binding.btnResendDeliveryOtp.text = getString(R.string.btn_resend_delivery_otp)
+            }
+        }.start()
     }
 }

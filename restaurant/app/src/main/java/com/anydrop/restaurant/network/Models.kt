@@ -514,7 +514,14 @@ data class Order(
     @SerializedName("scheduled_for") val scheduledFor: String? = null,
     @SerializedName("created_at") val createdAt: String,
     val items: List<OrderItemLine> = emptyList(),
-    @SerializedName("status_history") val statusHistory: List<OrderStatusHistoryEntry> = emptyList()
+    @SerializedName("status_history") val statusHistory: List<OrderStatusHistoryEntry> = emptyList(),
+    // Pickup OTP (2026-09-11, migration 83) — orders-detail.php/
+    // orders-list.php only populate pickup_otp while status ==
+    // rider_assigned (null otherwise, same reveal-window rule the
+    // rider/customer apps' own OTP fields already follow), so a null
+    // here is the normal "nothing to show" case, not a missing field.
+    @SerializedName("pickup_otp") val pickupOtp: String? = null,
+    @SerializedName("pickup_otp_verified") val pickupOtpVerified: Boolean = false
 )
 
 data class OrderResult(val order: Order)
@@ -522,6 +529,15 @@ data class OrderResult(val order: Order)
 data class RejectBody(val reason: String)
 data class StatusUpdateBody(val status: String)
 data class AcceptBody(@SerializedName("estimated_prep_minutes") val estimatedPrepMinutes: Int? = null)
+
+// Pickup OTP resend (2026-09-11) — POST with no request body; response
+// carries email_sent since the in-app notification always succeeds but
+// the email leg can fail independently (see pickup-otp-resend.php's
+// own kdoc for why that's not treated as a whole-request failure).
+data class ResendOtpResult(
+    val message: String,
+    @SerializedName("email_sent") val emailSent: Boolean
+)
 
 // ---- Dashboard ----
 

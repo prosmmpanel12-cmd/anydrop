@@ -241,18 +241,29 @@ try {
         $deliveryOtp = str_pad($deliveryOtp, $otpLength, '0', STR_PAD_LEFT);
     }
 
+    // Migration 83 — pickup OTP is ALWAYS generated (unlike delivery_otp
+    // above, which only exists for $otpRequired orders). See that
+    // migration's own comment for why: this protects the
+    // restaurant-to-rider handoff, a concern independent of payment
+    // method.
+    $pickupOtp = (string) random_int(
+        (int) str_pad('1', $otpLength, '0'),
+        (int) str_pad('', $otpLength, '9')
+    );
+    $pickupOtp = str_pad($pickupOtp, $otpLength, '0', STR_PAD_LEFT);
+
     $insertOrder = $db->prepare(
         'INSERT INTO orders (
             order_code, customer_id, idempotency_key, restaurant_id, status,
             item_total, delivery_charge, platform_fee, packing_charge, tax_amount, discount_amount,
             grand_total, commission_amount, payment_method, payment_status,
-            delivery_address_id, delivery_instructions, scheduled_for, coupon_id, delivery_otp,
+            delivery_address_id, delivery_instructions, scheduled_for, coupon_id, delivery_otp, pickup_otp,
             offer_id, offer_discount_amount, free_delivery_offer_id, free_delivery_discount_amount
         ) VALUES (
             :code, :cust, :idem, :rest, \'pending\',
             :item_total, :delivery_charge, :platform_fee, :packing_charge, :tax_amount, :discount_amount,
             :grand_total, :commission_amount, :payment_method, :payment_status,
-            :address_id, :instructions, :scheduled_for, :coupon_id, :otp,
+            :address_id, :instructions, :scheduled_for, :coupon_id, :otp, :pickup_otp,
             :offer_id, :offer_discount, :fd_offer_id, :fd_discount
         )'
     );
@@ -276,6 +287,7 @@ try {
         'scheduled_for' => $scheduledFor,
         'coupon_id' => $priced['coupon_id'],
         'otp' => $deliveryOtp,
+        'pickup_otp' => $pickupOtp,
         // recall.md Phase D item 28 / migration 47 — Offers Engine.
         'offer_id' => $priced['offer_id'],
         'offer_discount' => $priced['offer_discount_amount'],

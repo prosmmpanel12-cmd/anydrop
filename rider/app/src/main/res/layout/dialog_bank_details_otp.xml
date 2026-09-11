@@ -1,32 +1,62 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- App-owner ask, 2026-09-09: confirm-before-save on bank/UPI changes,
-     rider-style (OTP, not a password) — see payout-bank-details-save.php's
-     kdoc. Modeled on dialog_delivery_otp.xml's plain single-field style
-     (this is the rider's own email OTP, single 6-digit text entry, not
-     the boxed 6-digit grid activity_otp_verify.xml uses for login), with
-     a Resend row added since — unlike the delivery-OTP dialog — this OTP
-     is requested via a separate endpoint the rider may need to retrigger. -->
+<!-- UI polish pass, 2026-09-11 (app-owner ask: "rider ke dialogs sahi
+     karo... just like restaurant app") — restyled to match
+     restaurant/dialog_logout_confirm.xml's shape (icon badge, centered
+     title/subtitle, full-width custom buttons), same as
+     dialog_delivery_otp.xml and dialog_pickup_otp.xml got in this same
+     pass. Title moved in from the old AlertDialog.setTitle() call
+     (RequestPayoutActivity.kt's showBankOtpDialog() now uses
+     MaterialAlertDialogBuilder + custom button IDs instead, matching
+     AccountFragment.kt's own dialog_logout_confirm.xml wiring). Resend
+     row kept exactly as before — unlike the delivery/pickup dialogs,
+     this OTP is requested via a separate endpoint the rider may need
+     to retrigger. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:paddingHorizontal="24dp"
-    android:paddingTop="8dp"
-    android:paddingBottom="8dp">
+    android:gravity="center_horizontal"
+    android:padding="24dp">
+
+    <FrameLayout
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_icon_circle">
+
+        <ImageView
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_lock"
+            app:tint="@color/anydrop_green"
+            android:contentDescription="@null" />
+    </FrameLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/bank_otp_dialog_title"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="@color/text_primary"
+        android:gravity="center" />
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
         android:text="@string/bank_otp_dialog_subtitle"
         android:textColor="@color/text_secondary"
-        android:textSize="13sp" />
+        android:textSize="13sp"
+        android:gravity="center" />
 
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="20dp"
         style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
         app:boxCornerRadiusTopStart="12dp"
         app:boxCornerRadiusTopEnd="12dp"
@@ -46,6 +76,7 @@
             android:inputType="number"
             android:maxLength="6"
             android:letterSpacing="0.3"
+            android:gravity="center"
             android:textSize="18sp" />
 
     </com.google.android.material.textfield.TextInputLayout>
@@ -57,6 +88,7 @@
         android:layout_marginTop="8dp"
         android:textColor="@color/error_fg"
         android:textSize="12sp"
+        android:gravity="center"
         android:visibility="gone"
         tools:text="Incorrect code — 2 attempts remaining" />
 
@@ -73,5 +105,30 @@
         android:background="?attr/selectableItemBackgroundBorderless"
         android:padding="4dp"
         tools:text="Resend code" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="16dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnBankOtpCancel"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/btn_cancel" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnBankOtpConfirm"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:backgroundTint="@color/anydrop_green"
+            android:text="@string/btn_confirm_save" />
+
+    </LinearLayout>
 
 </LinearLayout>

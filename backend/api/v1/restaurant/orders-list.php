@@ -69,8 +69,16 @@ $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 $stmt->execute();
 $orders = $stmt->fetchAll();
 
+// Migration 83 — see orders-detail.php's identical comment: pickup OTP
+// is added here rather than in format_order() (shared by other apps'
+// endpoints), only surfaced once a rider is assigned.
 respond_ok([
-    'data' => array_map(fn($o) => format_order($db, $o), $orders),
+    'data' => array_map(function ($o) use ($db) {
+        $formatted = format_order($db, $o);
+        $formatted['pickup_otp'] = $o['status'] === 'rider_assigned' ? $o['pickup_otp'] : null;
+        $formatted['pickup_otp_verified'] = $o['pickup_otp_verified_at'] !== null;
+        return $formatted;
+    }, $orders),
     'meta' => [
         'page' => $page,
         'per_page' => $perPage,

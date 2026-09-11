@@ -250,6 +250,11 @@ data class OrderDetail(
 
 data class PickupOrderResult(@SerializedName("order_id") val orderId: Int, val status: String)
 
+/** Migration 83 (2026-09-11) — pickup_otp is always required (no
+ *  "otp not applicable" case like delivery's, see that migration's own
+ *  comment), so unlike DeliverOrderBody there's no legal empty-string path. */
+data class PickupOrderBody(val otp: String)
+
 /** otp is "" when the current order's deliveryOtpRequired is false —
  *  the backend ignores it entirely in that case (see orders-deliver.php kdoc). */
 data class DeliverOrderBody(val otp: String)

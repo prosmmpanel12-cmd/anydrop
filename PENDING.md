@@ -1143,6 +1143,36 @@ The following already have current source implementation/foundation and should o
 
 ---
 
+# 36a. Pickup OTP System + Delivery/Pickup OTP Resend (App+Email)
+
+**Status:** 🟡 BACKEND BUILT 2026-09-11 — Android (rider/restaurant/customer)
+NOT started, migration NOT run, NOT verified. See
+`docs/122_Handover_2026-09-11_AdminBootstrapFix_RestaurantBankUpiSplit_PickupOTP_Backend_Built_AndroidPending.md`
+for full detail.
+
+### Required
+- [x] Migration 83 — `pickup_otp`/`pickup_otp_attempts`/
+      `pickup_otp_verified_at`/`pickup_otp_last_sent_at`/
+      `delivery_otp_last_sent_at` columns (file written, not run)
+- [x] `orders/create.php` — generates pickup_otp for every order
+- [x] `rider/orders-pickup.php` — now requires + validates the OTP
+- [x] Restaurant `orders-detail.php`/`orders-list.php` expose pickup_otp
+      once a rider is assigned
+- [x] `restaurant/pickup-otp-resend.php` — app notification + email
+- [x] `customer/delivery-otp-resend.php` — app notification + email
+- [x] Attractive branded HTML OTP email template (`EmailOtpService.php`)
+- [x] Rider app `RiderDashboardActivity.kt` — Pickup OTP dialog + wiring
+      into the pickup button, delivery/bank OTP dialogs restyled to
+      match Restaurant app's style (see doc 123)
+- [ ] Rider app `HomeFragment.kt` — has its OWN separate copy of the
+      delivery-OTP dialog + pickup handling, NOT yet touched (doc 123)
+- [ ] Restaurant app — show Pickup OTP + Resend button on the order screen
+- [ ] Customer app — Resend button on the Delivery OTP display
+- [ ] Real DB/device verification (migration run, php -l, live email test,
+      real Gradle build)
+
+---
+
 # 37. Wallet Withdrawal + Prepaid-Cancel Auto-Refund-to-Wallet
 
 **Status:** 🟡 ALL CODE BUILT (backend + Android), 2026-08-30 (session

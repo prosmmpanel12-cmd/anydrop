@@ -601,6 +601,15 @@ data class CreateOrderResult(
 
 data class OrderDetailResult(val order: Order)
 
+// Delivery OTP Resend (2026-09-11) — response shape of
+// customer/delivery-otp-resend.php, matching the restaurant app's own
+// ResendOtpResult for pickup-otp-resend.php exactly (see that file's
+// kdoc for why email_sent isn't treated as a whole-request failure).
+data class ResendOtpResult(
+    val message: String,
+    @SerializedName("email_sent") val emailSent: Boolean
+)
+
 // ---- Native UPI Payment Gateway (doc 23, 2026-08-23) ----
 // Mirrors backend/lib/payment/UpipeProvider.php's client_payload shape
 // exactly — see PaymentService::initiatePayment()/rebuildClientPayloadFromRow().

@@ -2,10 +2,26 @@
 /**
  * POST /api/v1/rider/orders-pickup.php?id={order_id}
  * Auth: Rider token
- * Response: { "order_id": ..., "status": "out_for_delivery" }
+ * Request: { "otp": "1234" } — required, checked against orders.pickup_otp
+ * Response (success): { "order_id": ..., "status": "out_for_delivery" }
+ * Response (wrong otp): 401 invalid_otp, { "attempts_remaining": N }
+ * Response (locked):    400 otp_max_attempts_exceeded
  *
  * Phase 3 R4 (pickup/drop-off flow, deep-plan §10-11), built on top of
  * R3's accept flow (doc 85).
+ *
+ * Migration 83 (2026-09-11, app-owner ask): pickup used to be a single
+ * unauthenticated tap — anyone holding the rider's phone could advance
+ * the order with no proof they were actually the one standing at the
+ * restaurant counter. Now mirrors orders-deliver.php's own OTP-check
+ * shape exactly (same lockout via the shared otp_max_attempts setting,
+ * same attempts-remaining response body), just against pickup_otp/
+ * pickup_otp_attempts instead of delivery_otp/otp_attempts — kept as
+ * fully separate columns so a wrong pickup attempt never eats into the
+ * rider's delivery-OTP attempt budget later in the same order's life.
+ * Unlike delivery_otp, pickup_otp is never null (see migration 83's own
+ * comment), so — unlike orders-deliver.php — there is no "skip the
+ * check" branch here; every order requires it.
  *
  * Deep-plan §11's V1 recommendation is followed exactly: pickup
  * confirmation immediately transitions the order to out_for_delivery
@@ -30,6 +46,7 @@
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
+require_once __DIR__ . '/../../../lib/settings.php';
 require_once __DIR__ . '/../../../lib/orders.php';
 require_once __DIR__ . '/../../../lib/notifications.php';
 
@@ -49,11 +66,43 @@ if ($orderId <= 0) {
     respond_error('validation_error', 422, ['fields' => ['id']]);
 }
 
+$body = get_json_body();
+$enteredOtp = isset($body['otp']) ? trim((string) $body['otp']) : '';
+
 $db = Database::get();
+
+$orderStmt = $db->prepare('SELECT * FROM orders WHERE id = :id AND rider_id = :rider_id LIMIT 1');
+$orderStmt->execute(['id' => $orderId, 'rider_id' => $riderId]);
+$order = $orderStmt->fetch();
+
+if (!$order) {
+    respond_error('not_found', 404);
+}
+if ($order['status'] !== 'rider_assigned') {
+    respond_error('invalid_state', 409);
+}
+
+$maxAttempts = (int) get_setting('otp_max_attempts', 3);
+
+if ((int) $order['pickup_otp_attempts'] >= $maxAttempts) {
+    respond_error('otp_max_attempts_exceeded', 400);
+}
+
+if ($enteredOtp === '' || $enteredOtp !== $order['pickup_otp']) {
+    $incStmt = $db->prepare(
+        "UPDATE orders SET pickup_otp_attempts = pickup_otp_attempts + 1
+         WHERE id = :id AND rider_id = :rider_id AND status = 'rider_assigned'"
+    );
+    $incStmt->execute(['id' => $orderId, 'rider_id' => $riderId]);
+    respond_error('invalid_otp', 401, [
+        'attempts_remaining' => max(0, $maxAttempts - (int) $order['pickup_otp_attempts'] - 1),
+    ]);
+}
+
 $db->beginTransaction();
 
 $upd = $db->prepare(
-    "UPDATE orders SET status = 'out_for_delivery', picked_up_at = NOW()
+    "UPDATE orders SET status = 'out_for_delivery', picked_up_at = NOW(), pickup_otp_verified_at = NOW()
      WHERE id = :id AND rider_id = :rider_id AND status = 'rider_assigned'"
 );
 $upd->execute(['id' => $orderId, 'rider_id' => $riderId]);

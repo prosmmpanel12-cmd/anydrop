@@ -113,114 +113,194 @@
                 android:textColor="@color/text_secondary"
                 android:visibility="gone" />
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                app:boxCornerRadiusTopStart="12dp" app:boxCornerRadiusTopEnd="12dp"
-                app:boxCornerRadiusBottomStart="12dp" app:boxCornerRadiusBottomEnd="12dp"
-                app:boxStrokeColor="@color/anydrop_primary">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/inputAccountHolderName"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="@string/hint_account_holder_name"
-                    android:inputType="textCapWords"
-                    android:maxLength="100" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                app:boxCornerRadiusTopStart="12dp" app:boxCornerRadiusTopEnd="12dp"
-                app:boxCornerRadiusBottomStart="12dp" app:boxCornerRadiusBottomEnd="12dp"
-                app:boxStrokeColor="@color/anydrop_primary">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/inputBankName"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="@string/hint_bank_name"
-                    android:inputType="textCapWords"
-                    android:maxLength="100" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <!-- Account number only ever comes back masked from the
-                 server (serialize_bank_details_for_restaurant()'s own
-                 kdoc: full value never re-echoed after the initial save
-                 response) — this field always starts blank, with
-                 maskedAccountLabel below showing whatever's currently
-                 on file. Leaving this blank on Save means "keep the
-                 existing number, only other fields changed" —
-                 bank-details-save.php still requires it non-empty
-                 today, so BankDetailsActivity.kt must treat "blank +
-                 masked value already exists" as its own client-side
-                 case (see the Activity's own kdoc). -->
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                app:boxCornerRadiusTopStart="12dp" app:boxCornerRadiusTopEnd="12dp"
-                app:boxCornerRadiusBottomStart="12dp" app:boxCornerRadiusBottomEnd="12dp"
-                app:boxStrokeColor="@color/anydrop_primary">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/inputAccountNumber"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="@string/hint_account_number"
-                    android:inputType="number"
-                    android:maxLength="18" />
-            </com.google.android.material.textfield.TextInputLayout>
-
+            <!-- ==================== BANK ACCOUNT SECTION ==================== -->
             <TextView
-                android:id="@+id/maskedAccountLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:textSize="12sp"
-                android:textColor="@color/text_secondary"
-                android:visibility="gone" />
+                android:text="@string/section_bank_account_details"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.03"
+                android:textColor="@color/anydrop_primary"
+                android:layout_marginBottom="10dp" />
 
-            <com.google.android.material.textfield.TextInputLayout
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                app:boxCornerRadiusTopStart="12dp" app:boxCornerRadiusTopEnd="12dp"
-                app:boxCornerRadiusBottomStart="12dp" app:boxCornerRadiusBottomEnd="12dp"
-                app:boxStrokeColor="@color/anydrop_primary">
+                android:orientation="vertical"
+                android:background="@drawable/bg_card_rounded"
+                android:padding="14dp"
+                android:layout_marginBottom="20dp">
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/inputIfscCode"
+                <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/hint_ifsc_code"
-                    android:inputType="textCapCharacters"
-                    android:maxLength="11" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:text="@string/label_account_holder_name"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginBottom="4dp" />
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                app:boxCornerRadiusTopStart="12dp" app:boxCornerRadiusTopEnd="12dp"
-                app:boxCornerRadiusBottomStart="12dp" app:boxCornerRadiusBottomEnd="12dp"
-                app:boxStrokeColor="@color/anydrop_primary">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/inputUpiId"
+                <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/hint_upi_id"
-                    android:inputType="textNoSuggestions"
-                    android:maxLength="60" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    app:boxCornerRadiusTopStart="12dp" app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp" app:boxCornerRadiusBottomEnd="12dp"
+                    app:boxStrokeColor="@color/anydrop_primary">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputAccountHolderName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="@string/hint_account_holder_name"
+                        android:inputType="textCapWords"
+                        android:maxLength="100" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/label_bank_name"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginTop="14dp"
+                    android:layout_marginBottom="4dp" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    app:boxCornerRadiusTopStart="12dp" app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp" app:boxCornerRadiusBottomEnd="12dp"
+                    app:boxStrokeColor="@color/anydrop_primary">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputBankName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="@string/hint_bank_name"
+                        android:inputType="textCapWords"
+                        android:maxLength="100" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/label_account_number"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginTop="14dp"
+                    android:layout_marginBottom="4dp" />
+
+                <!-- Account number only ever comes back masked from the
+                     server (serialize_bank_details_for_restaurant()'s own
+                     kdoc: full value never re-echoed after the initial save
+                     response) — this field always starts blank, with
+                     maskedAccountLabel below showing whatever's currently
+                     on file. Leaving this blank on Save means "keep the
+                     existing number, only other fields changed" —
+                     bank-details-save.php still requires it non-empty
+                     today, so BankDetailsActivity.kt must treat "blank +
+                     masked value already exists" as its own client-side
+                     case (see the Activity's own kdoc). -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    app:boxCornerRadiusTopStart="12dp" app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp" app:boxCornerRadiusBottomEnd="12dp"
+                    app:boxStrokeColor="@color/anydrop_primary">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputAccountNumber"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="@string/hint_account_number"
+                        android:inputType="number"
+                        android:maxLength="18" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <TextView
+                    android:id="@+id/maskedAccountLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/label_ifsc_code"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginTop="14dp"
+                    android:layout_marginBottom="4dp" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    app:boxCornerRadiusTopStart="12dp" app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp" app:boxCornerRadiusBottomEnd="12dp"
+                    app:boxStrokeColor="@color/anydrop_primary">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputIfscCode"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="@string/hint_ifsc_code"
+                        android:inputType="textCapCharacters"
+                        android:maxLength="11" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+            </LinearLayout>
+
+            <!-- ==================== UPI SECTION ==================== -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/section_upi_details"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.03"
+                android:textColor="@color/anydrop_primary"
+                android:layout_marginBottom="10dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_card_rounded"
+                android:padding="14dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/label_upi_id_optional"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginBottom="4dp" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    app:boxCornerRadiusTopStart="12dp" app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp" app:boxCornerRadiusBottomEnd="12dp"
+                    app:boxStrokeColor="@color/anydrop_primary">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputUpiId"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="@string/hint_upi_id"
+                        android:inputType="textNoSuggestions"
+                        android:maxLength="60" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+            </LinearLayout>
 
         </LinearLayout>
     </ScrollView>

@@ -11,13 +11,13 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.anydrop.rider.R
 import com.anydrop.rider.data.TokenManager
 import com.anydrop.rider.databinding.DialogDeliveryOtpBinding
+import com.anydrop.rider.databinding.DialogPickupOtpBinding
 import com.anydrop.rider.databinding.FragmentHomeBinding
 import com.anydrop.rider.network.ApiClient
 import com.anydrop.rider.network.CurrentOrder
@@ -25,6 +25,7 @@ import com.anydrop.rider.network.DeliverOrderBody
 import com.anydrop.rider.network.LocationBody
 import com.anydrop.rider.network.Offer
 import com.anydrop.rider.network.OnlineStatusBody
+import com.anydrop.rider.network.PickupOrderBody
 import com.anydrop.rider.network.RejectOrderBody
 import com.anydrop.rider.network.parseApiError
 import com.anydrop.rider.ui.common.InAppNotifier
@@ -157,7 +158,7 @@ class HomeFragment : Fragment() {
                 )
             }
         }
-        binding.btnMarkPickedUp.setOnClickListener { activeOrder?.let { markPickedUp(it) } }
+        binding.btnMarkPickedUp.setOnClickListener { activeOrder?.let { showPickupOtpDialog(it) } }
         binding.btnMarkDelivered.setOnClickListener {
             val order = activeOrder ?: return@setOnClickListener
             if (order.deliveryOtpRequired) {
@@ -512,26 +513,110 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private fun markPickedUp(order: CurrentOrder) {
-        _binding?.btnMarkPickedUp?.isEnabled = false
+    /** Calls orders-pickup.php with the entered OTP. Migration 83
+     *  (2026-09-11): pickup now requires the restaurant-given code, same
+     *  invalid_otp/otp_max_attempts_exceeded/invalid_state contract as
+     *  deliverOrder() below — mirrors RiderDashboardActivity's copy
+     *  one-for-one (see that class's kdoc for the onInvalidOtp/onDone
+     *  split). */
+    private fun markPickedUp(
+        order: CurrentOrder,
+        otp: String,
+        onInvalidOtp: ((attemptsRemaining: Int?) -> Unit)? = null,
+        onDone: (() -> Unit)? = null
+    ) {
         lifecycleScope.launch {
             try {
-                val response = api.pickupOrder(order.id)
+                val response = api.pickupOrder(order.id, PickupOrderBody(otp))
                 if (response.isSuccessful && response.body()?.success == true) {
                     InAppNotifier.show(activity, getString(R.string.pickup_confirmed), InAppNotifier.Type.SUCCESS)
+                    onDone?.invoke()
+                    pollDashboardState()
                 } else {
                     val parsed = parseApiError(response.errorBody())
-                    if (parsed.code != "invalid_state") {
-                        InAppNotifier.show(activity, getString(R.string.error_network), InAppNotifier.Type.ERROR)
+                    when (parsed.code) {
+                        "invalid_otp" -> {
+                            // Keep the dialog open — onInvalidOtp shows the
+                            // inline error and re-enables the Confirm button.
+                            onInvalidOtp?.invoke(parsed.attemptsRemaining)
+                            // Do NOT call onDone — dialog must stay visible.
+                        }
+                        "otp_max_attempts_exceeded" -> {
+                            // Order stays rider_assigned server-side, same
+                            // "never change status on a bad OTP" rule as
+                            // delivery. No re-poll needed — card is correct.
+                            InAppNotifier.show(activity, getString(R.string.error_pickup_otp_locked), InAppNotifier.Type.ERROR)
+                            onDone?.invoke()
+                        }
+                        "invalid_state" -> {
+                            // Order moved on via another path — silent re-poll
+                            // to resync the card.
+                            onDone?.invoke()
+                            pollDashboardState()
+                        }
+                        else -> {
+                            InAppNotifier.show(activity, getString(R.string.error_network), InAppNotifier.Type.ERROR)
+                            onDone?.invoke()
+                            pollDashboardState()
+                        }
                     }
                 }
             } catch (e: Exception) {
                 InAppNotifier.show(activity, getString(R.string.error_network), InAppNotifier.Type.ERROR)
-            } finally {
-                _binding?.btnMarkPickedUp?.isEnabled = true
+                onDone?.invoke()
                 pollDashboardState()
             }
         }
+    }
+
+    /** Inflates dialog_pickup_otp.xml, shows the OTP entry dialog, and
+     *  calls markPickedUp() on Confirm. Same three-outcome shape as
+     *  showDeliveryOtpDialog() below — restyled in the same 2026-09-11
+     *  UI polish pass as RiderDashboardActivity's copy (icon badge,
+     *  centered title/subtitle, custom full-width buttons instead of
+     *  AlertDialog's default title bar / OS text buttons). */
+    private fun showPickupOtpDialog(order: CurrentOrder) {
+        val dialogBinding = DialogPickupOtpBinding.inflate(layoutInflater)
+
+        val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setView(dialogBinding.root)
+            .setCancelable(true)
+            .create()
+
+        dialogBinding.btnPickupOtpCancel.setOnClickListener { dialog.dismiss() }
+
+        val confirmButton = dialogBinding.btnPickupOtpConfirm
+        confirmButton.setOnClickListener {
+            val otp = dialogBinding.inputPickupOtp.text?.toString()?.trim() ?: ""
+            if (otp.isEmpty()) {
+                dialogBinding.pickupOtpError.text = getString(R.string.error_pickup_otp_empty)
+                dialogBinding.pickupOtpError.visibility = View.VISIBLE
+                return@setOnClickListener
+            }
+
+            confirmButton.isEnabled = false
+            dialogBinding.pickupOtpError.visibility = View.GONE
+
+            markPickedUp(
+                order = order,
+                otp = otp,
+                onInvalidOtp = { attemptsRemaining ->
+                    confirmButton.isEnabled = true
+                    val msg = if (attemptsRemaining != null) {
+                        getString(R.string.error_pickup_otp_invalid_format, attemptsRemaining)
+                    } else {
+                        getString(R.string.error_pickup_otp_invalid)
+                    }
+                    dialogBinding.pickupOtpError.text = msg
+                    dialogBinding.pickupOtpError.visibility = View.VISIBLE
+                },
+                onDone = {
+                    dialog.dismiss()
+                }
+            )
+        }
+
+        dialog.show()
     }
 
     private fun deliverOrder(
@@ -577,48 +662,51 @@ class HomeFragment : Fragment() {
         }
     }
 
+    /** Inflates dialog_delivery_otp.xml, shows the OTP entry dialog, and
+     *  calls deliverOrder() on Confirm. 2026-09-11 restyle: matches
+     *  RiderDashboardActivity's copy — dialog_delivery_otp.xml now has
+     *  its own real MaterialButtons (btnDeliveryOtpCancel/
+     *  btnDeliveryOtpConfirm) built in, so this no longer relies on
+     *  AlertDialog's default title bar / BUTTON_POSITIVE plumbing. */
     private fun showDeliveryOtpDialog(order: CurrentOrder) {
         val dialogBinding = DialogDeliveryOtpBinding.inflate(layoutInflater)
 
-        val dialog = AlertDialog.Builder(requireContext())
-            .setTitle(R.string.delivery_otp_dialog_title)
+        val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
             .setView(dialogBinding.root)
             .setCancelable(true)
-            .setPositiveButton(R.string.btn_mark_delivered, null)
-            .setNegativeButton(android.R.string.cancel, null)
             .create()
 
-        dialog.setOnShowListener {
-            val confirmButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            confirmButton.setOnClickListener {
-                val otp = dialogBinding.inputDeliveryOtp.text?.toString()?.trim() ?: ""
-                if (otp.isEmpty()) {
-                    dialogBinding.deliveryOtpError.text = getString(R.string.error_delivery_otp_empty)
-                    dialogBinding.deliveryOtpError.visibility = View.VISIBLE
-                    return@setOnClickListener
-                }
+        dialogBinding.btnDeliveryOtpCancel.setOnClickListener { dialog.dismiss() }
 
-                confirmButton.isEnabled = false
-                dialogBinding.deliveryOtpError.visibility = View.GONE
-
-                deliverOrder(
-                    order = order,
-                    otp = otp,
-                    onInvalidOtp = { attemptsRemaining ->
-                        confirmButton.isEnabled = true
-                        val msg = if (attemptsRemaining != null) {
-                            getString(R.string.error_delivery_otp_invalid_format, attemptsRemaining)
-                        } else {
-                            getString(R.string.error_delivery_otp_invalid)
-                        }
-                        dialogBinding.deliveryOtpError.text = msg
-                        dialogBinding.deliveryOtpError.visibility = View.VISIBLE
-                    },
-                    onDone = {
-                        dialog.dismiss()
-                    }
-                )
+        val confirmButton = dialogBinding.btnDeliveryOtpConfirm
+        confirmButton.setOnClickListener {
+            val otp = dialogBinding.inputDeliveryOtp.text?.toString()?.trim() ?: ""
+            if (otp.isEmpty()) {
+                dialogBinding.deliveryOtpError.text = getString(R.string.error_delivery_otp_empty)
+                dialogBinding.deliveryOtpError.visibility = View.VISIBLE
+                return@setOnClickListener
             }
+
+            confirmButton.isEnabled = false
+            dialogBinding.deliveryOtpError.visibility = View.GONE
+
+            deliverOrder(
+                order = order,
+                otp = otp,
+                onInvalidOtp = { attemptsRemaining ->
+                    confirmButton.isEnabled = true
+                    val msg = if (attemptsRemaining != null) {
+                        getString(R.string.error_delivery_otp_invalid_format, attemptsRemaining)
+                    } else {
+                        getString(R.string.error_delivery_otp_invalid)
+                    }
+                    dialogBinding.deliveryOtpError.text = msg
+                    dialogBinding.deliveryOtpError.visibility = View.VISIBLE
+                },
+                onDone = {
+                    dialog.dismiss()
+                }
+            )
         }
 
         dialog.show()

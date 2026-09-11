@@ -109,6 +109,15 @@ interface ApiService {
     @POST("orders/cancel.php")
     suspend fun cancelOrder(@Query("id") orderId: Int): Response<ApiResponse<OrderDetailResult>>
 
+    /** Delivery OTP Resend (2026-09-11) — re-sends the existing
+     *  delivery_otp (no new code generated) via notification + email.
+     *  Only legal while delivery_otp exists and the order is at
+     *  rider_assigned/out_for_delivery, matching orders/track.php's own
+     *  reveal condition; 429 resend_cooldown with retry_after_seconds
+     *  in data inside the 30s window — see that endpoint's own kdoc. */
+    @POST("customer/delivery-otp-resend.php")
+    suspend fun resendDeliveryOtp(@Query("id") orderId: Int): Response<ApiResponse<ResendOtpResult>>
+
     // ---- Native UPI Payment Gateway (doc 23, 2026-08-23) ----
     // Hits the .php files directly, same convention as every other
     // endpoint in this interface (see the notification-bell comment

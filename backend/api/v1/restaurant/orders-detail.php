@@ -31,4 +31,16 @@ if ((int) $order['restaurant_id'] !== (int) $owner['owner_id']) {
     respond_error('forbidden', 403);
 }
 
-respond_ok(['order' => format_order($db, $order)]);
+$formatted = format_order($db, $order);
+
+// Migration 83 — pickup OTP is restaurant-facing (the restaurant reads
+// it out to whichever rider shows up to collect the order), so it's
+// added here rather than in format_order() itself (shared by
+// customer/admin/rider responses too, none of which should ever see
+// this). Only surfaced once a rider is actually assigned — before
+// that there's no one to hand it to yet, and after pickup it's no
+// longer useful (pickup_otp_verified tells the app to stop showing it).
+$formatted['pickup_otp'] = $order['status'] === 'rider_assigned' ? $order['pickup_otp'] : null;
+$formatted['pickup_otp_verified'] = $order['pickup_otp_verified_at'] !== null;
+
+respond_ok(['order' => $formatted]);
