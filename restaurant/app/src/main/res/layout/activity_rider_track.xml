@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Restaurant order tracking (2026-09-11, plan doc 127 §1) — marker-only
+     map (rider/restaurant/delivery pins, animated rider movement), no
+     route polyline for v1 per that section's recommendation. Header +
+     full-screen MapView, same structural pattern as
+     activity_location_picker.xml (this app's other MapView-bearing
+     screen). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="16dp"
+        android:background="@color/surface">
+
+        <ImageView
+            android:id="@+id/btnBack"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_back"
+            app:tint="@color/text_primary"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            tools:ignore="ContentDescription" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:text="@string/rider_track_title" />
+
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <com.google.android.gms.maps.MapView
+            android:id="@+id/riderTrackMapView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- Shown until the first poll actually returns a rider position
+             (e.g. status is trackable but rider hasn't been assigned a
+             GPS fix yet) — see RiderTrackActivity's updateMap() kdoc. -->
+        <TextView
+            android:id="@+id/waitingText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_card_rounded"
+            android:padding="14dp"
+            android:text="@string/rider_track_waiting"
+            android:textColor="@color/text_secondary" />
+
+    </FrameLayout>
+
+</LinearLayout>

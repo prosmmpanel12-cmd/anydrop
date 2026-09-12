@@ -129,6 +129,12 @@
             android:name=".ui.orderdetail.OrderDetailActivity"
             android:exported="false" />
 
+        <!-- Restaurant order tracking (plan doc 127 §1, 2026-09-11) —
+             launched from OrderDetailActivity's "Track Order" card. -->
+        <activity
+            android:name=".ui.ordertrack.RiderTrackActivity"
+            android:exported="false" />
+
         <!-- Notification bell (Type 1, docs/Status.md 2026-08-20). -->
         <activity
             android:name=".ui.notifications.NotificationListActivity"

@@ -293,4 +293,9 @@ interface ApiService {
 
     @POST("restaurant/fcm-token-update.php")
     suspend fun updateFcmToken(@Body body: FcmTokenBody): Response<ApiResponse<FcmTokenResult>>
+
+    // ---- Restaurant order tracking (plan doc 127 §1, 2026-09-11) ----
+
+    @GET("restaurant/orders-track.php")
+    suspend fun trackOrder(@Query("id") orderId: Int): Response<ApiResponse<RestaurantTrackResult>>
 }

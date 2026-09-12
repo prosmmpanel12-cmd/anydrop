@@ -1,6 +1,7 @@
 package com.anydrop.restaurant.ui.orderdetail
 
 import android.os.Bundle
+import android.content.Intent
 import android.os.CountDownTimer
 import android.view.View
 import android.widget.TextView
@@ -17,6 +18,8 @@ import com.anydrop.restaurant.network.parseApiError
 import com.anydrop.restaurant.service.OrderNotificationHelper
 import com.anydrop.restaurant.ui.common.InAppNotifier
 import com.anydrop.restaurant.ui.common.PrepTimeDialog
+import com.anydrop.restaurant.ui.common.StatusChangeConfirmDialog
+import com.anydrop.restaurant.ui.ordertrack.RiderTrackActivity
 import com.anydrop.restaurant.util.ScheduledTimeFormatter
 import kotlinx.coroutines.launch
 
@@ -43,6 +46,10 @@ class OrderDetailActivity : AppCompatActivity() {
     private var pickupOtpResendTimer: CountDownTimer? = null
     private val pickupOtpResendCooldownMillis = 30_000L
 
+    // Track Order (2026-09-11, plan doc 127 §1) — same status set
+    // orders-track.php actually populates a rider position for.
+    private val trackableStatuses = setOf("rider_assigned", "picked_up", "out_for_delivery")
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Opening any order counts as "went in and did something" — stop
@@ -63,6 +70,13 @@ class OrderDetailActivity : AppCompatActivity() {
         binding.btnCancelReject.setOnClickListener { binding.rejectGroup.visibility = View.GONE }
         binding.btnConfirmReject.setOnClickListener { confirmReject() }
         binding.btnResendPickupOtp.setOnClickListener { resendPickupOtp() }
+        // Track Order (2026-09-11, plan doc 127 §1)
+        binding.btnTrackOrder.setOnClickListener {
+            startActivity(
+                Intent(this, RiderTrackActivity::class.java)
+                    .putExtra(RiderTrackActivity.EXTRA_ORDER_ID, orderId)
+            )
+        }
 
         loadOrder()
     }
@@ -122,7 +136,20 @@ class OrderDetailActivity : AppCompatActivity() {
         }
 
         renderPickupOtp(order)
+        renderTrackOrderCard(order)
         configureActions(order.status)
+    }
+
+    /** Track Order (2026-09-11, plan doc 127 §1) — visible for exactly the
+     * statuses the new orders-track.php endpoint actually populates a
+     * rider position for (see that endpoint's kdoc); different status set
+     * than pickup OTP, per doc 127 §1's Android plan: pickup OTP only
+     * shows for rider_assigned, tracking should stay visible through
+     * out_for_delivery since the restaurant may want to confirm delivery
+     * happened. */
+    private fun renderTrackOrderCard(order: Order) {
+        binding.trackOrderCard.visibility =
+            if (order.status in trackableStatuses) View.VISIBLE else View.GONE
     }
 
     /** Pickup OTP (2026-09-11, migration 83) — card only shows while
@@ -187,6 +214,12 @@ class OrderDetailActivity : AppCompatActivity() {
         }.start()
     }
 
+    /** Plan doc 127 §2 — "Mark Preparing"/"Mark Ready" now go through
+     * [StatusChangeConfirmDialog] instead of firing [updateStatus]
+     * directly. Accept (pending → accepted) and Reject are unchanged:
+     * Accept already has [PrepTimeDialog] as a real confirm step and
+     * Reject already requires typing a reason + a separate "Confirm
+     * Reject" tap — both count as sufficient confirmation on their own. */
     private fun configureActions(status: String) {
         binding.rejectGroup.visibility = View.GONE
 
@@ -205,14 +238,30 @@ class OrderDetailActivity : AppCompatActivity() {
                 binding.btnSecondaryAction.visibility = View.GONE
                 binding.btnPrimaryAction.visibility = View.VISIBLE
                 binding.btnPrimaryAction.text = getString(R.string.btn_mark_preparing)
-                binding.btnPrimaryAction.setOnClickListener { updateStatus("preparing") }
+                // Plan doc 127 §2 — was a direct updateStatus() call with
+                // zero confirmation; now gated behind a confirm dialog,
+                // same as "ready" below. Accept is intentionally left
+                // alone — see this method's kdoc.
+                binding.btnPrimaryAction.setOnClickListener {
+                    StatusChangeConfirmDialog.show(
+                        this,
+                        getString(R.string.dialog_confirm_preparing_title),
+                        getString(R.string.dialog_confirm_preparing_message)
+                    ) { updateStatus("preparing") }
+                }
             }
             "preparing" -> {
                 binding.actionBar.visibility = View.VISIBLE
                 binding.btnSecondaryAction.visibility = View.GONE
                 binding.btnPrimaryAction.visibility = View.VISIBLE
                 binding.btnPrimaryAction.text = getString(R.string.btn_mark_ready)
-                binding.btnPrimaryAction.setOnClickListener { updateStatus("ready") }
+                binding.btnPrimaryAction.setOnClickListener {
+                    StatusChangeConfirmDialog.show(
+                        this,
+                        getString(R.string.dialog_confirm_ready_title),
+                        getString(R.string.dialog_confirm_ready_message)
+                    ) { updateStatus("ready") }
+                }
             }
             else -> {
                 // ready / rider_assigned / picked_up / out_for_delivery / delivered / cancelled / rejected:

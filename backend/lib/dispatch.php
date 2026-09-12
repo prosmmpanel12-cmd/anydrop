@@ -161,7 +161,7 @@ function dispatch_next_candidate(PDO $db, int $orderId): bool
     }
 
     $riderId = $candidates[0]['rider_id'];
-    $timeoutSeconds = (int) get_setting('rider_assignment_timeout_seconds', 40);
+    $timeoutSeconds = (int) get_setting('rider_assignment_timeout_seconds', 180);
 
     $ins = $db->prepare(
         'INSERT INTO rider_order_assignments (order_id, rider_id, status, attempt_no, expires_at)

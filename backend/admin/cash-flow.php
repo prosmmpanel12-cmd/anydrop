@@ -29,8 +29,39 @@
  *      next page load, no separate bookkeeping step (deep plan §7's
  *      core ask) — this page reads, it never writes.
  *
- * Read-only page — no POST handling, no writes anywhere. Gated on
- * payouts_view, same module as Settlements/Rider Settlements.
+ *      UPDATE 2026-09-11 (app-owner ask): added a second, period-scoped
+ *      row under this section — Order Revenue / Commission Taken / Net
+ *      to Restaurants, summed straight from `orders` (delivered only,
+ *      same $fromDate/$toDate range as "Paid"/"Received" above). This
+ *      answers a genuinely different question from
+ *      total_payable_to_restaurants/total_due_from_restaurants (which
+ *      are "what's owed right now, all-time" — current_due) — it's
+ *      "how much business happened in this window", the same
+ *      delivered-orders definition restaurant/statement.php already
+ *      uses per-restaurant, just summed across all restaurants here.
+ *      The two rows are deliberately not reconciled against each other
+ *      on this page — current_due carries forward across periods
+ *      (it's a running balance) while the revenue row resets to
+ *      whatever the date filter covers, so they answer different
+ *      questions by design, same as this page's own Section
+ *      1/2/3 split already does.
+ *
+ * Gated on payouts_view (view) / payouts_manage (the quick-action
+ * forms below) — same modules as Settlements/Rider Settlements.
+ *
+ * UPDATE 2026-09-12 (app-owner ask): this was purely a read/aggregation
+ * page — "record the settlement" always meant leaving this page for
+ * rider-settlements.php or settlements.php. Added inline quick-action
+ * forms (rider "Settle", restaurant "Pay Now") that POST back to this
+ * same file and call the exact same lib/rider_ledger.php
+ * record_rider_settlement() / lib/ledger.php record_settlement()
+ * functions those detail pages already use — no new write logic, just
+ * a shorter path to it. Since this page always recomputes every number
+ * fresh from the ledger tables on load, acting here "auto syncs" the
+ * page the moment it reloads, same as acting on the detail pages
+ * always did. The detail pages are still linked next to every quick
+ * action for the full form (UTR/screenshot/remarks) when that's
+ * needed — this is a fast path for the common no-proof-needed case.
  *
  * UPDATE 2026-09-10 (same day, owner asked to merge rather than have
  * two separate "cash flow" pages): what used to be the standalone
@@ -54,12 +85,94 @@
 
 require_once __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../lib/rider_ledger.php';
+require_once __DIR__ . '/../lib/ledger.php';
+require_once __DIR__ . '/../lib/audit.php';
 
 $admin = admin_require_login();
 admin_require_permission($admin, 'payouts_view');
+$canEdit = admin_has_permission((int) $admin['id'], 'payouts_manage');
 $db = Database::get();
 
 $settlementLimit = rider_cod_settlement_limit();
+$csrf = admin_csrf_token();
+$flash = null;
+$flashType = 'success';
+
+// ============================================================
+// Quick-action POST handling — 2026-09-12 app-owner ask: let admin
+// record a rider's COD settlement or a restaurant's Pay Now directly
+// from this page, instead of having to click through to
+// rider-settlements.php / settlements.php first. Both write through
+// the exact same functions those detail pages already use
+// (record_rider_settlement() / record_settlement()) — no new ledger
+// logic, just a shorter path to the same write path. Since every
+// number below is read fresh from the ledger tables on every load
+// (same as this page always did), the numbers on this page "auto
+// sync" the moment the form posts back here — no separate refresh
+// step, no caching to invalidate.
+// ============================================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!admin_verify_csrf($_POST['csrf_token'] ?? '')) {
+        $flash = 'Session expired — please try again.';
+        $flashType = 'error';
+    } elseif (!$canEdit) {
+        $flash = 'You don\'t have permission to record settlements.';
+        $flashType = 'error';
+    } else {
+        $formAction = $_POST['form_action'] ?? '';
+        if ($formAction === 'rider_settle') {
+            $postRiderId = (int) ($_POST['rider_id'] ?? 0);
+            $amount = trim((string) ($_POST['amount'] ?? ''));
+            $remarks = trim((string) ($_POST['remarks'] ?? '')) ?: null;
+            if (!is_numeric($amount) || (float) $amount <= 0) {
+                $flash = 'Enter a valid settlement amount.';
+                $flashType = 'error';
+            } else {
+                try {
+                    record_rider_settlement($db, $postRiderId, (float) $amount, (int) $admin['id'], $remarks);
+                    write_audit_log('admin', $admin['id'], 'rider_settlement_recorded', [
+                        'rider_id' => $postRiderId, 'amount' => $amount, 'via' => 'cash_flow_quick_action',
+                    ]);
+                    $flash = 'Settlement recorded — rider\'s cash-held balance updated.';
+                } catch (Throwable $e) {
+                    $flash = 'Could not record settlement — nothing was saved.';
+                    $flashType = 'error';
+                }
+            }
+        } elseif ($formAction === 'restaurant_pay') {
+            $postRestaurantId = (int) ($_POST['restaurant_id'] ?? 0);
+            $direction = $_POST['direction'] ?? '';
+            $amount = trim((string) ($_POST['amount'] ?? ''));
+            $remarks = trim((string) ($_POST['remarks'] ?? '')) ?: null;
+            if (!is_numeric($amount) || (float) $amount <= 0) {
+                $flash = 'Enter a valid settlement amount.';
+                $flashType = 'error';
+            } elseif (!in_array($direction, ['admin_to_restaurant', 'restaurant_to_admin'], true)) {
+                $flash = 'Invalid settlement direction.';
+                $flashType = 'error';
+            } else {
+                try {
+                    // No UTR/screenshot field on this quick form on purpose —
+                    // it's a fast path for the common case; anything needing
+                    // proof attached still goes through settlements.php's
+                    // full Pay Now form (linked right next to this button).
+                    record_settlement(
+                        $db, $postRestaurantId, $direction, (float) $amount, (int) $admin['id'],
+                        null, null, $remarks, date('Y-m-d')
+                    );
+                    write_audit_log('admin', $admin['id'], 'settlement_recorded', [
+                        'restaurant_id' => $postRestaurantId, 'direction' => $direction, 'amount' => $amount,
+                        'via' => 'cash_flow_quick_action',
+                    ]);
+                    $flash = 'Settlement recorded and ledger updated.';
+                } catch (Throwable $e) {
+                    $flash = 'Could not record settlement — nothing was saved.';
+                    $flashType = 'error';
+                }
+            }
+        }
+    }
+}
 
 // ---------- Filters (restaurant "paid this cycle" only — rider section
 // is always all-time, since cod_cash_held itself is a live running
@@ -157,6 +270,19 @@ $dueTotals = $dueTotalsStmt->fetch();
 $totalPayableToRestaurants = (float) $dueTotals['total_payable_to_restaurants'];
 $totalDueFromRestaurants = (float) $dueTotals['total_due_from_restaurants'];
 
+// Per-restaurant outstanding balances — same list settlements.php's own
+// list mode shows (current_due != 0, biggest first), added here so the
+// quick Pay Now action below has a rider-list-style table to act on
+// without leaving this page. current_due sign convention (doc 19 §6):
+// positive = restaurant owes admin (COD commission piled up), negative
+// = admin owes restaurant (online-order payouts not yet paid out).
+$restaurantsWithDueStmt = $db->query(
+    "SELECT id, name, current_due FROM restaurants
+     WHERE deleted_at IS NULL AND current_due <> 0
+     ORDER BY ABS(current_due) DESC, name LIMIT 200"
+);
+$restaurantsWithDue = $restaurantsWithDueStmt->fetchAll();
+
 $paidStmt = $db->prepare(
     "SELECT
         COALESCE(SUM(CASE WHEN direction = 'admin_to_restaurant' THEN amount ELSE 0 END), 0) AS paid_to_restaurants,
@@ -168,6 +294,47 @@ $paidStmt->execute($payParams);
 $paidTotals = $paidStmt->fetch();
 $paidToRestaurants = (float) $paidTotals['paid_to_restaurants'];
 $receivedFromRestaurants = (float) $paidTotals['received_from_restaurants'];
+
+// App-owner ask, 2026-09-11 — "kitna payment aaya, commission kitna
+// tha, uske paas kitna aayega": a period-scoped view (how much order
+// revenue came in, how much commission was taken, what restaurants net
+// after it) sitting alongside the running-balance figures above. This
+// is deliberately a DIFFERENT question from total_payable_to_restaurants/
+// total_due_from_restaurants above (those are "what's owed right now,
+// all-time", i.e. current_due) — this is "how much business happened
+// in this period", read straight from orders like
+// restaurant/statement.php's own per-restaurant version does, just
+// summed across every restaurant instead of scoped to one. Same
+// $payWhereSql date range as the "Paid"/"Received" figures directly
+// above, reusing the exact same delivered-only revenue definition
+// admin/settlements.php's $payoutNonRevenueStatuses exclusion and
+// restaurant/statement.php both already use, so this figure agrees
+// with what a restaurant sees on their own Statement screen for the
+// same period.
+$revenueWhere = [];
+$revenueParams = [];
+if ($fromDate !== '') {
+    $revenueWhere[] = 'created_at >= :rev_from';
+    $revenueParams['rev_from'] = $fromDate . ' 00:00:00';
+}
+if ($toDate !== '') {
+    $revenueWhere[] = 'created_at <= :rev_to';
+    $revenueParams['rev_to'] = $toDate . ' 23:59:59';
+}
+$revenueWhereSql = empty($revenueWhere) ? '' : ('AND ' . implode(' AND ', $revenueWhere));
+$revenueStmt = $db->prepare(
+    "SELECT
+        COALESCE(SUM(grand_total), 0) AS total_order_revenue,
+        COALESCE(SUM(commission_amount), 0) AS total_commission_taken,
+        COALESCE(SUM(grand_total - commission_amount), 0) AS total_net_to_restaurants
+     FROM orders
+     WHERE status = 'delivered' $revenueWhereSql"
+);
+$revenueStmt->execute($revenueParams);
+$revenueTotals = $revenueStmt->fetch();
+$totalOrderRevenue = (float) $revenueTotals['total_order_revenue'];
+$totalCommissionTaken = (float) $revenueTotals['total_commission_taken'];
+$totalNetToRestaurants = (float) $revenueTotals['total_net_to_restaurants'];
 
 // ============================================================
 // Section 3 — Platform Cash Flow (admin's own UPIPE merchant account)
@@ -237,7 +404,8 @@ require __DIR__ . '/_layout_head.php';
 <div class="section">
 <div class="card">
     <h2>Cash Flow</h2>
-    <p class="muted">Three separate money flows, shown one after another but never merged into one number: rider-collected COD cash (Customer &rarr; Rider &rarr; Admin), restaurant commission/payout settlement, and the admin's own UPIPE merchant-account balance. All three read straight from the same ledger tables <a href="rider-settlements.php">Rider Settlements</a>' Record Settlement, <a href="settlements.php">Settlements</a>' Pay Now, and every refund/payout/withdrawal flow already write to — recording anything anywhere in the admin panel updates these numbers immediately, no separate step.</p>
+    <p class="muted">Three separate money flows, shown one after another but never merged into one number: rider-collected COD cash (Customer &rarr; Rider &rarr; Admin), restaurant commission/payout settlement, and the admin's own UPIPE merchant-account balance. All three read straight from the same ledger tables <a href="rider-settlements.php">Rider Settlements</a>' Record Settlement, <a href="settlements.php">Settlements</a>' Pay Now, and every refund/payout/withdrawal flow already write to — recording anything anywhere in the admin panel updates these numbers immediately, no separate step. The quick "Settle" / "Pay Now" buttons below write through those same functions, so acting from this page updates every number on it the moment it reloads — no separate sync step.</p>
+    <p class="muted"><strong>What "outstanding balance" means here:</strong> for a <em>rider</em>, it's COD cash they collected from customers and are still physically holding — <code>Cash Currently Held</code> — which they owe back to admin. For a <em>restaurant</em>, <code>current_due</code> is a running, signed balance: positive means the restaurant owes admin (COD-order commission that built up), negative means admin owes the restaurant (payouts for online-paid orders not yet sent). Neither is late/overdue by default — it's simply "not yet settled"; a rider only turns red when they cross the ₹<?= admin_escape(number_format($settlementLimit, 2)) ?> hold limit above.</p>
 </div>
 
 <h2 style="margin:24px 0 8px;">Rider COD Cash</h2>
@@ -286,7 +454,21 @@ require __DIR__ . '/_layout_head.php';
                     <span class="badge active">OK</span>
                 <?php endif; ?>
             </td>
-            <td><a class="btn btn-outline" href="rider-settlements.php?rider_id=<?= (int) $r['id'] ?>">View</a></td>
+            <td>
+                <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                <a class="btn btn-outline" href="rider-settlements.php?rider_id=<?= (int) $r['id'] ?>">View</a>
+                <?php if ($canEdit && (float) $r['cod_cash_held'] > 0): ?>
+                <form method="post" style="display:flex; gap:4px; align-items:center;"
+                    onsubmit="return confirm('Record that <?= admin_escape(addslashes($r['name'])) ?> handed over ₹' + this.amount.value + ' cash to admin?');">
+                    <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
+                    <input type="hidden" name="form_action" value="rider_settle">
+                    <input type="hidden" name="rider_id" value="<?= (int) $r['id'] ?>">
+                    <input type="number" name="amount" step="0.01" min="0.01" max="<?= admin_escape(number_format((float) $r['cod_cash_held'], 2, '.', '')) ?>" value="<?= admin_escape(number_format((float) $r['cod_cash_held'], 2, '.', '')) ?>" style="width:90px;" required>
+                    <button type="submit" class="btn btn-primary">Settle</button>
+                </form>
+                <?php endif; ?>
+                </div>
+            </td>
         </tr>
         <?php endforeach; ?>
     </table>
@@ -302,6 +484,50 @@ require __DIR__ . '/_layout_head.php';
     <div class="card stat"><div class="value">₹<?= admin_escape(number_format($totalDueFromRestaurants, 2)) ?></div><div class="label">Total Due From Restaurants (COD commission)</div></div>
     <div class="card stat"><div class="value">₹<?= admin_escape(number_format($paidToRestaurants, 2)) ?></div><div class="label">Paid to Restaurants <?= ($fromDate !== '' || $toDate !== '') ? 'This Period' : 'All Time' ?></div></div>
     <div class="card stat"><div class="value">₹<?= admin_escape(number_format($receivedFromRestaurants, 2)) ?></div><div class="label">Received From Restaurants <?= ($fromDate !== '' || $toDate !== '') ? 'This Period' : 'All Time' ?></div></div>
+</div>
+
+<div class="card">
+    <h2>Restaurants with an Outstanding Balance</h2>
+    <p class="muted">Every restaurant whose <code>current_due</code> isn't zero, biggest balance first — same list <a href="settlements.php">Settlements</a> shows. Positive = restaurant owes admin; negative = admin owes restaurant. "Pay Now" here is the fast path (no UTR/screenshot); use <a href="settlements.php">Settlements</a>' full form when you need to attach proof.</p>
+    <?php if (empty($restaurantsWithDue)): ?>
+        <p class="muted">No restaurant has an outstanding balance right now.</p>
+    <?php else: ?>
+    <div class="table-responsive">
+    <table>
+        <tr><th>Restaurant</th><th>Current Due</th><th>Direction</th><th></th></tr>
+        <?php foreach ($restaurantsWithDue as $rw): $rwDue = (float) $rw['current_due']; ?>
+        <tr>
+            <td><?= admin_escape($rw['name']) ?></td>
+            <td>₹<?= admin_escape(number_format(abs($rwDue), 2)) ?></td>
+            <td><?= $rwDue > 0 ? '<span class="badge inactive">Restaurant owes admin</span>' : '<span class="badge active">Admin owes restaurant</span>' ?></td>
+            <td>
+                <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                <a class="btn btn-outline" href="settlements.php?restaurant_id=<?= (int) $rw['id'] ?>">View / Settle</a>
+                <?php if ($canEdit): ?>
+                <form method="post" style="display:flex; gap:4px; align-items:center;"
+                    onsubmit="return confirm('Record this settlement for <?= admin_escape(addslashes($rw['name'])) ?>?');">
+                    <input type="hidden" name="csrf_token" value="<?= admin_escape($csrf) ?>">
+                    <input type="hidden" name="form_action" value="restaurant_pay">
+                    <input type="hidden" name="restaurant_id" value="<?= (int) $rw['id'] ?>">
+                    <input type="hidden" name="direction" value="<?= $rwDue > 0 ? 'restaurant_to_admin' : 'admin_to_restaurant' ?>">
+                    <input type="number" name="amount" step="0.01" min="0.01" value="<?= admin_escape(number_format(abs($rwDue), 2, '.', '')) ?>" style="width:90px;" required>
+                    <button type="submit" class="btn btn-primary">Pay Now</button>
+                </form>
+                <?php endif; ?>
+                </div>
+            </td>
+        </tr>
+        <?php endforeach; ?>
+    </table>
+    </div>
+    <?php endif; ?>
+</div>
+
+<p class="muted" style="margin:16px 0 -4px;">Order revenue for the period below (delivered orders only) — "kitna payment aaya, commission kitna tha, restaurants ke paas kitna aayega". A different question from the running-balance totals above: those are "what's owed right now, all-time"; these are "how much business happened in this window". Same delivered-orders definition <a href="settlements.php">Settlements</a> and each restaurant's own Statement screen use, so all three agree.</p>
+<div class="grid">
+    <div class="card stat"><div class="value">₹<?= admin_escape(number_format($totalOrderRevenue, 2)) ?></div><div class="label">Order Revenue <?= ($fromDate !== '' || $toDate !== '') ? 'This Period' : 'All Time' ?></div></div>
+    <div class="card stat"><div class="value">₹<?= admin_escape(number_format($totalCommissionTaken, 2)) ?></div><div class="label">Commission Taken <?= ($fromDate !== '' || $toDate !== '') ? 'This Period' : 'All Time' ?></div></div>
+    <div class="card stat"><div class="value">₹<?= admin_escape(number_format($totalNetToRestaurants, 2)) ?></div><div class="label">Net to Restaurants <?= ($fromDate !== '' || $toDate !== '') ? 'This Period' : 'All Time' ?></div></div>
 </div>
 
 <div class="card">

@@ -727,6 +727,12 @@ function format_order(PDO $db, array $order): array
         'payment_method' => $order['payment_method'],
         'payment_status' => $order['payment_status'],
         'delivery_instructions' => $order['delivery_instructions'],
+        // Plan doc 127 §4 / 128 — the cancel-retention flow's "change
+        // delivery address" bottom sheet needs this to highlight/exclude
+        // the order's current address in the saved-addresses picker.
+        // Wasn't exposed before this since nothing previously needed a
+        // client-visible read of an already-placed order's address id.
+        'delivery_address_id' => $order['delivery_address_id'] !== null ? (int) $order['delivery_address_id'] : null,
         // I4 — 'Y-m-d H:i:s' or null ("Now" order). Restaurant/rider apps
         // don't consume this yet (not built this session), but the field
         // is safe to expose already since it's just null until I4's create

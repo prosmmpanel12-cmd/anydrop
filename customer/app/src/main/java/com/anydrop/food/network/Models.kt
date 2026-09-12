@@ -585,6 +585,10 @@ data class Order(
     @SerializedName("grand_total") val grandTotal: Double,
     @SerializedName("payment_method") val paymentMethod: String,
     @SerializedName("payment_status") val paymentStatus: String,
+    // Plan doc 127 §4 / 128 — cancel-retention flow's address-change
+    // sheet needs this to highlight/exclude the current address in the
+    // saved-addresses picker.
+    @SerializedName("delivery_address_id") val deliveryAddressId: Int? = null,
     // I4 — "yyyy-MM-dd HH:mm:ss" or null (a normal "Now" order).
     @SerializedName("scheduled_for") val scheduledFor: String? = null,
     @SerializedName("estimated_prep_minutes") val estimatedPrepMinutes: Int?,
@@ -600,6 +604,18 @@ data class CreateOrderResult(
 )
 
 data class OrderDetailResult(val order: Order)
+
+// Plan doc 127 §4 / 128 — cancel-retention flow. `reason` defaults to
+// null (server falls back to "Cancelled by customer") so old call
+// shapes / a bare confirm-without-picking-a-reason still behave exactly
+// as before this was added.
+data class CancelOrderBody(val reason: String? = null)
+
+// Plan doc 127 §4 / 128 — cancel-retention flow's "change delivery
+// address" option.
+data class ChangeOrderAddressBody(
+    @SerializedName("delivery_address_id") val deliveryAddressId: Int
+)
 
 // Delivery OTP Resend (2026-09-11) — response shape of
 // customer/delivery-otp-resend.php, matching the restaurant app's own

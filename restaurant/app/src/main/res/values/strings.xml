@@ -481,6 +481,9 @@
     <string name="statement_title">Statement</string>
     <string name="statement_settled_label">Settled</string>
     <string name="statement_pending_label">Pending T+1</string>
+    <string name="statement_commission_label">Commission</string>
+    <string name="statement_net_payable_label">You get (net)</string>
+    <string name="statement_row_commission_net_format">Comm. \u20b9%1$s \u00b7 Net \u20b9%2$s</string>
     <string name="statement_empty">No orders on this day</string>
     <string name="statement_badge_settled">Settled</string>
     <string name="statement_badge_eligible">Ready to settle</string>
@@ -573,6 +576,22 @@
     <string name="hint_reject_reason">Reason for rejecting</string>
     <string name="btn_confirm_reject">Confirm Reject</string>
     <string name="btn_cancel">Cancel</string>
+    <string name="btn_confirm">Confirm</string>
+
+    <!-- Status-change confirm (2026-09-11, plan doc 127 §2) — generic
+         dialog reused for Mark Preparing / Mark Ready; only Accept is
+         left ungated (PrepTimeDialog already acts as its confirm step,
+         see OrderDetailActivity kdoc). -->
+    <string name="dialog_confirm_preparing_title">Mark as Preparing?</string>
+    <string name="dialog_confirm_preparing_message">The customer will be notified that preparation has started.</string>
+    <string name="dialog_confirm_ready_title">Mark as Ready?</string>
+    <string name="dialog_confirm_ready_message">This tells us the order is ready for a rider to pick up.</string>
+
+    <!-- Restaurant order tracking (2026-09-11, plan doc 127 §1) -->
+    <string name="track_order_message">Track your rider\'s live location</string>
+    <string name="btn_track_order">Track Order</string>
+    <string name="rider_track_title">Track Order</string>
+    <string name="rider_track_waiting">Waiting for rider location…</string>
     <string name="items_label">Items</string>
     <string name="customer_note_label">Delivery instructions</string>
     <string name="bill_total_label">Item total</string>

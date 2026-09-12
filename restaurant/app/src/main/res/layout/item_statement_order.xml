@@ -53,6 +53,18 @@
             android:textColor="@color/text_primary"
             tools:text="₹420" />
 
+        <!-- App-owner ask, 2026-09-11 — commission taken + what the
+             restaurant nets, right on the row (not just the day's
+             summary total), so each order's payout is unambiguous. -->
+        <TextView
+            android:id="@+id/orderCommissionNet"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textSize="11sp"
+            android:textColor="@color/text_secondary"
+            tools:text="Comm. ₹42 · Net ₹378" />
+
         <TextView
             android:id="@+id/settlementBadge"
             android:layout_width="wrap_content"

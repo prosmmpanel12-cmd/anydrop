@@ -147,6 +147,14 @@ class OrderStatusActivity : AppCompatActivity(), OnMapReadyCallback {
     private var deliveryLatLng: LatLng? = null
     private var mapEverShown = false
 
+    // Track Live (2026-09-11, plan doc 127 §5) — map data being
+    // *available* (isMapDataAvailable) no longer implies the map is
+    // *shown*; the user has to tap "Track Live" first. Kept separate
+    // from mapEverShown, which still means "shown at least once" and
+    // continues to drive updateMap()'s first-time camera-refit logic
+    // below, unchanged.
+    private var mapUserRequested = false
+
     // Plan doc 91 — admin-configurable numbers, refreshed from every
     // fetchAndDrawRoute() response; see route.php's kdoc for the
     // app_settings keys behind these.
@@ -174,6 +182,13 @@ class OrderStatusActivity : AppCompatActivity(), OnMapReadyCallback {
     private var deliveryOtpResendTimer: CountDownTimer? = null
     private val deliveryOtpResendCooldownMillis = 30_000L
 
+    // Cancel-retention flow (doc 127 §4 / 128 / 129) — the order's
+    // delivery_address_id, cached off the one-shot loadOrderDetail()
+    // fetch (full Order only — OrderTrackResult's 5s poll doesn't carry
+    // this field; see format_order()'s kdoc). Null until that first
+    // fetch lands, or if the order genuinely has none.
+    private var lastOrderDeliveryAddressId: Int? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityOrderStatusBinding.inflate(layoutInflater)
@@ -186,8 +201,18 @@ class OrderStatusActivity : AppCompatActivity(), OnMapReadyCallback {
         }
 
         binding.btnBackHome.setOnClickListener { goHome() }
-        binding.btnCancelOrder.setOnClickListener { cancelOrder() }
+        binding.btnCancelOrder.setOnClickListener { openCancelOptionsSheet() }
         binding.btnResendDeliveryOtp.setOnClickListener { resendDeliveryOtp() }
+        // Track Live (2026-09-11, plan doc 127 §5) — reveal the map on
+        // demand instead of it auto-showing. Replays immediately off
+        // lastTrack rather than waiting up to POLL_INTERVAL_MS for the
+        // next poll — same "replay immediately" reasoning onMapReady()
+        // already uses below.
+        binding.btnTrackLive.setOnClickListener {
+            mapUserRequested = true
+            binding.trackLiveCard.visibility = View.GONE
+            lastTrack?.let { track -> updateMap(track) }
+        }
 
         // Google Maps' MapView needs its own lifecycle forwarded from the
         // Activity's — same requirement MapPinDropActivity's kdoc
@@ -283,6 +308,7 @@ class OrderStatusActivity : AppCompatActivity(), OnMapReadyCallback {
                     binding.scheduledForText.text = getString(R.string.order_scheduled_for_format, timeText)
                 }
 
+                lastOrderDeliveryAddressId = order?.deliveryAddressId
                 renderRefund(order?.refund)
             } catch (e: Exception) {
                 // Silent — see kdoc above.
@@ -490,8 +516,23 @@ class OrderStatusActivity : AppCompatActivity(), OnMapReadyCallback {
 
     // ---- Live tracking map (Phase 3 R5 follow-up, deep-plan §14-15) ----
 
-    private fun shouldShowMap(track: OrderTrackResult): Boolean {
+    /** Plan doc 127 §5 — "map data available" is today's exact original
+     * condition (rider position exists for a trackable status), kept
+     * as its own function since startRouteRecalcLoop() and updateMap()
+     * both need to distinguish "data available, card shown" from
+     * "data available, map shown" rather than collapsing straight to
+     * the combined check. */
+    private fun isMapDataAvailable(track: OrderTrackResult): Boolean {
         return track.status in MAP_ACTIVE_STATUSES && track.rider?.lat != null && track.rider.lng != null
+    }
+
+    /** Map data being available is no longer enough on its own — the
+     * user also has to have tapped "Track Live" (see mapUserRequested
+     * kdoc). Everything downstream (trackingMapView visibility,
+     * marker/route drawing, the recalc loop) keys off this combined
+     * condition instead of availability alone. */
+    private fun shouldShowMap(track: OrderTrackResult): Boolean {
+        return isMapDataAvailable(track) && mapUserRequested
     }
 
     /** Called from every 5s render() — adds the static restaurant/
@@ -499,12 +540,24 @@ class OrderStatusActivity : AppCompatActivity(), OnMapReadyCallback {
      * and moves the rider marker (animated, never jumped) to its
      * latest position. Route line + camera refit are NOT done here —
      * those run on the separate, slower loop started by
-     * startRouteRecalcLoop(), per this class's kdoc. */
+     * startRouteRecalcLoop(), per this class's kdoc.
+     *
+     * Plan doc 127 §5 — when data is available but not yet requested,
+     * shows the "Track Live" card in the map's slot instead of the
+     * map itself; no dismiss affordance once requested (v1 is a
+     * one-way reveal, per that section's recommendation). */
     private fun updateMap(track: OrderTrackResult) {
-        if (!shouldShowMap(track)) {
+        if (!isMapDataAvailable(track)) {
+            binding.trackLiveCard.visibility = View.GONE
             binding.trackingMapView.visibility = View.GONE
             return
         }
+        if (!mapUserRequested) {
+            binding.trackLiveCard.visibility = View.VISIBLE
+            binding.trackingMapView.visibility = View.GONE
+            return
+        }
+        binding.trackLiveCard.visibility = View.GONE
         binding.trackingMapView.visibility = View.VISIBLE
 
         val map = googleMap
@@ -779,31 +832,43 @@ class OrderStatusActivity : AppCompatActivity(), OnMapReadyCallback {
         else -> status
     }
 
-    private fun cancelOrder() {
-        binding.btnCancelOrder.isEnabled = false
+    /** Doc 127 §4 / 128 / 129 — cancel-retention flow. Replaces the old
+     * direct cancelOrder() call: opens CancelOrderOptionsBottomSheet
+     * instead, which itself owns both the "change address" and "still
+     * cancel, with a reason" network calls. This Activity only reacts
+     * to the sheet's two completion callbacks below. */
+    private fun openCancelOptionsSheet() {
+        val sheet = CancelOrderOptionsBottomSheet.newInstance(orderId, lastOrderDeliveryAddressId)
+        sheet.onAddressChanged = {
+            // Address (and therefore delivery_charge/grand_total) changed
+            // server-side — re-fetch so this screen reflects the new
+            // address next time it's shown, same one-shot fetch loadOrderDetail()
+            // already does on initial load.
+            loadOrderDetail()
+        }
+        sheet.onCancelled = {
+            onOrderCancelledFromSheet()
+        }
+        sheet.show(supportFragmentManager, "cancel_order_options")
+    }
+
+    /** Same success-path work the old inline cancelOrder() did, now
+     * triggered by the sheet's onCancelled callback instead. */
+    private fun onOrderCancelledFromSheet() {
+        InAppNotifier.show(this, "Order cancelled", InAppNotifier.Type.INFO)
+        binding.statusText.text = statusLabel("cancelled")
+        binding.btnCancelOrder.visibility = View.GONE
         lifecycleScope.launch {
             try {
-                val response = api.cancelOrder(orderId)
-                if (response.isSuccessful) {
-                    InAppNotifier.show(this@OrderStatusActivity, "Order cancelled", InAppNotifier.Type.INFO)
-                    binding.statusText.text = statusLabel("cancelled")
-                    binding.btnCancelOrder.visibility = View.GONE
-                    // Item 25 — cancelling a paid order auto-creates a
-                    // `requested` refund server-side (orders/cancel.php).
-                    // Re-fetch so that card appears in this same session
-                    // instead of only on next screen open.
-                    renderRefund(api.getOrder(orderId).body()?.data?.order?.refund)
-                } else {
-                    // Same root-cause fix as CheckoutActivity's placeOrder() —
-                    // response.body() is null on this non-2xx branch; the real
-                    // error code is only in errorBody(). See ApiErrorParser's kdoc.
-                    val errCode = com.anydrop.food.network.ApiErrorParser.parse(response).code
-                    InAppNotifier.show(this@OrderStatusActivity, errCode ?: "Couldn't cancel order", InAppNotifier.Type.ERROR)
-                    binding.btnCancelOrder.isEnabled = true
-                }
+                // Item 25 — cancelling a paid order auto-creates a
+                // `requested` refund server-side (orders/cancel.php).
+                // Re-fetch so that card appears in this same session
+                // instead of only on next screen open.
+                renderRefund(api.getOrder(orderId).body()?.data?.order?.refund)
             } catch (e: Exception) {
-                InAppNotifier.show(this@OrderStatusActivity, "Network error while cancelling.", InAppNotifier.Type.ERROR)
-                binding.btnCancelOrder.isEnabled = true
+                // Silent — same reasoning as loadOrderDetail()'s own
+                // refund fetch; a refund card that hasn't loaded yet just
+                // means it stays hidden until the next screen open.
             }
         }
     }

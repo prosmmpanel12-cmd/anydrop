@@ -346,6 +346,32 @@
     <string name="btn_cancel_order">Cancel Order</string>
     <string name="btn_back_to_home">Back to Home</string>
 
+    <!-- Track Live button (2026-09-11, plan doc 127 §5) — shown instead
+         of auto-loading the map once a rider position is available; the
+         map itself only appears once the user taps this. -->
+    <string name="track_live_message">Your rider is on the way</string>
+    <string name="btn_track_live">Track Live</string>
+
+    <!-- Cancel-retention flow (2026-09-11, plan doc 127 §4 / 128) —
+         CancelOrderOptionsBottomSheet, opened instead of cancelling
+         directly. Scope confirmed with app owner: address-change +
+         reason-based cancel only (edit-instructions/contact-restaurant/
+         contact-support left out of this v1). -->
+    <string name="cancel_sheet_title">Cancel Order?</string>
+    <string name="cancel_sheet_subtitle">Before you cancel, see if one of these helps instead.</string>
+    <string name="cancel_option_change_address">Change delivery address</string>
+    <string name="cancel_address_current_badge">Current</string>
+    <string name="cancel_no_other_addresses">No other saved addresses. Add one from your Address Book first.</string>
+    <string name="cancel_address_change_success">Delivery address updated</string>
+    <string name="cancel_reason_prompt">Still want to cancel? Tell us why</string>
+    <string name="cancel_reason_mistake">Ordered by mistake</string>
+    <string name="cancel_reason_too_long">Taking too long</string>
+    <string name="cancel_reason_better_option">Found a better option</string>
+    <string name="cancel_reason_other">Other</string>
+    <string name="cancel_reason_details_hint">Add more details (optional)</string>
+    <string name="cancel_confirm_button">Yes, Cancel Order</string>
+    <string name="cancel_keep_order_button">Keep My Order</string>
+
     <!-- Delivery OTP Resend (2026-09-11) — customer-side counterpart to
          the restaurant app's pickup_otp_resend_* strings; names mirror
          those 1:1 (pickup -> delivery). -->

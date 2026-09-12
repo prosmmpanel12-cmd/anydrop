@@ -179,7 +179,15 @@ data class Offer(
     @SerializedName("grand_total") val grandTotal: Double,
     @SerializedName("item_count") val itemCount: Int,
     @SerializedName("expires_at") val expiresAt: String,
-    @SerializedName("expires_in_seconds") val expiresInSeconds: Int
+    @SerializedName("expires_in_seconds") val expiresInSeconds: Int,
+    // App-owner ask, 2026-09-11 — what the rider would earn for THIS
+    // delivery, shown before they accept/reject. Computed server-side
+    // by calculate_rider_earning() (same function that fires at actual
+    // delivery time), so this is always the real number, never a
+    // client-side guess. Nullable only as a defensive default against
+    // an older cached response shape — orders-available.php always
+    // sends it now.
+    @SerializedName("estimated_earning") val estimatedEarning: Double? = null
 )
 
 data class CurrentOrderResult(val order: CurrentOrder?)

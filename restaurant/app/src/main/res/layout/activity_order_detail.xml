@@ -131,6 +131,41 @@
                     android:textColor="@color/anydrop_primary" />
             </LinearLayout>
 
+            <!-- Track Order (2026-09-11, plan doc 127 §1) — entry point
+                 into RiderTrackActivity. render()/OrderDetailActivity own
+                 this card's visibility (shown only while order.status is
+                 rider_assigned/picked_up/out_for_delivery, same set the
+                 tracking data is actually available for). -->
+            <LinearLayout
+                android:id="@+id/trackOrderCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="18dp"
+                android:background="@drawable/bg_card_rounded"
+                android:padding="14dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/track_order_message"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTrackOrder"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="10dp"
+                    android:text="@string/btn_track_order"
+                    android:textSize="13sp"
+                    app:cornerRadius="10dp" />
+            </LinearLayout>
+
             <!-- Pickup OTP (2026-09-11, migration 83) — shown only while
                  status == rider_assigned and orders-detail.php actually
                  reveals a code (see that endpoint's kdoc). Hidden again

@@ -45,6 +45,16 @@ class StatementOrderAdapter : RecyclerView.Adapter<StatementOrderAdapter.ViewHol
 
         holder.binding.orderAmount.text = "₹${"%.0f".format(order.grandTotal)}"
 
+        // App-owner ask, 2026-09-11 — commission + net payable, right on
+        // the row. Backend always sends net_payable now; the 0.0 default
+        // on the model is only a defensive fallback for an old cached
+        // response shape.
+        holder.binding.orderCommissionNet.text = context.getString(
+            R.string.statement_row_commission_net_format,
+            "%.0f".format(order.commissionAmount),
+            "%.0f".format(order.netPayable)
+        )
+
         // Not-delivered orders (cancelled/rejected/still in progress)
         // never carry a real settlement status ('not_applicable' on the
         // backend) — hide the badge rather than show a misleading one.

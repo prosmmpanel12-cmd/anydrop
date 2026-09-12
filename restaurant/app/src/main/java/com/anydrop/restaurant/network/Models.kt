@@ -655,7 +655,11 @@ data class StatementSummary(
     @SerializedName("total_orders") val totalOrders: Int,
     @SerializedName("total_amount") val totalAmount: Double,
     @SerializedName("settled_amount") val settledAmount: Double,
-    @SerializedName("pending_amount") val pendingAmount: Double
+    @SerializedName("pending_amount") val pendingAmount: Double,
+    // App-owner ask, 2026-09-11 — day's total commission taken +
+    // what the restaurant nets after it (total_amount - total_commission).
+    @SerializedName("total_commission") val totalCommission: Double = 0.0,
+    @SerializedName("total_net_payable") val totalNetPayable: Double = 0.0
 )
 
 data class StatementOrder(
@@ -666,6 +670,10 @@ data class StatementOrder(
     @SerializedName("grand_total") val grandTotal: Double,
     @SerializedName("payment_method") val paymentMethod: String,
     @SerializedName("commission_amount") val commissionAmount: Double,
+    // App-owner ask, 2026-09-11 — what the restaurant actually gets
+    // for this one order (grand_total - commission_amount), computed
+    // server-side so this screen never has to duplicate that math.
+    @SerializedName("net_payable") val netPayable: Double = 0.0,
     @SerializedName("settlement_status") val settlementStatus: String,
     @SerializedName("settlement_eligible_at") val settlementEligibleAt: String?
 )
@@ -1022,4 +1030,35 @@ data class AppVersionInfo(
     // the field is ever missing from the response.
     @SerializedName("maintenance_mode") val maintenanceMode: Boolean = false,
     @SerializedName("maintenance_message") val maintenanceMessage: String? = null
+)
+
+// ---- Restaurant order tracking (plan doc 127 §1, 2026-09-11). Mirrors
+// the Customer App's TrackRider/TrackRestaurant/TrackDelivery/
+// OrderTrackResult field-for-field, minus `otp` — see
+// backend/api/v1/restaurant/orders-track.php's kdoc for why that field
+// doesn't belong on this response. ----
+
+data class RestaurantTrackRider(
+    val name: String?,
+    val mobile: String?,
+    val lat: Double?,
+    val lng: Double?
+)
+
+data class RestaurantTrackRestaurant(
+    val lat: Double?,
+    val lng: Double?
+)
+
+data class RestaurantTrackDelivery(
+    val lat: Double?,
+    val lng: Double?
+)
+
+data class RestaurantTrackResult(
+    val status: String,
+    val rider: RestaurantTrackRider?,
+    val restaurant: RestaurantTrackRestaurant?,
+    val delivery: RestaurantTrackDelivery?,
+    @SerializedName("eta_minutes") val etaMinutes: Int?
 )

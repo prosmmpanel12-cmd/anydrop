@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS rider_order_assignments (
 -- (that UI is a follow-up, not blocking the engine itself).
 INSERT INTO app_settings (`key`, `value`, description)
 VALUES
-    ('rider_assignment_timeout_seconds', '40', 'Seconds an offered delivery stays open before it expires and moves to the next eligible rider (deep-plan §8 suggests 30-45s).'),
+    ('rider_assignment_timeout_seconds', '180', 'Seconds an offered delivery stays open before it expires and moves to the next eligible rider. Raised to 180s (3 min) per app-owner ask, 2026-09-11 — see migration 84 for the update path on already-migrated DBs; original deep-plan §8 default was 40s.'),
     ('rider_dispatch_radius_km', '8', 'Max straight-line distance (km) from the restaurant a rider can be to receive an offer for it.'),
     ('rider_location_freshness_seconds', '300', 'A rider whose last_location_at is older than this is treated as stale and skipped for new offers, even if is_online=1 (deep-plan §4.1 "recent location freshness").')
 ON DUPLICATE KEY UPDATE `key` = `key`;

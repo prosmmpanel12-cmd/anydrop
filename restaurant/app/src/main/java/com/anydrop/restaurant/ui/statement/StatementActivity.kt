@@ -107,6 +107,10 @@ class StatementActivity : AppCompatActivity() {
                     binding.statOrderCount.text = "${result.summary.totalOrders} orders on this day"
                     binding.statSettledAmount.text = "₹${"%.0f".format(result.summary.settledAmount)}"
                     binding.statPendingAmount.text = "₹${"%.0f".format(result.summary.pendingAmount)}"
+                    // App-owner ask, 2026-09-11 — how much commission was
+                    // taken today, and what the restaurant nets after it.
+                    binding.statCommissionAmount.text = "₹${"%.0f".format(result.summary.totalCommission)}"
+                    binding.statNetPayableAmount.text = "₹${"%.0f".format(result.summary.totalNetPayable)}"
 
                     adapter.submit(result.orders)
                     binding.emptyState.visibility = if (result.orders.isEmpty()) View.VISIBLE else View.GONE

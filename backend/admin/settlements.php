@@ -21,17 +21,16 @@
  * Gated on payouts_view/payouts_manage (migration 29's existing keys —
  * no new permission needed).
  *
- * PARTIALLY WIRED (updated 2026-08-26, docs/43 — this note was stale):
- * the online/UPI half now IS live — record_paid_order_ledger_entries()
+ * FULLY WIRED (updated 2026-09-10 — this note was stale): both halves
+ * are now live. The online/UPI half — record_paid_order_ledger_entries()
  * fires automatically the moment a UPI order's payment confirms (see
- * lib/ledger.php's own kdoc), so payout_payable entries for online
- * orders already appear here in real time. The COD half is still the
- * one real gap: record_cod_order_ledger_entry() is never called,
- * because no 'delivered' transition exists anywhere yet (no rider-
- * facing API at all — Phase G, recall.md items 43-48, not built). So
- * today, a restaurant's ledger here shows online-order payouts +
- * whatever Pay Now settlements an admin manually records, but NOT COD
- * commission — that piece stays at ₹0 until the Rider App ships.
+ * lib/ledger.php's own kdoc). The COD half — record_cod_order_ledger_entry()
+ * now fires from the same 'delivered' transition as the rider's own COD
+ * cash-held entry (api/v1/rider/orders-deliver.php, and from the admin
+ * "mark delivered" action in admin/orders.php) — so a restaurant's
+ * ledger here reflects both online-order payouts and COD commission in
+ * real time, on top of whatever Pay Now settlements an admin manually
+ * records.
  *
  * STATUS: 🆕 BUILT 2026-08-22 — NOT build/device-verified (no PHP CLI
  * or live DB in this sandbox). Needs migration 38 run live, then: save

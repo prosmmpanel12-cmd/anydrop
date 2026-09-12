@@ -20,14 +20,12 @@
  * rider_cod_ledger/riders directly.
  *
  * NOT YET LIVE END-TO-END: cod_cash_held only ever moves today via the
- * manual Record Settlement action below (which only ever subtracts).
- * The automatic 'cod_collected' entry that should fire when a rider
- * actually delivers a COD order isn't wired up yet — no 'delivered'
- * transition/rider-facing API exists in the codebase at all (same gap
- * flagged in lib/ledger.php and settlements.php for the restaurant side).
- * Once the Rider App's delivery-confirmation flow exists, call
- * record_rider_cod_collected() from it and this page will start
- * reflecting real balances immediately — nothing else needs to change.
+ * manual Record Settlement action below (which only ever subtracts) and
+ * the automatic 'cod_collected' entry that fires when a rider actually
+ * delivers a COD order. That automatic trigger is now wired up (see
+ * lib/rider_ledger.php's record_rider_cod_collected(), called from
+ * api/v1/rider/orders-deliver.php's delivered-transition transaction) —
+ * this page reflects real balances as riders complete deliveries.
  *
  * Gated on payouts_view/payouts_manage — same module as Settlements.
  */
@@ -142,7 +140,7 @@ if ($riderId !== null) {
     <div class="card">
         <h2>Cash Ledger</h2>
         <?php if (empty($ledgerRows)): ?>
-            <p class="muted">No entries yet — this rider hasn't collected any COD cash, or the delivered-order trigger isn't wired up yet (see this page's kdoc).</p>
+            <p class="muted">No entries yet — this rider hasn't collected any COD cash.</p>
         <?php else: ?>
         <div class="table-responsive">
         <table>

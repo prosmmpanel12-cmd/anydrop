@@ -8,28 +8,38 @@
  * UPDATE+INSERT call sites would risk — same "one function everyone
  * calls" reasoning as lib/cod_rules.php.
  *
- * ---------- Sign convention (documented here because doc 19 §6's own
- * inline comments on the entry_type ENUM are inconsistent about it) ----------
- * `restaurants.current_due`: positive = restaurant owes admin (COD
- * commissions not yet settled), negative = admin owes restaurant
- * (online-order payouts not yet paid out), zero = settled — this part
- * of doc 19 §6 is unambiguous and kept as-is.
+ * ---------- Sign convention ----------
+ * `restaurants.current_due`: negative = admin owes restaurant (COD
+ * and online order payouts not yet paid out — the normal, expected
+ * state), positive = admin has already paid the restaurant MORE than
+ * it was owed (e.g. a manual settlement overshoot), zero = settled.
+ *
+ * UPDATE 2026-09-12 (app-owner correction): a restaurant never
+ * legitimately "owes admin" under this platform's own cash model —
+ * every rupee, COD or online, ends up with admin first (COD: Customer
+ * -> Rider -> Admin; online: straight into admin's payment gateway).
+ * The restaurant is never in physical possession of any of it, so
+ * there is nothing for them to owe — commission is simply subtracted
+ * from what admin pays them, never billed as a separate debt. The old
+ * `commission_cod` +commission_amount entry (billing the restaurant
+ * for commission with no offsetting payable) was what made
+ * `current_due` climb positive for COD-heavy restaurants; that entry
+ * type is no longer written (see `record_cod_order_ledger_entry()`
+ * below) — a positive `current_due` you see today should only ever be
+ * a genuine overpayment, not a phantom balance owed.
  *
  * Every restaurant_due_ledger row's `amount` is the signed delta such
  * that `new_current_due = old_current_due + amount` — this file is the
  * only place that math happens. Under that rule:
- *   commission_cod          : +commission_amount   (restaurant owes admin more)
- *   payout_payable          : -restaurant_share     (admin owes restaurant more)
+ *   payout_payable          : -restaurant_share     (admin owes restaurant more —
+ *                                                     written for BOTH COD and online orders now)
  *   settlement_to_restaurant: +paid_amount          (admin paid restaurant — current_due
  *                                                     rises back toward 0 from negative)
- *   settlement_from_restaurant: -paid_amount        (restaurant paid admin — current_due
- *                                                     falls back toward 0 from positive)
- * (doc 19 §6's own ALTER-statement comments label the two settlement
- * rows "-amount" — that contradicts the same doc's own prose two lines
- * above it, which says a `settlement_to_restaurant` entry "brings due
- * back toward 0 from negative". This file implements the prose
- * description, since that's the actual required behaviour; flag to the
- * app owner if the ENUM comment was meant literally instead.)
+ *   settlement_from_restaurant: -paid_amount        (restaurant paid admin — only used if
+ *                                                     current_due was pushed positive by an
+ *                                                     overpayment and the restaurant refunds it)
+ * (`commission_cod` remains in the entry_type ENUM for historical rows
+ * only — see the 2026-09-12 update above; nothing new writes it.)
  */
 
 require_once __DIR__ . '/../config/database.php';
@@ -240,32 +250,65 @@ if (!function_exists('record_settlement')) {
 
 if (!function_exists('record_cod_order_ledger_entry')) {
     /**
-     * STILL NOT CALLED ANYWHERE (confirmed again 2026-08-26, docs/43 —
-     * this is the one real remaining gap, unlike
-     * record_paid_order_ledger_entries() below which has since been
-     * wired up). Ready for the moment a COD order reaches a
-     * genuinely-final "restaurant collected the cash" state — the
-     * codebase still has no such transition (no rider-facing API
-     * namespace exists at all yet; nothing ever sets orders.status =
-     * 'delivered' — grepped the whole backend/api tree to confirm).
-     * That's the Rider App, Phase G (recall.md items 43-48) — a
-     * separate, much larger build than a one-line wire-up, so this
-     * stays flagged rather than half-built. Writing this at order
-     * CREATION time instead would be wrong — a placed COD order can
-     * still be rejected/cancelled before any cash actually changes
-     * hands, and that would leave a ledger entry for an order that
-     * never completed. Call this once a real 'delivered' transition
-     * exists, from that transition's own transaction.
+     * UPDATE 2026-09-12 (app-owner correction — "sara cash to apne paas
+     * aayega na, rider ke through?"): this function used to write ONLY
+     * a `commission_cod` +commission_amount entry — i.e. "restaurant
+     * owes admin the commission" — with nothing ever crediting the
+     * restaurant back for the rest of that same order's value. That was
+     * wrong given this platform's own COD model (docs/00_Deep_Plan...
+     * §0): COD cash flows Customer -> Rider -> Admin, in full — admin
+     * ends up holding 100% of every COD order's cash the same way it
+     * holds 100% of every online order's cash (via the payment
+     * gateway). The restaurant never receives a single rupee directly
+     * either way. So exactly like `record_paid_order_ledger_entries()`
+     * below already does for online orders, a COD order should ALSO
+     * net straight to a single "admin owes restaurant" payable —
+     * commission is simply subtracted out of what admin owes, never
+     * billed to the restaurant as a separate debt. Writing a bare
+     * `commission_cod` debit with no offsetting payable is what made
+     * `current_due` climb positive ("restaurant owes admin") for
+     * COD-heavy restaurants even though, in reality, admin was never
+     * owed anything by them — admin already had their cash.
+     *
+     * Net result: this now writes ONE ledger entry per COD order —
+     * `payout_payable` for -(grand_total - commission_amount -
+     * platform_fee), same restaurant-share formula
+     * `record_paid_order_ledger_entries()` uses for online orders — so
+     * a restaurant's `current_due` behaves identically regardless of
+     * how the customer paid, and only ever goes positive if admin
+     * genuinely overpaid them via a manual settlement (a real
+     * admin-caused state, not a phantom "commission owed" balance).
+     *
+     * The `commission_cod` entry_type itself is left in the ENUM
+     * (harmless, other code/comments reference it) but is no longer
+     * written here — nothing currently reads for that entry_type
+     * specifically, they all read `current_due` or sum every
+     * restaurant_due_ledger row regardless of type.
+     *
+     * Fires from the real 'delivered' transition, once it's a COD
+     * order — see api/v1/rider/orders-deliver.php (rider-facing
+     * delivery-confirmation flow, Phase G) and admin/orders.php's own
+     * "mark delivered" action. Both call sites run this inside the
+     * same transaction as the status flip, so a rolled-back delivery
+     * never leaves a dangling ledger entry. Deliberately NOT called at
+     * order creation time — a placed COD order can still be
+     * rejected/cancelled before any cash actually changes hands.
      */
     function record_cod_order_ledger_entry(PDO $db, array $order): void
     {
+        $grandTotal = (float) $order['grand_total'];
+        $commissionAmount = (float) $order['commission_amount'];
+        $platformFee = (float) ($order['platform_fee'] ?? 0);
+        $restaurantShare = round($grandTotal - $commissionAmount - $platformFee, 2);
+
         write_due_ledger_entry(
             $db,
             (int) $order['restaurant_id'],
             (int) $order['id'],
-            'commission_cod',
-            (float) $order['commission_amount'],
-            'COD order ' . $order['order_code'] . ' — commission owed to admin',
+            'payout_payable',
+            -$restaurantShare,
+            'COD order ' . $order['order_code'] . ' — net payable to restaurant (admin already holds the full COD cash via rider; commission ₹'
+                . number_format($commissionAmount, 2) . ' already netted out)',
             'system'
         );
     }

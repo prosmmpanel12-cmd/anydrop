@@ -106,8 +106,25 @@ interface ApiService {
     @GET("orders/route.php")
     suspend fun getOrderRoute(@Query("id") orderId: Int): Response<ApiResponse<RouteResult>>
 
+    // Plan doc 127 §4 / 128 — cancel-retention flow. orders/cancel.php
+    // already accepted an optional `reason` in its body long before this
+    // (defaults to "Cancelled by customer" server-side) — this signature
+    // just finally sends one instead of always relying on that default.
     @POST("orders/cancel.php")
-    suspend fun cancelOrder(@Query("id") orderId: Int): Response<ApiResponse<OrderDetailResult>>
+    suspend fun cancelOrder(
+        @Query("id") orderId: Int,
+        @Body body: CancelOrderBody = CancelOrderBody()
+    ): Response<ApiResponse<OrderDetailResult>>
+
+    // Plan doc 127 §4 / 128 — cancel-retention flow's "change delivery
+    // address" option. Only legal while the order is still
+    // pending/accepted and unpaid — see that endpoint's own kdoc for
+    // the full gating.
+    @POST("customer/order-change-address.php")
+    suspend fun changeOrderAddress(
+        @Query("id") orderId: Int,
+        @Body body: ChangeOrderAddressBody
+    ): Response<ApiResponse<OrderDetailResult>>
 
     /** Delivery OTP Resend (2026-09-11) — re-sends the existing
      *  delivery_otp (no new code generated) via notification + email.

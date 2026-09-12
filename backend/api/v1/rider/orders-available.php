@@ -5,7 +5,7 @@
  * Response: { "offer": null | { assignment_id, order_id, order_code,
  *             restaurant_name, restaurant_address, distance_km,
  *             payment_method, grand_total, item_count, expires_at,
- *             expires_in_seconds } }
+ *             expires_in_seconds, estimated_earning } }
  *
  * Phase 3 R3 (doc 83/85). Sequential single-offer model (see
  * lib/dispatch.php's header) — a rider only ever has at most one open
@@ -25,6 +25,7 @@ require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../lib/response.php';
 require_once __DIR__ . '/../../../lib/auth.php';
 require_once __DIR__ . '/../../../lib/dispatch.php';
+require_once __DIR__ . '/../../../lib/rider_earnings.php';
 
 header('Access-Control-Allow-Origin: *');
 
@@ -40,7 +41,7 @@ expire_stale_offers($db);
 
 $stmt = $db->prepare(
     "SELECT a.id AS assignment_id, a.order_id, a.expires_at,
-            o.order_code, o.payment_method, o.grand_total, o.restaurant_id,
+            o.order_code, o.payment_method, o.grand_total, o.delivery_charge, o.restaurant_id,
             r.name AS restaurant_name, r.address AS restaurant_address,
             r.latitude AS restaurant_lat, r.longitude AS restaurant_lng
      FROM rider_order_assignments a
@@ -76,6 +77,18 @@ if ($riderLoc && $riderLoc['last_lat'] !== null && $row['restaurant_lat'] !== nu
 
 $expiresInSeconds = max(0, strtotime($row['expires_at']) - time());
 
+// App-owner ask, 2026-09-11 — show the rider what they'd actually earn
+// BEFORE they accept, not just after delivery. Reuses
+// calculate_rider_earning() (lib/rider_earnings.php) — the exact same
+// pure function record_rider_delivery_earning() calls at actual
+// delivery time — so this preview can never drift from what really
+// gets credited; it's a preview of the real math, not a separate
+// estimate formula. Only the delivery_charge is known at offer time
+// (grand_total's other components don't factor into rider earning at
+// all — see calculate_rider_earning()'s own kdoc), so nothing else on
+// the order needs reading for this.
+$earningCalc = calculate_rider_earning((float) $row['delivery_charge']);
+
 respond_ok(['offer' => [
     'assignment_id' => (int) $row['assignment_id'],
     'order_id' => (int) $row['order_id'],
@@ -88,4 +101,9 @@ respond_ok(['offer' => [
     'item_count' => $itemCount,
     'expires_at' => $row['expires_at'],
     'expires_in_seconds' => $expiresInSeconds,
+    // Same shape as calculate_rider_earning()'s own return array, so a
+    // future screen can show the share_percent/floored detail too
+    // without a second endpoint — only estimated_earning is rendered
+    // by the dashboard today.
+    'estimated_earning' => $earningCalc['amount'],
 ]]);

@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Plan doc 127 §4 / 128 — cancel-retention flow. Tapping "Cancel Order"
+  on OrderStatusActivity now opens this sheet instead of cancelling
+  directly. Scope confirmed with the app owner this session: just the
+  two retention paths below (change address / still cancel with a
+  reason) — the earlier plan's edit-instructions/contact-restaurant/
+  contact-support options were explicitly left out of this v1.
+  Same drag-handle/title/close-icon shell as fragment_schedule_time.xml.
+-->
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/surface"
+    android:maxHeight="560dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="20dp">
+
+        <View
+            android:layout_width="40dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_chip_selected" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="14dp"
+            android:paddingBottom="4dp"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/cancel_sheet_title"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <ImageView
+                android:id="@+id/btnCloseCancelSheet"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_close"
+                app:tint="@color/text_secondary" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="16dp"
+            android:paddingBottom="14dp"
+            android:textSize="13sp"
+            android:textColor="@color/text_secondary"
+            android:text="@string/cancel_sheet_subtitle" />
+
+        <!-- Option 1: change delivery address. Row toggles addressListContainer
+             open/closed; that container is populated lazily (only fetches
+             getAddresses() the first time it's expanded), same "don't load
+             until asked for" idea as Track Live gating the map fetch. -->
+        <LinearLayout
+            android:id="@+id/changeAddressRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_card_rounded"
+            android:layout_marginHorizontal="16dp"
+            android:padding="14dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_location"
+                app:tint="@color/anydrop_primary" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="12dp"
+                android:text="@string/cancel_option_change_address"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <ImageView
+                android:id="@+id/changeAddressChevron"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:src="@drawable/ic_chevron_down"
+                app:tint="@color/text_secondary" />
+        </LinearLayout>
+
+        <!-- Populated at runtime with item_cancel_address_row.xml rows, one
+             per saved address other than the order's current one. Gone by
+             default — expands when changeAddressRow above is tapped. -->
+        <LinearLayout
+            android:id="@+id/addressListContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:visibility="gone" />
+
+        <ProgressBar
+            android:id="@+id/addressListLoading"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="8dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/addressListEmptyText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="8dp"
+            android:textSize="13sp"
+            android:textColor="@color/text_secondary"
+            android:text="@string/cancel_no_other_addresses"
+            android:visibility="gone" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="18dp"
+            android:layout_marginHorizontal="16dp"
+            android:background="@color/chip_border_unselected" />
+
+        <!-- Option 2: still cancel, now with a reason instead of the old
+             one-tap-and-it's-gone flow. -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:paddingHorizontal="16dp"
+            android:text="@string/cancel_reason_prompt"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/cancelReasonChipGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:paddingHorizontal="12dp"
+            app:singleSelection="true"
+            app:selectionRequired="false">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipReasonMistake"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/cancel_reason_mistake" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipReasonTooLong"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/cancel_reason_too_long" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipReasonBetterOption"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/cancel_reason_better_option" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipReasonOther"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/cancel_reason_other" />
+
+        </com.google.android.material.chip.ChipGroup>
+
+        <!-- Always-visible optional free-text, per app owner's choice of
+             "picker + optional free-text" — not gated behind picking
+             "Other" first, since a customer might want to add detail on
+             top of any of the picked reasons above. -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:layout_marginHorizontal="16dp"
+            android:hint="@string/cancel_reason_details_hint"
+            app:boxCornerRadiusTopStart="10dp"
+            app:boxCornerRadiusTopEnd="10dp"
+            app:boxCornerRadiusBottomStart="10dp"
+            app:boxCornerRadiusBottomEnd="10dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/cancelReasonDetailsInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minLines="2"
+                android:maxLines="4"
+                android:gravity="top|start"
+                android:inputType="textMultiLine|textCapSentences" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnConfirmCancel"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="18dp"
+            android:layout_marginHorizontal="16dp"
+            android:text="@string/cancel_confirm_button"
+            app:cornerRadius="12dp"
+            app:strokeColor="@color/anydrop_primary"
+            android:textColor="@color/anydrop_primary" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnKeepOrder"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginHorizontal="16dp"
+            android:text="@string/cancel_keep_order_button" />
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

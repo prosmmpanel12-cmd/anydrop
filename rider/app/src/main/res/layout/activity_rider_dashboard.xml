@@ -260,6 +260,16 @@
                 android:textSize="13sp"
                 tools:text="2.4 km \u2022 3 items \u2022 COD \u20b9420" />
 
+            <TextView
+                android:id="@+id/offerEarning"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="@color/anydrop_green"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                tools:text="You'll earn \u20b960" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

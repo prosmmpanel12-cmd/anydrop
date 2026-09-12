@@ -16,7 +16,7 @@
  * Expects, from the including page:
  *   $admin       — array from admin_require_login()
  *   $pageTitle   — string, shown in <title> and the topbar
- *   $activeNav   — one of 'dashboard' | 'approvals' | 'orders' | 'analytics' | 'support' | 'review_moderation' | 'customer_feedback' | 'areas' | 'cod_rules' | 'pricing_rules' | 'payment_restrictions' | 'categories' | 'banners' | 'roles' | 'commission_rules' | 'settlements' | 'rider_settlements' | 'rider_earnings' | 'cash_flow' | 'payment_gateways' | 'email_providers' | 'payment_pending' | 'refunds' | 'wallet_withdrawals' | 'reconciliation' | 'offers' | 'broadcast' | 'app_settings_customer' | 'app_settings_restaurant' | 'app_settings_rider' | 'fcm_settings' | 'directions_settings' | 'route_recalc_settings' | 'otp_settings' | 'riders' | 'rider_map' | 'rider_payouts' | 'rider_cod_limits'
+ *   $activeNav   — one of 'dashboard' | 'approvals' | 'orders' | 'analytics' | 'support' | 'review_moderation' | 'customer_feedback' | 'areas' | 'cod_rules' | 'pricing_rules' | 'payment_restrictions' | 'categories' | 'banners' | 'roles' | 'commission_rules' | 'settlements' | 'rider_settlements' | 'rider_earnings' | 'cash_flow' | 'payment_gateways' | 'email_providers' | 'payment_pending' | 'refunds' | 'wallet_withdrawals' | 'reconciliation' | 'offers' | 'broadcast' | 'app_settings_customer' | 'app_settings_restaurant' | 'app_settings_rider' | 'fcm_settings' | 'directions_settings' | 'route_recalc_settings' | 'otp_settings' | 'all_settings' | 'riders' | 'rider_map' | 'rider_payouts' | 'rider_cod_limits'
  *   $flash       — string|null, shown once as a toast (not a static banner)
  *   $flashType   — 'success' | 'error'
  */
@@ -277,6 +277,16 @@ $navItems = [
         'key' => 'otp_settings', 'href' => 'otp-settings.php', 'label' => 'OTP Settings',
         'perm' => 'settings_manage', 'group' => 'settings',
         'icon' => '<path d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5zm-3 8V6a3 3 0 0 1 6 0v3z"/>',
+    ],
+    [
+        // 2026-09-12 app-owner ask: every setting the app has a
+        // code-level default for should be visible/checkable in one
+        // place, not just whichever topic-specific page happens to
+        // manage it (or nowhere at all, if no page owns it yet — see
+        // migration 85). This lists every app_settings row directly.
+        'key' => 'all_settings', 'href' => 'all-settings.php', 'label' => 'All Settings (Full List)',
+        'perm' => 'settings_manage', 'group' => 'settings',
+        'icon' => '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/>',
     ],
     [
         'key' => 'broadcast', 'href' => 'broadcast.php', 'label' => 'Push Notifications',

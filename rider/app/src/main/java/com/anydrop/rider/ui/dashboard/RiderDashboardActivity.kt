@@ -610,6 +610,20 @@ class RiderDashboardActivity : AppCompatActivity() {
         val paymentPart = if (offer.paymentMethod == "cod") "COD ₹${offer.grandTotal.toInt()}" else "Paid"
         binding.offerDetails.text = "$distancePart${offer.itemCount} items • $paymentPart"
 
+        // App-owner ask, 2026-09-11 — rider sees the exact payout for
+        // this delivery before deciding to accept. Hidden (not "₹0")
+        // on the defensive-null case so an old cached response shape
+        // never shows a misleading zero.
+        if (offer.estimatedEarning != null) {
+            binding.offerEarning.visibility = View.VISIBLE
+            binding.offerEarning.text = getString(
+                R.string.dashboard_offer_earning_format,
+                offer.estimatedEarning.toInt().toString()
+            )
+        } else {
+            binding.offerEarning.visibility = View.GONE
+        }
+
         offerCountdownRunnable?.let { offerCountdown.removeCallbacks(it) }
         var remaining = offer.expiresInSeconds
         val runnable = object : Runnable {

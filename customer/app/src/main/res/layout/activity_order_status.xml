@@ -89,11 +89,49 @@
             android:textColor="@color/text_secondary" />
     </LinearLayout>
 
+    <!-- Track Live (2026-09-11, plan doc 127 §5) — shown instead of the
+         map itself once rider position data is available but the user
+         hasn't tapped in yet. Occupies the same slot the map used to
+         auto-fill; tapping the button sets mapUserRequested = true and
+         reveals trackingMapView below. Gone by default, same convention
+         as riderCard/otpCard. -->
+    <LinearLayout
+        android:id="@+id/trackLiveCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="14dp"
+        android:background="@drawable/bg_card_rounded"
+        android:padding="14dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/trackLiveMessageText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/track_live_message"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnTrackLive"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginStart="10dp"
+            android:text="@string/btn_track_live"
+            android:textSize="13sp"
+            app:cornerRadius="10dp" />
+    </LinearLayout>
+
     <!-- Phase 3 R5 follow-up (deep-plan §14-15) — live tracking map.
          Fixed height (not wrap_content — MapView needs an explicit
-         size) and gone by default; shown only while there's an active
-         rider position to plot (see shouldShowMap() in the Activity).
-         This screen has no ScrollView anywhere, same as before this
+         size) and gone by default; shown only once the rider position
+         is available AND the user has tapped "Track Live" above (see
+         shouldShowMap()/mapUserRequested in the Activity — plan doc 127
+         §5). This screen has no ScrollView anywhere, same as before this
          change — on a short screen with riderCard + this map + otpCard
          + refundCard all visible at once, content could in principle
          run past the visible area since nothing here scrolls. That

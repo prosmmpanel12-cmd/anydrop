@@ -21,12 +21,13 @@
  *   "date": "2026-09-09",
  *   "summary": {
  *     "total_orders": N, "total_amount": X,
- *     "settled_amount": Y, "pending_amount": Z
+ *     "settled_amount": Y, "pending_amount": Z,
+ *     "total_commission": C, "total_net_payable": X-C
  *   },
  *   "orders": [
  *     { "order_id", "order_code", "created_at", "status", "grand_total",
- *       "payment_method", "commission_amount", "settlement_status",
- *       "settlement_eligible_at" }, ...
+ *       "payment_method", "commission_amount", "net_payable",
+ *       "settlement_status", "settlement_eligible_at" }, ...
  *   ]
  * }
  */
@@ -74,6 +75,13 @@ $totalOrders = count($orders);
 $totalAmount = 0.0;
 $settledAmount = 0.0;
 $pendingAmount = 0.0;
+// App-owner ask, 2026-09-11 — restaurant needs to see, at a glance,
+// how much came in, how much commission was taken, and how much they
+// actually get. commission_amount already existed per-order on this
+// endpoint; net_payable (= grand_total - commission_amount) is the
+// missing piece, both per-order and as a daily total.
+$totalCommission = 0.0;
+$totalNetPayable = 0.0;
 
 foreach ($orders as $o) {
     // Only count revenue from orders that actually completed — mirrors
@@ -85,7 +93,10 @@ foreach ($orders as $o) {
         continue;
     }
     $amount = (float) $o['grand_total'];
+    $commission = (float) $o['commission_amount'];
     $totalAmount += $amount;
+    $totalCommission += $commission;
+    $totalNetPayable += ($amount - $commission);
     if ($o['settlement_status'] === 'settled') {
         $settledAmount += $amount;
     } else {
@@ -102,16 +113,28 @@ respond_ok([
         'total_amount' => round($totalAmount, 2),
         'settled_amount' => round($settledAmount, 2),
         'pending_amount' => round($pendingAmount, 2),
+        'total_commission' => round($totalCommission, 2),
+        'total_net_payable' => round($totalNetPayable, 2),
     ],
     'orders' => array_map(static function (array $o): array {
+        $grandTotal = (float) $o['grand_total'];
+        $commission = (float) $o['commission_amount'];
         return [
             'order_id' => (int) $o['order_id'],
             'order_code' => $o['order_code'],
             'created_at' => $o['created_at'],
             'status' => $o['status'],
-            'grand_total' => (float) $o['grand_total'],
+            'grand_total' => $grandTotal,
             'payment_method' => $o['payment_method'],
-            'commission_amount' => (float) $o['commission_amount'],
+            'commission_amount' => $commission,
+            // Per-order "what you actually get for this one" — same
+            // grand_total - commission_amount math as the summary total
+            // above, just not pre-summed. Not gated on delivered/
+            // settlement status — it's a plain arithmetic fact about the
+            // order regardless of where it is in the settlement pipeline
+            // (an in-progress or not-yet-settled order still has a
+            // well-defined net payable, it just hasn't been paid out yet).
+            'net_payable' => round($grandTotal - $commission, 2),
             'settlement_status' => $o['settlement_status'],
             'settlement_eligible_at' => $o['settlement_eligible_at'],
         ];

@@ -13,12 +13,13 @@
  * is deliberately NOT part of this file yet — rate model wasn't decided
  * as of 2026-08-27. This is cash-collected tracking only.
  *
- * NOT YET WIRED to a live trigger: same blocker as
- * record_cod_order_ledger_entry() in lib/ledger.php — no 'delivered'
- * status transition exists anywhere yet (no rider-facing API namespace
- * built). Call record_rider_cod_collected() from that transition's own
- * transaction once it exists. Everything below is ready to use as soon
- * as that call site appears.
+ * NOW WIRED to a live trigger (updated 2026-09-10 — this note was
+ * stale): record_rider_cod_collected() fires from the real 'delivered'
+ * status transition, alongside record_cod_order_ledger_entry() in
+ * lib/ledger.php — see api/v1/rider/orders-deliver.php (rider-facing
+ * delivery-confirmation flow) and admin/orders.php's own "mark
+ * delivered" action, both of which call it inside the same transaction
+ * as the status flip.
  */
 
 require_once __DIR__ . '/../config/database.php';
@@ -73,12 +74,13 @@ if (!function_exists('write_rider_cod_ledger_entry')) {
 
 if (!function_exists('record_rider_cod_collected')) {
     /**
-     * NOT YET CALLED ANYWHERE — see file kdoc. Fire this once a COD
-     * order's rider-facing "delivered, cash in hand" transition exists.
-     * Writing this at order creation would be wrong for the same reason
-     * record_cod_order_ledger_entry() in lib/ledger.php flags: a placed
-     * COD order can still be rejected/cancelled before cash ever changes
-     * hands.
+     * Fires from the real COD order 'delivered' transition — see
+     * api/v1/rider/orders-deliver.php and admin/orders.php's "mark
+     * delivered" action, both calling this inside the same transaction
+     * as the status flip. Writing this at order creation would be wrong
+     * for the same reason record_cod_order_ledger_entry() in
+     * lib/ledger.php flags: a placed COD order can still be
+     * rejected/cancelled before cash ever changes hands.
      */
     function record_rider_cod_collected(PDO $db, array $order): void
     {

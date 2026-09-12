@@ -96,6 +96,7 @@
     <string name="btn_reject">Reject</string>
     <string name="dashboard_offer_expired">This delivery was already taken</string>
     <string name="dashboard_offer_accepted">Order accepted \u2713</string>
+    <string name="dashboard_offer_earning_format">You\'ll earn \u20b9%1$s</string>
     <string name="status_rider_assigned">RIDER ASSIGNED</string>
     <string name="status_picked_up">PICKED UP</string>
     <string name="status_out_for_delivery">OUT FOR DELIVERY</string>
